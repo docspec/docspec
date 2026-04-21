@@ -41,8 +41,8 @@ Events never carry errors or warnings. If a reader cannot continue, it returns `
 
 ```rust
 trait AssetProvider: Send + Sync {
-    fn content_type(&self, asset_ref: &str) -> Option<Cow<'_, str>>;
-    fn stream_to(&self, asset_ref: &str, writer: &mut dyn Write) -> Option<io::Result<u64>>;
+    fn content_type(&self, asset_id: &str) -> Option<Cow<'_, str>>;
+    fn stream_to(&self, asset_id: &str, writer: &mut dyn Write) -> Option<io::Result<u64>>;
 }
 ```
 

@@ -1,0 +1,10 @@
+[package]
+name = "docspec-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core event types and traits for DocSpec streaming document conversion"
+
+[lints]
+workspace = true
