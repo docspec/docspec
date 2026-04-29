@@ -8,16 +8,30 @@ Thank you for considering a contribution. DocSpec is a memory-conscious streamin
 
 - Rust stable toolchain (latest stable version)
 - Git with your user name and email configured
-- pre-commit for running pre-commit hooks
+- [pre-commit](https://pre-commit.com/) for running pre-commit hooks
+- [taplo](https://taplo.tamasfe.dev/) for TOML formatting (`cargo install taplo-cli`)
+- [typos](https://github.com/crate-ci/typos) for spell checking (`cargo install typos-cli`)
 
 Clone the repository:
 ```bash
 git clone https://github.com/docspec/docspec.git
 cd docspec
-pre-commit install
+pre-commit install --hook-type pre-commit
+pre-commit install --hook-type commit-msg
+pre-commit install --hook-type pre-push
 ```
 
-The pre-commit hooks enforce conventional commit format and code style. Before diving into code, read the [Manifesto](MANIFESTO.md) to understand our philosophy: memory efficiency, streaming design, and strict quality above convenience.
+The pre-commit hooks enforce formatting, linting, spell checking, and conventional commit message format; the pre-push hooks verify the full build, test suite, and documentation. Before diving into code, read the [Manifesto](MANIFESTO.md) to understand our philosophy: memory efficiency, streaming design, and strict quality above convenience.
+
+The pre-commit stage (runs on every commit) enforces formatting, linting, and hygiene checks. The pre-push stage (runs before push) runs the full build, test suite, and documentation build.
+
+### Hook Bypass Policy
+
+Use `git commit --no-verify` or `git push --no-verify` only when:
+- Fixing a broken hook configuration (the hook itself is the problem)
+- Work-in-progress commits on a personal branch that will be squashed before PR
+
+Never bypass hooks on commits intended for pull request review. CI will catch what hooks miss, but hooks exist to give you fast local feedback.
 
 ## Branching Strategy
 

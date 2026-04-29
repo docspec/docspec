@@ -3,14 +3,14 @@
 /// Text alignment options for paragraphs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TextAlignment {
-    /// Left-aligned text.
-    Left,
     /// Center-aligned text.
     Center,
-    /// Right-aligned text.
-    Right,
     /// Justified text.
     Justify,
+    /// Left-aligned text.
+    Left,
+    /// Right-aligned text.
+    Right,
 }
 
 /// Whether a list is ordered (numbered) or unordered (bulleted).
@@ -27,22 +27,22 @@ pub enum ListType {
 /// Writers ignore mismatched styles (e.g., Disc on an ordered list).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ListStyleType {
-    /// Decimal numbering (1, 2, 3, ...).
-    Decimal,
-    /// Lowercase alphabetic (a, b, c, ...).
-    LowerAlpha,
-    /// Uppercase alphabetic (A, B, C, ...).
-    UpperAlpha,
-    /// Lowercase Roman numerals (i, ii, iii, ...).
-    LowerRoman,
-    /// Uppercase Roman numerals (I, II, III, ...).
-    UpperRoman,
-    /// Filled circle bullet.
-    Disc,
     /// Hollow circle bullet.
     Circle,
+    /// Decimal numbering (1, 2, 3, ...).
+    Decimal,
+    /// Filled circle bullet.
+    Disc,
+    /// Lowercase alphabetic (a, b, c, ...).
+    LowerAlpha,
+    /// Lowercase Roman numerals (i, ii, iii, ...).
+    LowerRoman,
     /// Square bullet.
     Square,
+    /// Uppercase alphabetic (A, B, C, ...).
+    UpperAlpha,
+    /// Uppercase Roman numerals (I, II, III, ...).
+    UpperRoman,
 }
 
 /// Scope of a table header cell.
@@ -61,12 +61,12 @@ pub enum TableHeaderScope {
 pub enum Color {
     /// RGB color with red, green, and blue components (0-255).
     Rgb {
-        /// Red component (0-255).
-        r: u8,
-        /// Green component (0-255).
-        g: u8,
         /// Blue component (0-255).
         b: u8,
+        /// Green component (0-255).
+        g: u8,
+        /// Red component (0-255).
+        r: u8,
     },
 }
 
@@ -85,24 +85,24 @@ pub enum ImageSource {
     },
 }
 
+/// An author with a name and optional email address.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Author {
+    /// Author's email address, if provided.
+    pub email: Option<String>,
+    /// Author's display name.
+    pub name: String,
+}
+
 /// Metadata attached to the document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentMeta {
-    /// Document title, if present.
-    pub title: Option<String>,
     /// Document authors, if present.
     pub authors: Option<Vec<Author>>,
     /// Short description or abstract, if present.
     pub description: Option<String>,
-}
-
-/// An author with a name and optional email address.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Author {
-    /// Author's display name.
-    pub name: String,
-    /// Author's email address, if provided.
-    pub email: Option<String>,
+    /// Document title, if present.
+    pub title: Option<String>,
 }
 
 #[cfg(test)]
@@ -110,131 +110,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_text_alignment_clone() {
-        let alignment = TextAlignment::Center;
-        let cloned = alignment.clone();
-        assert_eq!(alignment, cloned);
-    }
-
-    #[test]
-    fn test_text_alignment_variants() {
-        assert_eq!(TextAlignment::Left, TextAlignment::Left);
-        assert_ne!(TextAlignment::Left, TextAlignment::Right);
-        assert_eq!(TextAlignment::Justify, TextAlignment::Justify);
-    }
-
-    #[test]
-    fn test_list_type_clone() {
-        let list_type = ListType::Ordered;
-        let cloned = list_type.clone();
-        assert_eq!(list_type, cloned);
-    }
-
-    #[test]
-    fn test_list_type_variants() {
-        assert_eq!(ListType::Ordered, ListType::Ordered);
-        assert_ne!(ListType::Ordered, ListType::Unordered);
-    }
-
-    #[test]
-    fn test_list_style_type_clone() {
-        let style = ListStyleType::Decimal;
-        let cloned = style.clone();
-        assert_eq!(style, cloned);
-    }
-
-    #[test]
-    fn test_list_style_type_variants() {
-        assert_eq!(ListStyleType::Decimal, ListStyleType::Decimal);
-        assert_ne!(ListStyleType::Decimal, ListStyleType::LowerAlpha);
-        assert_eq!(ListStyleType::Disc, ListStyleType::Disc);
-        assert_ne!(ListStyleType::Disc, ListStyleType::Circle);
-    }
-
-    #[test]
-    fn test_table_header_scope_clone() {
-        let scope = TableHeaderScope::Column;
-        let cloned = scope.clone();
-        assert_eq!(scope, cloned);
-    }
-
-    #[test]
-    fn test_table_header_scope_variants() {
-        assert_eq!(TableHeaderScope::Column, TableHeaderScope::Column);
-        assert_ne!(TableHeaderScope::Column, TableHeaderScope::Row);
-    }
-
-    #[test]
-    fn test_color_clone() {
-        let color = Color::Rgb {
-            r: 255,
-            g: 128,
-            b: 0,
-        };
-        let cloned = color.clone();
-        assert_eq!(color, cloned);
-    }
-
-    #[test]
-    fn test_color_equality() {
-        let color1 = Color::Rgb { r: 255, g: 0, b: 0 };
-        let color2 = Color::Rgb { r: 255, g: 0, b: 0 };
-        let color3 = Color::Rgb { r: 0, g: 255, b: 0 };
-        assert_eq!(color1, color2);
-        assert_ne!(color1, color3);
-    }
-
-    #[test]
-    fn test_image_source_asset_clone() {
-        let source = ImageSource::Asset {
-            asset_id: "img_001".to_string(),
-        };
-        let cloned = source.clone();
-        assert_eq!(source, cloned);
-    }
-
-    #[test]
-    fn test_image_source_uri_clone() {
-        let source = ImageSource::Uri {
-            uri: "https://example.com/image.png".to_string(),
-        };
-        let cloned = source.clone();
-        assert_eq!(source, cloned);
-    }
-
-    #[test]
-    fn test_image_source_variants() {
-        let asset = ImageSource::Asset {
-            asset_id: "id1".to_string(),
-        };
-        let uri = ImageSource::Uri {
-            uri: "http://example.com".to_string(),
-        };
-        assert_ne!(asset, uri);
-    }
-
-    #[test]
-    fn test_author_constructor() {
-        let author = Author {
-            name: "John Doe".to_string(),
-            email: Some("john@example.com".to_string()),
-        };
-        assert_eq!(author.name, "John Doe");
-        assert_eq!(author.email, Some("john@example.com".to_string()));
-    }
-
-    #[test]
-    fn test_author_without_email() {
-        let author = Author {
-            name: "Jane Smith".to_string(),
-            email: None,
-        };
-        assert_eq!(author.name, "Jane Smith");
-        assert_eq!(author.email, None);
-    }
-
-    #[test]
-    fn test_author_clone() {
+    fn author_clone() {
         let author = Author {
             name: "Alice".to_string(),
             email: Some("alice@example.com".to_string()),
@@ -244,7 +120,17 @@ mod tests {
     }
 
     #[test]
-    fn test_author_equality() {
+    fn author_constructor() {
+        let author = Author {
+            name: "John Doe".to_string(),
+            email: Some("john@example.com".to_string()),
+        };
+        assert_eq!(author.name, "John Doe");
+        assert_eq!(author.email, Some("john@example.com".to_string()));
+    }
+
+    #[test]
+    fn author_equality() {
         let author1 = Author {
             name: "Bob".to_string(),
             email: Some("bob@example.com".to_string()),
@@ -262,7 +148,51 @@ mod tests {
     }
 
     #[test]
-    fn test_document_meta_constructor() {
+    fn author_without_email() {
+        let author = Author {
+            name: "Jane Smith".to_string(),
+            email: None,
+        };
+        assert_eq!(author.name, "Jane Smith");
+        assert_eq!(author.email, None);
+    }
+
+    #[test]
+    fn color_clone() {
+        let color = Color::Rgb {
+            r: 255,
+            g: 128,
+            b: 0,
+        };
+        let cloned = color.clone();
+        assert_eq!(color, cloned);
+    }
+
+    #[test]
+    fn color_equality() {
+        let color1 = Color::Rgb { r: 255, g: 0, b: 0 };
+        let color2 = Color::Rgb { r: 255, g: 0, b: 0 };
+        let color3 = Color::Rgb { r: 0, g: 255, b: 0 };
+        assert_eq!(color1, color2);
+        assert_ne!(color1, color3);
+    }
+
+    #[test]
+    fn document_meta_clone() {
+        let meta = DocumentMeta {
+            title: Some("Test".to_string()),
+            authors: Some(vec![Author {
+                name: "Test Author".to_string(),
+                email: None,
+            }]),
+            description: Some("Test Description".to_string()),
+        };
+        let cloned = meta.clone();
+        assert_eq!(meta, cloned);
+    }
+
+    #[test]
+    fn document_meta_constructor() {
         let meta = DocumentMeta {
             title: Some("My Document".to_string()),
             authors: Some(vec![Author {
@@ -277,7 +207,7 @@ mod tests {
     }
 
     #[test]
-    fn test_document_meta_empty() {
+    fn document_meta_empty() {
         let meta = DocumentMeta {
             title: None,
             authors: None,
@@ -289,21 +219,7 @@ mod tests {
     }
 
     #[test]
-    fn test_document_meta_clone() {
-        let meta = DocumentMeta {
-            title: Some("Test".to_string()),
-            authors: Some(vec![Author {
-                name: "Test Author".to_string(),
-                email: None,
-            }]),
-            description: Some("Test Description".to_string()),
-        };
-        let cloned = meta.clone();
-        assert_eq!(meta, cloned);
-    }
-
-    #[test]
-    fn test_document_meta_equality() {
+    fn document_meta_equality() {
         let meta1 = DocumentMeta {
             title: Some("Title".to_string()),
             authors: None,
@@ -321,5 +237,89 @@ mod tests {
         };
         assert_eq!(meta1, meta2);
         assert_ne!(meta1, meta3);
+    }
+
+    #[test]
+    fn image_source_asset_clone() {
+        let source = ImageSource::Asset {
+            asset_id: "img_001".to_string(),
+        };
+        let cloned = source.clone();
+        assert_eq!(source, cloned);
+    }
+
+    #[test]
+    fn image_source_uri_clone() {
+        let source = ImageSource::Uri {
+            uri: "https://example.com/image.png".to_string(),
+        };
+        let cloned = source.clone();
+        assert_eq!(source, cloned);
+    }
+
+    #[test]
+    fn image_source_variants() {
+        let asset = ImageSource::Asset {
+            asset_id: "id1".to_string(),
+        };
+        let uri = ImageSource::Uri {
+            uri: "http://example.com".to_string(),
+        };
+        assert_ne!(asset, uri);
+    }
+
+    #[test]
+    fn list_style_type_clone() {
+        let style = ListStyleType::Decimal;
+        let cloned = style.clone();
+        assert_eq!(style, cloned);
+    }
+
+    #[test]
+    fn list_style_type_variants() {
+        assert_eq!(ListStyleType::Decimal, ListStyleType::Decimal);
+        assert_ne!(ListStyleType::Decimal, ListStyleType::LowerAlpha);
+        assert_eq!(ListStyleType::Disc, ListStyleType::Disc);
+        assert_ne!(ListStyleType::Disc, ListStyleType::Circle);
+    }
+
+    #[test]
+    fn list_type_clone() {
+        let list_type = ListType::Ordered;
+        let cloned = list_type.clone();
+        assert_eq!(list_type, cloned);
+    }
+
+    #[test]
+    fn list_type_variants() {
+        assert_eq!(ListType::Ordered, ListType::Ordered);
+        assert_ne!(ListType::Ordered, ListType::Unordered);
+    }
+
+    #[test]
+    fn table_header_scope_clone() {
+        let scope = TableHeaderScope::Column;
+        let cloned = scope.clone();
+        assert_eq!(scope, cloned);
+    }
+
+    #[test]
+    fn table_header_scope_variants() {
+        assert_eq!(TableHeaderScope::Column, TableHeaderScope::Column);
+        assert_ne!(TableHeaderScope::Column, TableHeaderScope::Row);
+    }
+
+    #[test]
+    fn text_alignment_clone() {
+        let alignment = TextAlignment::Center;
+        let cloned = alignment.clone();
+        assert_eq!(alignment, cloned);
+    }
+
+    #[test]
+    fn text_alignment_variants() {
+        assert_eq!(TextAlignment::Left, TextAlignment::Left);
+        assert_ne!(TextAlignment::Left, TextAlignment::Right);
+        assert_eq!(TextAlignment::Justify, TextAlignment::Justify);
     }
 }

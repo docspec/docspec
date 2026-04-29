@@ -15,9 +15,90 @@
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
-    // ========================================================================
-    // Document structure (12 variants)
-    // ========================================================================
+    /// End a block quote.
+    EndBlockQuote,
+
+    /// End a table caption.
+    EndCaption,
+
+    /// End a definition detail.
+    EndDefinitionDetail,
+
+    /// End a definition list.
+    EndDefinitionList,
+
+    /// End a definition term.
+    EndDefinitionTerm,
+
+    /// End a document.
+    EndDocument,
+
+    /// End a footnote definition.
+    EndFootnote,
+
+    /// End a heading.
+    EndHeading,
+
+    /// End a hyperlink.
+    EndLink,
+
+    /// End a list item.
+    EndListItem,
+
+    /// End a paragraph.
+    EndParagraph,
+
+    /// End a preformatted block.
+    EndPreformatted,
+
+    /// End a table.
+    EndTable,
+
+    /// End a table data cell.
+    EndTableCell,
+
+    /// End a table header cell.
+    EndTableHeader,
+
+    /// End a table row.
+    EndTableRow,
+
+    /// A reference to a footnote.
+    FootnoteRef {
+        /// The footnote identifier being referenced.
+        id: u32,
+    },
+
+    /// An image reference.
+    Image {
+        /// Alternative text for accessibility.
+        alt: Option<String>,
+        /// Whether the image is purely decorative (no alt text needed).
+        decorative: bool,
+        /// Source of the image (embedded asset or external URI).
+        source: crate::ImageSource,
+        /// Optional tooltip text.
+        title: Option<String>,
+    },
+
+    /// A hard line break within a paragraph.
+    LineBreak,
+
+    /// Begin a block quote.
+    StartBlockQuote,
+
+    /// Begin a table caption.
+    StartCaption,
+
+    /// Begin a definition detail (description).
+    StartDefinitionDetail,
+
+    /// Begin a definition list.
+    StartDefinitionList,
+
+    /// Begin a definition term.
+    StartDefinitionTerm,
+
     /// Begin a document with optional language and metadata.
     StartDocument {
         /// BCP 47 language tag (e.g., "en", "en-US", "zh-Hans").
@@ -26,8 +107,11 @@ pub enum Event {
         metadata: Option<crate::DocumentMeta>,
     },
 
-    /// End a document.
-    EndDocument,
+    /// Begin a footnote definition.
+    StartFootnote {
+        /// Unique identifier for this footnote.
+        id: u32,
+    },
 
     /// Begin a heading of the given level.
     StartHeading {
@@ -35,45 +119,14 @@ pub enum Event {
         level: u8,
     },
 
-    /// End a heading.
-    EndHeading,
-
-    /// Begin a paragraph with optional alignment.
-    StartParagraph {
-        /// Text alignment for the paragraph.
-        alignment: Option<crate::TextAlignment>,
+    /// Begin a hyperlink.
+    StartLink {
+        /// URL or URI target of the link.
+        href: String,
+        /// Optional tooltip text.
+        title: Option<String>,
     },
 
-    /// End a paragraph.
-    EndParagraph,
-
-    /// Begin a block quote.
-    StartBlockQuote,
-
-    /// End a block quote.
-    EndBlockQuote,
-
-    /// Begin a preformatted (code) block with optional syntax highlighting.
-    StartPreformatted {
-        /// Language identifier for syntax highlighting (e.g., "rust", "python").
-        syntax: Option<String>,
-    },
-
-    /// End a preformatted block.
-    EndPreformatted,
-
-    /// Begin a footnote definition.
-    StartFootnote {
-        /// Unique identifier for this footnote.
-        id: u32,
-    },
-
-    /// End a footnote definition.
-    EndFootnote,
-
-    // ========================================================================
-    // Lists (2 variants)
-    // ========================================================================
     /// Begin a list item.
     StartListItem {
         /// Nesting level (1 = top-level).
@@ -86,44 +139,20 @@ pub enum Event {
         style_type: Option<crate::ListStyleType>,
     },
 
-    /// End a list item.
-    EndListItem,
-
-    // ========================================================================
-    // Tables (10 variants)
-    // ========================================================================
-    /// Begin a table.
-    StartTable,
-
-    /// End a table.
-    EndTable,
-
-    /// Begin a table caption.
-    StartCaption,
-
-    /// End a table caption.
-    EndCaption,
-
-    /// Begin a table row.
-    StartTableRow,
-
-    /// End a table row.
-    EndTableRow,
-
-    /// Begin a table header cell.
-    StartTableHeader {
-        /// Whether this header applies to a column or row.
-        scope: Option<crate::TableHeaderScope>,
-        /// Abbreviated content for accessibility.
-        abbr: Option<String>,
-        /// Number of columns this cell spans.
-        colspan: Option<u32>,
-        /// Number of rows this cell spans.
-        rowspan: Option<u32>,
+    /// Begin a paragraph with optional alignment.
+    StartParagraph {
+        /// Text alignment for the paragraph.
+        alignment: Option<crate::TextAlignment>,
     },
 
-    /// End a table header cell.
-    EndTableHeader,
+    /// Begin a preformatted (code) block with optional syntax highlighting.
+    StartPreformatted {
+        /// Language identifier for syntax highlighting (e.g., "rust", "python").
+        syntax: Option<String>,
+    },
+
+    /// Begin a table.
+    StartTable,
 
     /// Begin a table data cell.
     StartTableCell {
@@ -133,95 +162,45 @@ pub enum Event {
         rowspan: Option<u32>,
     },
 
-    /// End a table data cell.
-    EndTableCell,
-
-    // ========================================================================
-    // Definition lists (6 variants)
-    // ========================================================================
-    /// Begin a definition list.
-    StartDefinitionList,
-
-    /// End a definition list.
-    EndDefinitionList,
-
-    /// Begin a definition term.
-    StartDefinitionTerm,
-
-    /// End a definition term.
-    EndDefinitionTerm,
-
-    /// Begin a definition detail (description).
-    StartDefinitionDetail,
-
-    /// End a definition detail.
-    EndDefinitionDetail,
-
-    // ========================================================================
-    // Inline containers (2 variants)
-    // ========================================================================
-    /// Begin a hyperlink.
-    StartLink {
-        /// URL or URI target of the link.
-        href: String,
-        /// Optional tooltip text.
-        title: Option<String>,
+    /// Begin a table header cell.
+    StartTableHeader {
+        /// Abbreviated content for accessibility.
+        abbr: Option<String>,
+        /// Number of columns this cell spans.
+        colspan: Option<u32>,
+        /// Number of rows this cell spans.
+        rowspan: Option<u32>,
+        /// Whether this header applies to a column or row.
+        scope: Option<crate::TableHeaderScope>,
     },
 
-    /// End a hyperlink.
-    EndLink,
+    /// Begin a table row.
+    StartTableRow,
 
-    // ========================================================================
-    // Block self-contained (1 variant)
-    // ========================================================================
-    /// A horizontal rule / thematic break.
-    ThematicBreak,
-
-    // ========================================================================
-    // Inline self-contained (4 variants)
-    // ========================================================================
     /// A text run with formatting attributes.
     Text {
-        /// The text content.
-        content: String,
         /// Bold formatting.
         bold: bool,
-        /// Italic formatting.
-        italic: bool,
         /// Monospace/code formatting.
         code: bool,
+        /// The text content.
+        content: String,
+        /// Italic formatting.
+        italic: bool,
+        /// Highlight/mark color.
+        mark: Option<crate::Color>,
         /// Strikethrough formatting.
         strikethrough: bool,
-        /// Underline formatting.
-        underline: bool,
         /// Subscript formatting.
         subscript: bool,
         /// Superscript formatting.
         superscript: bool,
-        /// Highlight/mark color.
-        mark: Option<crate::Color>,
+        /// Underline formatting.
+        underline: bool,
     },
 
-    /// An image reference.
-    Image {
-        /// Source of the image (embedded asset or external URI).
-        source: crate::ImageSource,
-        /// Alternative text for accessibility.
-        alt: Option<String>,
-        /// Optional tooltip text.
-        title: Option<String>,
-        /// Whether the image is purely decorative (no alt text needed).
-        decorative: bool,
-    },
-
-    /// A reference to a footnote.
-    FootnoteRef {
-        /// The footnote identifier being referenced.
-        id: u32,
-    },
-
-    /// A hard line break within a paragraph.
-    LineBreak,
+    /// A horizontal rule / thematic break.
+    ThematicBreak,
 }
 
 #[cfg(test)]
@@ -232,12 +211,236 @@ mod tests {
         TextAlignment,
     };
 
-    // ========================================================================
-    // Document structure tests
-    // ========================================================================
+    #[test]
+    fn end_block_quote() {
+        let event = Event::EndBlockQuote;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
 
     #[test]
-    fn test_start_document_minimal() {
+    fn end_caption() {
+        let event = Event::EndCaption;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn end_definition_detail() {
+        let event = Event::EndDefinitionDetail;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn end_definition_list() {
+        let event = Event::EndDefinitionList;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn end_definition_term() {
+        let event = Event::EndDefinitionTerm;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn end_document() {
+        let event = Event::EndDocument;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn end_footnote() {
+        let event = Event::EndFootnote;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn end_heading() {
+        let event = Event::EndHeading;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn end_link() {
+        let event = Event::EndLink;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn end_list_item() {
+        let event = Event::EndListItem;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn end_paragraph() {
+        let event = Event::EndParagraph;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn end_preformatted() {
+        let event = Event::EndPreformatted;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn end_table() {
+        let event = Event::EndTable;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn end_table_cell() {
+        let event = Event::EndTableCell;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn end_table_header() {
+        let event = Event::EndTableHeader;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn end_table_row() {
+        let event = Event::EndTableRow;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn footnote_ref() {
+        let event = Event::FootnoteRef { id: 42 };
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+        assert_eq!(event, Event::FootnoteRef { id: 42 });
+    }
+
+    #[test]
+    fn image_asset() {
+        let event = Event::Image {
+            source: ImageSource::Asset {
+                asset_id: "img_001".to_string(),
+            },
+            alt: Some("A picture".to_string()),
+            title: Some("Image Title".to_string()),
+            decorative: false,
+        };
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn image_uri() {
+        let event = Event::Image {
+            source: ImageSource::Uri {
+                uri: "https://example.com/image.png".to_string(),
+            },
+            alt: None,
+            title: None,
+            decorative: true,
+        };
+        assert_eq!(
+            event,
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/image.png".to_string(),
+                },
+                alt: None,
+                title: None,
+                decorative: true,
+            }
+        );
+    }
+
+    #[test]
+    fn line_break() {
+        let event = Event::LineBreak;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn partial_eq_different_fields() {
+        let event1 = Event::StartHeading { level: 1 };
+        let event2 = Event::StartHeading { level: 2 };
+        assert_ne!(event1, event2);
+    }
+
+    #[test]
+    fn partial_eq_different_variants() {
+        let event1 = Event::StartHeading { level: 1 };
+        let event2 = Event::EndHeading;
+        assert_ne!(event1, event2);
+    }
+
+    #[test]
+    fn partial_eq_same_variant() {
+        let event1 = Event::StartHeading { level: 2 };
+        let event2 = Event::StartHeading { level: 2 };
+        assert_eq!(event1, event2);
+    }
+
+    #[test]
+    fn partial_eq_unit_variants() {
+        assert_eq!(Event::EndDocument, Event::EndDocument);
+        assert_eq!(Event::ThematicBreak, Event::ThematicBreak);
+        assert_eq!(Event::LineBreak, Event::LineBreak);
+        assert_ne!(Event::EndDocument, Event::ThematicBreak);
+    }
+
+    #[test]
+    fn start_block_quote() {
+        let event = Event::StartBlockQuote;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_caption() {
+        let event = Event::StartCaption;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_definition_detail() {
+        let event = Event::StartDefinitionDetail;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_definition_list() {
+        let event = Event::StartDefinitionList;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_definition_term() {
+        let event = Event::StartDefinitionTerm;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_document_minimal() {
         let event = Event::StartDocument {
             language: None,
             metadata: None,
@@ -247,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    fn test_start_document_with_language() {
+    fn start_document_with_language() {
         let event = Event::StartDocument {
             language: Some("en-US".to_string()),
             metadata: None,
@@ -262,7 +465,7 @@ mod tests {
     }
 
     #[test]
-    fn test_start_document_with_metadata() {
+    fn start_document_with_metadata() {
         let meta = DocumentMeta {
             title: Some("Test Document".to_string()),
             authors: Some(vec![Author {
@@ -285,105 +488,7 @@ mod tests {
     }
 
     #[test]
-    fn test_end_document() {
-        let event = Event::EndDocument;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_start_heading() {
-        let event = Event::StartHeading { level: 1 };
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-        assert_eq!(event, Event::StartHeading { level: 1 });
-    }
-
-    #[test]
-    fn test_start_heading_levels() {
-        for lvl in 1..=9 {
-            let event = Event::StartHeading { level: lvl };
-            assert_eq!(event, Event::StartHeading { level: lvl });
-        }
-    }
-
-    #[test]
-    fn test_end_heading() {
-        let event = Event::EndHeading;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_start_paragraph_no_alignment() {
-        let event = Event::StartParagraph { alignment: None };
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_start_paragraph_with_alignment() {
-        let event = Event::StartParagraph {
-            alignment: Some(TextAlignment::Center),
-        };
-        assert_eq!(
-            event,
-            Event::StartParagraph {
-                alignment: Some(TextAlignment::Center),
-            }
-        );
-    }
-
-    #[test]
-    fn test_end_paragraph() {
-        let event = Event::EndParagraph;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_start_block_quote() {
-        let event = Event::StartBlockQuote;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_end_block_quote() {
-        let event = Event::EndBlockQuote;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_start_preformatted_no_syntax() {
-        let event = Event::StartPreformatted { syntax: None };
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_start_preformatted_with_syntax() {
-        let event = Event::StartPreformatted {
-            syntax: Some("rust".to_string()),
-        };
-        assert_eq!(
-            event,
-            Event::StartPreformatted {
-                syntax: Some("rust".to_string()),
-            }
-        );
-    }
-
-    #[test]
-    fn test_end_preformatted() {
-        let event = Event::EndPreformatted;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_start_footnote() {
+    fn start_footnote() {
         let event = Event::StartFootnote { id: 1 };
         let cloned = event.clone();
         assert_eq!(event, cloned);
@@ -391,18 +496,48 @@ mod tests {
     }
 
     #[test]
-    fn test_end_footnote() {
-        let event = Event::EndFootnote;
+    fn start_heading() {
+        let event = Event::StartHeading { level: 1 };
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+        assert_eq!(event, Event::StartHeading { level: 1 });
+    }
+
+    #[test]
+    fn start_heading_levels() {
+        for lvl in 1..=9 {
+            let event = Event::StartHeading { level: lvl };
+            assert_eq!(event, Event::StartHeading { level: lvl });
+        }
+    }
+
+    #[test]
+    fn start_link() {
+        let event = Event::StartLink {
+            href: "https://example.com".to_string(),
+            title: Some("Example Link".to_string()),
+        };
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
 
-    // ========================================================================
-    // List tests
-    // ========================================================================
+    #[test]
+    fn start_link_no_title() {
+        let event = Event::StartLink {
+            href: "https://rust-lang.org".to_string(),
+            title: None,
+        };
+        assert_eq!(
+            event,
+            Event::StartLink {
+                href: "https://rust-lang.org".to_string(),
+                title: None,
+            }
+        );
+    }
 
     #[test]
-    fn test_start_list_item_ordered() {
+    fn start_list_item_ordered() {
         let event = Event::StartListItem {
             level: 1,
             list_type: ListType::Ordered,
@@ -414,7 +549,7 @@ mod tests {
     }
 
     #[test]
-    fn test_start_list_item_unordered() {
+    fn start_list_item_unordered() {
         let event = Event::StartListItem {
             level: 2,
             list_type: ListType::Unordered,
@@ -433,63 +568,55 @@ mod tests {
     }
 
     #[test]
-    fn test_end_list_item() {
-        let event = Event::EndListItem;
+    fn start_paragraph_no_alignment() {
+        let event = Event::StartParagraph { alignment: None };
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
 
-    // ========================================================================
-    // Table tests
-    // ========================================================================
+    #[test]
+    fn start_paragraph_with_alignment() {
+        let event = Event::StartParagraph {
+            alignment: Some(TextAlignment::Center),
+        };
+        assert_eq!(
+            event,
+            Event::StartParagraph {
+                alignment: Some(TextAlignment::Center),
+            }
+        );
+    }
 
     #[test]
-    fn test_start_table() {
+    fn start_preformatted_no_syntax() {
+        let event = Event::StartPreformatted { syntax: None };
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_preformatted_with_syntax() {
+        let event = Event::StartPreformatted {
+            syntax: Some("rust".to_string()),
+        };
+        assert_eq!(
+            event,
+            Event::StartPreformatted {
+                syntax: Some("rust".to_string()),
+            }
+        );
+    }
+
+    #[test]
+    fn start_table() {
         let event = Event::StartTable;
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
 
     #[test]
-    fn test_end_table() {
-        let event = Event::EndTable;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_start_caption() {
-        let event = Event::StartCaption;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_end_caption() {
-        let event = Event::EndCaption;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_start_table_row() {
-        let event = Event::StartTableRow;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_end_table_row() {
-        let event = Event::EndTableRow;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_start_table_header_minimal() {
-        let event = Event::StartTableHeader {
-            scope: None,
-            abbr: None,
+    fn start_table_cell_minimal() {
+        let event = Event::StartTableCell {
             colspan: None,
             rowspan: None,
         };
@@ -498,7 +625,22 @@ mod tests {
     }
 
     #[test]
-    fn test_start_table_header_full() {
+    fn start_table_cell_with_spans() {
+        let event = Event::StartTableCell {
+            colspan: Some(3),
+            rowspan: Some(2),
+        };
+        assert_eq!(
+            event,
+            Event::StartTableCell {
+                colspan: Some(3),
+                rowspan: Some(2),
+            }
+        );
+    }
+
+    #[test]
+    fn start_table_header_full() {
         let event = Event::StartTableHeader {
             scope: Some(TableHeaderScope::Column),
             abbr: Some("Qty".to_string()),
@@ -517,15 +659,10 @@ mod tests {
     }
 
     #[test]
-    fn test_end_table_header() {
-        let event = Event::EndTableHeader;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_start_table_cell_minimal() {
-        let event = Event::StartTableCell {
+    fn start_table_header_minimal() {
+        let event = Event::StartTableHeader {
+            scope: None,
+            abbr: None,
             colspan: None,
             rowspan: None,
         };
@@ -534,143 +671,14 @@ mod tests {
     }
 
     #[test]
-    fn test_start_table_cell_with_spans() {
-        let event = Event::StartTableCell {
-            colspan: Some(3),
-            rowspan: Some(2),
-        };
-        assert_eq!(
-            event,
-            Event::StartTableCell {
-                colspan: Some(3),
-                rowspan: Some(2),
-            }
-        );
-    }
-
-    #[test]
-    fn test_end_table_cell() {
-        let event = Event::EndTableCell;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    // ========================================================================
-    // Definition list tests
-    // ========================================================================
-
-    #[test]
-    fn test_start_definition_list() {
-        let event = Event::StartDefinitionList;
+    fn start_table_row() {
+        let event = Event::StartTableRow;
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
 
     #[test]
-    fn test_end_definition_list() {
-        let event = Event::EndDefinitionList;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_start_definition_term() {
-        let event = Event::StartDefinitionTerm;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_end_definition_term() {
-        let event = Event::EndDefinitionTerm;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_start_definition_detail() {
-        let event = Event::StartDefinitionDetail;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_end_definition_detail() {
-        let event = Event::EndDefinitionDetail;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    // ========================================================================
-    // Inline container tests
-    // ========================================================================
-
-    #[test]
-    fn test_start_link() {
-        let event = Event::StartLink {
-            href: "https://example.com".to_string(),
-            title: Some("Example Link".to_string()),
-        };
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_start_link_no_title() {
-        let event = Event::StartLink {
-            href: "https://rust-lang.org".to_string(),
-            title: None,
-        };
-        assert_eq!(
-            event,
-            Event::StartLink {
-                href: "https://rust-lang.org".to_string(),
-                title: None,
-            }
-        );
-    }
-
-    #[test]
-    fn test_end_link() {
-        let event = Event::EndLink;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    // ========================================================================
-    // Block self-contained tests
-    // ========================================================================
-
-    #[test]
-    fn test_thematic_break() {
-        let event = Event::ThematicBreak;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    // ========================================================================
-    // Inline self-contained tests
-    // ========================================================================
-
-    #[test]
-    fn test_text_plain() {
-        let event = Event::Text {
-            content: "Hello, world!".to_string(),
-            bold: false,
-            italic: false,
-            code: false,
-            strikethrough: false,
-            underline: false,
-            subscript: false,
-            superscript: false,
-            mark: None,
-        };
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_text_all_nine_fields_accessible() {
+    fn text_all_nine_fields_accessible() {
         let event = Event::Text {
             content: "Formatted text".to_string(),
             bold: true,
@@ -707,7 +715,24 @@ mod tests {
     }
 
     #[test]
-    fn test_text_with_bold_only() {
+    fn text_plain() {
+        let event = Event::Text {
+            content: "Hello, world!".to_string(),
+            bold: false,
+            italic: false,
+            code: false,
+            strikethrough: false,
+            underline: false,
+            subscript: false,
+            superscript: false,
+            mark: None,
+        };
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn text_with_bold_only() {
         let event = Event::Text {
             content: "Bold text".to_string(),
             bold: true,
@@ -736,7 +761,7 @@ mod tests {
     }
 
     #[test]
-    fn test_text_with_mark_color() {
+    fn text_with_mark_color() {
         let event = Event::Text {
             content: "Highlighted".to_string(),
             bold: false,
@@ -773,87 +798,9 @@ mod tests {
     }
 
     #[test]
-    fn test_image_asset() {
-        let event = Event::Image {
-            source: ImageSource::Asset {
-                asset_id: "img_001".to_string(),
-            },
-            alt: Some("A picture".to_string()),
-            title: Some("Image Title".to_string()),
-            decorative: false,
-        };
+    fn thematic_break() {
+        let event = Event::ThematicBreak;
         let cloned = event.clone();
         assert_eq!(event, cloned);
-    }
-
-    #[test]
-    fn test_image_uri() {
-        let event = Event::Image {
-            source: ImageSource::Uri {
-                uri: "https://example.com/image.png".to_string(),
-            },
-            alt: None,
-            title: None,
-            decorative: true,
-        };
-        assert_eq!(
-            event,
-            Event::Image {
-                source: ImageSource::Uri {
-                    uri: "https://example.com/image.png".to_string(),
-                },
-                alt: None,
-                title: None,
-                decorative: true,
-            }
-        );
-    }
-
-    #[test]
-    fn test_footnote_ref() {
-        let event = Event::FootnoteRef { id: 42 };
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-        assert_eq!(event, Event::FootnoteRef { id: 42 });
-    }
-
-    #[test]
-    fn test_line_break() {
-        let event = Event::LineBreak;
-        let cloned = event.clone();
-        assert_eq!(event, cloned);
-    }
-
-    // ========================================================================
-    // PartialEq tests
-    // ========================================================================
-
-    #[test]
-    fn test_partial_eq_same_variant() {
-        let event1 = Event::StartHeading { level: 2 };
-        let event2 = Event::StartHeading { level: 2 };
-        assert_eq!(event1, event2);
-    }
-
-    #[test]
-    fn test_partial_eq_different_fields() {
-        let event1 = Event::StartHeading { level: 1 };
-        let event2 = Event::StartHeading { level: 2 };
-        assert_ne!(event1, event2);
-    }
-
-    #[test]
-    fn test_partial_eq_different_variants() {
-        let event1 = Event::StartHeading { level: 1 };
-        let event2 = Event::EndHeading;
-        assert_ne!(event1, event2);
-    }
-
-    #[test]
-    fn test_partial_eq_unit_variants() {
-        assert_eq!(Event::EndDocument, Event::EndDocument);
-        assert_eq!(Event::ThematicBreak, Event::ThematicBreak);
-        assert_eq!(Event::LineBreak, Event::LineBreak);
-        assert_ne!(Event::EndDocument, Event::ThematicBreak);
     }
 }
