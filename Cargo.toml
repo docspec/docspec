@@ -13,6 +13,99 @@ unsafe_code = "forbid"
 missing_docs = "deny"
 
 [workspace.lints.clippy]
+# Verified against clippy 0.1.92 (2025-12-08)
+# Groups at priority -1 so individual allows (priority 0) override
+
+# --- Existing explicit denials (kept for clarity) ---
 unwrap_used = "deny"
 expect_used = "deny"
 allow_attributes = "deny"
+
+# --- Promote default-warn groups to deny ---
+suspicious = { level = "deny", priority = -1 }
+style = { level = "deny", priority = -1 }
+complexity = { level = "deny", priority = -1 }
+perf = { level = "deny", priority = -1 }
+
+# --- Enable opt-in groups at deny ---
+pedantic = { level = "deny", priority = -1 }
+restriction = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+
+# --- Nursery cherry-picks (individually selected per official guidance) ---
+cognitive_complexity = "deny"
+option_if_let_else = "deny"
+redundant_pub_crate = "deny"
+use_self = "deny"
+
+# --- Selective allows: restriction group (idiomatic Rust conflicts) ---
+# Reason: We deliberately enable the restriction group; this meta-lint warns against that
+blanket_clippy_restriction_lints = "allow"
+# Reason: Implicit return is idiomatic Rust; explicit return is only for early returns
+implicit_return = "allow"
+# Reason: ? operator is Rust's standard error propagation (CODING_STANDARDS.md mandates it)
+question_mark_used = "allow"
+# Reason: 'a, 'b are standard Rust lifetime conventions per The Rust Book
+single_char_lifetime_names = "allow"
+# Reason: Short variable names (i, n, s) appropriate in iterators, closures, small scopes
+min_ident_chars = "allow"
+# Reason: Standard imports preferred; absolute paths make code verbose and unreadable
+absolute_paths = "allow"
+# Reason: We use mod.rs style per CODING_STANDARDS.md
+mod_module_files = "allow"
+# Reason: Default trait implementations are intentional and valid
+missing_trait_methods = "allow"
+# Reason: Match ergonomics (binding modes) are idiomatic Rust since edition 2018
+pattern_type_mismatch = "allow"
+# Reason: Separate impl blocks for grouping related methods improves readability
+multiple_inherent_impl = "allow"
+# Reason: Redundant with allow_attributes = "deny" which already forbids all #[allow]
+allow_attributes_without_reason = "allow"
+
+# --- Selective allows: restriction group (practicality) ---
+# Reason: let x = x.trim() is idiomatic Rust transformation via shadowing
+shadow_same = "allow"
+# Reason: Too noisy; numeric types clear from context
+default_numeric_fallback = "allow"
+# Reason: Targeting embedded — prefer core/alloc over std where possible
+std_instead_of_core = "warn"
+alloc_instead_of_core = "warn"
+std_instead_of_alloc = "warn"
+# Reason: Public docs enforced by missing_docs = "deny"; private doc requirement too noisy
+missing_docs_in_private_items = "allow"
+# Reason: Mixed pub/private field visibility is normal Rust pattern
+partial_pub_fields = "allow"
+# Reason: let _ = expr is standard discard pattern; type annotation adds noise
+let_underscore_untyped = "allow"
+# Reason: .to_string() is more readable than .to_owned() in many contexts
+str_to_string = "allow"
+# Reason: Both semicolon positions are valid Rust; no strong convention
+semicolon_inside_block = "allow"
+# Reason: Division and remainder are fundamental operations; banning them is impractical
+integer_division_remainder_used = "allow"
+# Reason: Document format parsing legitimately needs endian-specific byte operations
+big_endian_bytes = "allow"
+little_endian_bytes = "allow"
+host_endian_bytes = "allow"
+# Reason: #[cfg(not(test))] is occasionally needed for test-only code paths
+cfg_not_test = "allow"
+# Reason: Large decimal literals are often clearer than hex for human-readable values
+decimal_literal_representation = "allow"
+# Reason: Standard re-export pattern in Rust libraries (pub use in lib.rs)
+pub_use = "allow"
+
+# --- Selective allows: library API design (reassess at 1.0) ---
+# Reason: Event enum must be exhaustive for downstream pattern matching. Reassess at 1.0.
+exhaustive_enums = "allow"
+# Reason: Public structs are intentionally exhaustive for construction. Reassess at 1.0.
+exhaustive_structs = "allow"
+
+# --- Selective allows: pedantic group ---
+# Reason: Names like event::EventType and error::ErrorKind are standard Rust patterns
+module_name_repetitions = "allow"
+# Reason: Naming a crate error type `Error` is the standard Rust convention; renaming breaks public API
+error_impl_error = "allow"
+
+# --- Selective allows: cargo group ---
+# Reason: Transitive dependency version conflicts are not directly controllable
+multiple_crate_versions = "allow"
