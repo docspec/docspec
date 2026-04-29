@@ -1,7 +1,78 @@
 repos:
+  # ─── General hygiene (pre-commit stage, fast) ─────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-yaml
+      - id: check-toml
+
+  # ─── Spell checking ────────────────────────────────────────────────────────
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.32.0
+    hooks:
+      - id: typos
+
+  # ─── TOML formatting ───────────────────────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: taplo-fmt
+        name: TOML formatting (taplo)
+        language: system
+        entry: taplo fmt --check
+        types: [toml]
+        pass_filenames: true
+
+  # ─── Rust checks (pre-commit stage) ───────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: Rust formatting
+        language: system
+        entry: cargo fmt --all --check
+        types: [rust]
+        pass_filenames: false
+        always_run: true
+      - id: cargo-clippy
+        name: Clippy (strict)
+        language: system
+        entry: cargo clippy --workspace --all-targets -- -D warnings
+        types: [rust]
+        pass_filenames: false
+        always_run: true
+
+  # ─── Conventional commit messages ─────────────────────────────────────────
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v3.4.0
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
         args: [feat, fix, docs, refactor, test, chore, perf, ci, build, revert]
+
+  # ─── Pre-push checks (heavier, run before sharing) ────────────────────────
+  - repo: local
+    hooks:
+      - id: cargo-build
+        name: Cargo build
+        language: system
+        entry: cargo build --workspace
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: cargo-test
+        name: Cargo test suite
+        language: system
+        entry: cargo test --workspace
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: cargo-doc
+        name: Cargo documentation
+        language: system
+        entry: bash -c 'RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps'
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

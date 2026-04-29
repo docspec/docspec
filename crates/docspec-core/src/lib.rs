@@ -1,19 +1,21 @@
-//! Core event types and traits for the DocSpec streaming document conversion library.
+//! Core event types and traits for the `DocSpec` streaming document conversion library.
 //!
-//! DocSpec converts documents through a streaming event pipeline. This crate defines
-//! the [Event] enum, supporting types, error types, and the [EventSource],
-//! [EventSink], and [AssetProvider] traits that decouple readers from writers.
+//! `DocSpec` converts documents through a streaming event pipeline. This crate defines
+//! the [`Event`] enum, supporting types, error types, and the [`EventSource`],
+//! [`EventSink`], and [`AssetProvider`] traits that decouple readers from writers.
 //!
 //! # Quick Start
 //!
-//! Implement [EventSource] to produce events and [EventSink] to consume them.
+//! Implement [`EventSource`] to produce events and [`EventSink`] to consume them.
 //! Events represent document structure (headings, paragraphs, tables, text runs).
 //! Readers and writers are fully decoupled through the event protocol.
 //!
 //! # Event Types
 //!
-//! The [Event] enum has 37 variants covering all document structures defined in
-//! the DocSpec specification.
+//! The [`Event`] enum has 37 variants covering all document structures defined in
+//! the `DocSpec` specification.
+
+extern crate alloc;
 
 mod error;
 mod event;

@@ -4,7 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "README.md"
 description = "Core event types and traits for DocSpec streaming document conversion"
+keywords = ["document", "conversion", "streaming"]
+categories = ["parsing", "encoding"]
 
 [lints]
 workspace = true
