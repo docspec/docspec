@@ -1,0 +1,25 @@
+# Rust build artifacts
+target/
+/crates/*/target/
+
+# Coverage artifacts
+lcov.info
+*.profraw
+*.profdata
+
+# Editor and IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment files
+.env
+.env.local
+
+# Sisyphus orchestration state (local only)
+.sisyphus/boulder.json
+.sisyphus/evidence/
+.sisyphus/notepads/
