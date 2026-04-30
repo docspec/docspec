@@ -1,0 +1,39 @@
+[
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Before ",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "image",
+    "props": {
+      "url": "https://example.com/img.png",
+      "caption": "alt text"
+    },
+    "content": null,
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": " after",
+        "styles": {}
+      }
+    ],
+    "children": []
+  }
+]

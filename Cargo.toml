@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["crates/docspec-core"]
+members = [
+  "crates/docspec-core",
+  "crates/docspec-markdown-reader",
+  "crates/docspec-blocknote-writer",
+]
 
 [workspace.package]
 version = "0.1.0"

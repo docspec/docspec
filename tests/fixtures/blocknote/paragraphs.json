@@ -1,0 +1,109 @@
+[
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Single paragraph with plain text.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Multiple paragraphs. This is the second paragraph.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Paragraph with ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "bold text",
+        "styles": {
+          "bold": true
+        }
+      },
+      {
+        "type": "text",
+        "text": " in the middle.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Paragraph with ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "italic text",
+        "styles": {
+          "italic": true
+        }
+      },
+      {
+        "type": "text",
+        "text": " in the middle.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Paragraph with ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "bold and italic text",
+        "styles": {
+          "bold": true,
+          "italic": true
+        }
+      },
+      {
+        "type": "text",
+        "text": " combined.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  }
+]

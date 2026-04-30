@@ -1,0 +1,18 @@
+[package]
+name = "docspec-blocknote-writer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+description = "DocSpec event stream to BlockNote JSON writer"
+keywords = ["document", "conversion", "streaming"]
+categories = ["encoding"]
+
+[dependencies]
+base64 = "0.22"
+docspec-core = { path = "../docspec-core" }
+struson = "0.7"
+
+[lints]
+workspace = true

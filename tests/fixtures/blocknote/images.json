@@ -1,0 +1,53 @@
+[
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [],
+    "children": []
+  },
+  {
+    "type": "image",
+    "props": {
+      "url": "https://example.com/image1.png",
+      "caption": "Alt text with title"
+    },
+    "content": null,
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [],
+    "children": []
+  },
+  {
+    "type": "image",
+    "props": {
+      "url": "https://example.com/image2.png",
+      "caption": "Alt text only"
+    },
+    "content": null,
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [],
+    "children": []
+  },
+  {
+    "type": "image",
+    "props": {
+      "url": "https://example.com/image3.png",
+      "caption": ""
+    },
+    "content": null,
+    "children": []
+  }
+]

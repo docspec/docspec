@@ -75,6 +75,8 @@ pub enum Event {
         alt: Option<String>,
         /// Whether the image is purely decorative (no alt text needed).
         decorative: bool,
+        /// Optional block identifier for the image.
+        id: Option<String>,
         /// Source of the image (embedded asset or external URI).
         source: crate::ImageSource,
         /// Optional tooltip text.
@@ -115,6 +117,8 @@ pub enum Event {
 
     /// Begin a heading of the given level.
     StartHeading {
+        /// Optional block identifier for the heading.
+        id: Option<String>,
         /// Heading level, 1–9 (1 is most prominent).
         level: u8,
     },
@@ -143,6 +147,8 @@ pub enum Event {
     StartParagraph {
         /// Text alignment for the paragraph.
         alignment: Option<crate::TextAlignment>,
+        /// Optional block identifier for the paragraph.
+        id: Option<String>,
     },
 
     /// Begin a preformatted (code) block with optional syntax highlighting.
@@ -340,6 +346,7 @@ mod tests {
             alt: Some("A picture".to_string()),
             title: Some("Image Title".to_string()),
             decorative: false,
+            id: None,
         };
         let cloned = event.clone();
         assert_eq!(event, cloned);
@@ -354,6 +361,7 @@ mod tests {
             alt: None,
             title: None,
             decorative: true,
+            id: None,
         };
         assert_eq!(
             event,
@@ -364,6 +372,7 @@ mod tests {
                 alt: None,
                 title: None,
                 decorative: true,
+                id: None,
             }
         );
     }
@@ -377,22 +386,22 @@ mod tests {
 
     #[test]
     fn partial_eq_different_fields() {
-        let event1 = Event::StartHeading { level: 1 };
-        let event2 = Event::StartHeading { level: 2 };
+        let event1 = Event::StartHeading { level: 1, id: None };
+        let event2 = Event::StartHeading { level: 2, id: None };
         assert_ne!(event1, event2);
     }
 
     #[test]
     fn partial_eq_different_variants() {
-        let event1 = Event::StartHeading { level: 1 };
+        let event1 = Event::StartHeading { level: 1, id: None };
         let event2 = Event::EndHeading;
         assert_ne!(event1, event2);
     }
 
     #[test]
     fn partial_eq_same_variant() {
-        let event1 = Event::StartHeading { level: 2 };
-        let event2 = Event::StartHeading { level: 2 };
+        let event1 = Event::StartHeading { level: 2, id: None };
+        let event2 = Event::StartHeading { level: 2, id: None };
         assert_eq!(event1, event2);
     }
 
@@ -497,17 +506,26 @@ mod tests {
 
     #[test]
     fn start_heading() {
-        let event = Event::StartHeading { level: 1 };
+        let event = Event::StartHeading { level: 1, id: None };
         let cloned = event.clone();
         assert_eq!(event, cloned);
-        assert_eq!(event, Event::StartHeading { level: 1 });
+        assert_eq!(event, Event::StartHeading { level: 1, id: None });
     }
 
     #[test]
     fn start_heading_levels() {
         for lvl in 1..=9 {
-            let event = Event::StartHeading { level: lvl };
-            assert_eq!(event, Event::StartHeading { level: lvl });
+            let event = Event::StartHeading {
+                level: lvl,
+                id: None,
+            };
+            assert_eq!(
+                event,
+                Event::StartHeading {
+                    level: lvl,
+                    id: None
+                }
+            );
         }
     }
 
@@ -569,7 +587,10 @@ mod tests {
 
     #[test]
     fn start_paragraph_no_alignment() {
-        let event = Event::StartParagraph { alignment: None };
+        let event = Event::StartParagraph {
+            alignment: None,
+            id: None,
+        };
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
@@ -578,11 +599,13 @@ mod tests {
     fn start_paragraph_with_alignment() {
         let event = Event::StartParagraph {
             alignment: Some(TextAlignment::Center),
+            id: None,
         };
         assert_eq!(
             event,
             Event::StartParagraph {
                 alignment: Some(TextAlignment::Center),
+                id: None,
             }
         );
     }
