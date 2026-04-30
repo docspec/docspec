@@ -1,0 +1,30 @@
+[
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Header",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "This paragraph is inside a table cell.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  }
+]

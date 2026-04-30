@@ -1,0 +1,21 @@
+[package]
+name = "docspec-markdown-reader"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+description = "Markdown to DocSpec event stream reader"
+keywords = ["document", "conversion", "streaming", "markdown"]
+categories = ["parsing"]
+
+[dependencies]
+docspec-core = { path = "../docspec-core" }
+pulldown-cmark = "0.13"
+
+[dev-dependencies]
+docspec-blocknote-writer = { path = "../docspec-blocknote-writer" }
+serde_json = "1"
+
+[lints]
+workspace = true

@@ -125,7 +125,10 @@ mod tests {
                 language: None,
                 metadata: None,
             };
-            let event2 = crate::Event::StartParagraph { alignment: None };
+            let event2 = crate::Event::StartParagraph {
+                alignment: None,
+                id: None,
+            };
             let event3 = crate::Event::Text {
                 content: "test".to_string(),
                 bold: false,
@@ -163,7 +166,10 @@ mod tests {
                     language: None,
                     metadata: None,
                 },
-                crate::Event::StartParagraph { alignment: None },
+                crate::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
                 crate::Event::Text {
                     content: "Hello".to_string(),
                     bold: false,
@@ -202,7 +208,10 @@ mod tests {
                     language: None,
                     metadata: None,
                 },
-                crate::Event::StartParagraph { alignment: None },
+                crate::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
                 crate::Event::Text {
                     content: "Pipeline test".to_string(),
                     bold: false,

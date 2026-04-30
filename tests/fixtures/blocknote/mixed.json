@@ -1,0 +1,128 @@
+[
+  {
+    "type": "heading",
+    "props": {
+      "level": 1,
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Main Heading",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "This is a paragraph with ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "bold",
+        "styles": {
+          "bold": true
+        }
+      },
+      {
+        "type": "text",
+        "text": " and ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "italic",
+        "styles": {
+          "italic": true
+        }
+      },
+      {
+        "type": "text",
+        "text": " text.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "heading",
+    "props": {
+      "level": 2,
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Subheading",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Another paragraph with some content.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [],
+    "children": []
+  },
+  {
+    "type": "image",
+    "props": {
+      "url": "https://example.com/example.png",
+      "caption": "Example image"
+    },
+    "content": null,
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Final paragraph with ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "bold italic",
+        "styles": {
+          "bold": true,
+          "italic": true
+        }
+      },
+      {
+        "type": "text",
+        "text": " styling.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  }
+]
