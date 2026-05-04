@@ -216,6 +216,26 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Ok(())
     }
 
+    fn handle_preformatted(&mut self, id: Option<&String>, syntax: Option<&String>) -> Result<()> {
+        self.close_text_block_if_needed()?;
+        self.writer.begin_object().map_err(io_err)?;
+        self.writer.name("type").map_err(io_err)?;
+        self.writer.string_value("codeBlock").map_err(io_err)?;
+        self.write_id(id)?;
+        if let Some(lang) = syntax {
+            self.writer.name("props").map_err(io_err)?;
+            self.writer.begin_object().map_err(io_err)?;
+            self.writer.name("language").map_err(io_err)?;
+            self.writer.string_value(lang).map_err(io_err)?;
+            self.writer.end_object().map_err(io_err)?;
+        }
+        self.writer.name("content").map_err(io_err)?;
+        self.writer.begin_array().map_err(io_err)?;
+
+        self.in_text_block = true;
+        Ok(())
+    }
+
     fn handle_text(&mut self, content: &str, bold: bool, italic: bool) -> Result<()> {
         if !self.in_text_block {
             self.handle_paragraph(None)?;
@@ -312,6 +332,9 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             | Event::EndListItem => self.close_text_block_if_needed(),
             Event::StartParagraph { id, .. } => self.handle_paragraph(id.as_ref()),
             Event::StartBlockQuote { id, .. } => self.handle_blockquote(id.as_ref()),
+            Event::StartPreformatted { id, syntax, .. } => {
+                self.handle_preformatted(id.as_ref(), syntax.as_ref())
+            }
             Event::ThematicBreak { id, .. } => self.handle_divider(id.as_ref()),
             Event::Text {
                 content,
@@ -337,7 +360,6 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             | Event::StartFootnote { .. }
             | Event::StartLink { .. }
             | Event::StartListItem { .. }
-            | Event::StartPreformatted { .. }
             | Event::StartTable { .. }
             | Event::StartTableCell { .. }
             | Event::StartTableHeader { .. }
