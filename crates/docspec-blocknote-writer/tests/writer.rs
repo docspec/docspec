@@ -1382,4 +1382,110 @@ mod tests {
         ]);
         assert!(!json.contains("\"id\""));
     }
+
+    #[test]
+    fn code_block_with_language() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartPreformatted {
+                id: None,
+                syntax: Some("rust".to_string()),
+            },
+            Event::Text {
+                content: "fn main() {}".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndPreformatted,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"codeBlock","props":{"language":"rust"},"content":[{"type":"text","text":"fn main() {}","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn code_block_without_language() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartPreformatted {
+                id: None,
+                syntax: None,
+            },
+            Event::Text {
+                content: "plain code".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndPreformatted,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"codeBlock","content":[{"type":"text","text":"plain code","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn empty_code_block() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartPreformatted {
+                id: None,
+                syntax: Some("python".to_string()),
+            },
+            Event::EndPreformatted,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"codeBlock","props":{"language":"python"},"content":[],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn code_block_with_id() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartPreformatted {
+                id: Some("cb-1".to_string()),
+                syntax: None,
+            },
+            Event::EndPreformatted,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"codeBlock","id":"cb-1","content":[],"children":[]}]"#
+        );
+    }
 }
