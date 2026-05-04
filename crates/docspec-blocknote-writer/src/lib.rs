@@ -93,6 +93,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_heading(&mut self, level: u8, id: Option<&String>) -> Result<()> {
+        self.close_text_block_if_needed()?;
         self.writer.begin_object().map_err(io_err)?;
         if let Some(id_val) = id {
             self.writer.name("id").map_err(io_err)?;
@@ -179,6 +180,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_paragraph(&mut self, id: Option<&String>) -> Result<()> {
+        self.close_text_block_if_needed()?;
         self.writer.begin_object().map_err(io_err)?;
         if let Some(id_val) = id {
             self.writer.name("id").map_err(io_err)?;
