@@ -524,4 +524,54 @@ mod tests {
             .any(|e| matches!(e, Event::Text { content, .. } if content == " "));
         assert!(space);
     }
+
+    #[test]
+    fn fenced_code_block_with_language() {
+        let markdown = "```rust\nfn main() {}\n```";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert!(events.iter().any(|e| matches!(
+            e,
+            Event::StartPreformatted {
+                syntax: Some(lang),
+                ..
+            } if lang == "rust"
+        )));
+        assert!(events.iter().any(|e| matches!(e, Event::EndPreformatted)));
+
+        let has_content = events
+            .iter()
+            .any(|e| matches!(e, Event::Text { content, .. } if content.contains("fn main")));
+        assert!(has_content);
+    }
+
+    #[test]
+    fn fenced_code_block_without_language() {
+        let markdown = "```\nsome code\n```";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, Event::StartPreformatted { syntax: None, .. })));
+        assert!(events.iter().any(|e| matches!(e, Event::EndPreformatted)));
+    }
+
+    #[test]
+    fn indented_code_block() {
+        let markdown = "    indented code\n";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, Event::StartPreformatted { syntax: None, .. })));
+        assert!(events.iter().any(|e| matches!(e, Event::EndPreformatted)));
+
+        let has_content = events
+            .iter()
+            .any(|e| matches!(e, Event::Text { content, .. } if content.contains("indented")));
+        assert!(has_content);
+    }
 }

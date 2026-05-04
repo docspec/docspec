@@ -41,7 +41,7 @@ use alloc::collections::VecDeque;
 
 pub use docspec_core::EventSource;
 use docspec_core::{Event, ImageSource, Result};
-use pulldown_cmark::{HeadingLevel, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{CodeBlockKind, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 /// Whether content is inside a block-level element.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -171,8 +171,8 @@ impl<'a> MarkdownReader<'a> {
                     });
                 }
             }
-            TagEnd::CodeBlock
-            | TagEnd::DefinitionList
+            TagEnd::CodeBlock => self.push_event_end(Event::EndPreformatted),
+            TagEnd::DefinitionList
             | TagEnd::DefinitionListDefinition
             | TagEnd::DefinitionListTitle
             | TagEnd::FootnoteDefinition
@@ -211,6 +211,13 @@ impl<'a> MarkdownReader<'a> {
                 id: None,
             }),
             Tag::BlockQuote(_) => self.push_event_start(Event::StartBlockQuote { id: None }),
+            Tag::CodeBlock(kind) => {
+                let syntax = match kind {
+                    CodeBlockKind::Fenced(lang) if !lang.is_empty() => Some(lang.into_string()),
+                    CodeBlockKind::Fenced(_) | CodeBlockKind::Indented => None,
+                };
+                self.push_event_start(Event::StartPreformatted { id: None, syntax });
+            }
             Tag::Emphasis => {
                 self.italic_depth = self.italic_depth.saturating_add(1);
             }
@@ -230,8 +237,7 @@ impl<'a> MarkdownReader<'a> {
                     url: dest_url.into_string(),
                 });
             }
-            Tag::CodeBlock(_)
-            | Tag::DefinitionList
+            Tag::DefinitionList
             | Tag::DefinitionListDefinition
             | Tag::DefinitionListTitle
             | Tag::FootnoteDefinition(_)
