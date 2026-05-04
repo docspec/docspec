@@ -5,6 +5,7 @@ members = [
   "crates/docspec-markdown-reader",
   "crates/docspec-blocknote-writer",
   "crates/docspec-cli",
+  "crates/docspec-wasm",
 ]
 
 [workspace.package]
