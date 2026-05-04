@@ -1,0 +1,13 @@
+[
+  {
+    "type": "quote",
+    "content": [
+      {
+        "type": "text",
+        "text": "test",
+        "styles": {}
+      }
+    ],
+    "children": []
+  }
+]

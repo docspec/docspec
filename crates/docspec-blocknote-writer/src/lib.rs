@@ -16,6 +16,7 @@
 //! - `StartDocument` / `EndDocument` — array start/end
 //! - `StartHeading` / `EndHeading` — heading blocks
 //! - `StartParagraph` / `EndParagraph` — paragraph blocks
+//! - `StartBlockQuote` / `EndBlockQuote` — quote blocks
 //! - `Text` — inline text content with bold/italic styles
 //! - `Image` — image blocks
 //!
@@ -70,6 +71,8 @@ use struson::writer::{JsonStreamWriter, JsonWriter as _};
 pub struct BlockNoteWriter<'a, W: Write> {
     /// Optional asset provider for resolving embedded asset references.
     assets: Option<&'a dyn AssetProvider>,
+    /// Whether we're currently inside a blockquote (suppresses inner paragraph wrappers).
+    in_blockquote: bool,
     /// Whether we're currently inside a paragraph/heading block (affects Image handling).
     in_text_block: bool,
     /// The underlying JSON stream writer.
@@ -102,6 +105,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.writer.name("content").map_err(io_err)?;
         self.writer.begin_array().map_err(io_err)?;
 
+        self.in_blockquote = true;
         self.in_text_block = true;
         Ok(())
     }
@@ -270,6 +274,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     pub fn new(writer: W) -> Self {
         Self {
             assets: None,
+            in_blockquote: false,
             in_text_block: false,
             writer: JsonStreamWriter::new(writer),
         }
@@ -290,6 +295,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     pub fn with_assets(writer: W, assets: &'a dyn AssetProvider) -> Self {
         Self {
             assets: Some(assets),
+            in_blockquote: false,
             in_text_block: false,
             writer: JsonStreamWriter::new(writer),
         }
@@ -321,16 +327,31 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 self.writer.end_array().map_err(io_err)
             }
             Event::StartHeading { level, id, .. } => self.handle_heading(level, id.as_ref()),
+            Event::StartParagraph { id, .. } => {
+                if self.in_blockquote {
+                    Ok(())
+                } else {
+                    self.handle_paragraph(id.as_ref())
+                }
+            }
+            Event::EndParagraph => {
+                if self.in_blockquote {
+                    Ok(())
+                } else {
+                    self.close_text_block_if_needed()
+                }
+            }
+            Event::EndBlockQuote => {
+                self.in_blockquote = false;
+                self.close_text_block_if_needed()
+            }
             Event::EndHeading
-            | Event::EndParagraph
-            | Event::EndBlockQuote
             | Event::EndPreformatted
             | Event::EndTable
             | Event::EndTableCell
             | Event::EndTableHeader
             | Event::EndTableRow
             | Event::EndListItem => self.close_text_block_if_needed(),
-            Event::StartParagraph { id, .. } => self.handle_paragraph(id.as_ref()),
             Event::StartBlockQuote { id, .. } => self.handle_blockquote(id.as_ref()),
             Event::StartPreformatted { id, syntax, .. } => {
                 self.handle_preformatted(id.as_ref(), syntax.as_ref())
