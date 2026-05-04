@@ -137,13 +137,12 @@ impl<'a> MarkdownReader<'a> {
 
     fn handle_end_tag(&mut self, tag_end: TagEnd) {
         match tag_end {
-            TagEnd::Heading(_) => {
-                self.queue.push_back(Event::EndHeading);
-                self.block_state = BlockState::None;
-            }
-            TagEnd::Paragraph => {
-                self.queue.push_back(Event::EndParagraph);
-                self.block_state = BlockState::None;
+            TagEnd::Heading(_) => self.push_event_end(Event::EndHeading),
+            TagEnd::Paragraph => self.push_event_end(Event::EndParagraph),
+            TagEnd::BlockQuote(_) | TagEnd::Item | TagEnd::TableCell => {
+                if self.block_state == BlockState::AutoParagraph {
+                    self.push_event_end(Event::EndParagraph);
+                }
             }
             TagEnd::Emphasis => {
                 self.italic_depth = self.italic_depth.saturating_sub(1);
@@ -169,12 +168,6 @@ impl<'a> MarkdownReader<'a> {
                         decorative,
                         id: None,
                     });
-                }
-            }
-            TagEnd::BlockQuote(_) | TagEnd::Item | TagEnd::TableCell => {
-                if self.block_state == BlockState::AutoParagraph {
-                    self.queue.push_back(Event::EndParagraph);
-                    self.block_state = BlockState::None;
                 }
             }
             TagEnd::CodeBlock
@@ -206,19 +199,16 @@ impl<'a> MarkdownReader<'a> {
                     HeadingLevel::H5 => 5,
                     HeadingLevel::H6 => 6,
                 };
-                self.queue.push_back(Event::StartHeading {
+
+                self.push_event_start(Event::StartHeading {
                     level: level_u8,
                     id: None,
                 });
-                self.block_state = BlockState::Explicit;
             }
-            Tag::Paragraph => {
-                self.queue.push_back(Event::StartParagraph {
-                    alignment: None,
-                    id: None,
-                });
-                self.block_state = BlockState::Explicit;
-            }
+            Tag::Paragraph => self.push_event_start(Event::StartParagraph {
+                alignment: None,
+                id: None,
+            }),
             Tag::Emphasis => {
                 self.italic_depth = self.italic_depth.saturating_add(1);
             }
@@ -351,6 +341,19 @@ impl<'a> MarkdownReader<'a> {
             | pulldown_cmark::Event::TaskListMarker(_) => {}
         }
     }
+
+    fn push_event(&mut self, event: Event, state: BlockState) {
+        self.queue.push_back(event);
+        self.block_state = state;
+    }
+
+    fn push_event_end(&mut self, event: Event) {
+        self.push_event(event, BlockState::None);
+    }
+
+    fn push_event_start(&mut self, event: Event) {
+        self.push_event(event, BlockState::Explicit);
+    }
 }
 
 impl EventSource for MarkdownReader<'_> {
@@ -359,6 +362,7 @@ impl EventSource for MarkdownReader<'_> {
         if self.phase == Phase::NotStarted {
             self.phase = Phase::Running;
             return Ok(Some(Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             }));

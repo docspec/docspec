@@ -30,7 +30,7 @@
 //! let mut buf = Vec::<u8>::new();
 //! let mut writer = BlockNoteWriter::new(&mut buf);
 //!
-//! writer.handle_event(Event::StartDocument { language: None, metadata: None })?;
+//! writer.handle_event(Event::StartDocument { id: None, language: None, metadata: None })?;
 //! writer.handle_event(Event::StartParagraph { alignment: None, id: None })?;
 //! writer.handle_event(Event::Text {
 //!     content: "Hello".to_string(),
@@ -95,12 +95,9 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     fn handle_heading(&mut self, level: u8, id: Option<&String>) -> Result<()> {
         self.close_text_block_if_needed()?;
         self.writer.begin_object().map_err(io_err)?;
-        if let Some(id_val) = id {
-            self.writer.name("id").map_err(io_err)?;
-            self.writer.string_value(id_val).map_err(io_err)?;
-        }
         self.writer.name("type").map_err(io_err)?;
         self.writer.string_value("heading").map_err(io_err)?;
+        self.write_id(id)?;
         self.writer.name("props").map_err(io_err)?;
         self.writer.begin_object().map_err(io_err)?;
         self.writer.name("level").map_err(io_err)?;
@@ -258,6 +255,15 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             writer: JsonStreamWriter::new(writer),
         }
     }
+
+    fn write_id(&mut self, id: Option<&String>) -> Result<()> {
+        if let Some(id_val) = id {
+            self.writer.name("id").map_err(io_err)?;
+            self.writer.string_value(id_val).map_err(io_err)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
@@ -302,19 +308,19 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             | Event::EndTableRow
             | Event::FootnoteRef { .. }
             | Event::LineBreak
-            | Event::StartBlockQuote
-            | Event::StartCaption
-            | Event::StartDefinitionDetail
-            | Event::StartDefinitionList
-            | Event::StartDefinitionTerm
+            | Event::StartBlockQuote { .. }
+            | Event::StartCaption { .. }
+            | Event::StartDefinitionDetail { .. }
+            | Event::StartDefinitionList { .. }
+            | Event::StartDefinitionTerm { .. }
             | Event::StartFootnote { .. }
             | Event::StartLink { .. }
             | Event::StartListItem { .. }
             | Event::StartPreformatted { .. }
-            | Event::StartTable
+            | Event::StartTable { .. }
             | Event::StartTableCell { .. }
             | Event::StartTableHeader { .. }
-            | Event::StartTableRow
+            | Event::StartTableRow { .. }
             | Event::ThematicBreak
             | _ => Ok(()),
         }

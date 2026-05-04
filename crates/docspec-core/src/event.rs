@@ -87,22 +87,39 @@ pub enum Event {
     LineBreak,
 
     /// Begin a block quote.
-    StartBlockQuote,
+    StartBlockQuote {
+        /// Optional block identifier.
+        id: Option<String>,
+    },
 
     /// Begin a table caption.
-    StartCaption,
+    StartCaption {
+        /// Optional block identifier.
+        id: Option<String>,
+    },
 
     /// Begin a definition detail (description).
-    StartDefinitionDetail,
+    StartDefinitionDetail {
+        /// Optional block identifier.
+        id: Option<String>,
+    },
 
     /// Begin a definition list.
-    StartDefinitionList,
+    StartDefinitionList {
+        /// Optional block identifier.
+        id: Option<String>,
+    },
 
     /// Begin a definition term.
-    StartDefinitionTerm,
+    StartDefinitionTerm {
+        /// Optional block identifier.
+        id: Option<String>,
+    },
 
     /// Begin a document with optional language and metadata.
     StartDocument {
+        /// Optional block identifier.
+        id: Option<String>,
         /// BCP 47 language tag (e.g., "en", "en-US", "zh-Hans").
         language: Option<String>,
         /// Document metadata including title, authors, and description.
@@ -127,12 +144,16 @@ pub enum Event {
     StartLink {
         /// URL or URI target of the link.
         href: String,
+        /// Optional block identifier.
+        id: Option<String>,
         /// Optional tooltip text.
         title: Option<String>,
     },
 
     /// Begin a list item.
     StartListItem {
+        /// Optional block identifier.
+        id: Option<String>,
         /// Nesting level (1 = top-level).
         level: u8,
         /// Whether the list is ordered or unordered.
@@ -153,17 +174,24 @@ pub enum Event {
 
     /// Begin a preformatted (code) block with optional syntax highlighting.
     StartPreformatted {
+        /// Optional block identifier.
+        id: Option<String>,
         /// Language identifier for syntax highlighting (e.g., "rust", "python").
         syntax: Option<String>,
     },
 
     /// Begin a table.
-    StartTable,
+    StartTable {
+        /// Optional block identifier.
+        id: Option<String>,
+    },
 
     /// Begin a table data cell.
     StartTableCell {
         /// Number of columns this cell spans.
         colspan: Option<u32>,
+        /// Optional block identifier.
+        id: Option<String>,
         /// Number of rows this cell spans.
         rowspan: Option<u32>,
     },
@@ -174,6 +202,8 @@ pub enum Event {
         abbr: Option<String>,
         /// Number of columns this cell spans.
         colspan: Option<u32>,
+        /// Optional block identifier.
+        id: Option<String>,
         /// Number of rows this cell spans.
         rowspan: Option<u32>,
         /// Whether this header applies to a column or row.
@@ -181,7 +211,10 @@ pub enum Event {
     },
 
     /// Begin a table row.
-    StartTableRow,
+    StartTableRow {
+        /// Optional block identifier.
+        id: Option<String>,
+    },
 
     /// A text run with formatting attributes.
     Text {
@@ -415,35 +448,35 @@ mod tests {
 
     #[test]
     fn start_block_quote() {
-        let event = Event::StartBlockQuote;
+        let event = Event::StartBlockQuote { id: None };
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
 
     #[test]
     fn start_caption() {
-        let event = Event::StartCaption;
+        let event = Event::StartCaption { id: None };
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
 
     #[test]
     fn start_definition_detail() {
-        let event = Event::StartDefinitionDetail;
+        let event = Event::StartDefinitionDetail { id: None };
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
 
     #[test]
     fn start_definition_list() {
-        let event = Event::StartDefinitionList;
+        let event = Event::StartDefinitionList { id: None };
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
 
     #[test]
     fn start_definition_term() {
-        let event = Event::StartDefinitionTerm;
+        let event = Event::StartDefinitionTerm { id: None };
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
@@ -451,6 +484,7 @@ mod tests {
     #[test]
     fn start_document_minimal() {
         let event = Event::StartDocument {
+            id: None,
             language: None,
             metadata: None,
         };
@@ -461,12 +495,14 @@ mod tests {
     #[test]
     fn start_document_with_language() {
         let event = Event::StartDocument {
+            id: None,
             language: Some("en-US".to_string()),
             metadata: None,
         };
         assert_eq!(
             event,
             Event::StartDocument {
+                id: None,
                 language: Some("en-US".to_string()),
                 metadata: None,
             }
@@ -484,12 +520,14 @@ mod tests {
             description: Some("A test document".to_string()),
         };
         let event = Event::StartDocument {
+            id: None,
             language: Some("en".to_string()),
             metadata: Some(meta.clone()),
         };
         assert_eq!(
             event,
             Event::StartDocument {
+                id: None,
                 language: Some("en".to_string()),
                 metadata: Some(meta),
             }
@@ -533,6 +571,7 @@ mod tests {
     fn start_link() {
         let event = Event::StartLink {
             href: "https://example.com".to_string(),
+            id: None,
             title: Some("Example Link".to_string()),
         };
         let cloned = event.clone();
@@ -543,12 +582,14 @@ mod tests {
     fn start_link_no_title() {
         let event = Event::StartLink {
             href: "https://rust-lang.org".to_string(),
+            id: None,
             title: None,
         };
         assert_eq!(
             event,
             Event::StartLink {
                 href: "https://rust-lang.org".to_string(),
+                id: None,
                 title: None,
             }
         );
@@ -557,6 +598,7 @@ mod tests {
     #[test]
     fn start_list_item_ordered() {
         let event = Event::StartListItem {
+            id: None,
             level: 1,
             list_type: ListType::Ordered,
             start: Some(1),
@@ -569,6 +611,7 @@ mod tests {
     #[test]
     fn start_list_item_unordered() {
         let event = Event::StartListItem {
+            id: None,
             level: 2,
             list_type: ListType::Unordered,
             start: None,
@@ -577,6 +620,7 @@ mod tests {
         assert_eq!(
             event,
             Event::StartListItem {
+                id: None,
                 level: 2,
                 list_type: ListType::Unordered,
                 start: None,
@@ -612,7 +656,10 @@ mod tests {
 
     #[test]
     fn start_preformatted_no_syntax() {
-        let event = Event::StartPreformatted { syntax: None };
+        let event = Event::StartPreformatted {
+            id: None,
+            syntax: None,
+        };
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
@@ -620,11 +667,13 @@ mod tests {
     #[test]
     fn start_preformatted_with_syntax() {
         let event = Event::StartPreformatted {
+            id: None,
             syntax: Some("rust".to_string()),
         };
         assert_eq!(
             event,
             Event::StartPreformatted {
+                id: None,
                 syntax: Some("rust".to_string()),
             }
         );
@@ -632,7 +681,7 @@ mod tests {
 
     #[test]
     fn start_table() {
-        let event = Event::StartTable;
+        let event = Event::StartTable { id: None };
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
@@ -641,6 +690,7 @@ mod tests {
     fn start_table_cell_minimal() {
         let event = Event::StartTableCell {
             colspan: None,
+            id: None,
             rowspan: None,
         };
         let cloned = event.clone();
@@ -651,12 +701,14 @@ mod tests {
     fn start_table_cell_with_spans() {
         let event = Event::StartTableCell {
             colspan: Some(3),
+            id: None,
             rowspan: Some(2),
         };
         assert_eq!(
             event,
             Event::StartTableCell {
                 colspan: Some(3),
+                id: None,
                 rowspan: Some(2),
             }
         );
@@ -665,18 +717,20 @@ mod tests {
     #[test]
     fn start_table_header_full() {
         let event = Event::StartTableHeader {
-            scope: Some(TableHeaderScope::Column),
             abbr: Some("Qty".to_string()),
             colspan: Some(2),
+            id: None,
             rowspan: Some(1),
+            scope: Some(TableHeaderScope::Column),
         };
         assert_eq!(
             event,
             Event::StartTableHeader {
-                scope: Some(TableHeaderScope::Column),
                 abbr: Some("Qty".to_string()),
                 colspan: Some(2),
+                id: None,
                 rowspan: Some(1),
+                scope: Some(TableHeaderScope::Column),
             }
         );
     }
@@ -684,10 +738,11 @@ mod tests {
     #[test]
     fn start_table_header_minimal() {
         let event = Event::StartTableHeader {
-            scope: None,
             abbr: None,
             colspan: None,
+            id: None,
             rowspan: None,
+            scope: None,
         };
         let cloned = event.clone();
         assert_eq!(event, cloned);
@@ -695,7 +750,7 @@ mod tests {
 
     #[test]
     fn start_table_row() {
-        let event = Event::StartTableRow;
+        let event = Event::StartTableRow { id: None };
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
