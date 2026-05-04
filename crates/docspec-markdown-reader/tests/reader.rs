@@ -24,7 +24,9 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(!events.iter().any(|e| matches!(e, Event::StartBlockQuote)));
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e, Event::StartBlockQuote { .. })));
         assert!(!events.iter().any(|e| matches!(e, Event::EndBlockQuote)));
 
         let has_quoted = events
@@ -101,20 +103,20 @@ mod tests {
                 | Event::FootnoteRef { .. }
                 | Event::Image { .. }
                 | Event::LineBreak
-                | Event::StartBlockQuote
-                | Event::StartCaption
-                | Event::StartDefinitionDetail
-                | Event::StartDefinitionList
-                | Event::StartDefinitionTerm
+                | Event::StartBlockQuote { .. }
+                | Event::StartCaption { .. }
+                | Event::StartDefinitionDetail { .. }
+                | Event::StartDefinitionList { .. }
+                | Event::StartDefinitionTerm { .. }
                 | Event::StartFootnote { .. }
                 | Event::StartHeading { .. }
                 | Event::StartLink { .. }
                 | Event::StartListItem { .. }
                 | Event::StartPreformatted { .. }
-                | Event::StartTable
+                | Event::StartTable { .. }
                 | Event::StartTableCell { .. }
                 | Event::StartTableHeader { .. }
-                | Event::StartTableRow
+                | Event::StartTableRow { .. }
                 | Event::ThematicBreak
                 | _ => "Other",
             })
@@ -148,6 +150,7 @@ mod tests {
         assert!(matches!(
             events.first(),
             Some(Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None
             })
@@ -171,6 +174,7 @@ mod tests {
         assert!(matches!(
             events.first(),
             Some(Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None
             })
@@ -391,7 +395,7 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(!events.iter().any(|e| matches!(e, Event::StartTable)));
+        assert!(!events.iter().any(|e| matches!(e, Event::StartTable { .. })));
         assert!(!events.iter().any(|e| matches!(e, Event::EndTable)));
 
         let has_header = events
