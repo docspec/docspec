@@ -122,6 +122,7 @@ mod tests {
         fn event_sink_collects_events() {
             let mut sink = MockEventSink::new();
             let event1 = crate::Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             };
@@ -163,6 +164,7 @@ mod tests {
         fn event_source_emits_events() {
             let events = vec![
                 crate::Event::StartDocument {
+                    id: None,
                     language: None,
                     metadata: None,
                 },
@@ -205,6 +207,7 @@ mod tests {
         fn pipeline_source_to_sink() {
             let events = vec![
                 crate::Event::StartDocument {
+                    id: None,
                     language: None,
                     metadata: None,
                 },

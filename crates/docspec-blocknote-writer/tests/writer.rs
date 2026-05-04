@@ -131,6 +131,7 @@ mod tests {
     fn empty_document() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -143,6 +144,7 @@ mod tests {
     fn single_paragraph() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -174,6 +176,7 @@ mod tests {
     fn bold_text() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -205,6 +208,7 @@ mod tests {
     fn italic_text() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -236,6 +240,7 @@ mod tests {
     fn bold_and_italic_text() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -267,6 +272,7 @@ mod tests {
     fn heading_level_1() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -295,6 +301,7 @@ mod tests {
     fn heading_level_2() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -323,6 +330,7 @@ mod tests {
     fn multiple_paragraphs() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -370,6 +378,7 @@ mod tests {
     fn image_block() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -394,6 +403,7 @@ mod tests {
     fn image_without_alt() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -419,6 +429,7 @@ mod tests {
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
         let start_result = writer.handle_event(Event::StartDocument {
+            id: None,
             language: None,
             metadata: None,
         });
@@ -439,6 +450,7 @@ mod tests {
     fn mixed_content() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -492,10 +504,11 @@ mod tests {
     fn ignored_events() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
-            Event::StartBlockQuote,
+            Event::StartBlockQuote { id: None },
             Event::EndBlockQuote,
             Event::LineBreak,
             Event::ThematicBreak,
@@ -508,6 +521,7 @@ mod tests {
     fn text_outside_block_auto_opens_paragraph() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -534,6 +548,7 @@ mod tests {
     fn multiple_text_in_paragraph() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -576,6 +591,7 @@ mod tests {
     fn two_paragraphs_without_ids() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -623,6 +639,7 @@ mod tests {
     fn json_escaping_quotes() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -654,6 +671,7 @@ mod tests {
     fn json_escaping_backslash() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -685,6 +703,7 @@ mod tests {
     fn json_escaping_newline() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -716,6 +735,7 @@ mod tests {
     fn json_escaping_tab() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -747,6 +767,7 @@ mod tests {
     fn empty_paragraph() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -767,6 +788,7 @@ mod tests {
     fn empty_heading() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -784,6 +806,7 @@ mod tests {
     fn image_in_paragraph() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -824,6 +847,7 @@ mod tests {
     fn heading_then_paragraph() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -868,6 +892,7 @@ mod tests {
     fn json_escaping_carriage_return() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -899,6 +924,7 @@ mod tests {
     fn image_url_escaping() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -923,6 +949,7 @@ mod tests {
     fn end_paragraph_after_image_is_noop() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -952,6 +979,7 @@ mod tests {
     fn error_on_start_document() {
         let mut writer = BlockNoteWriter::new(FailingWriter::new(0));
         let result = writer.handle_event(Event::StartDocument {
+            id: None,
             language: None,
             metadata: None,
         });
@@ -962,6 +990,7 @@ mod tests {
     fn error_on_end_document() {
         let mut writer = BlockNoteWriter::new(FailingWriter::new(1));
         let start_result = writer.handle_event(Event::StartDocument {
+            id: None,
             language: None,
             metadata: None,
         });
@@ -974,6 +1003,7 @@ mod tests {
     fn error_on_heading_begin_object() {
         let mut writer = BlockNoteWriter::new(FailingWriter::new(1));
         let start_result = writer.handle_event(Event::StartDocument {
+            id: None,
             language: None,
             metadata: None,
         });
@@ -986,6 +1016,7 @@ mod tests {
     fn error_on_paragraph_begin_object() {
         let mut writer = BlockNoteWriter::new(FailingWriter::new(1));
         let start_result = writer.handle_event(Event::StartDocument {
+            id: None,
             language: None,
             metadata: None,
         });
@@ -1004,6 +1035,7 @@ mod tests {
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::with_assets(&mut buf, &provider);
         let start_result = writer.handle_event(Event::StartDocument {
+            id: None,
             language: None,
             metadata: None,
         });
@@ -1035,6 +1067,7 @@ mod tests {
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::with_assets(&mut buf, &provider);
         let start_result = writer.handle_event(Event::StartDocument {
+            id: None,
             language: None,
             metadata: None,
         });
@@ -1059,6 +1092,7 @@ mod tests {
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::with_assets(&mut buf, &provider);
         let start_result = writer.handle_event(Event::StartDocument {
+            id: None,
             language: None,
             metadata: None,
         });
@@ -1082,6 +1116,7 @@ mod tests {
         let json = run_events_with_assets(
             &[
                 Event::StartDocument {
+                    id: None,
                     language: None,
                     metadata: None,
                 },
@@ -1110,6 +1145,7 @@ mod tests {
         let json = run_events_with_assets(
             &[
                 Event::StartDocument {
+                    id: None,
                     language: None,
                     metadata: None,
                 },
@@ -1139,6 +1175,7 @@ mod tests {
         let json = run_events_with_assets(
             &[
                 Event::StartDocument {
+                    id: None,
                     language: None,
                     metadata: None,
                 },
@@ -1177,6 +1214,7 @@ mod tests {
         let json = run_events_with_assets(
             &[
                 Event::StartDocument {
+                    id: None,
                     language: None,
                     metadata: None,
                 },
@@ -1215,6 +1253,7 @@ mod tests {
         let json = run_events_with_assets(
             &[
                 Event::StartDocument {
+                    id: None,
                     language: None,
                     metadata: None,
                 },
@@ -1266,6 +1305,7 @@ mod tests {
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::with_assets(&mut buf, &provider);
         let start_result = writer.handle_event(Event::StartDocument {
+            id: None,
             language: None,
             metadata: None,
         });
@@ -1286,6 +1326,7 @@ mod tests {
     fn heading_with_explicit_id() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
@@ -1314,6 +1355,7 @@ mod tests {
     fn paragraph_without_id_omits_id_key() {
         let json = run_events(&[
             Event::StartDocument {
+                id: None,
                 language: None,
                 metadata: None,
             },
