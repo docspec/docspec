@@ -139,7 +139,8 @@ impl<'a> MarkdownReader<'a> {
         match tag_end {
             TagEnd::Heading(_) => self.push_event_end(Event::EndHeading),
             TagEnd::Paragraph => self.push_event_end(Event::EndParagraph),
-            TagEnd::BlockQuote(_) | TagEnd::Item | TagEnd::TableCell => {
+            TagEnd::BlockQuote(_) => self.push_event_end(Event::EndBlockQuote),
+            TagEnd::Item | TagEnd::TableCell => {
                 if self.block_state == BlockState::AutoParagraph {
                     self.push_event_end(Event::EndParagraph);
                 }
@@ -209,6 +210,7 @@ impl<'a> MarkdownReader<'a> {
                 alignment: None,
                 id: None,
             }),
+            Tag::BlockQuote(_) => self.push_event_start(Event::StartBlockQuote { id: None }),
             Tag::Emphasis => {
                 self.italic_depth = self.italic_depth.saturating_add(1);
             }
@@ -228,8 +230,7 @@ impl<'a> MarkdownReader<'a> {
                     url: dest_url.into_string(),
                 });
             }
-            Tag::BlockQuote(_)
-            | Tag::CodeBlock(_)
+            Tag::CodeBlock(_)
             | Tag::DefinitionList
             | Tag::DefinitionListDefinition
             | Tag::DefinitionListTitle
@@ -331,7 +332,7 @@ impl<'a> MarkdownReader<'a> {
                 }
             }
             pulldown_cmark::Event::Rule => {
-                self.queue.push_back(Event::ThematicBreak);
+                self.queue.push_back(Event::ThematicBreak { id: None });
             }
             pulldown_cmark::Event::DisplayMath(_)
             | pulldown_cmark::Event::FootnoteReference(_)

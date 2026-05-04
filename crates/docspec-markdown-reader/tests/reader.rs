@@ -24,10 +24,10 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(!events
+        assert!(events
             .iter()
             .any(|e| matches!(e, Event::StartBlockQuote { .. })));
-        assert!(!events.iter().any(|e| matches!(e, Event::EndBlockQuote)));
+        assert!(events.iter().any(|e| matches!(e, Event::EndBlockQuote)));
 
         let has_quoted = events
             .iter()
@@ -117,7 +117,7 @@ mod tests {
                 | Event::StartTableCell { .. }
                 | Event::StartTableHeader { .. }
                 | Event::StartTableRow { .. }
-                | Event::ThematicBreak
+                | Event::ThematicBreak { .. }
                 | _ => "Other",
             })
             .collect();
@@ -414,7 +414,9 @@ mod tests {
         let mut reader = MarkdownReader::new("Before\n\n---\n\nAfter");
         let events = collect_events(&mut reader);
 
-        assert!(events.iter().any(|e| matches!(e, Event::ThematicBreak)));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, Event::ThematicBreak { .. })));
     }
 
     #[test]
