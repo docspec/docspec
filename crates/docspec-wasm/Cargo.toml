@@ -1,0 +1,75 @@
+[package]
+name = "docspec-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "WebAssembly bindings for the DocSpec document conversion library."
+readme = "README.md"
+keywords = ["document", "conversion", "streaming", "wasm"]
+categories = ["encoding", "wasm"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+docspec-core = { path = "../docspec-core" }
+docspec-markdown-reader = { path = "../docspec-markdown-reader" }
+docspec-blocknote-writer = { path = "../docspec-blocknote-writer" }
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+
+[lints.clippy]
+# Reason: wasm-bindgen exported functions cannot be inlined
+missing_inline_in_public_items = "allow"
+# Inherit all other workspace clippy lints
+unwrap_used = "deny"
+expect_used = "deny"
+allow_attributes = "deny"
+suspicious = { level = "deny", priority = -1 }
+style = { level = "deny", priority = -1 }
+complexity = { level = "deny", priority = -1 }
+perf = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+restriction = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+cognitive_complexity = "deny"
+option_if_let_else = "deny"
+redundant_pub_crate = "deny"
+use_self = "deny"
+blanket_clippy_restriction_lints = "allow"
+implicit_return = "allow"
+question_mark_used = "allow"
+single_char_lifetime_names = "allow"
+min_ident_chars = "allow"
+absolute_paths = "allow"
+mod_module_files = "allow"
+missing_trait_methods = "allow"
+pattern_type_mismatch = "allow"
+multiple_inherent_impl = "allow"
+allow_attributes_without_reason = "allow"
+shadow_same = "allow"
+default_numeric_fallback = "allow"
+std_instead_of_core = "warn"
+alloc_instead_of_core = "warn"
+std_instead_of_alloc = "warn"
+missing_docs_in_private_items = "allow"
+partial_pub_fields = "allow"
+let_underscore_untyped = "allow"
+str_to_string = "allow"
+semicolon_inside_block = "allow"
+integer_division_remainder_used = "allow"
+big_endian_bytes = "allow"
+little_endian_bytes = "allow"
+host_endian_bytes = "allow"
+cfg_not_test = "allow"
+decimal_literal_representation = "allow"
+pub_use = "allow"
+exhaustive_enums = "allow"
+exhaustive_structs = "allow"
+module_name_repetitions = "allow"
+error_impl_error = "allow"
+multiple_crate_versions = "allow"

@@ -48,6 +48,14 @@ typos:
 taplo:
     taplo fmt --check
 
+# Build the WASM artifact for browser use (debug)
+wasm:
+    wasm-pack build --dev --target web crates/docspec-wasm
+
+# Build the WASM artifact for browser use (release)
+wasm-release:
+    wasm-pack build --release --target web crates/docspec-wasm
+
 # Clean build artifacts
 clean:
     cargo clean
