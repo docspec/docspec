@@ -239,7 +239,10 @@ pub enum Event {
     },
 
     /// A horizontal rule / thematic break.
-    ThematicBreak,
+    ThematicBreak {
+        /// Optional block identifier.
+        id: Option<String>,
+    },
 }
 
 #[cfg(test)]
@@ -441,9 +444,12 @@ mod tests {
     #[test]
     fn partial_eq_unit_variants() {
         assert_eq!(Event::EndDocument, Event::EndDocument);
-        assert_eq!(Event::ThematicBreak, Event::ThematicBreak);
+        assert_eq!(
+            Event::ThematicBreak { id: None },
+            Event::ThematicBreak { id: None }
+        );
         assert_eq!(Event::LineBreak, Event::LineBreak);
-        assert_ne!(Event::EndDocument, Event::ThematicBreak);
+        assert_ne!(Event::EndDocument, Event::ThematicBreak { id: None });
     }
 
     #[test]
@@ -877,7 +883,7 @@ mod tests {
 
     #[test]
     fn thematic_break() {
-        let event = Event::ThematicBreak;
+        let event = Event::ThematicBreak { id: None };
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }

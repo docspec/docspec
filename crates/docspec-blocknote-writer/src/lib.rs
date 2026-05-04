@@ -92,6 +92,31 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Ok(())
     }
 
+    fn handle_blockquote(&mut self, id: Option<&String>) -> Result<()> {
+        self.close_text_block_if_needed()?;
+        self.writer.begin_object().map_err(io_err)?;
+        self.writer.name("type").map_err(io_err)?;
+        self.writer.string_value("quote").map_err(io_err)?;
+        self.write_id(id)?;
+
+        self.writer.name("content").map_err(io_err)?;
+        self.writer.begin_array().map_err(io_err)?;
+
+        self.in_text_block = true;
+        Ok(())
+    }
+
+    fn handle_divider(&mut self, id: Option<&String>) -> Result<()> {
+        self.close_text_block_if_needed()?;
+        self.writer.begin_object().map_err(io_err)?;
+        self.writer.name("type").map_err(io_err)?;
+        self.writer.string_value("divider").map_err(io_err)?;
+        self.write_id(id)?;
+        self.writer.end_object().map_err(io_err)?;
+
+        Ok(())
+    }
+
     fn handle_heading(&mut self, level: u8, id: Option<&String>) -> Result<()> {
         self.close_text_block_if_needed()?;
         self.writer.begin_object().map_err(io_err)?;
@@ -153,10 +178,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         let caption = alt.unwrap_or_default();
 
         self.writer.begin_object().map_err(io_err)?;
-        if let Some(id_val) = id {
-            self.writer.name("id").map_err(io_err)?;
-            self.writer.string_value(id_val).map_err(io_err)?;
-        }
+        self.write_id(id)?;
         self.writer.name("type").map_err(io_err)?;
         self.writer.string_value("image").map_err(io_err)?;
         self.writer.name("props").map_err(io_err)?;
@@ -179,10 +201,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     fn handle_paragraph(&mut self, id: Option<&String>) -> Result<()> {
         self.close_text_block_if_needed()?;
         self.writer.begin_object().map_err(io_err)?;
-        if let Some(id_val) = id {
-            self.writer.name("id").map_err(io_err)?;
-            self.writer.string_value(id_val).map_err(io_err)?;
-        }
+        self.write_id(id)?;
         self.writer.name("type").map_err(io_err)?;
         self.writer.string_value("paragraph").map_err(io_err)?;
         self.writer.name("props").map_err(io_err)?;
@@ -282,8 +301,18 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 self.writer.end_array().map_err(io_err)
             }
             Event::StartHeading { level, id, .. } => self.handle_heading(level, id.as_ref()),
-            Event::EndHeading | Event::EndParagraph => self.close_text_block_if_needed(),
+            Event::EndHeading
+            | Event::EndParagraph
+            | Event::EndBlockQuote
+            | Event::EndPreformatted
+            | Event::EndTable
+            | Event::EndTableCell
+            | Event::EndTableHeader
+            | Event::EndTableRow
+            | Event::EndListItem => self.close_text_block_if_needed(),
             Event::StartParagraph { id, .. } => self.handle_paragraph(id.as_ref()),
+            Event::StartBlockQuote { id, .. } => self.handle_blockquote(id.as_ref()),
+            Event::ThematicBreak { id, .. } => self.handle_divider(id.as_ref()),
             Event::Text {
                 content,
                 bold,
@@ -293,22 +322,14 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             Event::Image {
                 source, alt, id, ..
             } => self.handle_image(source, alt, id.as_ref()),
-            Event::EndBlockQuote
-            | Event::EndCaption
+            Event::EndCaption
             | Event::EndDefinitionDetail
             | Event::EndDefinitionList
             | Event::EndDefinitionTerm
             | Event::EndFootnote
             | Event::EndLink
-            | Event::EndListItem
-            | Event::EndPreformatted
-            | Event::EndTable
-            | Event::EndTableCell
-            | Event::EndTableHeader
-            | Event::EndTableRow
             | Event::FootnoteRef { .. }
             | Event::LineBreak
-            | Event::StartBlockQuote { .. }
             | Event::StartCaption { .. }
             | Event::StartDefinitionDetail { .. }
             | Event::StartDefinitionList { .. }
@@ -321,7 +342,6 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             | Event::StartTableCell { .. }
             | Event::StartTableHeader { .. }
             | Event::StartTableRow { .. }
-            | Event::ThematicBreak
             | _ => Ok(()),
         }
     }

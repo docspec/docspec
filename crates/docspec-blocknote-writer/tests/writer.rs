@@ -511,10 +511,13 @@ mod tests {
             Event::StartBlockQuote { id: None },
             Event::EndBlockQuote,
             Event::LineBreak,
-            Event::ThematicBreak,
+            Event::ThematicBreak { id: None },
             Event::EndDocument,
         ]);
-        assert_eq!(json, "[]");
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[],"children":[]},{"type":"divider"}]"#
+        );
     }
 
     #[test]
