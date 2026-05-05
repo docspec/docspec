@@ -10,7 +10,7 @@ mod tests {
     use std::io::Write;
 
     use docspec_blocknote_writer::BlockNoteWriter;
-    use docspec_core::{AssetProvider, Event, EventSink as _, ImageSource};
+    use docspec_core::{AssetProvider, Event, EventSink as _, ImageSource, StackTrackingSink};
 
     struct FailingWriter {
         fail_after: usize,
@@ -98,7 +98,7 @@ mod tests {
 
     fn run_events_with_assets(events: &[Event], provider: &dyn AssetProvider) -> String {
         let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::with_assets(&mut buf, provider);
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::with_assets(&mut buf, provider));
         for event in events {
             let handle_result = writer.handle_event(event.clone());
             assert!(
@@ -115,7 +115,7 @@ mod tests {
 
     fn run_events(events: &[Event]) -> String {
         let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
         for event in events {
             let handle_result = writer.handle_event(event.clone());
             assert!(handle_result.is_ok(), "handle_event failed");
@@ -427,7 +427,7 @@ mod tests {
     #[test]
     fn image_with_asset_source_without_provider_errors() {
         let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
         let start_result = writer.handle_event(Event::StartDocument {
             id: None,
             language: None,
@@ -635,6 +635,249 @@ mod tests {
         assert_eq!(
             json,
             r#"[{"type":"quote","content":[{"type":"text","text":"quoted","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"normal","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn blockquote_multiline() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartBlockQuote { id: None },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "line1".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::LineBreak,
+            Event::Text {
+                content: "line2".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::LineBreak,
+            Event::Text {
+                content: "line3".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[{"type":"text","text":"line1","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"line2","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"line3","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn stack_empty_after_document() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartHeading { level: 1, id: None },
+            Event::Text {
+                content: "Title".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndHeading,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Body".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::StartBlockQuote { id: None },
+            Event::Text {
+                content: "Quote".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Title","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Body","styles":{}}],"children":[]},{"type":"quote","content":[{"type":"text","text":"Quote","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn end_blockquote_auto_closes_open_content() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartBlockQuote { id: None },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Quoted text".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[{"type":"text","text":"Quoted text","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn multiple_block_types_in_sequence() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Para".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::StartBlockQuote { id: None },
+            Event::Text {
+                content: "Quote".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndBlockQuote,
+            Event::StartHeading { level: 2, id: None },
+            Event::Text {
+                content: "Head".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndHeading,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Para","styles":{}}],"children":[]},{"type":"quote","content":[{"type":"text","text":"Quote","styles":{}}],"children":[]},{"type":"heading","props":{"level":2,"textAlignment":"left"},"content":[{"type":"text","text":"Head","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn list_item_and_table_tracked_on_stack() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartListItem {
+                id: None,
+                level: 1,
+                list_type: docspec_core::ListType::Unordered,
+                start: None,
+                style_type: None,
+            },
+            Event::Text {
+                content: "Item".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndListItem,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -946,6 +1189,7 @@ mod tests {
                 superscript: false,
                 mark: None,
             },
+            Event::EndParagraph,
             Event::Image {
                 source: ImageSource::Uri {
                     uri: "https://example.com/img.png".to_string(),
@@ -955,7 +1199,6 @@ mod tests {
                 decorative: false,
                 id: None,
             },
-            Event::EndParagraph,
             Event::EndDocument,
         ]);
         assert_eq!(
@@ -1078,6 +1321,7 @@ mod tests {
                 alignment: None,
                 id: None,
             },
+            Event::EndParagraph,
             Event::Image {
                 source: ImageSource::Uri {
                     uri: "https://example.com/img.png".to_string(),
@@ -1087,7 +1331,6 @@ mod tests {
                 decorative: false,
                 id: None,
             },
-            Event::EndParagraph,
             Event::EndDocument,
         ]);
         assert_eq!(
@@ -1098,7 +1341,7 @@ mod tests {
 
     #[test]
     fn error_on_start_document() {
-        let mut writer = BlockNoteWriter::new(FailingWriter::new(0));
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(FailingWriter::new(0)));
         let result = writer.handle_event(Event::StartDocument {
             id: None,
             language: None,
@@ -1109,7 +1352,7 @@ mod tests {
 
     #[test]
     fn error_on_end_document() {
-        let mut writer = BlockNoteWriter::new(FailingWriter::new(1));
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(FailingWriter::new(1)));
         let start_result = writer.handle_event(Event::StartDocument {
             id: None,
             language: None,
@@ -1122,7 +1365,7 @@ mod tests {
 
     #[test]
     fn error_on_heading_begin_object() {
-        let mut writer = BlockNoteWriter::new(FailingWriter::new(1));
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(FailingWriter::new(1)));
         let start_result = writer.handle_event(Event::StartDocument {
             id: None,
             language: None,
@@ -1135,7 +1378,7 @@ mod tests {
 
     #[test]
     fn error_on_paragraph_begin_object() {
-        let mut writer = BlockNoteWriter::new(FailingWriter::new(1));
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(FailingWriter::new(1)));
         let start_result = writer.handle_event(Event::StartDocument {
             id: None,
             language: None,
@@ -1154,7 +1397,7 @@ mod tests {
         let provider =
             MockAssetProvider::new().with_asset("img1", "image/png", &[0x89, 0x50, 0x4E, 0x47]);
         let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::with_assets(&mut buf, &provider);
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::with_assets(&mut buf, &provider));
         let start_result = writer.handle_event(Event::StartDocument {
             id: None,
             language: None,
@@ -1186,7 +1429,7 @@ mod tests {
     fn image_with_asset_not_found_content_type() {
         let provider = MockAssetProvider::new();
         let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::with_assets(&mut buf, &provider);
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::with_assets(&mut buf, &provider));
         let start_result = writer.handle_event(Event::StartDocument {
             id: None,
             language: None,
@@ -1211,7 +1454,7 @@ mod tests {
             .with_asset("img1", "image/png", &[0x89])
             .with_failing_stream();
         let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::with_assets(&mut buf, &provider);
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::with_assets(&mut buf, &provider));
         let start_result = writer.handle_event(Event::StartDocument {
             id: None,
             language: None,
@@ -1393,6 +1636,7 @@ mod tests {
                     superscript: false,
                     mark: None,
                 },
+                Event::EndParagraph,
                 Event::Image {
                     source: ImageSource::Asset {
                         asset_id: "img1".to_string(),
@@ -1402,7 +1646,6 @@ mod tests {
                     decorative: false,
                     id: None,
                 },
-                Event::EndParagraph,
                 Event::EndDocument,
             ],
             &provider,
@@ -1424,7 +1667,7 @@ mod tests {
     fn image_with_asset_stream_not_found() {
         let provider = MockAssetProvider::new().with_content_type_only("img1", "image/png");
         let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::with_assets(&mut buf, &provider);
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::with_assets(&mut buf, &provider));
         let start_result = writer.handle_event(Event::StartDocument {
             id: None,
             language: None,
