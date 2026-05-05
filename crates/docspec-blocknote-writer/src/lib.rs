@@ -220,7 +220,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     fn handle_paragraph(&mut self, id: Option<&String>) -> Result<()> {
         if self.blockquote_depth > 0 {
             if self.blockquote_has_content {
-                self.handle_text("\n", false, false)?;
+                self.handle_text("\n\n", false, false)?;
             }
             return Ok(());
         }
