@@ -17,8 +17,16 @@
 //! - `StartHeading` / `EndHeading` — heading blocks
 //! - `StartParagraph` / `EndParagraph` — paragraph blocks
 //! - `StartBlockQuote` / `EndBlockQuote` — quote blocks
+//! - `StartPreformatted` / `EndPreformatted` — code blocks
+//! - `StartListItem` / `EndListItem` — list item tracking
+//! - `StartTable` / `EndTable` — table tracking
+//! - `StartTableRow` / `EndTableRow` — table row tracking
+//! - `StartTableCell` / `EndTableCell` — table cell tracking
+//! - `StartTableHeader` / `EndTableHeader` — table header tracking
 //! - `Text` — inline text content with bold/italic styles
 //! - `Image` — image blocks
+//! - `LineBreak` — line breaks within content blocks
+//! - `ThematicBreak` — divider blocks
 //!
 //! All other events are silently ignored.
 //!
@@ -26,10 +34,10 @@
 //!
 //! ```
 //! use docspec_blocknote_writer::BlockNoteWriter;
-//! use docspec_core::{Event, EventSink};
+//! use docspec_core::{Event, EventSink, StackTrackingSink};
 //!
 //! let mut buf = Vec::<u8>::new();
-//! let mut writer = BlockNoteWriter::new(&mut buf);
+//! let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 //!
 //! writer.handle_event(Event::StartDocument { id: None, language: None, metadata: None })?;
 //! writer.handle_event(Event::StartParagraph { alignment: None, id: None })?;
@@ -71,58 +79,46 @@ use struson::writer::{JsonStreamWriter, JsonWriter as _};
 pub struct BlockNoteWriter<'a, W: Write> {
     /// Optional asset provider for resolving embedded asset references.
     assets: Option<&'a dyn AssetProvider>,
-    /// Whether we're currently inside a blockquote (suppresses inner paragraph wrappers).
-    in_blockquote: bool,
-    /// Whether we're currently inside a paragraph/heading block (affects Image handling).
+    /// Depth of blockquote nesting (0 = not inside blockquote).
+    blockquote_depth: u32,
+    /// Whether we are inside a text-bearing content block (heading, paragraph, preformatted, or blockquote).
     in_text_block: bool,
     /// The underlying JSON stream writer.
     writer: JsonStreamWriter<W>,
 }
 
 impl<'a, W: Write> BlockNoteWriter<'a, W> {
-    fn close_text_block_if_needed(&mut self) -> Result<()> {
-        if self.in_text_block {
-            // Close content array
-            self.writer.end_array().map_err(io_err)?;
-            // Write children: []
-            self.writer.name("children").map_err(io_err)?;
-            self.writer.begin_array().map_err(io_err)?;
-            self.writer.end_array().map_err(io_err)?;
-            // Close block object
-            self.writer.end_object().map_err(io_err)?;
-            self.in_text_block = false;
-        }
+    fn close_content_block(&mut self) -> Result<()> {
+        self.writer.end_array().map_err(io_err)?;
+        self.writer.name("children").map_err(io_err)?;
+        self.writer.begin_array().map_err(io_err)?;
+        self.writer.end_array().map_err(io_err)?;
+        self.writer.end_object().map_err(io_err)?;
         Ok(())
     }
 
     fn handle_blockquote(&mut self, id: Option<&String>) -> Result<()> {
-        self.close_text_block_if_needed()?;
         self.writer.begin_object().map_err(io_err)?;
         self.writer.name("type").map_err(io_err)?;
         self.writer.string_value("quote").map_err(io_err)?;
         self.write_id(id)?;
-
         self.writer.name("content").map_err(io_err)?;
         self.writer.begin_array().map_err(io_err)?;
-
-        self.in_blockquote = true;
+        self.blockquote_depth = self.blockquote_depth.saturating_add(1);
         self.in_text_block = true;
         Ok(())
     }
 
     fn handle_divider(&mut self, id: Option<&String>) -> Result<()> {
-        self.close_text_block_if_needed()?;
         self.writer.begin_object().map_err(io_err)?;
         self.writer.name("type").map_err(io_err)?;
         self.writer.string_value("divider").map_err(io_err)?;
         self.write_id(id)?;
         self.writer.end_object().map_err(io_err)?;
-
         Ok(())
     }
 
     fn handle_heading(&mut self, level: u8, id: Option<&String>) -> Result<()> {
-        self.close_text_block_if_needed()?;
         self.writer.begin_object().map_err(io_err)?;
         self.writer.name("type").map_err(io_err)?;
         self.writer.string_value("heading").map_err(io_err)?;
@@ -136,7 +132,6 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.writer.end_object().map_err(io_err)?;
         self.writer.name("content").map_err(io_err)?;
         self.writer.begin_array().map_err(io_err)?;
-
         self.in_text_block = true;
         Ok(())
     }
@@ -147,8 +142,10 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         alt: Option<String>,
         id: Option<&String>,
     ) -> Result<()> {
-        self.close_text_block_if_needed()?;
-
+        if self.in_text_block && self.blockquote_depth == 0 {
+            self.close_content_block()?;
+            self.in_text_block = false;
+        }
         let url = match source {
             ImageSource::Uri { uri } => uri,
             ImageSource::Asset { asset_id } => {
@@ -203,7 +200,9 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_paragraph(&mut self, id: Option<&String>) -> Result<()> {
-        self.close_text_block_if_needed()?;
+        if self.blockquote_depth > 0 {
+            return Ok(());
+        }
         self.writer.begin_object().map_err(io_err)?;
         self.write_id(id)?;
         self.writer.name("type").map_err(io_err)?;
@@ -215,13 +214,11 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.writer.end_object().map_err(io_err)?;
         self.writer.name("content").map_err(io_err)?;
         self.writer.begin_array().map_err(io_err)?;
-
         self.in_text_block = true;
         Ok(())
     }
 
     fn handle_preformatted(&mut self, id: Option<&String>, syntax: Option<&String>) -> Result<()> {
-        self.close_text_block_if_needed()?;
         self.writer.begin_object().map_err(io_err)?;
         self.writer.name("type").map_err(io_err)?;
         self.writer.string_value("codeBlock").map_err(io_err)?;
@@ -235,14 +232,13 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         }
         self.writer.name("content").map_err(io_err)?;
         self.writer.begin_array().map_err(io_err)?;
-
         self.in_text_block = true;
         Ok(())
     }
 
     fn handle_text(&mut self, content: &str, bold: bool, italic: bool) -> Result<()> {
         if !self.in_text_block {
-            self.handle_paragraph(None)?;
+            return Ok(());
         }
         self.writer.begin_object().map_err(io_err)?;
         self.writer.name("type").map_err(io_err)?;
@@ -274,7 +270,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     pub fn new(writer: W) -> Self {
         Self {
             assets: None,
-            in_blockquote: false,
+            blockquote_depth: 0,
             in_text_block: false,
             writer: JsonStreamWriter::new(writer),
         }
@@ -295,7 +291,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     pub fn with_assets(writer: W, assets: &'a dyn AssetProvider) -> Self {
         Self {
             assets: Some(assets),
-            in_blockquote: false,
+            blockquote_depth: 0,
             in_text_block: false,
             writer: JsonStreamWriter::new(writer),
         }
@@ -306,7 +302,6 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             self.writer.name("id").map_err(io_err)?;
             self.writer.string_value(id_val).map_err(io_err)?;
         }
-
         Ok(())
     }
 }
@@ -322,37 +317,29 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
     fn handle_event(&mut self, event: Event) -> Result<()> {
         match event {
             Event::StartDocument { .. } => self.writer.begin_array().map_err(io_err),
-            Event::EndDocument => {
-                self.close_text_block_if_needed()?;
-                self.writer.end_array().map_err(io_err)
-            }
+            Event::EndDocument => self.writer.end_array().map_err(io_err),
             Event::StartHeading { level, id, .. } => self.handle_heading(level, id.as_ref()),
-            Event::StartParagraph { id, .. } => {
-                if self.in_blockquote {
-                    Ok(())
-                } else {
-                    self.handle_paragraph(id.as_ref())
-                }
+            Event::EndHeading | Event::EndPreformatted => {
+                self.close_content_block()?;
+                self.in_text_block = false;
+                Ok(())
             }
+            Event::StartParagraph { id, .. } => self.handle_paragraph(id.as_ref()),
             Event::EndParagraph => {
-                if self.in_blockquote {
-                    Ok(())
-                } else {
-                    self.close_text_block_if_needed()
+                if self.blockquote_depth > 0 || !self.in_text_block {
+                    return Ok(());
                 }
+                self.close_content_block()?;
+                self.in_text_block = false;
+                Ok(())
             }
-            Event::EndBlockQuote => {
-                self.in_blockquote = false;
-                self.close_text_block_if_needed()
-            }
-            Event::EndHeading
-            | Event::EndPreformatted
-            | Event::EndTable
-            | Event::EndTableCell
-            | Event::EndTableHeader
-            | Event::EndTableRow
-            | Event::EndListItem => self.close_text_block_if_needed(),
             Event::StartBlockQuote { id, .. } => self.handle_blockquote(id.as_ref()),
+            Event::EndBlockQuote => {
+                self.close_content_block()?;
+                self.blockquote_depth = self.blockquote_depth.saturating_sub(1);
+                self.in_text_block = self.blockquote_depth > 0;
+                Ok(())
+            }
             Event::StartPreformatted { id, syntax, .. } => {
                 self.handle_preformatted(id.as_ref(), syntax.as_ref())
             }
@@ -362,18 +349,35 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 bold,
                 italic,
                 ..
-            } => self.handle_text(&content, bold, italic),
+            } => {
+                // Auto-open paragraph for orphan text (e.g., text after image closed paragraph)
+                if !self.in_text_block && self.blockquote_depth == 0 {
+                    self.handle_paragraph(None)?;
+                }
+                self.handle_text(&content, bold, italic)
+            }
             Event::Image {
                 source, alt, id, ..
             } => self.handle_image(source, alt, id.as_ref()),
+            Event::LineBreak => {
+                if self.in_text_block {
+                    self.handle_text("\n", false, false)
+                } else {
+                    Ok(())
+                }
+            }
             Event::EndCaption
             | Event::EndDefinitionDetail
             | Event::EndDefinitionList
             | Event::EndDefinitionTerm
             | Event::EndFootnote
             | Event::EndLink
+            | Event::EndListItem
+            | Event::EndTable
+            | Event::EndTableCell
+            | Event::EndTableHeader
+            | Event::EndTableRow
             | Event::FootnoteRef { .. }
-            | Event::LineBreak
             | Event::StartCaption { .. }
             | Event::StartDefinitionDetail { .. }
             | Event::StartDefinitionList { .. }

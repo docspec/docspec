@@ -27,7 +27,7 @@
 //! - Italic text → `Text { italic: true, ... }`
 //! - Inline code → `Text { code: true, ... }`
 //! - Images → `Image { source: Uri, alt, title, decorative }`
-//! - Hard line breaks → `LineBreak`
+//! - Hard and soft line breaks → `LineBreak`
 //! - Thematic breaks → `ThematicBreak`
 //!
 //! # Unsupported Elements
@@ -171,7 +171,15 @@ impl<'a> MarkdownReader<'a> {
                     });
                 }
             }
-            TagEnd::CodeBlock => self.push_event_end(Event::EndPreformatted),
+            TagEnd::CodeBlock => {
+                if let Some(Event::Text { content, .. }) = self.queue.back_mut() {
+                    let trimmed = content.trim_end_matches('\n');
+                    if trimmed.len() != content.len() {
+                        *content = trimmed.to_owned();
+                    }
+                }
+                self.push_event_end(Event::EndPreformatted);
+            }
             TagEnd::DefinitionList
             | TagEnd::DefinitionListDefinition
             | TagEnd::DefinitionListTitle
@@ -323,18 +331,11 @@ impl<'a> MarkdownReader<'a> {
             pulldown_cmark::Event::End(tag_end) => self.handle_end_tag(tag_end),
             pulldown_cmark::Event::Text(text) => self.handle_text(text.into_string()),
             pulldown_cmark::Event::Code(code) => self.handle_code(code.into_string()),
-            pulldown_cmark::Event::HardBreak => {
+            pulldown_cmark::Event::HardBreak | pulldown_cmark::Event::SoftBreak => {
                 if let Some(img) = &mut self.image {
                     img.alt_buf.push(' ');
                 } else {
                     self.queue.push_back(Event::LineBreak);
-                }
-            }
-            pulldown_cmark::Event::SoftBreak => {
-                if let Some(img) = &mut self.image {
-                    img.alt_buf.push(' ');
-                } else {
-                    self.handle_text(" ".to_string());
                 }
             }
             pulldown_cmark::Event::Rule => {

@@ -19,11 +19,13 @@ extern crate alloc;
 
 mod error;
 mod event;
+mod stack;
 mod traits;
 mod types;
 
 pub use error::{Error, Position, Result};
 pub use event::Event;
+pub use stack::{block_kind_for_end, block_kind_for_start, BlockKind, StackTrackingSink};
 pub use traits::{AssetProvider, EventSink, EventSource};
 pub use types::{
     Author, Color, DocumentMeta, ImageSource, ListStyleType, ListType, TableHeaderScope,

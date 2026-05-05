@@ -1,0 +1,33 @@
+[
+  {
+    "type": "quote",
+    "content": [
+      {
+        "type": "text",
+        "text": "test123",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "\n",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "xyz",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "\n",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "123",
+        "styles": {}
+      }
+    ],
+    "children": []
+  }
+]
