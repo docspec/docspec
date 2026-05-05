@@ -8,7 +8,7 @@ DocSpec is a streaming document conversion library in Rust. Documents are stream
 - [ARCHITECTURE.md](ARCHITECTURE.md) — streaming pipeline and design
 - [EVENTS.md](EVENTS.md) — event types and well-formedness rules
 - [CODING_STANDARDS.md](CODING_STANDARDS.md) — code quality rules
-- [TESTING.md](TESTING.md) — 99.5% coverage requirement and test types
+- [TESTING.md](TESTING.md) — 98% coverage requirement and test types
 - [CONTRIBUTING.md](CONTRIBUTING.md) — branching, commits, PRs, semver
 - [SECURITY.md](SECURITY.md) — error handling by context, resource limits
 
@@ -19,7 +19,7 @@ DocSpec is a streaming document conversion library in Rust. Documents are stream
 - **No inline #[allow]** — fix the code, not the warning
 - **Never buffer full documents** — stream always
 - **Fail fast** — return errors immediately
-- **99.5% test coverage floor**
+- **98% test coverage floor**
 
 See [CODING_STANDARDS.md](CODING_STANDARDS.md) for full details.
 

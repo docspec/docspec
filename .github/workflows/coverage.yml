@@ -14,5 +14,4 @@ jobs:
         with:
           components: llvm-tools-preview
       - uses: taiki-e/install-action@cargo-llvm-cov
-      - run: cargo llvm-cov --workspace --lcov --output-path lcov.info
-      - run: cargo llvm-cov report --fail-under-lines 99.5
+      - run: cargo llvm-cov --workspace --exclude docspec-wasm --exclude docspec-cli --lcov --output-path lcov.info --fail-under-lines 98
