@@ -10,7 +10,7 @@ use std::io::{IsTerminal as _, Read as _, Write};
 
 use clap::Parser as _;
 use docspec_blocknote_writer::BlockNoteWriter;
-use docspec_core::{EventSink as _, EventSource as _};
+use docspec_core::{EventSink as _, EventSource as _, StackTrackingSink};
 use docspec_markdown_reader::MarkdownReader;
 
 use crate::args::{Cli, ColorChoice, Format};
@@ -19,7 +19,7 @@ use crate::error::{CliError, Result};
 /// Runs the streaming conversion pipeline from markdown to `BlockNote`.
 fn run_pipeline<W: Write>(content: &str, output: W) -> Result<()> {
     let mut reader = MarkdownReader::new(content);
-    let mut sink = BlockNoteWriter::new(output);
+    let mut sink = StackTrackingSink::new(BlockNoteWriter::new(output));
 
     let mut next = reader.next_event();
     while let Ok(Some(event)) = next {

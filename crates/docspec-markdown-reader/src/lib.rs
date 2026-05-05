@@ -28,6 +28,7 @@
 //! - Inline code → `Text { code: true, ... }`
 //! - Images → `Image { source: Uri, alt, title, decorative }`
 //! - Hard line breaks → `LineBreak`
+//! - Soft line breaks → space `Text`
 //! - Thematic breaks → `ThematicBreak`
 //!
 //! # Unsupported Elements
@@ -171,7 +172,15 @@ impl<'a> MarkdownReader<'a> {
                     });
                 }
             }
-            TagEnd::CodeBlock => self.push_event_end(Event::EndPreformatted),
+            TagEnd::CodeBlock => {
+                if let Some(Event::Text { content, .. }) = self.queue.back_mut() {
+                    let trimmed = content.trim_end_matches('\n');
+                    if trimmed.len() != content.len() {
+                        *content = trimmed.to_owned();
+                    }
+                }
+                self.push_event_end(Event::EndPreformatted);
+            }
             TagEnd::DefinitionList
             | TagEnd::DefinitionListDefinition
             | TagEnd::DefinitionListTitle
@@ -334,7 +343,17 @@ impl<'a> MarkdownReader<'a> {
                 if let Some(img) = &mut self.image {
                     img.alt_buf.push(' ');
                 } else {
-                    self.handle_text(" ".to_string());
+                    self.queue.push_back(Event::Text {
+                        content: " ".to_string(),
+                        bold: self.bold_depth > 0,
+                        italic: self.italic_depth > 0,
+                        code: false,
+                        strikethrough: false,
+                        underline: false,
+                        subscript: false,
+                        superscript: false,
+                        mark: None,
+                    });
                 }
             }
             pulldown_cmark::Event::Rule => {

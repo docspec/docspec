@@ -379,14 +379,16 @@ mod tests {
     }
 
     #[test]
-    fn soft_break_becomes_space() {
+    fn soft_break_becomes_space_text() {
         let mut reader = MarkdownReader::new("Line one\nLine two");
         let events = collect_events(&mut reader);
 
-        let space_event = events
-            .iter()
-            .any(|e| matches!(e, Event::Text { content, .. } if content == " "));
-        assert!(space_event, "SoftBreak should emit a space Text event");
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, Event::Text { content, .. } if content == " ")),
+            "SoftBreak should emit a space Text event"
+        );
     }
 
     #[test]
@@ -519,10 +521,12 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        let space = events
-            .iter()
-            .any(|e| matches!(e, Event::Text { content, .. } if content == " "));
-        assert!(space);
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, Event::Text { content, .. } if content == " ")),
+            "SoftBreak in table cell should emit space Text"
+        );
     }
 
     #[test]

@@ -1,13 +1,13 @@
 //! Markdown to `BlockNote` JSON pipeline integration tests.
 
 use docspec_blocknote_writer::BlockNoteWriter;
-use docspec_core::{EventSink as _, EventSource as _};
+use docspec_core::{EventSink as _, EventSource as _, StackTrackingSink};
 use docspec_markdown_reader::MarkdownReader;
 
 fn run_pipeline(markdown: &str) -> String {
     let mut reader = MarkdownReader::new(markdown);
     let mut buf = Vec::<u8>::new();
-    let mut writer = BlockNoteWriter::new(&mut buf);
+    let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 
     let mut next = reader.next_event();
     while let Ok(Some(event)) = next {
@@ -112,6 +112,14 @@ mod tests {
     fn pipeline_blockquote() {
         let markdown = include_str!("../../../tests/fixtures/markdown/blockquote.md");
         let expected = include_str!("../../../tests/fixtures/blocknote/blockquote.json");
+        let actual = run_pipeline(markdown);
+        assert_json_eq(&actual, expected);
+    }
+
+    #[test]
+    fn pipeline_blockquote_multiline() {
+        let markdown = include_str!("../../../tests/fixtures/markdown/blockquote_multiline.md");
+        let expected = include_str!("../../../tests/fixtures/blocknote/blockquote_multiline.json");
         let actual = run_pipeline(markdown);
         assert_json_eq(&actual, expected);
     }

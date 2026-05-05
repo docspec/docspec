@@ -4,7 +4,7 @@
 //! environments via wasm-bindgen.
 
 use docspec_blocknote_writer::BlockNoteWriter;
-use docspec_core::{Error, EventSink as _, EventSource as _};
+use docspec_core::{Error, EventSink as _, EventSource as _, StackTrackingSink};
 use docspec_markdown_reader::MarkdownReader;
 use wasm_bindgen::prelude::*;
 
@@ -18,7 +18,7 @@ use wasm_bindgen::prelude::*;
 pub fn convert_markdown_to_blocknote(markdown: &str) -> core::result::Result<String, JsValue> {
     let mut reader = MarkdownReader::new(markdown);
     let mut output = Vec::new();
-    let mut writer = BlockNoteWriter::new(&mut output);
+    let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut output));
 
     let mut next = reader.next_event();
     while let Ok(Some(event)) = next {
