@@ -130,6 +130,13 @@ impl<S: EventSink> EventSink for StackTrackingSink<S> {
     #[inline]
     fn handle_event(&mut self, event: Event) -> Result<()> {
         if let Some(kind) = block_kind_for_start(&event) {
+            if kind == BlockKind::Document && self.stack.contains(&BlockKind::Document) {
+                return Err(Error::InvalidSequence {
+                    expected: "single Document".to_string(),
+                    found: "StartDocument".to_string(),
+                    message: "StartDocument received while Document already open".to_string(),
+                });
+            }
             if kind != BlockKind::Link && self.stack.last() == Some(&BlockKind::Paragraph) {
                 self.stack.pop();
                 self.sink.handle_event(Event::EndParagraph)?;

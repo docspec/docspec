@@ -18,17 +18,14 @@
 //! - `StartParagraph` / `EndParagraph` — paragraph blocks
 //! - `StartBlockQuote` / `EndBlockQuote` — quote blocks
 //! - `StartPreformatted` / `EndPreformatted` — code blocks
-//! - `StartListItem` / `EndListItem` — list item tracking
-//! - `StartTable` / `EndTable` — table tracking
-//! - `StartTableRow` / `EndTableRow` — table row tracking
-//! - `StartTableCell` / `EndTableCell` — table cell tracking
-//! - `StartTableHeader` / `EndTableHeader` — table header tracking
 //! - `Text` — inline text content with bold/italic styles
 //! - `Image` — image blocks
 //! - `LineBreak` — line breaks within content blocks
 //! - `ThematicBreak` — divider blocks
 //!
-//! All other events are silently ignored.
+//! List and table structure events (`StartListItem`, `StartTable*`, etc.) are silently ignored
+//! by this writer. Use `StackTrackingSink` from `docspec_core` to wrap the writer for automatic
+//! paragraph insertion within list items and table cells.
 //!
 //! # Example
 //!
