@@ -594,7 +594,7 @@ mod tests {
                 e,
                 Event::Text {
                     content,
-                    code: false,
+                    code: true,
                     ..
                 } if content.contains("code")
             )
@@ -602,9 +602,10 @@ mod tests {
 
         // The content should preserve the blank lines (two newlines after "code")
         // Only the parser-added terminator should be removed
+        // Use exact equality to catch regressions
         assert!(matches!(
             text_event,
-            Some(Event::Text { content, .. }) if content.contains("code\n\n")
+            Some(Event::Text { content, .. }) if content == "code\n\n"
         ));
     }
 }

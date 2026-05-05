@@ -98,6 +98,8 @@ pub struct MarkdownReader<'a> {
     block_state: BlockState,
     /// Nesting depth for bold (strong) formatting.
     bold_depth: usize,
+    /// Buffered code block text (accumulated until `EndCodeBlock` to strip trailing newline).
+    code_block_buffer: Option<String>,
     /// Buffered image being processed (alt text accumulation).
     image: Option<ImageBuffer>,
     /// Nesting depth for italic (emphasis) formatting.
@@ -173,10 +175,20 @@ impl<'a> MarkdownReader<'a> {
                 }
             }
             TagEnd::CodeBlock => {
-                if let Some(Event::Text { content, .. }) = self.queue.back_mut() {
-                    let trimmed = content.strip_suffix('\n').unwrap_or(content);
-                    if trimmed.len() != content.len() {
-                        *content = trimmed.to_owned();
+                if let Some(buf) = self.code_block_buffer.take() {
+                    let content = buf.strip_suffix('\n').unwrap_or(&buf).to_owned();
+                    if !content.is_empty() {
+                        self.queue.push_back(Event::Text {
+                            content,
+                            bold: false,
+                            italic: false,
+                            code: true,
+                            strikethrough: false,
+                            underline: false,
+                            subscript: false,
+                            superscript: false,
+                            mark: None,
+                        });
                     }
                 }
                 self.push_event_end(Event::EndPreformatted);
@@ -225,6 +237,7 @@ impl<'a> MarkdownReader<'a> {
                     CodeBlockKind::Fenced(lang) if !lang.is_empty() => Some(lang.into_string()),
                     CodeBlockKind::Fenced(_) | CodeBlockKind::Indented => None,
                 };
+                self.code_block_buffer = Some(String::new());
                 self.push_event_start(Event::StartPreformatted { id: None, syntax });
             }
             Tag::Emphasis => {
@@ -268,6 +281,8 @@ impl<'a> MarkdownReader<'a> {
     fn handle_text(&mut self, content: String) {
         if let Some(img) = &mut self.image {
             img.alt_buf.push_str(&content);
+        } else if let Some(buf) = &mut self.code_block_buffer {
+            buf.push_str(&content);
         } else {
             if self.block_state == BlockState::None {
                 self.queue.push_back(Event::StartParagraph {
@@ -310,6 +325,7 @@ impl<'a> MarkdownReader<'a> {
         Self {
             block_state: BlockState::None,
             bold_depth: 0,
+            code_block_buffer: None,
             image: None,
             italic_depth: 0,
             parser,
