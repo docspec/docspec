@@ -107,4 +107,12 @@ mod tests {
         let actual = run_pipeline(markdown);
         assert_json_eq(&actual, expected);
     }
+
+    #[test]
+    fn pipeline_blockquote() {
+        let markdown = include_str!("../../../tests/fixtures/markdown/blockquote.md");
+        let expected = include_str!("../../../tests/fixtures/blocknote/blockquote.json");
+        let actual = run_pipeline(markdown);
+        assert_json_eq(&actual, expected);
+    }
 }
