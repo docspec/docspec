@@ -81,8 +81,8 @@ pub struct BlockNoteWriter<'a, W: Write> {
     assets: Option<&'a dyn AssetProvider>,
     /// Depth of blockquote nesting (0 = not inside blockquote).
     blockquote_depth: u32,
-    /// Whether the current blockquote was force-closed due to a sibling block element.
-    blockquote_force_closed: bool,
+    /// Count of blockquotes force-closed by sibling emission (`EndBlockQuote` events to ignore).
+    blockquote_force_closed_count: usize,
     /// Whether any inline content has been written to the current blockquote's content array.
     blockquote_has_content: bool,
     /// Whether we are inside a text-bearing content block (heading, paragraph, preformatted, or blockquote).
@@ -95,7 +95,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     fn close_blockquote_for_sibling(&mut self) -> Result<()> {
         self.close_content_block()?;
         self.blockquote_depth = self.blockquote_depth.saturating_sub(1);
-        self.blockquote_force_closed = true;
+        self.blockquote_force_closed_count = self.blockquote_force_closed_count.saturating_add(1);
         self.in_text_block = self.blockquote_depth > 0;
         Ok(())
     }
@@ -128,7 +128,6 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.writer.name("content").map_err(io_err)?;
         self.writer.begin_array().map_err(io_err)?;
         self.blockquote_depth = self.blockquote_depth.saturating_add(1);
-        self.blockquote_force_closed = false;
         self.blockquote_has_content = false;
         self.in_text_block = true;
         Ok(())
@@ -299,7 +298,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Self {
             assets: None,
             blockquote_depth: 0,
-            blockquote_force_closed: false,
+            blockquote_force_closed_count: 0,
             blockquote_has_content: false,
             in_text_block: false,
             writer: JsonStreamWriter::new(writer),
@@ -322,7 +321,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Self {
             assets: Some(assets),
             blockquote_depth: 0,
-            blockquote_force_closed: false,
+            blockquote_force_closed_count: 0,
             blockquote_has_content: false,
             in_text_block: false,
             writer: JsonStreamWriter::new(writer),
@@ -373,8 +372,9 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 self.handle_blockquote(id.as_ref())
             }
             Event::EndBlockQuote => {
-                if self.blockquote_force_closed {
-                    self.blockquote_force_closed = false;
+                if self.blockquote_force_closed_count > 0 {
+                    self.blockquote_force_closed_count =
+                        self.blockquote_force_closed_count.saturating_sub(1);
                     return Ok(());
                 }
                 self.close_content_block()?;
@@ -501,7 +501,8 @@ mod tests {
         let mut buf = Vec::<u8>::new();
         let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 
-        // Nested blockquote: outer quote with text, then inner quote becomes sibling
+        // Test actual nesting: send StartBlockQuote while another is open
+        // Sibling emission should close outer quote and emit inner as sibling
         assert!(writer
             .handle_event(Event::StartDocument {
                 id: None,
@@ -532,7 +533,7 @@ mod tests {
             })
             .is_ok());
         assert!(writer.handle_event(Event::EndParagraph).is_ok());
-        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
+        // DO NOT close outer quote - send nested StartBlockQuote directly
         assert!(writer
             .handle_event(Event::StartBlockQuote { id: None })
             .is_ok());
@@ -557,13 +558,13 @@ mod tests {
             .is_ok());
         assert!(writer.handle_event(Event::EndParagraph).is_ok());
         assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
+        // Outer was force-closed by sibling emission, so only close inner
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         assert!(writer.finish().is_ok());
 
         if let Ok(json) = String::from_utf8(buf) {
-            // Should have two quote blocks at root level
+            // Should have two quote blocks at root level (outer + inner as sibling)
             assert!(json.contains("\"type\":\"quote\""));
-            // Count occurrences of quote type
             let count = json.matches("\"type\":\"quote\"").count();
             assert!(
                 count >= 2,
