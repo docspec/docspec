@@ -2,17 +2,17 @@
 
 Testing is not a step that happens after development. It is development. Every feature, every bug fix, every refactor comes with tests that prove it works. Untested code is incomplete code.
 
-We target 99.5% test coverage from day one. Not as an aspirational goal. As a floor. The 0.5% tolerance exists for genuinely untestable code: platform-specific initialization, embedded hardware interaction, code that interfaces with external systems beyond our control. If your code does not have tests, it is not done.
+We target 98% test coverage from day one. Not as an aspirational goal. As a floor. The 2% tolerance exists for genuinely untestable code: platform-specific initialization, embedded hardware interaction, code that interfaces with external systems beyond our control, and WASM/CLI entry points that require integration testing. If your code does not have tests, it is not done.
 
-## Why 99.5%
+## Why 98%
 
 Coverage is not a perfect metric. You can have 100% coverage and still have bugs. But low coverage guarantees bugs — code that has never been executed by a test has never been verified. High coverage forces you to think about every path, every edge case, every failure mode.
 
-Going from 80% to 99.5% coverage catches the subtle bugs, the edge cases, the error paths that only trigger in production. These are the bugs that corrupt data. These are the bugs that crash servers. These are the bugs we refuse to ship.
+Going from 80% to 98% coverage catches the subtle bugs, the edge cases, the error paths that only trigger in production. These are the bugs that corrupt data. These are the bugs that crash servers. These are the bugs we refuse to ship.
 
-99.5% is not perfectionism. It is discipline. It says we do not ship code we have not thought carefully about. It says we respect our users enough to verify our work.
+98% is not perfectionism. It is discipline. It says we do not ship code we have not thought carefully about. It says we respect our users enough to verify our work.
 
-The 0.5% gap is a recognition that some code lives at the boundary between our system and the outside world. Code that talks to hardware. Code that interfaces with the operating system. Code that handles signals we cannot simulate. Everything else gets tested.
+The 2% gap is a recognition that some code lives at the boundary between our system and the outside world. Code that talks to hardware. Code that interfaces with the operating system. Code that handles signals we cannot simulate. Everything else gets tested.
 
 We track coverage religiously. We run coverage reports on every build. We review coverage in pull requests. We question any drop in coverage. Coverage is a team metric, not an individual one.
 

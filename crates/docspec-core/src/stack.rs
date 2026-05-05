@@ -72,11 +72,16 @@ impl<S: EventSink> StackTrackingSink<S> {
     /// Returns `true` if the stack contains any content-bearing block.
     ///
     /// Content-bearing blocks are: [`BlockKind::Heading`], [`BlockKind::Paragraph`],
-    /// [`BlockKind::Preformatted`], [`BlockKind::Link`].
+    /// [`BlockKind::Preformatted`], [`BlockKind::Link`], [`BlockKind::DefinitionTerm`].
     ///
     /// Note: [`BlockKind::Blockquote`] is NOT content-bearing because block quotes contain
     /// block elements (paragraphs, headings, etc.), not inline text directly. Text inside
     /// a block quote without an explicit paragraph triggers auto-paragraph insertion.
+    ///
+    /// Note: [`BlockKind::ListItem`], [`BlockKind::TableCell`], [`BlockKind::TableHeader`],
+    /// and [`BlockKind::DefinitionDetail`] are NOT content-bearing despite being able to
+    /// contain inline content per `EVENTS.md`. This is because downstream writers like
+    /// `BlockNoteWriter` rely on auto-paragraph insertion for these container types.
     #[inline]
     pub fn has_open_content(&self) -> bool {
         self.stack.iter().any(|kind| {
@@ -86,6 +91,7 @@ impl<S: EventSink> StackTrackingSink<S> {
                     | BlockKind::Paragraph
                     | BlockKind::Preformatted
                     | BlockKind::Link
+                    | BlockKind::DefinitionTerm
             )
         })
     }
