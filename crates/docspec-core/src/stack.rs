@@ -64,6 +64,7 @@ pub enum BlockKind {
 /// - **Validation**: An End event that does not match any open block on the stack returns
 ///   [`Error::InvalidSequence`](crate::Error::InvalidSequence).
 pub struct StackTrackingSink<S: EventSink> {
+    document_finished: bool,
     sink: S,
     stack: Vec<BlockKind>,
 }
@@ -106,6 +107,7 @@ impl<S: EventSink> StackTrackingSink<S> {
     #[inline]
     pub fn new(sink: S) -> Self {
         Self {
+            document_finished: false,
             sink,
             stack: Vec::new(),
         }
@@ -129,12 +131,40 @@ impl<S: EventSink> EventSink for StackTrackingSink<S> {
 
     #[inline]
     fn handle_event(&mut self, event: Event) -> Result<()> {
+        // Reject all events after document has finished (except we already handle StartDocument
+        // specially below for a clearer error message)
+        if self.document_finished && !matches!(event, Event::StartDocument { .. }) {
+            return Err(Error::InvalidSequence {
+                expected: "end of stream".to_string(),
+                found: format!("{event:?}"),
+                message: "event received after document already finished".to_string(),
+            });
+        }
+
         if let Some(kind) = block_kind_for_start(&event) {
-            if kind == BlockKind::Document && self.stack.contains(&BlockKind::Document) {
+            if kind == BlockKind::Document {
+                if self.stack.contains(&BlockKind::Document) {
+                    return Err(Error::InvalidSequence {
+                        expected: "single Document".to_string(),
+                        found: "StartDocument".to_string(),
+                        message: "StartDocument received while Document already open".to_string(),
+                    });
+                }
+                if self.document_finished {
+                    return Err(Error::InvalidSequence {
+                        expected: "end of stream".to_string(),
+                        found: "StartDocument".to_string(),
+                        message: "StartDocument received after document already finished"
+                            .to_string(),
+                    });
+                }
+            }
+            // Links cannot nest per EVENTS.md
+            if kind == BlockKind::Link && self.stack.contains(&BlockKind::Link) {
                 return Err(Error::InvalidSequence {
-                    expected: "single Document".to_string(),
-                    found: "StartDocument".to_string(),
-                    message: "StartDocument received while Document already open".to_string(),
+                    expected: "no nested links".to_string(),
+                    found: "StartLink".to_string(),
+                    message: "StartLink received while another link is already open".to_string(),
                 });
             }
             if kind != BlockKind::Link && self.stack.last() == Some(&BlockKind::Paragraph) {
@@ -146,7 +176,6 @@ impl<S: EventSink> EventSink for StackTrackingSink<S> {
         }
 
         if matches!(event, Event::EndDocument) {
-            // Validate that Document is on the stack before auto-closing
             if !self.stack.contains(&BlockKind::Document) {
                 return Err(Error::InvalidSequence {
                     expected: "open Document".to_string(),
@@ -159,6 +188,7 @@ impl<S: EventSink> EventSink for StackTrackingSink<S> {
                     self.sink.handle_event(end_event_for(kind))?;
                 }
             }
+            self.document_finished = true;
             return self.sink.handle_event(event);
         }
 
@@ -1213,6 +1243,96 @@ mod tests {
         assert!(result.is_err());
         let err_str = format!("{result:?}");
         assert!(err_str.contains("EndDocument received without StartDocument"));
+    }
+
+    #[test]
+    fn start_document_after_finish_returns_error() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        assert!(sink
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(sink.handle_event(Event::EndDocument).is_ok());
+
+        let result = sink.handle_event(Event::StartDocument {
+            id: None,
+            language: None,
+            metadata: None,
+        });
+        assert!(result.is_err());
+        let err_str = format!("{result:?}");
+        assert!(err_str.contains("StartDocument received after document already finished"));
+    }
+
+    #[test]
+    fn any_event_after_finish_returns_error() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        assert!(sink
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(sink.handle_event(Event::EndDocument).is_ok());
+
+        let result = sink.handle_event(Event::Text {
+            content: "orphan".to_string(),
+            bold: false,
+            italic: false,
+            code: false,
+            strikethrough: false,
+            underline: false,
+            subscript: false,
+            superscript: false,
+            mark: None,
+        });
+        assert!(result.is_err());
+        let err_str = format!("{result:?}");
+        assert!(err_str.contains("event received after document already finished"));
+    }
+
+    #[test]
+    fn nested_link_returns_error() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        assert!(sink
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(sink
+            .handle_event(Event::StartParagraph {
+                alignment: None,
+                id: None,
+            })
+            .is_ok());
+        assert!(sink
+            .handle_event(Event::StartLink {
+                href: "https://example.com".to_string(),
+                id: None,
+                title: None,
+            })
+            .is_ok());
+
+        let result = sink.handle_event(Event::StartLink {
+            href: "https://nested.com".to_string(),
+            id: None,
+            title: None,
+        });
+        assert!(result.is_err());
+        let err_str = format!("{result:?}");
+        assert!(err_str.contains("StartLink received while another link is already open"));
     }
 
     #[test]

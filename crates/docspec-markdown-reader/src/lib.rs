@@ -23,6 +23,8 @@
 //!
 //! - Headings (h1–h6) → `StartHeading` / `EndHeading`
 //! - Paragraphs → `StartParagraph` / `EndParagraph`
+//! - Block quotes → `StartBlockQuote` / `EndBlockQuote`
+//! - Code blocks → `StartPreformatted` / `EndPreformatted`
 //! - Bold text → `Text { bold: true, ... }`
 //! - Italic text → `Text { italic: true, ... }`
 //! - Inline code → `Text { code: true, ... }`
@@ -33,8 +35,14 @@
 //!
 //! # Unsupported Elements
 //!
-//! Tables, lists, and links are not emitted as structured events. Their text content
-//! is recursively extracted; structure is silently dropped.
+//! The following elements are not emitted as structured events. Text content is
+//! recursively extracted where applicable; structure is silently dropped:
+//!
+//! - Tables, lists, and links (text extracted, structure dropped)
+//! - Definition lists and footnotes
+//! - HTML blocks and inline HTML
+//! - Math blocks and inline math
+//! - Strikethrough, subscript, and superscript formatting
 
 extern crate alloc;
 
