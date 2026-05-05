@@ -33,8 +33,8 @@
 //!
 //! # Unsupported Elements
 //!
-//! Tables, lists, block quotes, code blocks, and links are not emitted as structured
-//! events. Their text content is recursively extracted; structure is silently dropped.
+//! Tables, lists, and links are not emitted as structured events. Their text content
+//! is recursively extracted; structure is silently dropped.
 
 extern crate alloc;
 
@@ -174,7 +174,7 @@ impl<'a> MarkdownReader<'a> {
             }
             TagEnd::CodeBlock => {
                 if let Some(Event::Text { content, .. }) = self.queue.back_mut() {
-                    let trimmed = content.trim_end_matches('\n');
+                    let trimmed = content.strip_suffix('\n').unwrap_or(content);
                     if trimmed.len() != content.len() {
                         *content = trimmed.to_owned();
                     }

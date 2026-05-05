@@ -578,4 +578,33 @@ mod tests {
             .any(|e| matches!(e, Event::Text { content, .. } if content.contains("indented")));
         assert!(has_content);
     }
+
+    #[test]
+    fn code_block_preserves_trailing_blank_lines() {
+        // Code block with intentional trailing blank lines
+        // The parser adds a newline terminator, but we should only remove that one,
+        // not all trailing newlines
+        let markdown = "```\ncode\n\n\n```";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        // Find the text event inside the code block
+        let text_event = events.iter().find(|e| {
+            matches!(
+                e,
+                Event::Text {
+                    content,
+                    code: false,
+                    ..
+                } if content.contains("code")
+            )
+        });
+
+        // The content should preserve the blank lines (two newlines after "code")
+        // Only the parser-added terminator should be removed
+        assert!(matches!(
+            text_event,
+            Some(Event::Text { content, .. }) if content.contains("code\n\n")
+        ));
+    }
 }

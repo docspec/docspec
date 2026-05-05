@@ -71,17 +71,21 @@ pub struct StackTrackingSink<S: EventSink> {
 impl<S: EventSink> StackTrackingSink<S> {
     /// Returns `true` if the stack contains any content-bearing block.
     ///
-    /// Content-bearing blocks are: [`BlockKind::Blockquote`], [`BlockKind::Heading`],
-    /// [`BlockKind::Paragraph`], [`BlockKind::Preformatted`].
+    /// Content-bearing blocks are: [`BlockKind::Heading`], [`BlockKind::Paragraph`],
+    /// [`BlockKind::Preformatted`], [`BlockKind::Link`].
+    ///
+    /// Note: [`BlockKind::Blockquote`] is NOT content-bearing because block quotes contain
+    /// block elements (paragraphs, headings, etc.), not inline text directly. Text inside
+    /// a block quote without an explicit paragraph triggers auto-paragraph insertion.
     #[inline]
     pub fn has_open_content(&self) -> bool {
         self.stack.iter().any(|kind| {
             matches!(
                 kind,
-                BlockKind::Blockquote
-                    | BlockKind::Heading
+                BlockKind::Heading
                     | BlockKind::Paragraph
                     | BlockKind::Preformatted
+                    | BlockKind::Link
             )
         })
     }
@@ -129,6 +133,14 @@ impl<S: EventSink> EventSink for StackTrackingSink<S> {
         }
 
         if matches!(event, Event::EndDocument) {
+            // Validate that Document is on the stack before auto-closing
+            if !self.stack.contains(&BlockKind::Document) {
+                return Err(Error::InvalidSequence {
+                    expected: "open Document".to_string(),
+                    found: "EndDocument".to_string(),
+                    message: "EndDocument received without StartDocument".to_string(),
+                });
+            }
             while let Some(kind) = self.stack.pop() {
                 if kind != BlockKind::Document {
                     self.sink.handle_event(end_event_for(kind))?;
@@ -623,12 +635,13 @@ mod tests {
     }
 
     #[test]
-    fn has_open_content_with_blockquote() {
+    fn has_open_content_with_blockquote_returns_false() {
         let mock = MockSink::new();
         let mut sink = StackTrackingSink::new(mock);
         sink.stack.push(BlockKind::Document);
         sink.stack.push(BlockKind::Blockquote);
-        assert!(sink.has_open_content());
+        // Blockquote is NOT content-bearing - it contains block elements, not inline text
+        assert!(!sink.has_open_content());
     }
 
     #[test]
@@ -879,6 +892,63 @@ mod tests {
     }
 
     #[test]
+    fn orphan_text_inside_blockquote_gets_paragraph() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(&mut sink, Event::StartBlockQuote { id: None });
+        send(
+            &mut sink,
+            Event::Text {
+                content: "quoted".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+        );
+        send(&mut sink, Event::EndBlockQuote);
+        send(&mut sink, Event::EndDocument);
+
+        // Should auto-insert paragraph around orphan text inside blockquote
+        assert_eq!(sink.sink.events.len(), 7);
+        assert!(matches!(
+            sink.sink.events.first(),
+            Some(Event::StartDocument { .. })
+        ));
+        assert!(matches!(
+            sink.sink.events.get(1),
+            Some(Event::StartBlockQuote { .. })
+        ));
+        assert_eq!(
+            sink.sink.events.get(2),
+            Some(&Event::StartParagraph {
+                alignment: None,
+                id: None
+            })
+        );
+        assert!(matches!(sink.sink.events.get(3), Some(Event::Text { .. })));
+        assert_eq!(sink.sink.events.get(4), Some(&Event::EndParagraph));
+        assert!(matches!(
+            sink.sink.events.get(5),
+            Some(Event::EndBlockQuote)
+        ));
+        assert!(matches!(sink.sink.events.get(6), Some(Event::EndDocument)));
+    }
+
+    #[test]
     fn text_inside_paragraph_no_extra_insert() {
         let mock = MockSink::new();
         let mut sink = StackTrackingSink::new(mock);
@@ -1122,6 +1192,17 @@ mod tests {
     }
 
     #[test]
+    fn end_document_without_start_returns_error() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        let result = sink.handle_event(Event::EndDocument);
+        assert!(result.is_err());
+        let err_str = format!("{result:?}");
+        assert!(err_str.contains("EndDocument received without StartDocument"));
+    }
+
+    #[test]
     fn end_event_for_all_kinds() {
         assert_eq!(end_event_for(BlockKind::Blockquote), Event::EndBlockQuote);
         assert_eq!(end_event_for(BlockKind::Caption), Event::EndCaption);
@@ -1151,5 +1232,32 @@ mod tests {
         assert_eq!(end_event_for(BlockKind::TableCell), Event::EndTableCell);
         assert_eq!(end_event_for(BlockKind::TableHeader), Event::EndTableHeader);
         assert_eq!(end_event_for(BlockKind::TableRow), Event::EndTableRow);
+    }
+
+    #[test]
+    fn link_is_content_bearing() {
+        let mut sink = StackTrackingSink::new(MockSink::new());
+
+        // Link is NOT content-bearing initially
+        assert!(!sink.has_open_content());
+
+        // Open a link
+        send(
+            &mut sink,
+            Event::StartLink {
+                href: "https://example.com".to_string(),
+                title: None,
+                id: None,
+            },
+        );
+
+        // Link IS content-bearing (prevents auto-paragraph insertion inside links)
+        assert!(sink.has_open_content());
+
+        // Close the link
+        send(&mut sink, Event::EndLink);
+
+        // No longer content-bearing
+        assert!(!sink.has_open_content());
     }
 }
