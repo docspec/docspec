@@ -33,7 +33,7 @@ fn run_pipeline<W: Write>(content: &str, output: W) -> Result<()> {
     Ok(())
 }
 
-/// Main entry point
+/// Main entry point.
 fn main() {
     let cli = Cli::parse();
 

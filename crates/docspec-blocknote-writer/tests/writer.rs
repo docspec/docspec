@@ -847,7 +847,7 @@ mod tests {
     }
 
     #[test]
-    fn list_item_and_table_tracked_on_stack() {
+    fn list_item_tracked_on_stack() {
         let json = run_events(&[
             Event::StartDocument {
                 id: None,

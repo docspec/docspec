@@ -410,11 +410,11 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 }
             }
             Event::EndCaption
+            | Event::EndDefinitionTerm
+            | Event::EndLink
             | Event::EndDefinitionDetail
             | Event::EndDefinitionList
-            | Event::EndDefinitionTerm
             | Event::EndFootnote
-            | Event::EndLink
             | Event::EndListItem
             | Event::EndTable
             | Event::EndTableCell
@@ -486,10 +486,10 @@ mod tests {
         assert!(writer.finish().is_ok());
 
         if let Ok(json) = String::from_utf8(buf) {
-            // Should have quote block followed by image block as siblings
-            assert!(json.contains("\"type\":\"quote\""));
-            assert!(json.contains("\"type\":\"image\""));
-            assert!(json.contains("\"url\":\"https://example.com/logo.png\""));
+            assert_eq!(
+                json,
+                r#"[{"type":"quote","content":[],"children":[]},{"type":"image","props":{"url":"https://example.com/logo.png","caption":"logo"},"content":null,"children":[]}]"#
+            );
         }
     }
 
@@ -560,12 +560,9 @@ mod tests {
         assert!(writer.finish().is_ok());
 
         if let Ok(json) = String::from_utf8(buf) {
-            // Should have two quote blocks at root level (outer + inner as sibling)
-            assert!(json.contains("\"type\":\"quote\""));
-            let count = json.matches("\"type\":\"quote\"").count();
-            assert!(
-                count >= 2,
-                "Expected at least 2 quote blocks, found {count}"
+            assert_eq!(
+                json,
+                r#"[{"type":"quote","content":[{"type":"text","text":"outer","styles":{}}],"children":[]},{"type":"quote","content":[{"type":"text","text":"inner","styles":{}}],"children":[]}]"#
             );
         }
     }
@@ -608,9 +605,10 @@ mod tests {
         assert!(writer.finish().is_ok());
 
         if let Ok(json) = String::from_utf8(buf) {
-            // Should have quote block followed by heading block as siblings
-            assert!(json.contains("\"type\":\"quote\""));
-            assert!(json.contains("\"type\":\"heading\""));
+            assert_eq!(
+                json,
+                r#"[{"type":"quote","content":[],"children":[]},{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Title","styles":{}}],"children":[]}]"#
+            );
         }
     }
 
@@ -655,9 +653,10 @@ mod tests {
         assert!(writer.finish().is_ok());
 
         if let Ok(json) = String::from_utf8(buf) {
-            // Should have quote block followed by code block as siblings
-            assert!(json.contains("\"type\":\"quote\""));
-            assert!(json.contains("\"type\":\"codeBlock\""));
+            assert_eq!(
+                json,
+                r#"[{"type":"quote","content":[],"children":[]},{"type":"codeBlock","props":{"language":"rust"},"content":[{"type":"text","text":"fn main() {}","styles":{}}],"children":[]}]"#
+            );
         }
     }
 
@@ -685,9 +684,10 @@ mod tests {
         assert!(writer.finish().is_ok());
 
         if let Ok(json) = String::from_utf8(buf) {
-            // Should have quote block followed by divider block as siblings
-            assert!(json.contains("\"type\":\"quote\""));
-            assert!(json.contains("\"type\":\"divider\""));
+            assert_eq!(
+                json,
+                r#"[{"type":"quote","content":[],"children":[]},{"type":"divider"}]"#
+            );
         }
     }
 }
