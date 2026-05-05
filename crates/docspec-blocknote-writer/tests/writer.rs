@@ -521,6 +521,124 @@ mod tests {
     }
 
     #[test]
+    fn blockquote_with_text() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartBlockQuote { id: None },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "test".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[{"type":"text","text":"test","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn blockquote_with_styled_text() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartBlockQuote { id: None },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "bold quote".to_string(),
+                bold: true,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[{"type":"text","text":"bold quote","styles":{"bold":true}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn blockquote_followed_by_paragraph() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartBlockQuote { id: None },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "quoted".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndBlockQuote,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "normal".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[{"type":"text","text":"quoted","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"normal","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
     fn text_outside_block_auto_opens_paragraph() {
         let json = run_events(&[
             Event::StartDocument {
