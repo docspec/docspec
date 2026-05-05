@@ -111,6 +111,8 @@ exhaustive_structs = "allow"
 module_name_repetitions = "allow"
 # Reason: Naming a crate error type `Error` is the standard Rust convention; renaming breaks public API
 error_impl_error = "allow"
+# Reason: Test code must assert on Results; unwrap_used is forbidden, assert!(x.is_ok()) is the only option
+assertions_on_result_states = "allow"
 
 # --- Selective allows: cargo group ---
 # Reason: Transitive dependency version conflicts are not directly controllable

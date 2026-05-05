@@ -81,6 +81,8 @@ pub struct BlockNoteWriter<'a, W: Write> {
     assets: Option<&'a dyn AssetProvider>,
     /// Depth of blockquote nesting (0 = not inside blockquote).
     blockquote_depth: u32,
+    /// Whether the current blockquote was force-closed due to a sibling block element.
+    blockquote_force_closed: bool,
     /// Whether any inline content has been written to the current blockquote's content array.
     blockquote_has_content: bool,
     /// Whether we are inside a text-bearing content block (heading, paragraph, preformatted, or blockquote).
@@ -90,12 +92,31 @@ pub struct BlockNoteWriter<'a, W: Write> {
 }
 
 impl<'a, W: Write> BlockNoteWriter<'a, W> {
+    fn close_blockquote_for_sibling(&mut self) -> Result<()> {
+        self.close_content_block()?;
+        self.blockquote_depth = self.blockquote_depth.saturating_sub(1);
+        self.blockquote_force_closed = true;
+        self.in_text_block = self.blockquote_depth > 0;
+        Ok(())
+    }
+
     fn close_content_block(&mut self) -> Result<()> {
         self.writer.end_array().map_err(io_err)?;
         self.writer.name("children").map_err(io_err)?;
         self.writer.begin_array().map_err(io_err)?;
         self.writer.end_array().map_err(io_err)?;
         self.writer.end_object().map_err(io_err)?;
+        Ok(())
+    }
+
+    fn close_for_block_sibling(&mut self) -> Result<()> {
+        if self.blockquote_depth > 0 {
+            return self.close_blockquote_for_sibling();
+        }
+        if self.in_text_block {
+            self.close_content_block()?;
+            self.in_text_block = false;
+        }
         Ok(())
     }
 
@@ -107,6 +128,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.writer.name("content").map_err(io_err)?;
         self.writer.begin_array().map_err(io_err)?;
         self.blockquote_depth = self.blockquote_depth.saturating_add(1);
+        self.blockquote_force_closed = false;
         self.blockquote_has_content = false;
         self.in_text_block = true;
         Ok(())
@@ -145,18 +167,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         alt: Option<String>,
         id: Option<&String>,
     ) -> Result<()> {
-        if self.blockquote_depth > 0 {
-            if let Some(alt_text) = &alt {
-                if !alt_text.is_empty() {
-                    self.handle_text(alt_text, false, false)?;
-                }
-            }
-            return Ok(());
-        }
-        if self.in_text_block {
-            self.close_content_block()?;
-            self.in_text_block = false;
-        }
+        self.close_for_block_sibling()?;
         let url = match source {
             ImageSource::Uri { uri } => uri,
             ImageSource::Asset { asset_id } => {
@@ -288,6 +299,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Self {
             assets: None,
             blockquote_depth: 0,
+            blockquote_force_closed: false,
             blockquote_has_content: false,
             in_text_block: false,
             writer: JsonStreamWriter::new(writer),
@@ -310,6 +322,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Self {
             assets: Some(assets),
             blockquote_depth: 0,
+            blockquote_force_closed: false,
             blockquote_has_content: false,
             in_text_block: false,
             writer: JsonStreamWriter::new(writer),
@@ -338,10 +351,7 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             Event::StartDocument { .. } => self.writer.begin_array().map_err(io_err),
             Event::EndDocument => self.writer.end_array().map_err(io_err),
             Event::StartHeading { level, id, .. } => {
-                if self.in_text_block && self.blockquote_depth == 0 {
-                    self.close_content_block()?;
-                    self.in_text_block = false;
-                }
+                self.close_for_block_sibling()?;
                 self.handle_heading(level, id.as_ref())
             }
             Event::EndHeading | Event::EndPreformatted => {
@@ -359,30 +369,25 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 Ok(())
             }
             Event::StartBlockQuote { id, .. } => {
-                if self.in_text_block && self.blockquote_depth == 0 {
-                    self.close_content_block()?;
-                    self.in_text_block = false;
-                }
+                self.close_for_block_sibling()?;
                 self.handle_blockquote(id.as_ref())
             }
             Event::EndBlockQuote => {
+                if self.blockquote_force_closed {
+                    self.blockquote_force_closed = false;
+                    return Ok(());
+                }
                 self.close_content_block()?;
                 self.blockquote_depth = self.blockquote_depth.saturating_sub(1);
                 self.in_text_block = self.blockquote_depth > 0;
                 Ok(())
             }
             Event::StartPreformatted { id, syntax, .. } => {
-                if self.in_text_block && self.blockquote_depth == 0 {
-                    self.close_content_block()?;
-                    self.in_text_block = false;
-                }
+                self.close_for_block_sibling()?;
                 self.handle_preformatted(id.as_ref(), syntax.as_ref())
             }
             Event::ThematicBreak { id, .. } => {
-                if self.in_text_block && self.blockquote_depth == 0 {
-                    self.close_content_block()?;
-                    self.in_text_block = false;
-                }
+                self.close_for_block_sibling()?;
                 self.handle_divider(id.as_ref())
             }
             Event::Text {
@@ -443,11 +448,248 @@ fn io_err(e: std::io::Error) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use docspec_core::StackTrackingSink;
 
     #[test]
     fn io_err_maps_correctly() {
         let io_error = std::io::Error::other("test");
         let docspec_error = super::io_err(io_error);
         assert!(matches!(docspec_error, Error::Io { .. }));
+    }
+
+    #[test]
+    fn image_in_blockquote_emits_sibling() {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+        // > ![logo](https://example.com/logo.png)
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartBlockQuote { id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/logo.png".to_string(),
+                },
+                alt: Some("logo".to_string()),
+                decorative: false,
+                id: None,
+                title: None,
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+
+        if let Ok(json) = String::from_utf8(buf) {
+            // Should have quote block followed by image block as siblings
+            assert!(json.contains("\"type\":\"quote\""));
+            assert!(json.contains("\"type\":\"image\""));
+            assert!(json.contains("\"url\":\"https://example.com/logo.png\""));
+        }
+    }
+
+    #[test]
+    fn nested_blockquote_emits_sibling() {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+        // Nested blockquote: outer quote with text, then inner quote becomes sibling
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartBlockQuote { id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartParagraph {
+                alignment: None,
+                id: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::Text {
+                content: "outer".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndParagraph).is_ok());
+        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
+        assert!(writer
+            .handle_event(Event::StartBlockQuote { id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartParagraph {
+                alignment: None,
+                id: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::Text {
+                content: "inner".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndParagraph).is_ok());
+        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+
+        if let Ok(json) = String::from_utf8(buf) {
+            // Should have two quote blocks at root level
+            assert!(json.contains("\"type\":\"quote\""));
+            // Count occurrences of quote type
+            let count = json.matches("\"type\":\"quote\"").count();
+            assert!(
+                count >= 2,
+                "Expected at least 2 quote blocks, found {count}"
+            );
+        }
+    }
+
+    #[test]
+    fn heading_in_blockquote_emits_sibling() {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+        // > # Title
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartBlockQuote { id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartHeading { level: 1, id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::Text {
+                content: "Title".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndHeading).is_ok());
+        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+
+        if let Ok(json) = String::from_utf8(buf) {
+            // Should have quote block followed by heading block as siblings
+            assert!(json.contains("\"type\":\"quote\""));
+            assert!(json.contains("\"type\":\"heading\""));
+        }
+    }
+
+    #[test]
+    fn code_block_in_blockquote_emits_sibling() {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+        // > ```code```
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartBlockQuote { id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartPreformatted {
+                syntax: Some("rust".to_string()),
+                id: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::Text {
+                content: "fn main() {}".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndPreformatted).is_ok());
+        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+
+        if let Ok(json) = String::from_utf8(buf) {
+            // Should have quote block followed by code block as siblings
+            assert!(json.contains("\"type\":\"quote\""));
+            assert!(json.contains("\"type\":\"codeBlock\""));
+        }
+    }
+
+    #[test]
+    fn thematic_break_in_blockquote_emits_sibling() {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+        // > ---
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartBlockQuote { id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::ThematicBreak { id: None })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+
+        if let Ok(json) = String::from_utf8(buf) {
+            // Should have quote block followed by divider block as siblings
+            assert!(json.contains("\"type\":\"quote\""));
+            assert!(json.contains("\"type\":\"divider\""));
+        }
     }
 }
