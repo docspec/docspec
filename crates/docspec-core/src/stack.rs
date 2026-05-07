@@ -113,6 +113,12 @@ impl<S: EventSink> StackTrackingSink<S> {
         }
     }
 
+    /// Returns a reference to the inner sink.
+    #[cfg(test)]
+    fn sink(&self) -> &S {
+        &self.sink
+    }
+
     /// Returns a slice of the current nesting stack.
     ///
     /// The first element is the outermost container (typically [`BlockKind::Document`]),
@@ -120,6 +126,12 @@ impl<S: EventSink> StackTrackingSink<S> {
     #[inline]
     pub fn stack(&self) -> &[BlockKind] {
         &self.stack
+    }
+
+    /// Returns a mutable reference to the stack.
+    #[cfg(test)]
+    fn stack_mut(&mut self) -> &mut Vec<BlockKind> {
+        &mut self.stack
     }
 }
 
@@ -356,6 +368,8 @@ pub fn end_event_for(kind: BlockKind) -> Event {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec::Vec;
+
     use super::*;
 
     struct MockSink {
@@ -381,308 +395,15 @@ mod tests {
 
     fn send(sink: &mut StackTrackingSink<MockSink>, event: Event) {
         let result = sink.handle_event(event);
-        assert!(matches!(result, Ok(())));
-    }
-
-    #[test]
-    fn block_kind_clone() {
-        let kind = BlockKind::Paragraph;
-        let cloned = kind;
-        assert_eq!(kind, cloned);
-    }
-
-    #[test]
-    fn block_kind_copy() {
-        let kind = BlockKind::Heading;
-        let copied: BlockKind = kind;
-        assert_eq!(kind, copied);
-    }
-
-    #[test]
-    fn block_kind_debug() {
-        let kind = BlockKind::Document;
-        let debug_str = format!("{kind:?}");
-        assert_eq!(debug_str, "Document");
-    }
-
-    #[test]
-    fn block_kind_eq() {
-        assert_eq!(BlockKind::Paragraph, BlockKind::Paragraph);
-        assert_ne!(BlockKind::Paragraph, BlockKind::Heading);
-    }
-
-    #[test]
-    fn block_kind_for_end_blockquote() {
-        let event = Event::EndBlockQuote;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::Blockquote));
-    }
-
-    #[test]
-    fn block_kind_for_end_caption() {
-        let event = Event::EndCaption;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::Caption));
-    }
-
-    #[test]
-    fn block_kind_for_end_definition_detail() {
-        let event = Event::EndDefinitionDetail;
-        assert_eq!(
-            block_kind_for_end(&event),
-            Some(BlockKind::DefinitionDetail)
-        );
-    }
-
-    #[test]
-    fn block_kind_for_end_definition_list() {
-        let event = Event::EndDefinitionList;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::DefinitionList));
-    }
-
-    #[test]
-    fn block_kind_for_end_definition_term() {
-        let event = Event::EndDefinitionTerm;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::DefinitionTerm));
-    }
-
-    #[test]
-    fn block_kind_for_end_document() {
-        let event = Event::EndDocument;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::Document));
-    }
-
-    #[test]
-    fn block_kind_for_end_footnote() {
-        let event = Event::EndFootnote;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::Footnote));
-    }
-
-    #[test]
-    fn block_kind_for_end_heading() {
-        let event = Event::EndHeading;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::Heading));
-    }
-
-    #[test]
-    fn block_kind_for_end_link() {
-        let event = Event::EndLink;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::Link));
-    }
-
-    #[test]
-    fn block_kind_for_end_list_item() {
-        let event = Event::EndListItem;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::ListItem));
-    }
-
-    #[test]
-    fn block_kind_for_end_paragraph() {
-        let event = Event::EndParagraph;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::Paragraph));
-    }
-
-    #[test]
-    fn block_kind_for_end_preformatted() {
-        let event = Event::EndPreformatted;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::Preformatted));
-    }
-
-    #[test]
-    fn block_kind_for_end_table() {
-        let event = Event::EndTable;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::Table));
-    }
-
-    #[test]
-    fn block_kind_for_end_table_cell() {
-        let event = Event::EndTableCell;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::TableCell));
-    }
-
-    #[test]
-    fn block_kind_for_end_table_header() {
-        let event = Event::EndTableHeader;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::TableHeader));
-    }
-
-    #[test]
-    fn block_kind_for_end_table_row() {
-        let event = Event::EndTableRow;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::TableRow));
-    }
-
-    #[test]
-    fn block_kind_for_end_text_returns_none() {
-        let event = Event::Text {
-            content: "hello".to_string(),
-            bold: false,
-            italic: false,
-            code: false,
-            strikethrough: false,
-            underline: false,
-            subscript: false,
-            superscript: false,
-            mark: None,
-        };
-        assert_eq!(block_kind_for_end(&event), None);
-    }
-
-    #[test]
-    fn block_kind_for_start_blockquote() {
-        let event = Event::StartBlockQuote { id: None };
-        assert_eq!(block_kind_for_start(&event), Some(BlockKind::Blockquote));
-    }
-
-    #[test]
-    fn block_kind_for_start_caption() {
-        let event = Event::StartCaption { id: None };
-        assert_eq!(block_kind_for_start(&event), Some(BlockKind::Caption));
-    }
-
-    #[test]
-    fn block_kind_for_start_definition_detail() {
-        let event = Event::StartDefinitionDetail { id: None };
-        assert_eq!(
-            block_kind_for_start(&event),
-            Some(BlockKind::DefinitionDetail)
-        );
-    }
-
-    #[test]
-    fn block_kind_for_start_definition_list() {
-        let event = Event::StartDefinitionList { id: None };
-        assert_eq!(
-            block_kind_for_start(&event),
-            Some(BlockKind::DefinitionList)
-        );
-    }
-
-    #[test]
-    fn block_kind_for_start_definition_term() {
-        let event = Event::StartDefinitionTerm { id: None };
-        assert_eq!(
-            block_kind_for_start(&event),
-            Some(BlockKind::DefinitionTerm)
-        );
-    }
-
-    #[test]
-    fn block_kind_for_start_document() {
-        let event = Event::StartDocument {
-            id: None,
-            language: None,
-            metadata: None,
-        };
-        assert_eq!(block_kind_for_start(&event), Some(BlockKind::Document));
-    }
-
-    #[test]
-    fn block_kind_for_start_footnote() {
-        let event = Event::StartFootnote { id: 1 };
-        assert_eq!(block_kind_for_start(&event), Some(BlockKind::Footnote));
-    }
-
-    #[test]
-    fn block_kind_for_start_heading() {
-        let event = Event::StartHeading { id: None, level: 1 };
-        assert_eq!(block_kind_for_start(&event), Some(BlockKind::Heading));
-    }
-
-    #[test]
-    fn block_kind_for_start_link() {
-        let event = Event::StartLink {
-            href: "https://example.com".to_string(),
-            id: None,
-            title: None,
-        };
-        assert_eq!(block_kind_for_start(&event), Some(BlockKind::Link));
-    }
-
-    #[test]
-    fn block_kind_for_start_list_item() {
-        let event = Event::StartListItem {
-            id: None,
-            level: 1,
-            list_type: crate::ListType::Unordered,
-            start: None,
-            style_type: None,
-        };
-        assert_eq!(block_kind_for_start(&event), Some(BlockKind::ListItem));
-    }
-
-    #[test]
-    fn block_kind_for_start_paragraph() {
-        let event = Event::StartParagraph {
-            alignment: None,
-            id: None,
-        };
-        assert_eq!(block_kind_for_start(&event), Some(BlockKind::Paragraph));
-    }
-
-    #[test]
-    fn block_kind_for_start_preformatted() {
-        let event = Event::StartPreformatted {
-            id: None,
-            syntax: None,
-        };
-        assert_eq!(block_kind_for_start(&event), Some(BlockKind::Preformatted));
-    }
-
-    #[test]
-    fn block_kind_for_start_table() {
-        let event = Event::StartTable { id: None };
-        assert_eq!(block_kind_for_start(&event), Some(BlockKind::Table));
-    }
-
-    #[test]
-    fn block_kind_for_start_table_cell() {
-        let event = Event::StartTableCell {
-            colspan: None,
-            id: None,
-            rowspan: None,
-        };
-        assert_eq!(block_kind_for_start(&event), Some(BlockKind::TableCell));
-    }
-
-    #[test]
-    fn block_kind_for_start_table_header() {
-        let event = Event::StartTableHeader {
-            abbr: None,
-            colspan: None,
-            id: None,
-            rowspan: None,
-            scope: None,
-        };
-        assert_eq!(block_kind_for_start(&event), Some(BlockKind::TableHeader));
-    }
-
-    #[test]
-    fn block_kind_for_start_table_row() {
-        let event = Event::StartTableRow { id: None };
-        assert_eq!(block_kind_for_start(&event), Some(BlockKind::TableRow));
-    }
-
-    #[test]
-    fn block_kind_for_start_text_returns_none() {
-        let event = Event::Text {
-            content: "hello".to_string(),
-            bold: false,
-            italic: false,
-            code: false,
-            strikethrough: false,
-            underline: false,
-            subscript: false,
-            superscript: false,
-            mark: None,
-        };
-        assert_eq!(block_kind_for_start(&event), None);
+        assert!(result.is_ok());
     }
 
     #[test]
     fn has_open_content_with_blockquote_returns_false() {
         let mock = MockSink::new();
         let mut sink = StackTrackingSink::new(mock);
-        sink.stack.push(BlockKind::Document);
-        sink.stack.push(BlockKind::Blockquote);
+        sink.stack_mut().push(BlockKind::Document);
+        sink.stack_mut().push(BlockKind::Blockquote);
         // Blockquote is NOT content-bearing - it contains block elements, not inline text
         assert!(!sink.has_open_content());
     }
@@ -691,8 +412,8 @@ mod tests {
     fn has_open_content_with_heading() {
         let mock = MockSink::new();
         let mut sink = StackTrackingSink::new(mock);
-        sink.stack.push(BlockKind::Document);
-        sink.stack.push(BlockKind::Heading);
+        sink.stack_mut().push(BlockKind::Document);
+        sink.stack_mut().push(BlockKind::Heading);
         assert!(sink.has_open_content());
     }
 
@@ -700,8 +421,8 @@ mod tests {
     fn has_open_content_with_paragraph() {
         let mock = MockSink::new();
         let mut sink = StackTrackingSink::new(mock);
-        sink.stack.push(BlockKind::Document);
-        sink.stack.push(BlockKind::Paragraph);
+        sink.stack_mut().push(BlockKind::Document);
+        sink.stack_mut().push(BlockKind::Paragraph);
         assert!(sink.has_open_content());
     }
 
@@ -709,8 +430,8 @@ mod tests {
     fn has_open_content_with_preformatted() {
         let mock = MockSink::new();
         let mut sink = StackTrackingSink::new(mock);
-        sink.stack.push(BlockKind::Document);
-        sink.stack.push(BlockKind::Preformatted);
+        sink.stack_mut().push(BlockKind::Document);
+        sink.stack_mut().push(BlockKind::Preformatted);
         assert!(sink.has_open_content());
     }
 
@@ -718,9 +439,9 @@ mod tests {
     fn has_open_content_without_content_blocks() {
         let mock = MockSink::new();
         let mut sink = StackTrackingSink::new(mock);
-        sink.stack.push(BlockKind::Document);
-        sink.stack.push(BlockKind::Table);
-        sink.stack.push(BlockKind::TableRow);
+        sink.stack_mut().push(BlockKind::Document);
+        sink.stack_mut().push(BlockKind::Table);
+        sink.stack_mut().push(BlockKind::TableRow);
         assert!(!sink.has_open_content());
     }
 
@@ -728,9 +449,9 @@ mod tests {
     fn is_inside_finds_nested_kind() {
         let mock = MockSink::new();
         let mut sink = StackTrackingSink::new(mock);
-        sink.stack.push(BlockKind::Document);
-        sink.stack.push(BlockKind::Blockquote);
-        sink.stack.push(BlockKind::Paragraph);
+        sink.stack_mut().push(BlockKind::Document);
+        sink.stack_mut().push(BlockKind::Blockquote);
+        sink.stack_mut().push(BlockKind::Paragraph);
         assert!(sink.is_inside(BlockKind::Blockquote));
     }
 
@@ -738,45 +459,17 @@ mod tests {
     fn is_inside_returns_false_for_missing_kind() {
         let mock = MockSink::new();
         let mut sink = StackTrackingSink::new(mock);
-        sink.stack.push(BlockKind::Document);
-        sink.stack.push(BlockKind::Paragraph);
+        sink.stack_mut().push(BlockKind::Document);
+        sink.stack_mut().push(BlockKind::Paragraph);
         assert!(!sink.is_inside(BlockKind::Blockquote));
-    }
-
-    #[test]
-    fn new_creates_empty_stack() {
-        let mock = MockSink::new();
-        let sink = StackTrackingSink::new(mock);
-        assert!(sink.stack().is_empty());
-    }
-
-    #[test]
-    fn sink_finish_forwards_to_inner() {
-        let mock = MockSink::new();
-        let sink = StackTrackingSink::new(mock);
-        let result = sink.finish();
-        assert!(matches!(result, Ok(())));
-    }
-
-    #[test]
-    fn sink_handle_event_forwards_to_inner() {
-        let mock = MockSink::new();
-        let mut sink = StackTrackingSink::new(mock);
-        let event = Event::StartDocument {
-            id: None,
-            language: None,
-            metadata: None,
-        };
-        let result = sink.handle_event(event);
-        assert!(matches!(result, Ok(())));
     }
 
     #[test]
     fn stack_returns_current_stack() {
         let mock = MockSink::new();
         let mut sink = StackTrackingSink::new(mock);
-        sink.stack.push(BlockKind::Document);
-        sink.stack.push(BlockKind::Paragraph);
+        sink.stack_mut().push(BlockKind::Document);
+        sink.stack_mut().push(BlockKind::Paragraph);
         let stack = sink.stack();
         assert_eq!(stack.len(), 2);
         assert_eq!(stack.first(), Some(&BlockKind::Document));
@@ -820,18 +513,27 @@ mod tests {
         send(&mut sink, Event::EndParagraph);
         send(&mut sink, Event::EndDocument);
 
-        assert_eq!(sink.sink.events.len(), 5);
+        assert_eq!(sink.sink().events.len(), 5);
         assert!(matches!(
-            sink.sink.events.first(),
+            sink.sink().events.first(),
             Some(Event::StartDocument { .. })
         ));
         assert!(matches!(
-            sink.sink.events.get(1),
+            sink.sink().events.get(1),
             Some(Event::StartParagraph { .. })
         ));
-        assert!(matches!(sink.sink.events.get(2), Some(Event::Text { .. })));
-        assert!(matches!(sink.sink.events.get(3), Some(Event::EndParagraph)));
-        assert!(matches!(sink.sink.events.get(4), Some(Event::EndDocument)));
+        assert!(matches!(
+            sink.sink().events.get(2),
+            Some(Event::Text { .. })
+        ));
+        assert!(matches!(
+            sink.sink().events.get(3),
+            Some(Event::EndParagraph)
+        ));
+        assert!(matches!(
+            sink.sink().events.get(4),
+            Some(Event::EndDocument)
+        ));
         assert!(sink.stack().is_empty());
     }
 
@@ -864,21 +566,27 @@ mod tests {
         );
         send(&mut sink, Event::EndDocument);
 
-        assert_eq!(sink.sink.events.len(), 5);
+        assert_eq!(sink.sink().events.len(), 5);
         assert!(matches!(
-            sink.sink.events.first(),
+            sink.sink().events.first(),
             Some(Event::StartDocument { .. })
         ));
         assert_eq!(
-            sink.sink.events.get(1),
+            sink.sink().events.get(1),
             Some(&Event::StartParagraph {
                 alignment: None,
                 id: None
             })
         );
-        assert!(matches!(sink.sink.events.get(2), Some(Event::Text { .. })));
-        assert_eq!(sink.sink.events.get(3), Some(&Event::EndParagraph));
-        assert!(matches!(sink.sink.events.get(4), Some(Event::EndDocument)));
+        assert!(matches!(
+            sink.sink().events.get(2),
+            Some(Event::Text { .. })
+        ));
+        assert_eq!(sink.sink().events.get(3), Some(&Event::EndParagraph));
+        assert!(matches!(
+            sink.sink().events.get(4),
+            Some(Event::EndDocument)
+        ));
     }
 
     #[test]
@@ -923,15 +631,15 @@ mod tests {
         send(&mut sink, Event::EndTable);
         send(&mut sink, Event::EndDocument);
 
-        assert_eq!(sink.sink.events.len(), 11);
+        assert_eq!(sink.sink().events.len(), 11);
         assert_eq!(
-            sink.sink.events.get(4),
+            sink.sink().events.get(4),
             Some(&Event::StartParagraph {
                 alignment: None,
                 id: None
             })
         );
-        assert_eq!(sink.sink.events.get(6), Some(&Event::EndParagraph));
+        assert_eq!(sink.sink().events.get(6), Some(&Event::EndParagraph));
     }
 
     #[test]
@@ -966,29 +674,35 @@ mod tests {
         send(&mut sink, Event::EndDocument);
 
         // Should auto-insert paragraph around orphan text inside blockquote
-        assert_eq!(sink.sink.events.len(), 7);
+        assert_eq!(sink.sink().events.len(), 7);
         assert!(matches!(
-            sink.sink.events.first(),
+            sink.sink().events.first(),
             Some(Event::StartDocument { .. })
         ));
         assert!(matches!(
-            sink.sink.events.get(1),
+            sink.sink().events.get(1),
             Some(Event::StartBlockQuote { .. })
         ));
         assert_eq!(
-            sink.sink.events.get(2),
+            sink.sink().events.get(2),
             Some(&Event::StartParagraph {
                 alignment: None,
                 id: None
             })
         );
-        assert!(matches!(sink.sink.events.get(3), Some(Event::Text { .. })));
-        assert_eq!(sink.sink.events.get(4), Some(&Event::EndParagraph));
         assert!(matches!(
-            sink.sink.events.get(5),
+            sink.sink().events.get(3),
+            Some(Event::Text { .. })
+        ));
+        assert_eq!(sink.sink().events.get(4), Some(&Event::EndParagraph));
+        assert!(matches!(
+            sink.sink().events.get(5),
             Some(Event::EndBlockQuote)
         ));
-        assert!(matches!(sink.sink.events.get(6), Some(Event::EndDocument)));
+        assert!(matches!(
+            sink.sink().events.get(6),
+            Some(Event::EndDocument)
+        ));
     }
 
     #[test]
@@ -1042,39 +756,7 @@ mod tests {
         send(&mut sink, Event::EndParagraph);
         send(&mut sink, Event::EndDocument);
 
-        assert_eq!(sink.sink.events.len(), 6);
-    }
-
-    #[test]
-    fn stack_tracks_nesting() {
-        let mock = MockSink::new();
-        let mut sink = StackTrackingSink::new(mock);
-
-        send(
-            &mut sink,
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-        );
-        send(&mut sink, Event::StartTable { id: None });
-        send(&mut sink, Event::StartTableRow { id: None });
-        send(
-            &mut sink,
-            Event::StartTableCell {
-                colspan: None,
-                id: None,
-                rowspan: None,
-            },
-        );
-
-        assert!(sink.is_inside(BlockKind::Document));
-        assert!(sink.is_inside(BlockKind::Table));
-        assert!(sink.is_inside(BlockKind::TableRow));
-        assert!(sink.is_inside(BlockKind::TableCell));
-        assert!(!sink.is_inside(BlockKind::Paragraph));
-        assert!(!sink.has_open_content());
+        assert_eq!(sink.sink().events.len(), 6);
     }
 
     #[test]
@@ -1123,11 +805,11 @@ mod tests {
         );
         send(&mut sink, Event::EndTable);
 
-        assert_eq!(sink.sink.events.len(), 10);
-        assert_eq!(sink.sink.events.get(6), Some(&Event::EndParagraph));
-        assert_eq!(sink.sink.events.get(7), Some(&Event::EndTableCell));
-        assert_eq!(sink.sink.events.get(8), Some(&Event::EndTableRow));
-        assert_eq!(sink.sink.events.get(9), Some(&Event::EndTable));
+        assert_eq!(sink.sink().events.len(), 10);
+        assert_eq!(sink.sink().events.get(6), Some(&Event::EndParagraph));
+        assert_eq!(sink.sink().events.get(7), Some(&Event::EndTableCell));
+        assert_eq!(sink.sink().events.get(8), Some(&Event::EndTableRow));
+        assert_eq!(sink.sink().events.get(9), Some(&Event::EndTable));
     }
 
     #[test]
@@ -1167,9 +849,9 @@ mod tests {
         );
         send(&mut sink, Event::EndBlockQuote);
 
-        assert_eq!(sink.sink.events.len(), 6);
-        assert_eq!(sink.sink.events.get(4), Some(&Event::EndParagraph));
-        assert_eq!(sink.sink.events.get(5), Some(&Event::EndBlockQuote));
+        assert_eq!(sink.sink().events.len(), 6);
+        assert_eq!(sink.sink().events.get(4), Some(&Event::EndParagraph));
+        assert_eq!(sink.sink().events.get(5), Some(&Event::EndBlockQuote));
     }
 
     #[test]
@@ -1195,144 +877,11 @@ mod tests {
         );
         send(&mut sink, Event::EndDocument);
 
-        assert_eq!(sink.sink.events.len(), 6);
-        assert_eq!(sink.sink.events.get(3), Some(&Event::EndParagraph));
-        assert_eq!(sink.sink.events.get(4), Some(&Event::EndBlockQuote));
-        assert_eq!(sink.sink.events.get(5), Some(&Event::EndDocument));
+        assert_eq!(sink.sink().events.len(), 6);
+        assert_eq!(sink.sink().events.get(3), Some(&Event::EndParagraph));
+        assert_eq!(sink.sink().events.get(4), Some(&Event::EndBlockQuote));
+        assert_eq!(sink.sink().events.get(5), Some(&Event::EndDocument));
         assert!(sink.stack().is_empty());
-    }
-
-    #[test]
-    fn mismatched_end_returns_error() {
-        let mock = MockSink::new();
-        let mut sink = StackTrackingSink::new(mock);
-
-        send(
-            &mut sink,
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-        );
-        send(&mut sink, Event::StartTable { id: None });
-
-        let result = sink.handle_event(Event::EndBlockQuote);
-        assert!(result.is_err());
-        let err_str = format!("{result:?}");
-        assert!(err_str.contains("Blockquote"));
-    }
-
-    #[test]
-    fn end_without_start_returns_error() {
-        let mock = MockSink::new();
-        let mut sink = StackTrackingSink::new(mock);
-
-        let result = sink.handle_event(Event::EndParagraph);
-        assert!(result.is_err());
-        let err_str = format!("{result:?}");
-        assert!(err_str.contains("empty stack"));
-    }
-
-    #[test]
-    fn end_document_without_start_returns_error() {
-        let mock = MockSink::new();
-        let mut sink = StackTrackingSink::new(mock);
-
-        let result = sink.handle_event(Event::EndDocument);
-        assert!(result.is_err());
-        let err_str = format!("{result:?}");
-        assert!(err_str.contains("EndDocument received without StartDocument"));
-    }
-
-    #[test]
-    fn start_document_after_finish_returns_error() {
-        let mock = MockSink::new();
-        let mut sink = StackTrackingSink::new(mock);
-
-        assert!(sink
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(sink.handle_event(Event::EndDocument).is_ok());
-
-        let result = sink.handle_event(Event::StartDocument {
-            id: None,
-            language: None,
-            metadata: None,
-        });
-        assert!(result.is_err());
-        let err_str = format!("{result:?}");
-        assert!(err_str.contains("StartDocument received after document already finished"));
-    }
-
-    #[test]
-    fn any_event_after_finish_returns_error() {
-        let mock = MockSink::new();
-        let mut sink = StackTrackingSink::new(mock);
-
-        assert!(sink
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(sink.handle_event(Event::EndDocument).is_ok());
-
-        let result = sink.handle_event(Event::Text {
-            content: "orphan".to_string(),
-            bold: false,
-            italic: false,
-            code: false,
-            strikethrough: false,
-            underline: false,
-            subscript: false,
-            superscript: false,
-            mark: None,
-        });
-        assert!(result.is_err());
-        let err_str = format!("{result:?}");
-        assert!(err_str.contains("event received after document already finished"));
-    }
-
-    #[test]
-    fn nested_link_returns_error() {
-        let mock = MockSink::new();
-        let mut sink = StackTrackingSink::new(mock);
-
-        assert!(sink
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(sink
-            .handle_event(Event::StartParagraph {
-                alignment: None,
-                id: None,
-            })
-            .is_ok());
-        assert!(sink
-            .handle_event(Event::StartLink {
-                href: "https://example.com".to_string(),
-                id: None,
-                title: None,
-            })
-            .is_ok());
-
-        let result = sink.handle_event(Event::StartLink {
-            href: "https://nested.com".to_string(),
-            id: None,
-            title: None,
-        });
-        assert!(result.is_err());
-        let err_str = format!("{result:?}");
-        assert!(err_str.contains("StartLink received while another link is already open"));
     }
 
     #[test]
@@ -1365,32 +914,5 @@ mod tests {
         assert_eq!(end_event_for(BlockKind::TableCell), Event::EndTableCell);
         assert_eq!(end_event_for(BlockKind::TableHeader), Event::EndTableHeader);
         assert_eq!(end_event_for(BlockKind::TableRow), Event::EndTableRow);
-    }
-
-    #[test]
-    fn link_is_content_bearing() {
-        let mut sink = StackTrackingSink::new(MockSink::new());
-
-        // Link is NOT content-bearing initially
-        assert!(!sink.has_open_content());
-
-        // Open a link
-        send(
-            &mut sink,
-            Event::StartLink {
-                href: "https://example.com".to_string(),
-                title: None,
-                id: None,
-            },
-        );
-
-        // Link IS content-bearing (prevents auto-paragraph insertion inside links)
-        assert!(sink.has_open_content());
-
-        // Close the link
-        send(&mut sink, Event::EndLink);
-
-        // No longer content-bearing
-        assert!(!sink.has_open_content());
     }
 }

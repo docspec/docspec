@@ -1,5 +1,7 @@
 //! Integration tests for `BlockNoteWriter`.
 
+#![allow(clippy::expect_used)]
+
 extern crate alloc;
 
 #[cfg(test)]
@@ -1847,6 +1849,277 @@ mod tests {
         assert_eq!(
             json,
             r#"[{"type":"codeBlock","id":"cb-1","content":[],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn image_in_blockquote_emits_sibling() {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+        // > ![logo](https://example.com/logo.png)
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartBlockQuote { id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/logo.png".to_string(),
+                },
+                alt: Some("logo".to_string()),
+                decorative: false,
+                id: None,
+                title: None,
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+
+        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[],"children":[]},{"type":"image","props":{"url":"https://example.com/logo.png","caption":"logo"},"content":null,"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn nested_blockquote_emits_sibling() {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+        // Test actual nesting: send StartBlockQuote while another is open
+        // Sibling emission should close outer quote and emit inner as sibling
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartBlockQuote { id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartParagraph {
+                alignment: None,
+                id: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::Text {
+                content: "outer".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndParagraph).is_ok());
+        // DO NOT close outer quote - send nested StartBlockQuote directly
+        assert!(writer
+            .handle_event(Event::StartBlockQuote { id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartParagraph {
+                alignment: None,
+                id: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::Text {
+                content: "inner".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndParagraph).is_ok());
+        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
+        // Outer was force-closed by sibling emission, so only close inner
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+
+        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[{"type":"text","text":"outer","styles":{}}],"children":[]},{"type":"quote","content":[{"type":"text","text":"inner","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn heading_in_blockquote_emits_sibling() {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+        // > # Title
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartBlockQuote { id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartHeading { level: 1, id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::Text {
+                content: "Title".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndHeading).is_ok());
+        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+
+        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[],"children":[]},{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Title","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn code_block_in_blockquote_emits_sibling() {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+        // > ```code```
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartBlockQuote { id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartPreformatted {
+                syntax: Some("rust".to_string()),
+                id: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::Text {
+                content: "fn main() {}".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndPreformatted).is_ok());
+        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+
+        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[],"children":[]},{"type":"codeBlock","props":{"language":"rust"},"content":[{"type":"text","text":"fn main() {}","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn image_in_heading_emits_sibling() {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+        // # ![logo](https://example.com/logo.png)
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartHeading { level: 1, id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/logo.png".to_string(),
+                },
+                alt: Some("logo".to_string()),
+                decorative: false,
+                id: None,
+                title: None,
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndHeading).is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+
+        let string_result = String::from_utf8(buf);
+        assert!(string_result.is_ok(), "invalid UTF-8 output");
+        assert_eq!(
+            string_result.unwrap_or_default(),
+            r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[],"children":[]},{"type":"image","props":{"url":"https://example.com/logo.png","caption":"logo"},"content":null,"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn thematic_break_in_blockquote_emits_sibling() {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+        // > ---
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartBlockQuote { id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::ThematicBreak { id: None })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+
+        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[],"children":[]},{"type":"divider"}]"#
         );
     }
 }
