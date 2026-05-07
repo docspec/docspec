@@ -351,6 +351,9 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 self.handle_heading(level, id.as_ref())
             }
             Event::EndHeading | Event::EndPreformatted => {
+                if !self.in_text_block {
+                    return Ok(());
+                }
                 self.close_content_block()?;
                 self.in_text_block = false;
                 Ok(())
@@ -658,6 +661,45 @@ mod tests {
                 r#"[{"type":"quote","content":[],"children":[]},{"type":"codeBlock","props":{"language":"rust"},"content":[{"type":"text","text":"fn main() {}","styles":{}}],"children":[]}]"#
             );
         }
+    }
+
+    #[test]
+    fn image_in_heading_emits_sibling() {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+        // # ![logo](https://example.com/logo.png)
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartHeading { level: 1, id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/logo.png".to_string(),
+                },
+                alt: Some("logo".to_string()),
+                decorative: false,
+                id: None,
+                title: None,
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndHeading).is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+
+        let string_result = String::from_utf8(buf);
+        assert!(string_result.is_ok(), "invalid UTF-8 output");
+        assert_eq!(
+            string_result.unwrap_or_default(),
+            r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[],"children":[]},{"type":"image","props":{"url":"https://example.com/logo.png","caption":"logo"},"content":null,"children":[]}]"#
+        );
     }
 
     #[test]
