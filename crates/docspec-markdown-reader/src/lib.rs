@@ -28,6 +28,7 @@
 //! - Bold text → `Text { bold: true, ... }`
 //! - Italic text → `Text { italic: true, ... }`
 //! - Inline code → `Text { code: true, ... }`
+//! - Strikethrough → `Text { strikethrough: true, ... }`
 //! - Images → `Image { source: Uri, alt, title, decorative }`
 //! - Hard line breaks → `LineBreak`
 //! - Soft line breaks → space `Text`
@@ -42,7 +43,7 @@
 //! - Definition lists and footnotes
 //! - HTML blocks and inline HTML
 //! - Math blocks and inline math
-//! - Strikethrough, subscript, and superscript formatting
+//! - Subscript and superscript formatting
 
 extern crate alloc;
 
@@ -118,6 +119,8 @@ pub struct MarkdownReader<'a> {
     phase: Phase,
     /// Queue of `DocSpec` events to emit.
     queue: VecDeque<Event>,
+    /// Nesting depth for strikethrough formatting.
+    strikethrough_depth: usize,
 }
 
 impl<'a> MarkdownReader<'a> {
@@ -137,7 +140,7 @@ impl<'a> MarkdownReader<'a> {
                 bold: self.bold_depth > 0,
                 italic: self.italic_depth > 0,
                 code: true,
-                strikethrough: false,
+                strikethrough: self.strikethrough_depth > 0,
                 underline: false,
                 subscript: false,
                 superscript: false,
@@ -161,6 +164,9 @@ impl<'a> MarkdownReader<'a> {
             }
             TagEnd::Strong => {
                 self.bold_depth = self.bold_depth.saturating_sub(1);
+            }
+            TagEnd::Strikethrough => {
+                self.strikethrough_depth = self.strikethrough_depth.saturating_sub(1);
             }
             TagEnd::Image => {
                 if let Some(img) = self.image.take() {
@@ -191,7 +197,7 @@ impl<'a> MarkdownReader<'a> {
                             bold: false,
                             italic: false,
                             code: true,
-                            strikethrough: false,
+                            strikethrough: self.strikethrough_depth > 0,
                             underline: false,
                             subscript: false,
                             superscript: false,
@@ -209,7 +215,6 @@ impl<'a> MarkdownReader<'a> {
             | TagEnd::Link
             | TagEnd::List(_)
             | TagEnd::MetadataBlock(_)
-            | TagEnd::Strikethrough
             | TagEnd::Subscript
             | TagEnd::Superscript
             | TagEnd::Table
@@ -254,6 +259,9 @@ impl<'a> MarkdownReader<'a> {
             Tag::Strong => {
                 self.bold_depth = self.bold_depth.saturating_add(1);
             }
+            Tag::Strikethrough => {
+                self.strikethrough_depth = self.strikethrough_depth.saturating_add(1);
+            }
             Tag::Image {
                 dest_url, title, ..
             } => {
@@ -276,7 +284,6 @@ impl<'a> MarkdownReader<'a> {
             | Tag::Link { .. }
             | Tag::List(_)
             | Tag::MetadataBlock(_)
-            | Tag::Strikethrough
             | Tag::Subscript
             | Tag::Superscript
             | Tag::Table(_)
@@ -304,7 +311,7 @@ impl<'a> MarkdownReader<'a> {
                 bold: self.bold_depth > 0,
                 italic: self.italic_depth > 0,
                 code: false,
-                strikethrough: false,
+                strikethrough: self.strikethrough_depth > 0,
                 underline: false,
                 subscript: false,
                 superscript: false,
@@ -328,7 +335,7 @@ impl<'a> MarkdownReader<'a> {
     #[inline]
     #[must_use]
     pub fn new(markdown: &'a str) -> Self {
-        let options = Options::ENABLE_TABLES;
+        let options = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH;
         let parser = Parser::new_ext(markdown, options);
         Self {
             block_state: BlockState::None,
@@ -339,6 +346,7 @@ impl<'a> MarkdownReader<'a> {
             parser,
             phase: Phase::NotStarted,
             queue: VecDeque::new(),
+            strikethrough_depth: 0,
         }
     }
 
@@ -372,7 +380,7 @@ impl<'a> MarkdownReader<'a> {
                         bold: self.bold_depth > 0,
                         italic: self.italic_depth > 0,
                         code: false,
-                        strikethrough: false,
+                        strikethrough: self.strikethrough_depth > 0,
                         underline: false,
                         subscript: false,
                         superscript: false,

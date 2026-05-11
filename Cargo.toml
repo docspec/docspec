@@ -118,3 +118,7 @@ assertions_on_result_states = "allow"
 # --- Selective allows: cargo group ---
 # Reason: Transitive dependency version conflicts are not directly controllable
 multiple_crate_versions = "allow"
+
+# --- Selective allows: pedantic group (continued) ---
+# Reason: BlockNote text styling requires 5 bool parameters (bold, italic, code, strike, underline) that directly map to JSON fields. Refactoring into a struct would add complexity without improving clarity.
+fn_params_excessive_bools = "allow"
