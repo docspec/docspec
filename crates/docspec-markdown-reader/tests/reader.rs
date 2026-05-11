@@ -608,4 +608,114 @@ mod tests {
             Some(Event::Text { content, .. }) if content == "code\n\n"
         ));
     }
+
+    #[test]
+    fn strikethrough_basic() {
+        let mut reader = MarkdownReader::new("~~struck~~");
+        let events = collect_events(&mut reader);
+
+        let text_event = events.iter().find(|e| {
+            matches!(
+                e,
+                Event::Text {
+                    strikethrough: true,
+                    ..
+                }
+            )
+        });
+        assert!(matches!(
+            text_event,
+            Some(Event::Text { content, strikethrough: true, .. }) if content == "struck"
+        ));
+    }
+
+    #[test]
+    fn strikethrough_with_bold() {
+        let mut reader = MarkdownReader::new("~~**bold struck**~~");
+        let events = collect_events(&mut reader);
+
+        let text_event = events.iter().find(|e| {
+            matches!(
+                e,
+                Event::Text {
+                    bold: true,
+                    strikethrough: true,
+                    ..
+                }
+            )
+        });
+        assert!(matches!(
+            text_event,
+            Some(Event::Text { content, bold: true, strikethrough: true, .. }) if content == "bold struck"
+        ));
+    }
+
+    #[test]
+    fn strikethrough_with_italic() {
+        let mut reader = MarkdownReader::new("~~*italic struck*~~");
+        let events = collect_events(&mut reader);
+
+        let text_event = events.iter().find(|e| {
+            matches!(
+                e,
+                Event::Text {
+                    italic: true,
+                    strikethrough: true,
+                    ..
+                }
+            )
+        });
+        assert!(matches!(
+            text_event,
+            Some(Event::Text { content, italic: true, strikethrough: true, .. }) if content == "italic struck"
+        ));
+    }
+
+    #[test]
+    fn strikethrough_in_paragraph() {
+        let markdown = "This is ~~struck~~ text in a paragraph.";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, Event::StartParagraph { .. })));
+
+        let struck_text = events.iter().find(|e| {
+            matches!(
+                e,
+                Event::Text {
+                    content,
+                    strikethrough: true,
+                    ..
+                } if content == "struck"
+            )
+        });
+        assert!(
+            struck_text.is_some(),
+            "Should find strikethrough text in paragraph"
+        );
+    }
+
+    #[test]
+    fn strikethrough_with_bold_and_italic() {
+        let mut reader = MarkdownReader::new("~~***bold italic struck***~~");
+        let events = collect_events(&mut reader);
+
+        let text_event = events.iter().find(|e| {
+            matches!(
+                e,
+                Event::Text {
+                    bold: true,
+                    italic: true,
+                    strikethrough: true,
+                    ..
+                }
+            )
+        });
+        assert!(matches!(
+            text_event,
+            Some(Event::Text { content, bold: true, italic: true, strikethrough: true, .. }) if content == "bold italic struck"
+        ));
+    }
 }

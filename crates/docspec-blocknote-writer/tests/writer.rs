@@ -2122,4 +2122,136 @@ mod tests {
             r#"[{"type":"quote","content":[],"children":[]},{"type":"divider"}]"#
         );
     }
+
+    // ============================================================================
+    // CODE/STRIKE/UNDERLINE STYLE TESTS
+    // ============================================================================
+
+    #[test]
+    fn code_text() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "code".to_string(),
+                bold: false,
+                italic: false,
+                code: true,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"code","styles":{"code":true}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn strikethrough_text() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "struck".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: true,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"struck","styles":{"strike":true}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn underline_text() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "underlined".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: true,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"underlined","styles":{"underline":true}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn combined_styles_bold_code_strikethrough() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "combined".to_string(),
+                bold: true,
+                italic: false,
+                code: true,
+                strikethrough: true,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"combined","styles":{"bold":true,"code":true,"strike":true}}],"children":[]}]"#
+        );
+    }
 }
