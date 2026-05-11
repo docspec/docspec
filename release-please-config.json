@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "rust",
+  "include-component-in-tag": false,
+  "packages": {
+    "crates/docspec-core": { "component": "docspec-core" },
+    "crates/docspec-markdown-reader": { "component": "docspec-markdown-reader" },
+    "crates/docspec-blocknote-writer": { "component": "docspec-blocknote-writer" },
+    "crates/docspec-cli": { "component": "docspec-cli" },
+    "crates/docspec-wasm": { "component": "docspec-wasm" }
+  },
+  "plugins": [
+    { "type": "cargo-workspace", "merge": false },
+    {
+      "type": "linked-versions",
+      "groupName": "docspec",
+      "components": ["docspec-core", "docspec-markdown-reader", "docspec-blocknote-writer", "docspec-cli", "docspec-wasm"]
+    }
+  ]
+}
