@@ -18,7 +18,7 @@
 //! - `StartParagraph` / `EndParagraph` — paragraph blocks
 //! - `StartBlockQuote` / `EndBlockQuote` — quote blocks
 //! - `StartPreformatted` / `EndPreformatted` — code blocks
-//! - `Text` — inline text content with bold/italic styles
+//! - `Text` — inline text content with bold/italic/code/strikethrough/underline styles
 //! - `Image` — image blocks
 //! - `LineBreak` — line breaks within content blocks
 //! - `ThematicBreak` — divider blocks
@@ -220,7 +220,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     fn handle_paragraph(&mut self, id: Option<&String>) -> Result<()> {
         if self.blockquote_depth > 0 {
             if self.blockquote_has_content {
-                self.handle_text("\n\n", false, false)?;
+                self.handle_text("\n\n", false, false, false, false, false)?;
             }
             return Ok(());
         }
@@ -257,7 +257,15 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Ok(())
     }
 
-    fn handle_text(&mut self, content: &str, bold: bool, italic: bool) -> Result<()> {
+    fn handle_text(
+        &mut self,
+        content: &str,
+        bold: bool,
+        italic: bool,
+        code: bool,
+        strikethrough: bool,
+        underline: bool,
+    ) -> Result<()> {
         if !self.in_text_block {
             return Ok(());
         }
@@ -277,6 +285,18 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         }
         if italic {
             self.writer.name("italic").map_err(io_err)?;
+            self.writer.bool_value(true).map_err(io_err)?;
+        }
+        if code {
+            self.writer.name("code").map_err(io_err)?;
+            self.writer.bool_value(true).map_err(io_err)?;
+        }
+        if strikethrough {
+            self.writer.name("strike").map_err(io_err)?;
+            self.writer.bool_value(true).map_err(io_err)?;
+        }
+        if underline {
+            self.writer.name("underline").map_err(io_err)?;
             self.writer.bool_value(true).map_err(io_err)?;
         }
         self.writer.end_object().map_err(io_err)?;
@@ -394,20 +414,23 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 content,
                 bold,
                 italic,
+                code,
+                strikethrough,
+                underline,
                 ..
             } => {
                 // Auto-open paragraph for orphan text (e.g., text after image closed paragraph)
                 if !self.in_text_block && self.blockquote_depth == 0 {
                     self.handle_paragraph(None)?;
                 }
-                self.handle_text(&content, bold, italic)
+                self.handle_text(&content, bold, italic, code, strikethrough, underline)
             }
             Event::Image {
                 source, alt, id, ..
             } => self.handle_image(source, alt, id.as_ref()),
             Event::LineBreak => {
                 if self.in_text_block {
-                    self.handle_text("\n", false, false)
+                    self.handle_text("\n", false, false, false, false, false)
                 } else {
                     Ok(())
                 }

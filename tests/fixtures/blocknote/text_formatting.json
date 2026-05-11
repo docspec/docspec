@@ -1,0 +1,175 @@
+[
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "This is a paragraph with ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "strikethrough",
+        "styles": {
+          "strike": true
+        }
+      },
+      {
+        "type": "text",
+        "text": " text.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "This is a paragraph with ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "code",
+        "styles": {
+          "code": true
+        }
+      },
+      {
+        "type": "text",
+        "text": " text.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "This is a paragraph with ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "bold struck",
+        "styles": {
+          "bold": true,
+          "strike": true
+        }
+      },
+      {
+        "type": "text",
+        "text": " text.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "This is a paragraph with ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "**bold code**",
+        "styles": {
+          "code": true
+        }
+      },
+      {
+        "type": "text",
+        "text": " text.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "This is a paragraph with ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "italic struck",
+        "styles": {
+          "italic": true,
+          "strike": true
+        }
+      },
+      {
+        "type": "text",
+        "text": " text.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "This is a paragraph with ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "bold italic struck",
+        "styles": {
+          "bold": true,
+          "italic": true
+        }
+      },
+      {
+        "type": "text",
+        "text": " and ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "combined",
+        "styles": {
+          "bold": true,
+          "italic": true,
+          "strike": true
+        }
+      },
+      {
+        "type": "text",
+        "text": " text.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  }
+]

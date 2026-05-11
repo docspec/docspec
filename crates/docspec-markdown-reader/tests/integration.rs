@@ -123,4 +123,12 @@ mod tests {
         let actual = run_pipeline(markdown);
         assert_json_eq(&actual, expected);
     }
+
+    #[test]
+    fn pipeline_text_formatting() {
+        let markdown = include_str!("../../../tests/fixtures/markdown/text_formatting.md");
+        let expected = include_str!("../../../tests/fixtures/blocknote/text_formatting.json");
+        let actual = run_pipeline(markdown);
+        assert_json_eq(&actual, expected);
+    }
 }
