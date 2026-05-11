@@ -1,0 +1,72 @@
+[
+  {
+    "type": "numberedListItem",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "First item",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "numberedListItem",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Second item",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "numberedListItem",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Third item with ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "bold text",
+        "styles": {
+          "bold": true
+        }
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "numberedListItem",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Fourth item with ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "italic text",
+        "styles": {
+          "italic": true
+        }
+      }
+    ],
+    "children": []
+  }
+]

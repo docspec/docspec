@@ -164,31 +164,32 @@ mod tests {
     }
 
     #[test]
-    fn list_style_type_clone() {
-        let style = ListStyleType::Decimal;
+    fn ordered_list_style_clone() {
+        let style = OrderedListStyle::Decimal;
         let cloned = style.clone();
         assert_eq!(style, cloned);
     }
 
     #[test]
-    fn list_style_type_variants() {
-        assert_eq!(ListStyleType::Decimal, ListStyleType::Decimal);
-        assert_ne!(ListStyleType::Decimal, ListStyleType::LowerAlpha);
-        assert_eq!(ListStyleType::Disc, ListStyleType::Disc);
-        assert_ne!(ListStyleType::Disc, ListStyleType::Circle);
+    fn ordered_list_style_variants() {
+        assert_eq!(OrderedListStyle::Decimal, OrderedListStyle::Decimal);
+        assert_ne!(OrderedListStyle::Decimal, OrderedListStyle::LowerAlpha);
+        assert_eq!(OrderedListStyle::LowerRoman, OrderedListStyle::LowerRoman);
+        assert_ne!(OrderedListStyle::UpperAlpha, OrderedListStyle::UpperRoman);
     }
 
     #[test]
-    fn list_type_clone() {
-        let list_type = ListType::Ordered;
-        let cloned = list_type.clone();
-        assert_eq!(list_type, cloned);
+    fn unordered_list_style_clone() {
+        let style = UnorderedListStyle::Disc;
+        let cloned = style.clone();
+        assert_eq!(style, cloned);
     }
 
     #[test]
-    fn list_type_variants() {
-        assert_eq!(ListType::Ordered, ListType::Ordered);
-        assert_ne!(ListType::Ordered, ListType::Unordered);
+    fn unordered_list_style_variants() {
+        assert_eq!(UnorderedListStyle::Disc, UnorderedListStyle::Disc);
+        assert_ne!(UnorderedListStyle::Disc, UnorderedListStyle::Circle);
+        assert_ne!(UnorderedListStyle::Circle, UnorderedListStyle::Square);
     }
 
     #[test]

@@ -21,6 +21,9 @@ pub enum Event {
     /// End a table caption.
     EndCaption,
 
+    /// End a check list item.
+    EndCheckListItem,
+
     /// End a definition detail.
     EndDefinitionDetail,
 
@@ -42,8 +45,8 @@ pub enum Event {
     /// End a hyperlink.
     EndLink,
 
-    /// End a list item.
-    EndListItem,
+    /// End an ordered list item.
+    EndOrderedListItem,
 
     /// End a paragraph.
     EndParagraph,
@@ -62,6 +65,9 @@ pub enum Event {
 
     /// End a table row.
     EndTableRow,
+
+    /// End an unordered list item.
+    EndUnorderedListItem,
 
     /// A reference to a footnote.
     FootnoteRef {
@@ -96,6 +102,16 @@ pub enum Event {
     StartCaption {
         /// Optional block identifier.
         id: Option<String>,
+    },
+
+    /// Begin a check list item.
+    StartCheckListItem {
+        /// Whether the checkbox is checked.
+        checked: bool,
+        /// Optional block identifier.
+        id: Option<String>,
+        /// Nesting level (1 = top-level).
+        level: u8,
     },
 
     /// Begin a definition detail (description).
@@ -150,18 +166,16 @@ pub enum Event {
         title: Option<String>,
     },
 
-    /// Begin a list item.
-    StartListItem {
+    /// Begin an ordered list item.
+    StartOrderedListItem {
         /// Optional block identifier.
         id: Option<String>,
         /// Nesting level (1 = top-level).
         level: u8,
-        /// Whether the list is ordered or unordered.
-        list_type: crate::ListType,
-        /// Starting number for ordered lists (None = continue from previous).
+        /// Starting number (None = continue from previous).
         start: Option<u32>,
         /// Visual style for the list marker.
-        style_type: Option<crate::ListStyleType>,
+        style: Option<crate::OrderedListStyle>,
     },
 
     /// Begin a paragraph with optional alignment.
@@ -214,6 +228,16 @@ pub enum Event {
     StartTableRow {
         /// Optional block identifier.
         id: Option<String>,
+    },
+
+    /// Begin an unordered list item.
+    StartUnorderedListItem {
+        /// Optional block identifier.
+        id: Option<String>,
+        /// Nesting level (1 = top-level).
+        level: u8,
+        /// Visual style for the list marker.
+        style: Option<crate::UnorderedListStyle>,
     },
 
     /// A text run with formatting attributes.

@@ -131,4 +131,36 @@ mod tests {
         let actual = run_pipeline(markdown);
         assert_json_eq(&actual, expected);
     }
+
+    #[test]
+    fn pipeline_nested_lists() {
+        let markdown = include_str!("../../../tests/fixtures/markdown/nested_lists.md");
+        let expected = include_str!("../../../tests/fixtures/blocknote/nested_lists.json");
+        let actual = run_pipeline(markdown);
+        assert_json_eq(&actual, expected);
+    }
+
+    #[test]
+    fn pipeline_ordered_list() {
+        let markdown = include_str!("../../../tests/fixtures/markdown/ordered_list.md");
+        let expected = include_str!("../../../tests/fixtures/blocknote/ordered_list.json");
+        let actual = run_pipeline(markdown);
+        assert_json_eq(&actual, expected);
+    }
+
+    #[test]
+    fn pipeline_task_list() {
+        let markdown = include_str!("../../../tests/fixtures/markdown/task_list.md");
+        let expected = include_str!("../../../tests/fixtures/blocknote/task_list.json");
+        let actual = run_pipeline(markdown);
+        assert_json_eq(&actual, expected);
+    }
+
+    #[test]
+    fn pipeline_unordered_list() {
+        let markdown = include_str!("../../../tests/fixtures/markdown/unordered_list.md");
+        let expected = include_str!("../../../tests/fixtures/blocknote/unordered_list.json");
+        let actual = run_pipeline(markdown);
+        assert_json_eq(&actual, expected);
+    }
 }

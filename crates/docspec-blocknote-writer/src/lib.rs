@@ -18,14 +18,15 @@
 //! - `StartParagraph` / `EndParagraph` — paragraph blocks
 //! - `StartBlockQuote` / `EndBlockQuote` — quote blocks
 //! - `StartPreformatted` / `EndPreformatted` — code blocks
+//! - `StartOrderedListItem` / `EndOrderedListItem` — numbered list items
+//! - `StartUnorderedListItem` / `EndUnorderedListItem` — bullet list items
+//! - `StartCheckListItem` / `EndCheckListItem` — check list items with checked state
 //! - `Text` — inline text content with bold/italic/code/strikethrough/underline styles
 //! - `Image` — image blocks
 //! - `LineBreak` — line breaks within content blocks
 //! - `ThematicBreak` — divider blocks
 //!
-//! List and table structure events (`StartListItem`, `StartTable*`, etc.) are silently ignored
-//! by this writer. Use `StackTrackingSink` from `docspec_core` to wrap the writer for automatic
-//! paragraph insertion within list items and table cells.
+//! Table structure events (`StartTable*`, etc.) are silently ignored by this writer.
 //!
 //! # Example
 //!
@@ -62,6 +63,15 @@ use base64::write::EncoderWriter as Base64Encoder;
 use docspec_core::{AssetProvider, Error, Event, EventSink, ImageSource, Result};
 use struson::writer::{JsonStreamWriter, JsonWriter as _};
 
+/// Tracks a list item's state for nesting support.
+#[derive(Debug, Clone)]
+struct ListItemState {
+    /// Whether the content array has been closed (ready for children).
+    content_closed: bool,
+    /// The nesting level of this list item (1 = top-level).
+    level: u8,
+}
+
 /// A streaming `BlockNote` JSON writer.
 ///
 /// Writes JSON tokens directly to the underlying `Write` as events arrive using `struson`.
@@ -84,6 +94,8 @@ pub struct BlockNoteWriter<'a, W: Write> {
     blockquote_has_content: bool,
     /// Whether we are inside a text-bearing content block (heading, paragraph, preformatted, or blockquote).
     in_text_block: bool,
+    /// Stack of list item states for nesting support.
+    list_item_stack: Vec<ListItemState>,
     /// The underlying JSON stream writer.
     writer: JsonStreamWriter<W>,
 }
@@ -117,6 +129,28 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Ok(())
     }
 
+    fn close_list_items_to_level(&mut self, target_level: u8) -> Result<()> {
+        while let Some(item_state) = self.list_item_stack.last() {
+            if item_state.level < target_level {
+                break;
+            }
+
+            let Some(popped_state) = self.list_item_stack.pop() else {
+                break;
+            };
+
+            if !popped_state.content_closed {
+                self.writer.end_array().map_err(io_err)?;
+                self.writer.name("children").map_err(io_err)?;
+                self.writer.begin_array().map_err(io_err)?;
+            }
+            self.writer.end_array().map_err(io_err)?;
+            self.writer.end_object().map_err(io_err)?;
+        }
+        self.in_text_block = !self.list_item_stack.is_empty();
+        Ok(())
+    }
+
     fn handle_blockquote(&mut self, id: Option<&String>) -> Result<()> {
         self.writer.begin_object().map_err(io_err)?;
         self.writer.name("type").map_err(io_err)?;
@@ -136,6 +170,48 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.writer.string_value("divider").map_err(io_err)?;
         self.write_id(id)?;
         self.writer.end_object().map_err(io_err)?;
+        Ok(())
+    }
+
+    fn handle_end_blockquote(&mut self) -> Result<()> {
+        if self.blockquote_force_closed_count > 0 {
+            self.blockquote_force_closed_count =
+                self.blockquote_force_closed_count.saturating_sub(1);
+            return Ok(());
+        }
+        self.close_content_block()?;
+        self.blockquote_depth = self.blockquote_depth.saturating_sub(1);
+        self.in_text_block = self.blockquote_depth > 0;
+        Ok(())
+    }
+
+    fn handle_end_list_item(&mut self) -> Result<()> {
+        if let Some(state) = self.list_item_stack.pop() {
+            if !state.content_closed {
+                self.writer.end_array().map_err(io_err)?;
+                self.writer.name("children").map_err(io_err)?;
+                self.writer.begin_array().map_err(io_err)?;
+            }
+            self.writer.end_array().map_err(io_err)?;
+            self.writer.end_object().map_err(io_err)?;
+        }
+        self.in_text_block = self
+            .list_item_stack
+            .last()
+            .is_some_and(|parent| !parent.content_closed);
+        Ok(())
+    }
+
+    fn handle_end_paragraph(&mut self) -> Result<()> {
+        let in_list_content = self
+            .list_item_stack
+            .last()
+            .is_some_and(|item| !item.content_closed);
+        if self.blockquote_depth > 0 || !self.in_text_block || in_list_content {
+            return Ok(());
+        }
+        self.close_content_block()?;
+        self.in_text_block = false;
         Ok(())
     }
 
@@ -163,7 +239,17 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         alt: Option<String>,
         id: Option<&String>,
     ) -> Result<()> {
-        self.close_for_block_sibling()?;
+        if let Some(parent) = self.list_item_stack.last_mut() {
+            if !parent.content_closed {
+                self.writer.end_array().map_err(io_err)?;
+                self.writer.name("children").map_err(io_err)?;
+                self.writer.begin_array().map_err(io_err)?;
+                parent.content_closed = true;
+                self.in_text_block = false;
+            }
+        } else {
+            self.close_for_block_sibling()?;
+        }
         let url = match source {
             ImageSource::Uri { uri } => uri,
             ImageSource::Asset { asset_id } => {
@@ -217,11 +303,69 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Ok(())
     }
 
+    fn handle_list_item(
+        &mut self,
+        block_type: &str,
+        level: u8,
+        id: Option<&String>,
+        checked: Option<bool>,
+    ) -> Result<()> {
+        self.close_list_items_to_level(level)?;
+
+        let is_nested_child = self
+            .list_item_stack
+            .last()
+            .is_some_and(|parent| level > parent.level);
+
+        if !is_nested_child {
+            self.close_for_block_sibling()?;
+        }
+
+        if let Some(parent) = self.list_item_stack.last_mut() {
+            if level > parent.level && !parent.content_closed {
+                self.writer.end_array().map_err(io_err)?;
+                self.writer.name("children").map_err(io_err)?;
+                self.writer.begin_array().map_err(io_err)?;
+                parent.content_closed = true;
+            }
+        }
+
+        self.writer.begin_object().map_err(io_err)?;
+        self.writer.name("type").map_err(io_err)?;
+        self.writer.string_value(block_type).map_err(io_err)?;
+        self.write_id(id)?;
+        self.writer.name("props").map_err(io_err)?;
+        self.writer.begin_object().map_err(io_err)?;
+        self.writer.name("textAlignment").map_err(io_err)?;
+        self.writer.string_value("left").map_err(io_err)?;
+        if let Some(is_checked) = checked {
+            self.writer.name("checked").map_err(io_err)?;
+            self.writer.bool_value(is_checked).map_err(io_err)?;
+        }
+        self.writer.end_object().map_err(io_err)?;
+        self.writer.name("content").map_err(io_err)?;
+        self.writer.begin_array().map_err(io_err)?;
+
+        self.list_item_stack.push(ListItemState {
+            content_closed: false,
+            level,
+        });
+        self.in_text_block = true;
+        Ok(())
+    }
+
     fn handle_paragraph(&mut self, id: Option<&String>) -> Result<()> {
         if self.blockquote_depth > 0 {
             if self.blockquote_has_content {
                 self.handle_text("\n\n", false, false, false, false, false)?;
             }
+            return Ok(());
+        }
+        if self
+            .list_item_stack
+            .last()
+            .is_some_and(|item| !item.content_closed)
+        {
             return Ok(());
         }
         self.writer.begin_object().map_err(io_err)?;
@@ -318,6 +462,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             blockquote_force_closed_count: 0,
             blockquote_has_content: false,
             in_text_block: false,
+            list_item_stack: Vec::new(),
             writer: JsonStreamWriter::new(writer),
         }
     }
@@ -341,6 +486,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             blockquote_force_closed_count: 0,
             blockquote_has_content: false,
             in_text_block: false,
+            list_item_stack: Vec::new(),
             writer: JsonStreamWriter::new(writer),
         }
     }
@@ -379,29 +525,12 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 Ok(())
             }
             Event::StartParagraph { id, .. } => self.handle_paragraph(id.as_ref()),
-            Event::EndParagraph => {
-                if self.blockquote_depth > 0 || !self.in_text_block {
-                    return Ok(());
-                }
-                self.close_content_block()?;
-                self.in_text_block = false;
-                Ok(())
-            }
+            Event::EndParagraph => self.handle_end_paragraph(),
             Event::StartBlockQuote { id, .. } => {
                 self.close_for_block_sibling()?;
                 self.handle_blockquote(id.as_ref())
             }
-            Event::EndBlockQuote => {
-                if self.blockquote_force_closed_count > 0 {
-                    self.blockquote_force_closed_count =
-                        self.blockquote_force_closed_count.saturating_sub(1);
-                    return Ok(());
-                }
-                self.close_content_block()?;
-                self.blockquote_depth = self.blockquote_depth.saturating_sub(1);
-                self.in_text_block = self.blockquote_depth > 0;
-                Ok(())
-            }
+            Event::EndBlockQuote => self.handle_end_blockquote(),
             Event::StartPreformatted { id, syntax, .. } => {
                 self.close_for_block_sibling()?;
                 self.handle_preformatted(id.as_ref(), syntax.as_ref())
@@ -435,13 +564,24 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                     Ok(())
                 }
             }
+            Event::StartOrderedListItem { id, level, .. } => {
+                self.handle_list_item("numberedListItem", level, id.as_ref(), None)
+            }
+            Event::StartUnorderedListItem { id, level, .. } => {
+                self.handle_list_item("bulletListItem", level, id.as_ref(), None)
+            }
+            Event::StartCheckListItem { id, level, checked } => {
+                self.handle_list_item("checkListItem", level, id.as_ref(), Some(checked))
+            }
+            Event::EndOrderedListItem | Event::EndUnorderedListItem | Event::EndCheckListItem => {
+                self.handle_end_list_item()
+            }
             Event::EndCaption
             | Event::EndDefinitionTerm
             | Event::EndLink
             | Event::EndDefinitionDetail
             | Event::EndDefinitionList
             | Event::EndFootnote
-            | Event::EndListItem
             | Event::EndTable
             | Event::EndTableCell
             | Event::EndTableHeader
@@ -453,7 +593,6 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             | Event::StartDefinitionTerm { .. }
             | Event::StartFootnote { .. }
             | Event::StartLink { .. }
-            | Event::StartListItem { .. }
             | Event::StartTable { .. }
             | Event::StartTableCell { .. }
             | Event::StartTableHeader { .. }

@@ -89,34 +89,38 @@ mod tests {
                 Event::Text { .. } => "Text",
                 Event::EndBlockQuote
                 | Event::EndCaption
+                | Event::EndCheckListItem
                 | Event::EndDefinitionDetail
                 | Event::EndDefinitionList
                 | Event::EndDefinitionTerm
                 | Event::EndFootnote
                 | Event::EndLink
-                | Event::EndListItem
+                | Event::EndOrderedListItem
                 | Event::EndPreformatted
                 | Event::EndTable
                 | Event::EndTableCell
                 | Event::EndTableHeader
                 | Event::EndTableRow
+                | Event::EndUnorderedListItem
                 | Event::FootnoteRef { .. }
                 | Event::Image { .. }
                 | Event::LineBreak
                 | Event::StartBlockQuote { .. }
                 | Event::StartCaption { .. }
+                | Event::StartCheckListItem { .. }
                 | Event::StartDefinitionDetail { .. }
                 | Event::StartDefinitionList { .. }
                 | Event::StartDefinitionTerm { .. }
                 | Event::StartFootnote { .. }
                 | Event::StartHeading { .. }
                 | Event::StartLink { .. }
-                | Event::StartListItem { .. }
+                | Event::StartOrderedListItem { .. }
                 | Event::StartPreformatted { .. }
                 | Event::StartTable { .. }
                 | Event::StartTableCell { .. }
                 | Event::StartTableHeader { .. }
                 | Event::StartTableRow { .. }
+                | Event::StartUnorderedListItem { .. }
                 | Event::ThematicBreak { .. }
                 | _ => "Other",
             })
@@ -320,10 +324,12 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(!events
+        assert!(events
             .iter()
-            .any(|e| matches!(e, Event::StartListItem { .. })));
-        assert!(!events.iter().any(|e| matches!(e, Event::EndListItem)));
+            .any(|e| matches!(e, Event::StartUnorderedListItem { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, Event::EndUnorderedListItem)));
 
         let has_item_one = events
             .iter()
@@ -581,14 +587,10 @@ mod tests {
 
     #[test]
     fn code_block_preserves_trailing_blank_lines() {
-        // Code block with intentional trailing blank lines
-        // The parser adds a newline terminator, but we should only remove that one,
-        // not all trailing newlines
         let markdown = "```\ncode\n\n\n```";
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        // Find the text event inside the code block
         let text_event = events.iter().find(|e| {
             matches!(
                 e,
@@ -600,9 +602,6 @@ mod tests {
             )
         });
 
-        // The content should preserve the blank lines (two newlines after "code")
-        // Only the parser-added terminator should be removed
-        // Use exact equality to catch regressions
         assert!(matches!(
             text_event,
             Some(Event::Text { content, .. }) if content == "code\n\n"
@@ -716,6 +715,454 @@ mod tests {
         assert!(matches!(
             text_event,
             Some(Event::Text { content, bold: true, italic: true, strikethrough: true, .. }) if content == "bold italic struck"
+        ));
+    }
+
+    #[test]
+    fn ordered_list_emits_events() {
+        let markdown = "1. First\n2. Second\n3. Third";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let ordered_starts: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, Event::StartOrderedListItem { .. }))
+            .collect();
+        assert_eq!(ordered_starts.len(), 3, "Expected 3 ordered list items");
+
+        assert!(matches!(
+            ordered_starts.first(),
+            Some(Event::StartOrderedListItem {
+                level: 1,
+                start: Some(1),
+                ..
+            })
+        ));
+
+        assert!(matches!(
+            ordered_starts.get(1),
+            Some(Event::StartOrderedListItem {
+                level: 1,
+                start: None,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn unordered_list_emits_events() {
+        let markdown = "- Item one\n- Item two";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let unordered_starts: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, Event::StartUnorderedListItem { .. }))
+            .collect();
+        assert_eq!(unordered_starts.len(), 2, "Expected 2 unordered list items");
+    }
+
+    #[test]
+    fn task_list_emits_events() {
+        let markdown = "- [x] Done\n- [ ] Todo";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let check_starts: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, Event::StartCheckListItem { .. }))
+            .collect();
+        assert_eq!(check_starts.len(), 2, "Expected 2 check list items");
+
+        assert!(matches!(
+            check_starts.first(),
+            Some(Event::StartCheckListItem { checked: true, .. })
+        ));
+
+        assert!(matches!(
+            check_starts.get(1),
+            Some(Event::StartCheckListItem { checked: false, .. })
+        ));
+    }
+
+    #[test]
+    fn nested_list_levels() {
+        let markdown = "- Level 1\n  - Level 2\n    - Level 3";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let items: Vec<_> = events
+            .iter()
+            .filter_map(|e| {
+                if let Event::StartUnorderedListItem { level, .. } = e {
+                    Some(*level)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        assert_eq!(items, vec![1, 2, 3], "Expected levels 1, 2, 3");
+    }
+
+    #[test]
+    fn mixed_list_types() {
+        let markdown = "1. Ordered\n- Unordered";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, Event::StartOrderedListItem { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, Event::StartUnorderedListItem { .. })));
+    }
+
+    #[test]
+    fn ordered_list_with_custom_start_number() {
+        let markdown = "5. First\n6. Second";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let ordered_starts: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, Event::StartOrderedListItem { .. }))
+            .collect();
+        assert_eq!(ordered_starts.len(), 2, "Expected 2 ordered list items");
+
+        assert!(matches!(
+            ordered_starts.first(),
+            Some(Event::StartOrderedListItem {
+                level: 1,
+                start: Some(5),
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn nested_task_list() {
+        let markdown = "- [x] Parent\n  - [ ] Child";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let check_starts: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, Event::StartCheckListItem { .. }))
+            .collect();
+        assert_eq!(check_starts.len(), 2, "Expected 2 check list items");
+
+        assert!(matches!(
+            check_starts.first(),
+            Some(Event::StartCheckListItem { level: 1, .. })
+        ));
+        assert!(matches!(
+            check_starts.get(1),
+            Some(Event::StartCheckListItem { level: 2, .. })
+        ));
+    }
+
+    #[test]
+    fn list_items_have_end_events() {
+        let markdown = "- Item one\n- Item two";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let end_unordered: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, Event::EndUnorderedListItem))
+            .collect();
+        assert_eq!(
+            end_unordered.len(),
+            2,
+            "Expected 2 EndUnorderedListItem events"
+        );
+    }
+
+    #[test]
+    fn ordered_list_items_have_end_events() {
+        let markdown = "1. First\n2. Second";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let end_ordered: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, Event::EndOrderedListItem))
+            .collect();
+        assert_eq!(end_ordered.len(), 2, "Expected 2 EndOrderedListItem events");
+    }
+
+    #[test]
+    fn task_list_items_have_end_events() {
+        let markdown = "- [x] Done\n- [ ] Todo";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let end_check: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, Event::EndCheckListItem))
+            .collect();
+        assert_eq!(end_check.len(), 2, "Expected 2 EndCheckListItem events");
+    }
+
+    #[test]
+    fn empty_list_item() {
+        let markdown = "- \n- Item";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let unordered_starts: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, Event::StartUnorderedListItem { .. }))
+            .collect();
+        assert_eq!(
+            unordered_starts.len(),
+            2,
+            "Expected 2 list items including empty"
+        );
+    }
+
+    /// Regression test: ordered parent with unordered child must emit correct End events.
+    /// Bug: single `item_state` field gets overwritten by child, causing parent to emit wrong End.
+    #[test]
+    fn nested_mixed_list_types_correct_end_events() {
+        let markdown = "1. Parent\n   - Child";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let list_events: Vec<_> = events
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e,
+                    Event::StartOrderedListItem { .. }
+                        | Event::EndOrderedListItem
+                        | Event::StartUnorderedListItem { .. }
+                        | Event::EndUnorderedListItem
+                )
+            })
+            .collect();
+
+        assert_eq!(list_events.len(), 4, "Expected 4 list events");
+        assert!(matches!(
+            list_events.first(),
+            Some(Event::StartOrderedListItem { level: 1, .. })
+        ));
+        assert!(matches!(
+            list_events.get(1),
+            Some(Event::StartUnorderedListItem { level: 2, .. })
+        ));
+        assert!(matches!(
+            list_events.get(2),
+            Some(Event::EndUnorderedListItem)
+        ));
+        assert!(matches!(
+            list_events.get(3),
+            Some(Event::EndOrderedListItem)
+        ));
+    }
+
+    /// Regression test: deeply nested lists maintain correct Start/End pairing.
+    /// Bug: `item_state` stack corruption causes wrong End events at depth > 2.
+    #[test]
+    fn deeply_nested_lists_correct_pairing() {
+        let markdown = "- L1\n  - L2\n    - L3";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let list_events: Vec<_> = events
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e,
+                    Event::StartUnorderedListItem { .. } | Event::EndUnorderedListItem
+                )
+            })
+            .collect();
+
+        assert_eq!(
+            list_events.len(),
+            6,
+            "Expected 6 list events (3 starts, 3 ends)"
+        );
+        assert!(matches!(
+            list_events.first(),
+            Some(Event::StartUnorderedListItem { level: 1, .. })
+        ));
+        assert!(matches!(
+            list_events.get(1),
+            Some(Event::StartUnorderedListItem { level: 2, .. })
+        ));
+        assert!(matches!(
+            list_events.get(2),
+            Some(Event::StartUnorderedListItem { level: 3, .. })
+        ));
+        assert!(matches!(
+            list_events.get(3),
+            Some(Event::EndUnorderedListItem)
+        ));
+        assert!(matches!(
+            list_events.get(4),
+            Some(Event::EndUnorderedListItem)
+        ));
+        assert!(matches!(
+            list_events.get(5),
+            Some(Event::EndUnorderedListItem)
+        ));
+    }
+
+    /// Regression test: task list parent with regular child.
+    /// Bug: task marker could be consumed by wrong item.
+    #[test]
+    fn nested_task_list_marker_applies_to_correct_item() {
+        let markdown = "- [x] Parent\n  - Child";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let check_events: Vec<_> = events
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e,
+                    Event::StartCheckListItem { .. } | Event::EndCheckListItem
+                )
+            })
+            .collect();
+
+        let unordered_events: Vec<_> = events
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e,
+                    Event::StartUnorderedListItem { .. } | Event::EndUnorderedListItem
+                )
+            })
+            .collect();
+
+        assert_eq!(check_events.len(), 2, "Parent should be check list item");
+        assert_eq!(
+            unordered_events.len(),
+            2,
+            "Child should be unordered list item"
+        );
+
+        assert!(matches!(
+            check_events.first(),
+            Some(Event::StartCheckListItem {
+                level: 1,
+                checked: true,
+                ..
+            })
+        ));
+        assert!(matches!(
+            unordered_events.first(),
+            Some(Event::StartUnorderedListItem { level: 2, .. })
+        ));
+    }
+
+    /// Regression test: image inside list item should emit proper Start/End events.
+    /// Bug: image as first content in list item may not trigger `StartUnorderedListItem` emission.
+    #[test]
+    fn image_inside_list_item_emits_correct_events() {
+        let markdown = "- ![alt text](http://example.com/img.png)";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let list_events: Vec<_> = events
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e,
+                    Event::StartUnorderedListItem { .. } | Event::EndUnorderedListItem
+                )
+            })
+            .collect();
+
+        let image_events: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, Event::Image { .. }))
+            .collect();
+
+        assert_eq!(
+            list_events.len(),
+            2,
+            "Expected Start and End list item events"
+        );
+        assert_eq!(image_events.len(), 1, "Expected one image event");
+
+        assert!(matches!(
+            list_events.first(),
+            Some(Event::StartUnorderedListItem { level: 1, .. })
+        ));
+        assert!(matches!(
+            list_events.get(1),
+            Some(Event::EndUnorderedListItem)
+        ));
+
+        assert!(matches!(
+            image_events.first(),
+            Some(Event::Image { alt: Some(alt), .. }) if alt == "alt text"
+        ));
+    }
+
+    /// Regression test: list item with only an image (no text) should still emit events.
+    #[test]
+    fn list_item_with_image_only_no_text() {
+        let markdown = "1. ![](http://example.com/img.png)";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let list_events: Vec<_> = events
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e,
+                    Event::StartOrderedListItem { .. } | Event::EndOrderedListItem
+                )
+            })
+            .collect();
+
+        assert_eq!(
+            list_events.len(),
+            2,
+            "Expected Start and End ordered list item events"
+        );
+        assert!(matches!(
+            list_events.first(),
+            Some(Event::StartOrderedListItem {
+                level: 1,
+                start: Some(1),
+                ..
+            })
+        ));
+    }
+
+    /// Regression test: nested list with image in parent.
+    #[test]
+    fn nested_list_with_image_in_parent() {
+        let markdown = "- ![img](http://example.com/img.png)\n  - Child text";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let list_events: Vec<_> = events
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e,
+                    Event::StartUnorderedListItem { .. } | Event::EndUnorderedListItem
+                )
+            })
+            .collect();
+
+        assert_eq!(list_events.len(), 4, "Expected 2 starts and 2 ends");
+        assert!(matches!(
+            list_events.first(),
+            Some(Event::StartUnorderedListItem { level: 1, .. })
+        ));
+        assert!(matches!(
+            list_events.get(1),
+            Some(Event::StartUnorderedListItem { level: 2, .. })
         ));
     }
 }

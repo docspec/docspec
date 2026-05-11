@@ -1,0 +1,76 @@
+[
+  {
+    "type": "checkListItem",
+    "props": {
+      "checked": true,
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Completed task",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "checkListItem",
+    "props": {
+      "checked": false,
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Pending task",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "checkListItem",
+    "props": {
+      "checked": true,
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Another done item with ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "bold",
+        "styles": {
+          "bold": true
+        }
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "checkListItem",
+    "props": {
+      "checked": false,
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Todo with ",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "emphasis",
+        "styles": {
+          "italic": true
+        }
+      }
+    ],
+    "children": []
+  }
+]

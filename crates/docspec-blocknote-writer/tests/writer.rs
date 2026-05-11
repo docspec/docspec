@@ -856,12 +856,10 @@ mod tests {
                 language: None,
                 metadata: None,
             },
-            Event::StartListItem {
+            Event::StartUnorderedListItem {
                 id: None,
                 level: 1,
-                list_type: docspec_core::ListType::Unordered,
-                start: None,
-                style_type: None,
+                style: None,
             },
             Event::Text {
                 content: "Item".to_string(),
@@ -874,12 +872,12 @@ mod tests {
                 superscript: false,
                 mark: None,
             },
-            Event::EndListItem,
+            Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -2252,6 +2250,626 @@ mod tests {
         assert_eq!(
             json,
             r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"combined","styles":{"bold":true,"code":true,"strike":true}}],"children":[]}]"#
+        );
+    }
+
+    // ============================================================================
+    // LIST TESTS
+    // ============================================================================
+
+    #[test]
+    fn ordered_list_outputs_numbered_list_item() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartOrderedListItem {
+                id: None,
+                level: 1,
+                start: Some(1),
+                style: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "First".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndOrderedListItem,
+            Event::EndDocument,
+        ]);
+        assert!(
+            json.contains(r#""type":"numberedListItem""#),
+            "Expected numberedListItem type"
+        );
+        assert!(json.contains("First"), "Expected text content");
+    }
+
+    #[test]
+    fn unordered_list_outputs_bullet_list_item() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 1,
+                style: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Bullet".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert!(
+            json.contains(r#""type":"bulletListItem""#),
+            "Expected bulletListItem type"
+        );
+    }
+
+    #[test]
+    fn check_list_outputs_check_list_item_checked() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartCheckListItem {
+                id: None,
+                level: 1,
+                checked: true,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Done".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndCheckListItem,
+            Event::EndDocument,
+        ]);
+        assert!(
+            json.contains(r#""type":"checkListItem""#),
+            "Expected checkListItem type"
+        );
+        assert!(
+            json.contains(r#""checked":true"#),
+            "Expected checked:true prop"
+        );
+    }
+
+    #[test]
+    fn check_list_outputs_check_list_item_unchecked() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartCheckListItem {
+                id: None,
+                level: 1,
+                checked: false,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Todo".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndCheckListItem,
+            Event::EndDocument,
+        ]);
+        assert!(
+            json.contains(r#""type":"checkListItem""#),
+            "Expected checkListItem type"
+        );
+        assert!(
+            json.contains(r#""checked":false"#),
+            "Expected checked:false prop"
+        );
+    }
+
+    #[test]
+    fn nested_list_uses_children_array() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 1,
+                style: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Parent".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 2,
+                style: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Child".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndUnorderedListItem,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert!(
+            json.contains(r#""type":"bulletListItem""#),
+            "Expected parent to be bulletListItem type"
+        );
+        assert!(
+            json.contains(r#""children":["#),
+            "Expected children array for nesting"
+        );
+        assert!(json.contains("Parent"), "Expected parent text");
+        assert!(json.contains("Child"), "Expected child text");
+    }
+
+    #[test]
+    fn list_level_transition_deep_to_shallow() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 1,
+                style: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Parent".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 2,
+                style: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Child".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndUnorderedListItem,
+            Event::EndUnorderedListItem,
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 1,
+                style: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Sibling".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert!(json.contains("Parent"), "Expected parent text");
+        assert!(json.contains("Child"), "Expected child text");
+        assert!(json.contains("Sibling"), "Expected sibling text");
+        assert!(
+            json.contains(r#""type":"bulletListItem""#),
+            "Expected bulletListItem type"
+        );
+    }
+
+    #[test]
+    fn list_level_transition_skip_levels_deep() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 1,
+                style: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Level1".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 2,
+                style: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Level2".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 3,
+                style: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Level3".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndUnorderedListItem,
+            Event::EndUnorderedListItem,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert!(json.contains("Level1"), "Expected Level1 text");
+        assert!(json.contains("Level2"), "Expected Level2 text");
+        assert!(json.contains("Level3"), "Expected Level3 text");
+    }
+
+    #[test]
+    fn list_level_transition_skip_levels_return() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 1,
+                style: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Level1Again".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert!(json.contains("Level1Again"), "Expected Level1Again text");
+        assert!(
+            json.contains(r#""type":"bulletListItem""#),
+            "Expected bulletListItem type"
+        );
+    }
+
+    #[test]
+    fn list_same_level_siblings() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 1,
+                style: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Parent".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 2,
+                style: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "FirstChild".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndUnorderedListItem,
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 2,
+                style: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "SecondChild".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndUnorderedListItem,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert!(json.contains("Parent"), "Expected parent text");
+        assert!(json.contains("FirstChild"), "Expected first child text");
+        assert!(json.contains("SecondChild"), "Expected second child text");
+        assert!(
+            json.contains(r#""children":["#),
+            "Expected children array for nesting"
+        );
+    }
+
+    #[test]
+    fn image_inside_list_item_produces_valid_json() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 1,
+                style: None,
+            },
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "http://example.com/img.png".to_string(),
+                },
+                alt: Some("alt text".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert!(
+            json.contains(r#""type":"bulletListItem""#),
+            "Expected bulletListItem block"
+        );
+        assert!(
+            json.contains(r#""type":"image""#),
+            "Expected image block inside list item"
+        );
+        assert!(
+            json.contains("http://example.com/img.png"),
+            "Expected image URL"
+        );
+    }
+
+    #[test]
+    fn nested_list_with_image_in_parent_produces_valid_json() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 1,
+                style: None,
+            },
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "http://example.com/parent.png".to_string(),
+                },
+                alt: Some("parent image".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 2,
+                style: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Child text".to_string(),
+                bold: false,
+                italic: false,
+                code: false,
+                strikethrough: false,
+                underline: false,
+                subscript: false,
+                superscript: false,
+                mark: None,
+            },
+            Event::EndParagraph,
+            Event::EndUnorderedListItem,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert!(
+            json.contains(r#""type":"bulletListItem""#),
+            "Expected bulletListItem blocks"
+        );
+        assert!(json.contains("parent.png"), "Expected parent image URL");
+        assert!(json.contains("Child text"), "Expected child text content");
+        assert!(
+            json.contains(r#""children":["#),
+            "Expected children array for nested structure"
         );
     }
 }

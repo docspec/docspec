@@ -13,36 +13,30 @@ pub enum TextAlignment {
     Right,
 }
 
-/// Whether a list is ordered (numbered) or unordered (bulleted).
+/// Visual style for ordered list markers.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ListType {
-    /// Numbered list.
-    Ordered,
-    /// Bulleted list.
-    Unordered,
-}
-
-/// The specific visual style for a list.
-///
-/// Writers ignore mismatched styles (e.g., Disc on an ordered list).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ListStyleType {
-    /// Hollow circle bullet.
-    Circle,
+pub enum OrderedListStyle {
     /// Decimal numbering (1, 2, 3, ...).
     Decimal,
-    /// Filled circle bullet.
-    Disc,
     /// Lowercase alphabetic (a, b, c, ...).
     LowerAlpha,
     /// Lowercase Roman numerals (i, ii, iii, ...).
     LowerRoman,
-    /// Square bullet.
-    Square,
     /// Uppercase alphabetic (A, B, C, ...).
     UpperAlpha,
     /// Uppercase Roman numerals (I, II, III, ...).
     UpperRoman,
+}
+
+/// Visual style for unordered list markers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnorderedListStyle {
+    /// Hollow circle bullet.
+    Circle,
+    /// Filled circle bullet (default).
+    Disc,
+    /// Square bullet.
+    Square,
 }
 
 /// Scope of a table header cell.

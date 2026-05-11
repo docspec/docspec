@@ -28,6 +28,6 @@ pub use event::Event;
 pub use stack::{block_kind_for_end, block_kind_for_start, BlockKind, StackTrackingSink};
 pub use traits::{AssetProvider, EventSink, EventSource};
 pub use types::{
-    Author, Color, DocumentMeta, ImageSource, ListStyleType, ListType, TableHeaderScope,
-    TextAlignment,
+    Author, Color, DocumentMeta, ImageSource, OrderedListStyle, TableHeaderScope, TextAlignment,
+    UnorderedListStyle,
 };

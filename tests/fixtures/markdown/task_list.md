@@ -1,0 +1,4 @@
+- [x] Completed task
+- [ ] Pending task
+- [x] Another done item with **bold**
+- [ ] Todo with *emphasis*

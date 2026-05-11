@@ -55,15 +55,9 @@ Readers register assets as encountered. Writers call `stream_to()` on demand —
 ```rust
 enum TextAlignment { Left, Center, Right, Justify }
 
-enum ListType { Ordered, Unordered }
+enum OrderedListStyle { Decimal, LowerAlpha, UpperAlpha, LowerRoman, UpperRoman }
 
-enum ListStyleType {
-    // Ordered list styles
-    Decimal, LowerAlpha, UpperAlpha, LowerRoman, UpperRoman,
-    // Unordered list styles
-    Disc, Circle, Square,
-}
-// Writers ignore mismatched styles (e.g., Disc on an ordered list).
+enum UnorderedListStyle { Disc, Circle, Square }
 
 enum TableHeaderScope { Column, Row }  // Column: header describes cells below; Row: header describes cells to the right
 
@@ -108,9 +102,50 @@ All events in the `Event` enum, grouped by category.
 
 **Lists:**
 
-| Event            | Fields                                                                                         | Pair           |
-| ---------------- | ---------------------------------------------------------------------------------------------- | -------------- |
-| `StartListItem`  | `level: u8`, `list_type: ListType`, `start: Option<u32>`, `style_type: Option<ListStyleType>` | `EndListItem`  |
+| Event                     | Fields                                                                          | Pair                   |
+| ------------------------- | ------------------------------------------------------------------------------- | ---------------------- |
+| `StartOrderedListItem`    | `id: Option<String>`, `level: u8`, `start: Option<u32>`, `style: Option<OrderedListStyle>` | `EndOrderedListItem`   |
+| `StartUnorderedListItem`  | `id: Option<String>`, `level: u8`, `style: Option<UnorderedListStyle>`          | `EndUnorderedListItem` |
+| `StartCheckListItem`      | `id: Option<String>`, `level: u8`, `checked: bool`                              | `EndCheckListItem`     |
+
+**List Examples:**
+
+```
+Simple ordered list (1. First, 2. Second):
+  StartOrderedListItem { id: None, level: 1, start: Some(1), style: None }
+    Text { content: "First", ... }
+  EndOrderedListItem
+  StartOrderedListItem { id: None, level: 1, start: None, style: None }
+    Text { content: "Second", ... }
+  EndOrderedListItem
+
+Simple unordered list (- Item, - Item):
+  StartUnorderedListItem { id: None, level: 1, style: None }
+    Text { content: "Item", ... }
+  EndUnorderedListItem
+  StartUnorderedListItem { id: None, level: 1, style: None }
+    Text { content: "Item", ... }
+  EndUnorderedListItem
+
+Task/check list (- [x] Done, - [ ] Todo):
+  StartCheckListItem { id: None, level: 1, checked: true }
+    Text { content: "Done", ... }
+  EndCheckListItem
+  StartCheckListItem { id: None, level: 1, checked: false }
+    Text { content: "Todo", ... }
+  EndCheckListItem
+
+Nested list (level 1, level 2):
+  StartUnorderedListItem { id: None, level: 1, style: None }
+    Text { content: "Parent", ... }
+    StartOrderedListItem { id: None, level: 2, start: Some(1), style: None }
+      Text { content: "Child 1", ... }
+    EndOrderedListItem
+    StartOrderedListItem { id: None, level: 2, start: None, style: None }
+      Text { content: "Child 2", ... }
+    EndOrderedListItem
+  EndUnorderedListItem
+```
 
 **Tables:**
 
@@ -161,7 +196,13 @@ Every `Start*` has a matching `End*`. They nest but never overlap.
 
 **Heading.** Levels 1–6 are standard (HTML). DOCX/ODT/RTF support 1–9. Writers clamp higher levels. Both heading and list levels are 1-based (range 1–255); no format exceeds 9.
 
-**List items.** Nesting is flat — children follow parents sequentially, distinguished by `level`. No `StartList`/`EndList` exists. The `start` field sets numbering base until another `start` appears. **Boundary rules:** a new list begins when (a) a non-list block intervenes, (b) `list_type` changes at the same level, or (c) level decreases then increases without a parent.
+**List items.** Three distinct list item types: ordered, unordered, and check lists. Each has its own start/end event pair with fields relevant to that type only.
+
+- **Ordered lists:** Numbered items (1, 2, 3 or a, b, c). Carry optional `start` for numbering offset and `style` for marker appearance.
+- **Unordered lists:** Bulleted items. Carry optional `style` for bullet appearance (disc, circle, square).
+- **Check lists:** Task items with checkboxes. Carry required `checked` boolean. No style field (checkboxes are checkboxes).
+
+All list items have `id` for optional block identifiers and `level` for nesting (1 = top-level). Nesting is flat — children follow parents sequentially, distinguished by `level`. No `StartList`/`EndList` exists. **Boundary rules:** a new list begins when (a) a non-list block intervenes, (b) list type changes at the same level, or (c) level decreases then increases without a parent.
 
 **Table.** `StartCaption` is optional, appears before rows. Header cells carry `scope`/`abbr` for accessibility; data cells omit these. Cells may contain any block element.
 
@@ -195,7 +236,7 @@ Readers MUST produce well-formed streams. Writers MAY assume well-formedness.
 2. Exactly one root: `StartDocument`. Empty containers (`Start*` immediately followed by `End*`) are valid.
 3. `Text` appears only inside containers, never at root.
 4. `StartLink` appears inside inline-accepting blocks (paragraphs, headings, list items, cells, definition details). Links do not nest.
-5. `StartListItem` appears inside block containers. List items are flat — distinguished by `level` field.
+5. List item events (`StartOrderedListItem`, `StartUnorderedListItem`, `StartCheckListItem`) appear inside block containers. List items are flat — distinguished by `level` field.
 6. `StartCaption` appears at most once per table, before any rows.
 7. Each footnote ID appears in exactly one `FootnoteRef` and one `StartFootnote`.
 8. Table structure: `StartTableRow` appears only inside `StartTable`. `StartTableCell`/`StartTableHeader` appear only inside `StartTableRow`.

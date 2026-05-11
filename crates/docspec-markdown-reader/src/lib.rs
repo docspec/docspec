@@ -25,6 +25,9 @@
 //! - Paragraphs → `StartParagraph` / `EndParagraph`
 //! - Block quotes → `StartBlockQuote` / `EndBlockQuote`
 //! - Code blocks → `StartPreformatted` / `EndPreformatted`
+//! - Ordered lists → `StartOrderedListItem` / `EndOrderedListItem`
+//! - Unordered lists → `StartUnorderedListItem` / `EndUnorderedListItem`
+//! - Task lists → `StartCheckListItem` / `EndCheckListItem`
 //! - Bold text → `Text { bold: true, ... }`
 //! - Italic text → `Text { italic: true, ... }`
 //! - Inline code → `Text { code: true, ... }`
@@ -39,7 +42,7 @@
 //! The following elements are not emitted as structured events. Text content is
 //! recursively extracted where applicable; structure is silently dropped:
 //!
-//! - Tables, lists, and links (text extracted, structure dropped)
+//! - Tables and links (text extracted, structure dropped)
 //! - Definition lists and footnotes
 //! - HTML blocks and inline HTML
 //! - Math blocks and inline math
@@ -85,6 +88,20 @@ struct ImageBuffer {
     url: String,
 }
 
+struct ListContext {
+    is_first_item: bool,
+    is_ordered: bool,
+    level: u8,
+    start: Option<u32>,
+}
+
+enum ItemState {
+    EmittedCheckList,
+    EmittedOrdered,
+    EmittedUnordered,
+    Pending { task_marker: Option<bool> },
+}
+
 /// A streaming Markdown reader that implements [`EventSource`].
 ///
 /// `MarkdownReader` parses Markdown using `pulldown-cmark` and emits `DocSpec` events
@@ -113,6 +130,10 @@ pub struct MarkdownReader<'a> {
     image: Option<ImageBuffer>,
     /// Nesting depth for italic (emphasis) formatting.
     italic_depth: usize,
+    /// Stack of item states for nested list items.
+    item_state_stack: Vec<ItemState>,
+    /// Stack of list contexts for nested lists.
+    list_stack: Vec<ListContext>,
     /// The pulldown-cmark parser.
     parser: Parser<'a>,
     /// Document processing phase.
@@ -124,10 +145,80 @@ pub struct MarkdownReader<'a> {
 }
 
 impl<'a> MarkdownReader<'a> {
+    fn emit_list_item_end(&mut self) {
+        if self.list_stack.is_empty() {
+            self.item_state_stack.clear();
+            return;
+        }
+
+        if matches!(
+            self.item_state_stack.last(),
+            Some(ItemState::Pending { .. })
+        ) {
+            self.emit_list_item_start();
+        }
+
+        match self.item_state_stack.pop() {
+            Some(ItemState::EmittedCheckList) => {
+                self.queue.push_back(Event::EndCheckListItem);
+            }
+            Some(ItemState::EmittedOrdered) => {
+                self.queue.push_back(Event::EndOrderedListItem);
+            }
+            Some(ItemState::EmittedUnordered) => {
+                self.queue.push_back(Event::EndUnorderedListItem);
+            }
+            Some(ItemState::Pending { .. }) | None => {}
+        }
+    }
+
+    fn emit_list_item_start(&mut self) {
+        let task_marker = match self.item_state_stack.last() {
+            Some(ItemState::Pending { task_marker }) => *task_marker,
+            _ => return,
+        };
+
+        let Some(ctx) = self.list_stack.last_mut() else {
+            return;
+        };
+
+        let new_state = if let Some(checked) = task_marker {
+            ctx.is_first_item = false;
+            self.queue.push_back(Event::StartCheckListItem {
+                id: None,
+                level: ctx.level,
+                checked,
+            });
+            ItemState::EmittedCheckList
+        } else if ctx.is_ordered {
+            let start = if ctx.is_first_item { ctx.start } else { None };
+            ctx.is_first_item = false;
+            self.queue.push_back(Event::StartOrderedListItem {
+                id: None,
+                level: ctx.level,
+                start,
+                style: None,
+            });
+            ItemState::EmittedOrdered
+        } else {
+            self.queue.push_back(Event::StartUnorderedListItem {
+                id: None,
+                level: ctx.level,
+                style: None,
+            });
+            ItemState::EmittedUnordered
+        };
+
+        if let Some(last) = self.item_state_stack.last_mut() {
+            *last = new_state;
+        }
+    }
+
     fn handle_code(&mut self, content: String) {
         if let Some(img) = &mut self.image {
             img.alt_buf.push_str(&content);
         } else {
+            self.emit_list_item_start();
             if self.block_state == BlockState::None {
                 self.queue.push_back(Event::StartParagraph {
                     alignment: None,
@@ -154,10 +245,19 @@ impl<'a> MarkdownReader<'a> {
             TagEnd::Heading(_) => self.push_event_end(Event::EndHeading),
             TagEnd::Paragraph => self.push_event_end(Event::EndParagraph),
             TagEnd::BlockQuote(_) => self.push_event_end(Event::EndBlockQuote),
-            TagEnd::Item | TagEnd::TableCell => {
+            TagEnd::Item => {
                 if self.block_state == BlockState::AutoParagraph {
                     self.push_event_end(Event::EndParagraph);
                 }
+                self.emit_list_item_end();
+            }
+            TagEnd::TableCell => {
+                if self.block_state == BlockState::AutoParagraph {
+                    self.push_event_end(Event::EndParagraph);
+                }
+            }
+            TagEnd::List(_) => {
+                self.list_stack.pop();
             }
             TagEnd::Emphasis => {
                 self.italic_depth = self.italic_depth.saturating_sub(1);
@@ -170,6 +270,7 @@ impl<'a> MarkdownReader<'a> {
             }
             TagEnd::Image => {
                 if let Some(img) = self.image.take() {
+                    self.emit_list_item_start();
                     let alt = {
                         let trimmed = img.alt_buf.trim();
                         if trimmed.is_empty() {
@@ -213,7 +314,6 @@ impl<'a> MarkdownReader<'a> {
             | TagEnd::FootnoteDefinition
             | TagEnd::HtmlBlock
             | TagEnd::Link
-            | TagEnd::List(_)
             | TagEnd::MetadataBlock(_)
             | TagEnd::Subscript
             | TagEnd::Superscript
@@ -275,14 +375,28 @@ impl<'a> MarkdownReader<'a> {
                     url: dest_url.into_string(),
                 });
             }
+            Tag::List(first_item_number) => {
+                self.emit_list_item_start();
+                let is_ordered = first_item_number.is_some();
+                let level =
+                    u8::try_from(self.list_stack.len().saturating_add(1)).unwrap_or(u8::MAX);
+                self.list_stack.push(ListContext {
+                    is_first_item: true,
+                    is_ordered,
+                    level,
+                    start: first_item_number.and_then(|n| u32::try_from(n).ok()),
+                });
+            }
+            Tag::Item => {
+                self.item_state_stack
+                    .push(ItemState::Pending { task_marker: None });
+            }
             Tag::DefinitionList
             | Tag::DefinitionListDefinition
             | Tag::DefinitionListTitle
             | Tag::FootnoteDefinition(_)
             | Tag::HtmlBlock
-            | Tag::Item
             | Tag::Link { .. }
-            | Tag::List(_)
             | Tag::MetadataBlock(_)
             | Tag::Subscript
             | Tag::Superscript
@@ -299,6 +413,7 @@ impl<'a> MarkdownReader<'a> {
         } else if let Some(buf) = &mut self.code_block_buffer {
             buf.push_str(&content);
         } else {
+            self.emit_list_item_start();
             if self.block_state == BlockState::None {
                 self.queue.push_back(Event::StartParagraph {
                     alignment: None,
@@ -335,7 +450,8 @@ impl<'a> MarkdownReader<'a> {
     #[inline]
     #[must_use]
     pub fn new(markdown: &'a str) -> Self {
-        let options = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH;
+        let options =
+            Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TASKLISTS;
         let parser = Parser::new_ext(markdown, options);
         Self {
             block_state: BlockState::None,
@@ -343,6 +459,8 @@ impl<'a> MarkdownReader<'a> {
             code_block_buffer: None,
             image: None,
             italic_depth: 0,
+            item_state_stack: Vec::new(),
+            list_stack: Vec::new(),
             parser,
             phase: Phase::NotStarted,
             queue: VecDeque::new(),
@@ -391,12 +509,16 @@ impl<'a> MarkdownReader<'a> {
             pulldown_cmark::Event::Rule => {
                 self.queue.push_back(Event::ThematicBreak { id: None });
             }
+            pulldown_cmark::Event::TaskListMarker(checked) => {
+                if let Some(ItemState::Pending { task_marker }) = self.item_state_stack.last_mut() {
+                    *task_marker = Some(checked);
+                }
+            }
             pulldown_cmark::Event::DisplayMath(_)
             | pulldown_cmark::Event::FootnoteReference(_)
             | pulldown_cmark::Event::Html(_)
             | pulldown_cmark::Event::InlineHtml(_)
-            | pulldown_cmark::Event::InlineMath(_)
-            | pulldown_cmark::Event::TaskListMarker(_) => {}
+            | pulldown_cmark::Event::InlineMath(_) => {}
         }
     }
 

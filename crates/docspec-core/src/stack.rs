@@ -18,6 +18,8 @@ pub enum BlockKind {
     Blockquote,
     /// A table caption container.
     Caption,
+    /// A check list item container.
+    CheckListItem,
     /// A definition detail (description) container.
     DefinitionDetail,
     /// A definition list container.
@@ -32,8 +34,8 @@ pub enum BlockKind {
     Heading,
     /// A hyperlink container.
     Link,
-    /// A list item container.
-    ListItem,
+    /// An ordered list item container.
+    OrderedListItem,
     /// A paragraph container.
     Paragraph,
     /// A preformatted (code) block container.
@@ -46,6 +48,8 @@ pub enum BlockKind {
     TableHeader,
     /// A table row container.
     TableRow,
+    /// An unordered list item container.
+    UnorderedListItem,
 }
 
 /// A wrapper around any [`EventSink`] that tracks the nesting stack of open block-level containers
@@ -79,7 +83,8 @@ impl<S: EventSink> StackTrackingSink<S> {
     /// block elements (paragraphs, headings, etc.), not inline text directly. Text inside
     /// a block quote without an explicit paragraph triggers auto-paragraph insertion.
     ///
-    /// Note: [`BlockKind::ListItem`], [`BlockKind::TableCell`], [`BlockKind::TableHeader`],
+    /// Note: List item variants ([`BlockKind::OrderedListItem`], [`BlockKind::UnorderedListItem`],
+    /// [`BlockKind::CheckListItem`]), [`BlockKind::TableCell`], [`BlockKind::TableHeader`],
     /// and [`BlockKind::DefinitionDetail`] are NOT content-bearing despite being able to
     /// contain inline content per `EVENTS.md`. This is because downstream writers like
     /// `BlockNoteWriter` rely on auto-paragraph insertion for these container types.
@@ -259,40 +264,48 @@ impl<S: EventSink> EventSink for StackTrackingSink<S> {
 #[inline]
 #[must_use]
 pub fn block_kind_for_start(event: &Event) -> Option<BlockKind> {
-    if let Event::StartBlockQuote { .. } = event {
-        Some(BlockKind::Blockquote)
-    } else if let Event::StartCaption { .. } = event {
-        Some(BlockKind::Caption)
-    } else if let Event::StartDefinitionDetail { .. } = event {
-        Some(BlockKind::DefinitionDetail)
-    } else if let Event::StartDefinitionList { .. } = event {
-        Some(BlockKind::DefinitionList)
-    } else if let Event::StartDefinitionTerm { .. } = event {
-        Some(BlockKind::DefinitionTerm)
-    } else if let Event::StartDocument { .. } = event {
-        Some(BlockKind::Document)
-    } else if let Event::StartFootnote { .. } = event {
-        Some(BlockKind::Footnote)
-    } else if let Event::StartHeading { .. } = event {
-        Some(BlockKind::Heading)
-    } else if let Event::StartLink { .. } = event {
-        Some(BlockKind::Link)
-    } else if let Event::StartListItem { .. } = event {
-        Some(BlockKind::ListItem)
-    } else if let Event::StartParagraph { .. } = event {
-        Some(BlockKind::Paragraph)
-    } else if let Event::StartPreformatted { .. } = event {
-        Some(BlockKind::Preformatted)
-    } else if let Event::StartTable { .. } = event {
-        Some(BlockKind::Table)
-    } else if let Event::StartTableCell { .. } = event {
-        Some(BlockKind::TableCell)
-    } else if let Event::StartTableHeader { .. } = event {
-        Some(BlockKind::TableHeader)
-    } else if let Event::StartTableRow { .. } = event {
-        Some(BlockKind::TableRow)
-    } else {
-        None
+    match event {
+        Event::StartBlockQuote { .. } => Some(BlockKind::Blockquote),
+        Event::StartCaption { .. } => Some(BlockKind::Caption),
+        Event::StartCheckListItem { .. } => Some(BlockKind::CheckListItem),
+        Event::StartDefinitionDetail { .. } => Some(BlockKind::DefinitionDetail),
+        Event::StartDefinitionList { .. } => Some(BlockKind::DefinitionList),
+        Event::StartDefinitionTerm { .. } => Some(BlockKind::DefinitionTerm),
+        Event::StartDocument { .. } => Some(BlockKind::Document),
+        Event::StartFootnote { .. } => Some(BlockKind::Footnote),
+        Event::StartHeading { .. } => Some(BlockKind::Heading),
+        Event::StartLink { .. } => Some(BlockKind::Link),
+        Event::StartOrderedListItem { .. } => Some(BlockKind::OrderedListItem),
+        Event::StartParagraph { .. } => Some(BlockKind::Paragraph),
+        Event::StartPreformatted { .. } => Some(BlockKind::Preformatted),
+        Event::StartTable { .. } => Some(BlockKind::Table),
+        Event::StartTableCell { .. } => Some(BlockKind::TableCell),
+        Event::StartTableHeader { .. } => Some(BlockKind::TableHeader),
+        Event::StartTableRow { .. } => Some(BlockKind::TableRow),
+        Event::StartUnorderedListItem { .. } => Some(BlockKind::UnorderedListItem),
+        Event::EndBlockQuote
+        | Event::EndCaption
+        | Event::EndCheckListItem
+        | Event::EndDefinitionDetail
+        | Event::EndDefinitionList
+        | Event::EndDefinitionTerm
+        | Event::EndDocument
+        | Event::EndFootnote
+        | Event::EndHeading
+        | Event::EndLink
+        | Event::EndOrderedListItem
+        | Event::EndParagraph
+        | Event::EndPreformatted
+        | Event::EndTable
+        | Event::EndTableCell
+        | Event::EndTableHeader
+        | Event::EndTableRow
+        | Event::EndUnorderedListItem
+        | Event::FootnoteRef { .. }
+        | Event::Image { .. }
+        | Event::LineBreak
+        | Event::Text { .. }
+        | Event::ThematicBreak { .. } => None,
     }
 }
 
@@ -302,40 +315,48 @@ pub fn block_kind_for_start(event: &Event) -> Option<BlockKind> {
 #[inline]
 #[must_use]
 pub fn block_kind_for_end(event: &Event) -> Option<BlockKind> {
-    if let Event::EndBlockQuote = event {
-        Some(BlockKind::Blockquote)
-    } else if let Event::EndCaption = event {
-        Some(BlockKind::Caption)
-    } else if let Event::EndDefinitionDetail = event {
-        Some(BlockKind::DefinitionDetail)
-    } else if let Event::EndDefinitionList = event {
-        Some(BlockKind::DefinitionList)
-    } else if let Event::EndDefinitionTerm = event {
-        Some(BlockKind::DefinitionTerm)
-    } else if let Event::EndDocument = event {
-        Some(BlockKind::Document)
-    } else if let Event::EndFootnote = event {
-        Some(BlockKind::Footnote)
-    } else if let Event::EndHeading = event {
-        Some(BlockKind::Heading)
-    } else if let Event::EndLink = event {
-        Some(BlockKind::Link)
-    } else if let Event::EndListItem = event {
-        Some(BlockKind::ListItem)
-    } else if let Event::EndParagraph = event {
-        Some(BlockKind::Paragraph)
-    } else if let Event::EndPreformatted = event {
-        Some(BlockKind::Preformatted)
-    } else if let Event::EndTable = event {
-        Some(BlockKind::Table)
-    } else if let Event::EndTableCell = event {
-        Some(BlockKind::TableCell)
-    } else if let Event::EndTableHeader = event {
-        Some(BlockKind::TableHeader)
-    } else if let Event::EndTableRow = event {
-        Some(BlockKind::TableRow)
-    } else {
-        None
+    match event {
+        Event::EndBlockQuote => Some(BlockKind::Blockquote),
+        Event::EndCaption => Some(BlockKind::Caption),
+        Event::EndCheckListItem => Some(BlockKind::CheckListItem),
+        Event::EndDefinitionDetail => Some(BlockKind::DefinitionDetail),
+        Event::EndDefinitionList => Some(BlockKind::DefinitionList),
+        Event::EndDefinitionTerm => Some(BlockKind::DefinitionTerm),
+        Event::EndDocument => Some(BlockKind::Document),
+        Event::EndFootnote => Some(BlockKind::Footnote),
+        Event::EndHeading => Some(BlockKind::Heading),
+        Event::EndLink => Some(BlockKind::Link),
+        Event::EndOrderedListItem => Some(BlockKind::OrderedListItem),
+        Event::EndUnorderedListItem => Some(BlockKind::UnorderedListItem),
+        Event::EndParagraph => Some(BlockKind::Paragraph),
+        Event::EndPreformatted => Some(BlockKind::Preformatted),
+        Event::EndTable => Some(BlockKind::Table),
+        Event::EndTableCell => Some(BlockKind::TableCell),
+        Event::EndTableHeader => Some(BlockKind::TableHeader),
+        Event::EndTableRow => Some(BlockKind::TableRow),
+        Event::FootnoteRef { .. }
+        | Event::Image { .. }
+        | Event::LineBreak
+        | Event::StartBlockQuote { .. }
+        | Event::StartCaption { .. }
+        | Event::StartCheckListItem { .. }
+        | Event::StartDefinitionDetail { .. }
+        | Event::StartDefinitionList { .. }
+        | Event::StartDefinitionTerm { .. }
+        | Event::StartDocument { .. }
+        | Event::StartFootnote { .. }
+        | Event::StartHeading { .. }
+        | Event::StartLink { .. }
+        | Event::StartOrderedListItem { .. }
+        | Event::StartParagraph { .. }
+        | Event::StartPreformatted { .. }
+        | Event::StartTable { .. }
+        | Event::StartTableCell { .. }
+        | Event::StartTableHeader { .. }
+        | Event::StartTableRow { .. }
+        | Event::StartUnorderedListItem { .. }
+        | Event::Text { .. }
+        | Event::ThematicBreak { .. } => None,
     }
 }
 
@@ -356,7 +377,9 @@ pub fn end_event_for(kind: BlockKind) -> Event {
         BlockKind::Footnote => Event::EndFootnote,
         BlockKind::Heading => Event::EndHeading,
         BlockKind::Link => Event::EndLink,
-        BlockKind::ListItem => Event::EndListItem,
+        BlockKind::CheckListItem => Event::EndCheckListItem,
+        BlockKind::OrderedListItem => Event::EndOrderedListItem,
+        BlockKind::UnorderedListItem => Event::EndUnorderedListItem,
         BlockKind::Paragraph => Event::EndParagraph,
         BlockKind::Preformatted => Event::EndPreformatted,
         BlockKind::Table => Event::EndTable,
@@ -904,7 +927,18 @@ mod tests {
         assert_eq!(end_event_for(BlockKind::Footnote), Event::EndFootnote);
         assert_eq!(end_event_for(BlockKind::Heading), Event::EndHeading);
         assert_eq!(end_event_for(BlockKind::Link), Event::EndLink);
-        assert_eq!(end_event_for(BlockKind::ListItem), Event::EndListItem);
+        assert_eq!(
+            end_event_for(BlockKind::CheckListItem),
+            Event::EndCheckListItem
+        );
+        assert_eq!(
+            end_event_for(BlockKind::OrderedListItem),
+            Event::EndOrderedListItem
+        );
+        assert_eq!(
+            end_event_for(BlockKind::UnorderedListItem),
+            Event::EndUnorderedListItem
+        );
         assert_eq!(end_event_for(BlockKind::Paragraph), Event::EndParagraph);
         assert_eq!(
             end_event_for(BlockKind::Preformatted),

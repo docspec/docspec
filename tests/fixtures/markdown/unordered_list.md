@@ -1,0 +1,4 @@
+- Apple
+- Banana
+- Cherry with **bold** and *italic*
+- Date

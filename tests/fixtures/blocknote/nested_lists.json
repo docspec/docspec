@@ -1,0 +1,45 @@
+[
+  {
+    "type": "bulletListItem",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Level 1 first",
+        "styles": {}
+      }
+    ],
+    "children": [
+      {
+        "type": "bulletListItem",
+        "props": {
+          "textAlignment": "left"
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Level 2 child",
+            "styles": {}
+          }
+        ],
+        "children": []
+      }
+    ]
+  },
+  {
+    "type": "bulletListItem",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Level 1 second",
+        "styles": {}
+      }
+    ],
+    "children": []
+  }
+]
