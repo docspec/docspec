@@ -120,5 +120,5 @@ assertions_on_result_states = "allow"
 multiple_crate_versions = "allow"
 
 # --- Selective allows: pedantic group (continued) ---
-# Reason: BlockNote text styling requires 5 bool parameters (bold, italic, code, strike, underline) that directly map to JSON fields. Refactoring into a struct would add complexity without improving clarity.
+# Reason: Some internal helpers may use multiple bool parameters for clarity over struct wrapping.
 fn_params_excessive_bools = "allow"

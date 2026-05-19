@@ -160,14 +160,7 @@ mod tests {
     fn block_kind_for_end_text_returns_none() {
         let event = Event::Text {
             content: "hello".to_string(),
-            bold: false,
-            italic: false,
-            code: false,
-            strikethrough: false,
-            underline: false,
-            subscript: false,
-            superscript: false,
-            mark: None,
+            style: TextStyle::default(),
         };
         assert_eq!(block_kind_for_end(&event), None);
     }
@@ -311,14 +304,7 @@ mod tests {
     fn block_kind_for_start_text_returns_none() {
         let event = Event::Text {
             content: "hello".to_string(),
-            bold: false,
-            italic: false,
-            code: false,
-            strikethrough: false,
-            underline: false,
-            subscript: false,
-            superscript: false,
-            mark: None,
+            style: TextStyle::default(),
         };
         assert_eq!(block_kind_for_start(&event), None);
     }
@@ -466,14 +452,7 @@ mod tests {
 
         let result = sink.handle_event(Event::Text {
             content: "orphan".to_string(),
-            bold: false,
-            italic: false,
-            code: false,
-            strikethrough: false,
-            underline: false,
-            subscript: false,
-            superscript: false,
-            mark: None,
+            style: TextStyle::default(),
         });
         assert!(result.is_err());
         let err_str = format!("{result:?}");

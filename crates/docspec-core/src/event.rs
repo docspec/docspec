@@ -3,6 +3,97 @@
 //! Events represent the atomic units of document structure. Sources emit events
 //! in document order; sinks consume them. This decouples all readers from all writers.
 
+/// Text formatting attributes for an [`Event::Text`] event.
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "TextStyle intentionally stores one boolean per formatting attribute for a simple builder API"
+)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct TextStyle {
+    /// Bold formatting.
+    pub bold: bool,
+    /// Monospace/code formatting.
+    pub code: bool,
+    /// Italic formatting.
+    pub italic: bool,
+    /// Highlight/mark color.
+    pub mark: Option<crate::Color>,
+    /// Strikethrough formatting.
+    pub strikethrough: bool,
+    /// Subscript formatting.
+    pub subscript: bool,
+    /// Superscript formatting.
+    pub superscript: bool,
+    /// Underline formatting.
+    pub underline: bool,
+}
+
+impl TextStyle {
+    /// Enables bold formatting.
+    #[inline]
+    #[must_use]
+    pub fn bold(mut self) -> Self {
+        self.bold = true;
+        self
+    }
+
+    /// Enables monospace/code formatting.
+    #[inline]
+    #[must_use]
+    pub fn code(mut self) -> Self {
+        self.code = true;
+        self
+    }
+
+    /// Enables italic formatting.
+    #[inline]
+    #[must_use]
+    pub fn italic(mut self) -> Self {
+        self.italic = true;
+        self
+    }
+
+    /// Sets the highlight/mark color.
+    #[inline]
+    #[must_use]
+    pub fn mark(mut self, color: crate::Color) -> Self {
+        self.mark = Some(color);
+        self
+    }
+
+    /// Enables strikethrough formatting.
+    #[inline]
+    #[must_use]
+    pub fn strikethrough(mut self) -> Self {
+        self.strikethrough = true;
+        self
+    }
+
+    /// Enables subscript formatting.
+    #[inline]
+    #[must_use]
+    pub fn subscript(mut self) -> Self {
+        self.subscript = true;
+        self
+    }
+
+    /// Enables superscript formatting.
+    #[inline]
+    #[must_use]
+    pub fn superscript(mut self) -> Self {
+        self.superscript = true;
+        self
+    }
+
+    /// Enables underline formatting.
+    #[inline]
+    #[must_use]
+    pub fn underline(mut self) -> Self {
+        self.underline = true;
+        self
+    }
+}
+
 /// A streaming document event.
 ///
 /// Events flow from [`crate::EventSource`] readers to [`crate::EventSink`] writers. The enum is
@@ -218,24 +309,10 @@ pub enum Event {
 
     /// A text run with formatting attributes.
     Text {
-        /// Bold formatting.
-        bold: bool,
-        /// Monospace/code formatting.
-        code: bool,
         /// The text content.
         content: String,
-        /// Italic formatting.
-        italic: bool,
-        /// Highlight/mark color.
-        mark: Option<crate::Color>,
-        /// Strikethrough formatting.
-        strikethrough: bool,
-        /// Subscript formatting.
-        subscript: bool,
-        /// Superscript formatting.
-        superscript: bool,
-        /// Underline formatting.
-        underline: bool,
+        /// Text formatting attributes.
+        style: TextStyle,
     },
 
     /// A horizontal rule / thematic break.

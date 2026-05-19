@@ -25,10 +25,10 @@
 //! - Paragraphs → `StartParagraph` / `EndParagraph`
 //! - Block quotes → `StartBlockQuote` / `EndBlockQuote`
 //! - Code blocks → `StartPreformatted` / `EndPreformatted`
-//! - Bold text → `Text { bold: true, ... }`
-//! - Italic text → `Text { italic: true, ... }`
-//! - Inline code → `Text { code: true, ... }`
-//! - Strikethrough → `Text { strikethrough: true, ... }`
+//! - Bold text → `Text { style: TextStyle { bold: true, .. }, .. }`
+//! - Italic text → `Text { style: TextStyle { italic: true, .. }, .. }`
+//! - Inline code → `Text { style: TextStyle { code: true, .. }, .. }`
+//! - Strikethrough → `Text { style: TextStyle { strikethrough: true, .. }, .. }`
 //! - Images → `Image { source: Uri, alt, title, decorative }`
 //! - Hard line breaks → `LineBreak`
 //! - Soft line breaks → space `Text`
@@ -50,7 +50,7 @@ extern crate alloc;
 use alloc::collections::VecDeque;
 
 pub use docspec_core::EventSource;
-use docspec_core::{Event, ImageSource, Result};
+use docspec_core::{Event, ImageSource, Result, TextStyle};
 use pulldown_cmark::{CodeBlockKind, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 /// Whether content is inside a block-level element.
@@ -124,6 +124,20 @@ pub struct MarkdownReader<'a> {
 }
 
 impl<'a> MarkdownReader<'a> {
+    fn current_text_style(&self) -> TextStyle {
+        let mut style = TextStyle::default();
+        if self.bold_depth > 0 {
+            style = style.bold();
+        }
+        if self.italic_depth > 0 {
+            style = style.italic();
+        }
+        if self.strikethrough_depth > 0 {
+            style = style.strikethrough();
+        }
+        style
+    }
+
     fn handle_code(&mut self, content: String) {
         if let Some(img) = &mut self.image {
             img.alt_buf.push_str(&content);
@@ -137,14 +151,7 @@ impl<'a> MarkdownReader<'a> {
             }
             self.queue.push_back(Event::Text {
                 content,
-                bold: self.bold_depth > 0,
-                italic: self.italic_depth > 0,
-                code: true,
-                strikethrough: self.strikethrough_depth > 0,
-                underline: false,
-                subscript: false,
-                superscript: false,
-                mark: None,
+                style: self.current_text_style().code(),
             });
         }
     }
@@ -194,14 +201,7 @@ impl<'a> MarkdownReader<'a> {
                     if !content.is_empty() {
                         self.queue.push_back(Event::Text {
                             content,
-                            bold: false,
-                            italic: false,
-                            code: true,
-                            strikethrough: self.strikethrough_depth > 0,
-                            underline: false,
-                            subscript: false,
-                            superscript: false,
-                            mark: None,
+                            style: TextStyle::default().code(),
                         });
                     }
                 }
@@ -308,14 +308,7 @@ impl<'a> MarkdownReader<'a> {
             }
             self.queue.push_back(Event::Text {
                 content,
-                bold: self.bold_depth > 0,
-                italic: self.italic_depth > 0,
-                code: false,
-                strikethrough: self.strikethrough_depth > 0,
-                underline: false,
-                subscript: false,
-                superscript: false,
-                mark: None,
+                style: self.current_text_style(),
             });
         }
     }
@@ -377,14 +370,7 @@ impl<'a> MarkdownReader<'a> {
                 } else {
                     self.queue.push_back(Event::Text {
                         content: " ".to_string(),
-                        bold: self.bold_depth > 0,
-                        italic: self.italic_depth > 0,
-                        code: false,
-                        strikethrough: self.strikethrough_depth > 0,
-                        underline: false,
-                        subscript: false,
-                        superscript: false,
-                        mark: None,
+                        style: self.current_text_style(),
                     });
                 }
             }
