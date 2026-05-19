@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use docspec_core::{Event, EventSource as _, ImageSource};
+    use docspec_core::{Event, EventSource as _, ImageSource, TextStyle};
     use docspec_markdown_reader::MarkdownReader;
 
     fn collect_events(reader: &mut MarkdownReader<'_>) -> Vec<Event> {
@@ -44,15 +44,18 @@ mod tests {
             matches!(
                 e,
                 Event::Text {
-                    bold: true,
-                    italic: true,
+                    style: TextStyle {
+                        bold: true,
+                        italic: true,
+                        ..
+                    },
                     ..
                 }
             )
         });
         assert!(matches!(
             text_event,
-            Some(Event::Text { content, bold: true, italic: true, .. }) if content == "both"
+            Some(Event::Text { content, style: TextStyle { bold: true, italic: true, .. }, .. }) if content == "both"
         ));
     }
 
@@ -61,12 +64,18 @@ mod tests {
         let mut reader = MarkdownReader::new("**bold**");
         let events = collect_events(&mut reader);
 
-        let text_event = events
-            .iter()
-            .find(|e| matches!(e, Event::Text { bold: true, .. }));
+        let text_event = events.iter().find(|e| {
+            matches!(
+                e,
+                Event::Text {
+                    style: TextStyle { bold: true, .. },
+                    ..
+                }
+            )
+        });
         assert!(matches!(
             text_event,
-            Some(Event::Text { content, bold: true, italic: false, .. }) if content == "bold"
+            Some(Event::Text { content, style: TextStyle { bold: true, italic: false, .. }, .. }) if content == "bold"
         ));
     }
 
@@ -185,7 +194,7 @@ mod tests {
         ));
         assert!(matches!(
             events.get(2),
-            Some(Event::Text { content, bold: false, italic: false, .. }) if content == "Hello"
+            Some(Event::Text { content, style: TextStyle { bold: false, italic: false, .. }, .. }) if content == "Hello"
         ));
         assert!(matches!(events.get(3), Some(Event::EndHeading)));
         assert!(matches!(events.get(4), Some(Event::EndDocument)));
@@ -291,13 +300,100 @@ mod tests {
         let mut reader = MarkdownReader::new("Use `code` here");
         let events = collect_events(&mut reader);
 
-        let code_event = events
-            .iter()
-            .find(|e| matches!(e, Event::Text { code: true, .. }));
+        let code_event = events.iter().find(|e| {
+            matches!(
+                e,
+                Event::Text {
+                    style: TextStyle { code: true, .. },
+                    ..
+                }
+            )
+        });
         assert!(matches!(
             code_event,
-            Some(Event::Text { content, code: true, .. }) if content == "code"
+            Some(Event::Text { content, style: TextStyle { code: true, .. }, .. }) if content == "code"
         ));
+    }
+
+    #[test]
+    fn inline_code_inherits_bold() {
+        let mut reader = MarkdownReader::new("**bold `code` bold**");
+        let events = collect_events(&mut reader);
+
+        let code_event = events.iter().find(|e| {
+            matches!(
+                e,
+                Event::Text {
+                    style: TextStyle { code: true, .. },
+                    ..
+                }
+            )
+        });
+        assert!(
+            matches!(
+                code_event,
+                Some(Event::Text {
+                    content,
+                    style: TextStyle { code: true, bold: true, .. },
+                    ..
+                }) if content == "code"
+            ),
+            "Code inside bold should inherit bold formatting"
+        );
+    }
+
+    #[test]
+    fn inline_code_inherits_italic() {
+        let mut reader = MarkdownReader::new("*italic `code` italic*");
+        let events = collect_events(&mut reader);
+
+        let code_event = events.iter().find(|e| {
+            matches!(
+                e,
+                Event::Text {
+                    style: TextStyle { code: true, .. },
+                    ..
+                }
+            )
+        });
+        assert!(
+            matches!(
+                code_event,
+                Some(Event::Text {
+                    content,
+                    style: TextStyle { code: true, italic: true, .. },
+                    ..
+                }) if content == "code"
+            ),
+            "Code inside italic should inherit italic formatting"
+        );
+    }
+
+    #[test]
+    fn inline_code_inherits_strikethrough() {
+        let mut reader = MarkdownReader::new("~~strikethrough `code` strikethrough~~");
+        let events = collect_events(&mut reader);
+
+        let code_event = events.iter().find(|e| {
+            matches!(
+                e,
+                Event::Text {
+                    style: TextStyle { code: true, .. },
+                    ..
+                }
+            )
+        });
+        assert!(
+            matches!(
+                code_event,
+                Some(Event::Text {
+                    content,
+                    style: TextStyle { code: true, strikethrough: true, .. },
+                    ..
+                }) if content == "code"
+            ),
+            "Code inside strikethrough should inherit strikethrough formatting"
+        );
     }
 
     #[test]
@@ -305,12 +401,18 @@ mod tests {
         let mut reader = MarkdownReader::new("*italic*");
         let events = collect_events(&mut reader);
 
-        let text_event = events
-            .iter()
-            .find(|e| matches!(e, Event::Text { italic: true, .. }));
+        let text_event = events.iter().find(|e| {
+            matches!(
+                e,
+                Event::Text {
+                    style: TextStyle { italic: true, .. },
+                    ..
+                }
+            )
+        });
         assert!(matches!(
             text_event,
-            Some(Event::Text { content, bold: false, italic: true, .. }) if content == "italic"
+            Some(Event::Text { content, style: TextStyle { bold: false, italic: true, .. }, .. }) if content == "italic"
         ));
     }
 
@@ -506,12 +608,18 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        let code_event = events
-            .iter()
-            .find(|e| matches!(e, Event::Text { code: true, .. }));
+        let code_event = events.iter().find(|e| {
+            matches!(
+                e,
+                Event::Text {
+                    style: TextStyle { code: true, .. },
+                    ..
+                }
+            )
+        });
         assert!(matches!(
             code_event,
-            Some(Event::Text { content, code: true, .. }) if content == "code"
+            Some(Event::Text { content, style: TextStyle { code: true, .. }, .. }) if content == "code"
         ));
     }
 
@@ -592,11 +700,7 @@ mod tests {
         let text_event = events.iter().find(|e| {
             matches!(
                 e,
-                Event::Text {
-                    content,
-                    code: true,
-                    ..
-                } if content.contains("code")
+                Event::Text { content, style: TextStyle { code: true, .. }, .. } if content.contains("code")
             )
         });
 
@@ -618,14 +722,17 @@ mod tests {
             matches!(
                 e,
                 Event::Text {
-                    strikethrough: true,
+                    style: TextStyle {
+                        strikethrough: true,
+                        ..
+                    },
                     ..
                 }
             )
         });
         assert!(matches!(
             text_event,
-            Some(Event::Text { content, strikethrough: true, .. }) if content == "struck"
+            Some(Event::Text { content, style: TextStyle { strikethrough: true, .. }, .. }) if content == "struck"
         ));
     }
 
@@ -638,15 +745,18 @@ mod tests {
             matches!(
                 e,
                 Event::Text {
-                    bold: true,
-                    strikethrough: true,
+                    style: TextStyle {
+                        bold: true,
+                        strikethrough: true,
+                        ..
+                    },
                     ..
                 }
             )
         });
         assert!(matches!(
             text_event,
-            Some(Event::Text { content, bold: true, strikethrough: true, .. }) if content == "bold struck"
+            Some(Event::Text { content, style: TextStyle { bold: true, strikethrough: true, .. }, .. }) if content == "bold struck"
         ));
     }
 
@@ -659,15 +769,18 @@ mod tests {
             matches!(
                 e,
                 Event::Text {
-                    italic: true,
-                    strikethrough: true,
+                    style: TextStyle {
+                        italic: true,
+                        strikethrough: true,
+                        ..
+                    },
                     ..
                 }
             )
         });
         assert!(matches!(
             text_event,
-            Some(Event::Text { content, italic: true, strikethrough: true, .. }) if content == "italic struck"
+            Some(Event::Text { content, style: TextStyle { italic: true, strikethrough: true, .. }, .. }) if content == "italic struck"
         ));
     }
 
@@ -684,11 +797,7 @@ mod tests {
         let struck_text = events.iter().find(|e| {
             matches!(
                 e,
-                Event::Text {
-                    content,
-                    strikethrough: true,
-                    ..
-                } if content == "struck"
+                Event::Text { content, style: TextStyle { strikethrough: true, .. }, .. } if content == "struck"
             )
         });
         assert!(
@@ -706,16 +815,19 @@ mod tests {
             matches!(
                 e,
                 Event::Text {
-                    bold: true,
-                    italic: true,
-                    strikethrough: true,
+                    style: TextStyle {
+                        bold: true,
+                        italic: true,
+                        strikethrough: true,
+                        ..
+                    },
                     ..
                 }
             )
         });
         assert!(matches!(
             text_event,
-            Some(Event::Text { content, bold: true, italic: true, strikethrough: true, .. }) if content == "bold italic struck"
+            Some(Event::Text { content, style: TextStyle { bold: true, italic: true, strikethrough: true, .. }, .. }) if content == "bold italic struck"
         ));
     }
 }

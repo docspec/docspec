@@ -31,7 +31,7 @@
 //!
 //! ```
 //! use docspec_blocknote_writer::BlockNoteWriter;
-//! use docspec_core::{Event, EventSink, StackTrackingSink};
+//! use docspec_core::{Event, EventSink, StackTrackingSink, TextStyle};
 //!
 //! let mut buf = Vec::<u8>::new();
 //! let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
@@ -40,9 +40,7 @@
 //! writer.handle_event(Event::StartParagraph { alignment: None, id: None })?;
 //! writer.handle_event(Event::Text {
 //!     content: "Hello".to_string(),
-//!     bold: false, italic: false, code: false,
-//!     strikethrough: false, underline: false,
-//!     subscript: false, superscript: false, mark: None,
+//!     style: TextStyle::default(),
 //! })?;
 //! writer.handle_event(Event::EndParagraph)?;
 //! writer.handle_event(Event::EndDocument)?;
@@ -59,7 +57,7 @@ use std::io::Write;
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::write::EncoderWriter as Base64Encoder;
-use docspec_core::{AssetProvider, Error, Event, EventSink, ImageSource, Result};
+use docspec_core::{AssetProvider, Error, Event, EventSink, ImageSource, Result, TextStyle};
 use struson::writer::{JsonStreamWriter, JsonWriter as _};
 
 /// A streaming `BlockNote` JSON writer.
@@ -220,7 +218,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     fn handle_paragraph(&mut self, id: Option<&String>) -> Result<()> {
         if self.blockquote_depth > 0 {
             if self.blockquote_has_content {
-                self.handle_text("\n\n", false, false, false, false, false)?;
+                self.handle_text("\n\n", &TextStyle::default())?;
             }
             return Ok(());
         }
@@ -257,15 +255,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Ok(())
     }
 
-    fn handle_text(
-        &mut self,
-        content: &str,
-        bold: bool,
-        italic: bool,
-        code: bool,
-        strikethrough: bool,
-        underline: bool,
-    ) -> Result<()> {
+    fn handle_text(&mut self, content: &str, style: &TextStyle) -> Result<()> {
         if !self.in_text_block {
             return Ok(());
         }
@@ -279,23 +269,23 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.writer.string_value(content).map_err(io_err)?;
         self.writer.name("styles").map_err(io_err)?;
         self.writer.begin_object().map_err(io_err)?;
-        if bold {
+        if style.bold {
             self.writer.name("bold").map_err(io_err)?;
             self.writer.bool_value(true).map_err(io_err)?;
         }
-        if italic {
+        if style.italic {
             self.writer.name("italic").map_err(io_err)?;
             self.writer.bool_value(true).map_err(io_err)?;
         }
-        if code {
+        if style.code {
             self.writer.name("code").map_err(io_err)?;
             self.writer.bool_value(true).map_err(io_err)?;
         }
-        if strikethrough {
+        if style.strikethrough {
             self.writer.name("strike").map_err(io_err)?;
             self.writer.bool_value(true).map_err(io_err)?;
         }
-        if underline {
+        if style.underline {
             self.writer.name("underline").map_err(io_err)?;
             self.writer.bool_value(true).map_err(io_err)?;
         }
@@ -410,27 +400,19 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 self.close_for_block_sibling()?;
                 self.handle_divider(id.as_ref())
             }
-            Event::Text {
-                content,
-                bold,
-                italic,
-                code,
-                strikethrough,
-                underline,
-                ..
-            } => {
+            Event::Text { content, style, .. } => {
                 // Auto-open paragraph for orphan text (e.g., text after image closed paragraph)
                 if !self.in_text_block && self.blockquote_depth == 0 {
                     self.handle_paragraph(None)?;
                 }
-                self.handle_text(&content, bold, italic, code, strikethrough, underline)
+                self.handle_text(&content, &style)
             }
             Event::Image {
                 source, alt, id, ..
             } => self.handle_image(source, alt, id.as_ref()),
             Event::LineBreak => {
                 if self.in_text_block {
-                    self.handle_text("\n", false, false, false, false, false)
+                    self.handle_text("\n", &TextStyle::default())
                 } else {
                     Ok(())
                 }
