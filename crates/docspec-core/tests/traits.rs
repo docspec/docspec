@@ -64,14 +64,7 @@ mod tests {
             };
             let event3 = docspec_core::Event::Text {
                 content: "test".to_string(),
-                bold: false,
-                italic: false,
-                code: false,
-                strikethrough: false,
-                underline: false,
-                subscript: false,
-                superscript: false,
-                mark: None,
+                style: TextStyle::default(),
             };
 
             let result1 = sink.handle_event(event1.clone());
@@ -106,14 +99,7 @@ mod tests {
                 },
                 docspec_core::Event::Text {
                     content: "Hello".to_string(),
-                    bold: false,
-                    italic: false,
-                    code: false,
-                    strikethrough: false,
-                    underline: false,
-                    subscript: false,
-                    superscript: false,
-                    mark: None,
+                    style: TextStyle::default(),
                 },
                 docspec_core::Event::EndParagraph,
                 docspec_core::Event::EndDocument,
@@ -149,14 +135,7 @@ mod tests {
                 },
                 docspec_core::Event::Text {
                     content: "Pipeline test".to_string(),
-                    bold: false,
-                    italic: false,
-                    code: false,
-                    strikethrough: false,
-                    underline: false,
-                    subscript: false,
-                    superscript: false,
-                    mark: None,
+                    style: TextStyle::default(),
                 },
                 docspec_core::Event::EndParagraph,
                 docspec_core::Event::EndDocument,
