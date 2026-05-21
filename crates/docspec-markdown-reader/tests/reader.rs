@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use docspec_core::{Event, EventSource as _, ImageSource, TextStyle};
+    use docspec_core::{Event, EventSource as _, ImageSource, TableHeaderScope, TextStyle};
     use docspec_markdown_reader::MarkdownReader;
 
     fn collect_events(reader: &mut MarkdownReader<'_>) -> Vec<Event> {
@@ -494,26 +494,6 @@ mod tests {
     }
 
     #[test]
-    fn table_content_extraction() {
-        let markdown = "| Header |\n|--------|\n| Cell content |";
-        let mut reader = MarkdownReader::new(markdown);
-        let events = collect_events(&mut reader);
-
-        assert!(!events.iter().any(|e| matches!(e, Event::StartTable { .. })));
-        assert!(!events.iter().any(|e| matches!(e, Event::EndTable)));
-
-        let has_header = events
-            .iter()
-            .any(|e| matches!(e, Event::Text { content, .. } if content.contains("Header")));
-        let has_cell = events
-            .iter()
-            .any(|e| matches!(e, Event::Text { content, .. } if content.contains("Cell content")));
-
-        assert!(has_header, "Table header text should be extracted");
-        assert!(has_cell, "Table cell text should be extracted");
-    }
-
-    #[test]
     fn thematic_break() {
         let mut reader = MarkdownReader::new("Before\n\n---\n\nAfter");
         let events = collect_events(&mut reader);
@@ -557,28 +537,6 @@ mod tests {
     }
 
     #[test]
-    fn table_cell_text_wrapped_in_auto_paragraph() {
-        let markdown = "| Header |\n|--------|\n| Cell |";
-        let mut reader = MarkdownReader::new(markdown);
-        let events = collect_events(&mut reader);
-
-        let paragraph_count = events
-            .iter()
-            .filter(|e| matches!(e, Event::StartParagraph { .. }))
-            .count();
-        assert_eq!(
-            paragraph_count, 2,
-            "each cell text should auto-open a paragraph"
-        );
-
-        let end_paragraph_count = events
-            .iter()
-            .filter(|e| matches!(e, Event::EndParagraph))
-            .count();
-        assert_eq!(end_paragraph_count, 2);
-    }
-
-    #[test]
     fn blockquote_text_wrapped_in_auto_paragraph() {
         let markdown = "> Quoted";
         let mut reader = MarkdownReader::new(markdown);
@@ -600,41 +558,6 @@ mod tests {
             .iter()
             .any(|e| matches!(e, Event::StartParagraph { .. })));
         assert!(events.iter().any(|e| matches!(e, Event::EndParagraph)));
-    }
-
-    #[test]
-    fn table_cell_with_inline_code_auto_paragraph() {
-        let markdown = "| `code` |\n|--------|\n| data |";
-        let mut reader = MarkdownReader::new(markdown);
-        let events = collect_events(&mut reader);
-
-        let code_event = events.iter().find(|e| {
-            matches!(
-                e,
-                Event::Text {
-                    style: TextStyle { code: true, .. },
-                    ..
-                }
-            )
-        });
-        assert!(matches!(
-            code_event,
-            Some(Event::Text { content, style: TextStyle { code: true, .. }, .. }) if content == "code"
-        ));
-    }
-
-    #[test]
-    fn table_cell_with_soft_break_auto_paragraph() {
-        let markdown = "| a\nb |\n|-----|\n| c |";
-        let mut reader = MarkdownReader::new(markdown);
-        let events = collect_events(&mut reader);
-
-        assert!(
-            events
-                .iter()
-                .any(|e| matches!(e, Event::Text { content, .. } if content == " ")),
-            "SoftBreak in table cell should emit space Text"
-        );
     }
 
     #[test]
@@ -829,5 +752,153 @@ mod tests {
             text_event,
             Some(Event::Text { content, style: TextStyle { bold: true, italic: true, strikethrough: true, .. }, .. }) if content == "bold italic struck"
         ));
+    }
+
+    #[test]
+    fn simple_table_emits_structured_events() {
+        let markdown = "| A | B |\n|---|---|\n| C | D |";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(
+            events.get(1),
+            Some(Event::StartTable { id: None })
+        ));
+        assert!(matches!(
+            events.get(2),
+            Some(Event::StartTableRow { id: None })
+        ));
+        assert!(matches!(
+            events.get(3),
+            Some(Event::StartTableHeader { .. })
+        ));
+        assert!(matches!(events.get(9), Some(Event::EndTableRow)));
+        assert!(matches!(
+            events.get(10),
+            Some(Event::StartTableRow { id: None })
+        ));
+        assert!(matches!(events.get(18), Some(Event::EndTable)));
+    }
+
+    #[test]
+    fn table_header_cells_have_column_scope() {
+        let markdown = "| H1 | H2 |\n|----|----|";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(
+            events.get(3),
+            Some(Event::StartTableHeader {
+                scope: Some(TableHeaderScope::Column),
+                ..
+            })
+        ));
+        assert!(matches!(
+            events.get(6),
+            Some(Event::StartTableHeader {
+                scope: Some(TableHeaderScope::Column),
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn table_body_cells_have_no_scope_field() {
+        let markdown = "| H |\n|---|\n| C |";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(
+            events.get(3),
+            Some(Event::StartTableHeader { .. })
+        ));
+        assert!(matches!(
+            events.get(7),
+            Some(Event::StartTableRow { id: None })
+        ));
+        assert!(matches!(events.get(8), Some(Event::StartTableCell { .. })));
+    }
+
+    #[test]
+    fn table_cell_text_emits_raw_not_wrapped() {
+        let markdown = "| H |\n|---|\n| text |";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(events.get(8), Some(Event::StartTableCell { .. })));
+        assert!(matches!(events.get(9), Some(Event::Text { .. })));
+        assert!(matches!(events.get(10), Some(Event::EndTableCell)));
+    }
+
+    #[test]
+    fn table_with_inline_formatting_in_cells() {
+        let markdown = "| **bold** | `code` |\n|-----------|--------|\n| *italic* | plain |";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(
+            events.get(4),
+            Some(Event::Text {
+                content,
+                style: TextStyle { bold: true, .. },
+                ..
+            }) if content == "bold"
+        ));
+        assert!(matches!(
+            events.get(7),
+            Some(Event::Text {
+                content,
+                style: TextStyle { code: true, .. },
+                ..
+            }) if content == "code"
+        ));
+        assert!(matches!(
+            events.get(12),
+            Some(Event::Text {
+                content,
+                style: TextStyle { italic: true, .. },
+                ..
+            }) if content == "italic"
+        ));
+    }
+
+    #[test]
+    fn header_only_table() {
+        let markdown = "| H1 | H2 |\n|----|----|";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(events.get(1), Some(Event::StartTable { .. })));
+        assert!(matches!(events.get(2), Some(Event::StartTableRow { .. })));
+        assert!(matches!(events.get(9), Some(Event::EndTableRow)));
+        assert!(matches!(events.get(10), Some(Event::EndTable)));
+        assert!(matches!(events.get(11), Some(Event::EndDocument)));
+    }
+
+    #[test]
+    fn table_with_empty_cells() {
+        let markdown = "| A |  |\n|---|---|\n|  | B |";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(
+            events.get(6),
+            Some(Event::StartTableHeader { .. })
+        ));
+        assert!(matches!(events.get(7), Some(Event::EndTableHeader)));
+        assert!(matches!(events.get(10), Some(Event::StartTableCell { .. })));
+        assert!(matches!(events.get(11), Some(Event::EndTableCell)));
+    }
+
+    #[test]
+    fn multiple_tables_in_sequence() {
+        let markdown = "| A |\n|---|\n| B |\n\n| C |\n|---|\n| D |";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(events.get(1), Some(Event::StartTable { .. })));
+        assert!(matches!(events.get(12), Some(Event::EndTable)));
+        assert!(matches!(events.get(13), Some(Event::StartTable { .. })));
+        assert!(matches!(events.get(24), Some(Event::EndTable)));
     }
 }
