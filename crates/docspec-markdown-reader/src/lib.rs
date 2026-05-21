@@ -33,13 +33,16 @@
 //! - Hard line breaks → `LineBreak`
 //! - Soft line breaks → space `Text`
 //! - Thematic breaks → `ThematicBreak`
+//! - Tables → `StartTable` / `EndTable`, `StartTableRow` / `EndTableRow`,
+//!   `StartTableHeader` / `EndTableHeader`, `StartTableCell` / `EndTableCell`
+//!   (GFM column alignment syntax is parsed, but alignment data is discarded)
 //!
 //! # Unsupported Elements
 //!
 //! The following elements are not emitted as structured events. Text content is
 //! recursively extracted where applicable; structure is silently dropped:
 //!
-//! - Tables, lists, and links (text extracted, structure dropped)
+//! - Lists and links (text extracted, structure dropped)
 //! - Definition lists and footnotes
 //! - HTML blocks and inline HTML
 //! - Math blocks and inline math
@@ -50,7 +53,7 @@ extern crate alloc;
 use alloc::collections::VecDeque;
 
 pub use docspec_core::EventSource;
-use docspec_core::{Event, ImageSource, Result, TextStyle};
+use docspec_core::{Event, ImageSource, Result, TableHeaderScope, TextStyle};
 use pulldown_cmark::{CodeBlockKind, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 /// Whether content is inside a block-level element.
@@ -111,6 +114,8 @@ pub struct MarkdownReader<'a> {
     code_block_buffer: Option<String>,
     /// Buffered image being processed (alt text accumulation).
     image: Option<ImageBuffer>,
+    /// Whether the parser is currently inside a table header row.
+    in_table_head: bool,
     /// Nesting depth for italic (emphasis) formatting.
     italic_depth: usize,
     /// The pulldown-cmark parser.
@@ -161,7 +166,7 @@ impl<'a> MarkdownReader<'a> {
             TagEnd::Heading(_) => self.push_event_end(Event::EndHeading),
             TagEnd::Paragraph => self.push_event_end(Event::EndParagraph),
             TagEnd::BlockQuote(_) => self.push_event_end(Event::EndBlockQuote),
-            TagEnd::Item | TagEnd::TableCell => {
+            TagEnd::Item => {
                 if self.block_state == BlockState::AutoParagraph {
                     self.push_event_end(Event::EndParagraph);
                 }
@@ -216,10 +221,20 @@ impl<'a> MarkdownReader<'a> {
             | TagEnd::List(_)
             | TagEnd::MetadataBlock(_)
             | TagEnd::Subscript
-            | TagEnd::Superscript
-            | TagEnd::Table
-            | TagEnd::TableHead
-            | TagEnd::TableRow => {}
+            | TagEnd::Superscript => {}
+            TagEnd::Table => self.push_event_end(Event::EndTable),
+            TagEnd::TableHead => {
+                self.push_event_end(Event::EndTableRow);
+                self.in_table_head = false;
+            }
+            TagEnd::TableRow => self.push_event_end(Event::EndTableRow),
+            TagEnd::TableCell => {
+                if self.in_table_head {
+                    self.push_event_end(Event::EndTableHeader);
+                } else {
+                    self.push_event_end(Event::EndTableCell);
+                }
+            }
         }
     }
 
@@ -285,11 +300,30 @@ impl<'a> MarkdownReader<'a> {
             | Tag::List(_)
             | Tag::MetadataBlock(_)
             | Tag::Subscript
-            | Tag::Superscript
-            | Tag::Table(_)
-            | Tag::TableCell
-            | Tag::TableHead
-            | Tag::TableRow => {}
+            | Tag::Superscript => {}
+            Tag::Table(_) => self.push_event_start(Event::StartTable { id: None }),
+            Tag::TableHead => {
+                self.in_table_head = true;
+                self.push_event_start(Event::StartTableRow { id: None });
+            }
+            Tag::TableRow => self.push_event_start(Event::StartTableRow { id: None }),
+            Tag::TableCell => {
+                if self.in_table_head {
+                    self.push_event_start(Event::StartTableHeader {
+                        scope: Some(TableHeaderScope::Column),
+                        abbr: None,
+                        colspan: None,
+                        rowspan: None,
+                        id: None,
+                    });
+                } else {
+                    self.push_event_start(Event::StartTableCell {
+                        colspan: None,
+                        rowspan: None,
+                        id: None,
+                    });
+                }
+            }
         }
     }
 
@@ -334,6 +368,7 @@ impl<'a> MarkdownReader<'a> {
             block_state: BlockState::None,
             bold_depth: 0,
             code_block_buffer: None,
+            in_table_head: false,
             image: None,
             italic_depth: 0,
             parser,
