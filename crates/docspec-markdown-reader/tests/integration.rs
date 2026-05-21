@@ -131,4 +131,12 @@ mod tests {
         let actual = run_pipeline(markdown);
         assert_json_eq(&actual, expected);
     }
+
+    #[test]
+    fn pipeline_tables() {
+        let markdown = include_str!("../../../tests/fixtures/markdown/tables.md");
+        let expected = include_str!("../../../tests/fixtures/blocknote/tables.json");
+        let actual = run_pipeline(markdown);
+        assert_json_eq(&actual, expected);
+    }
 }
