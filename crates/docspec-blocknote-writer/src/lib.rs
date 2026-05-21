@@ -86,7 +86,59 @@ pub struct BlockNoteWriter<'a, W: Write> {
     writer: JsonStreamWriter<W>,
 }
 
+struct Null;
+struct StartArray;
+struct StartObject;
+
+trait WriteVal {
+    fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()>;
+}
+
+impl WriteVal for Null {
+    fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()> {
+        w.writer.null_value().map_err(io_err)
+    }
+}
+
+impl WriteVal for StartArray {
+    fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()> {
+        w.writer.begin_array().map_err(io_err)
+    }
+}
+
+impl WriteVal for StartObject {
+    fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()> {
+        w.writer.begin_object().map_err(io_err)
+    }
+}
+
+impl WriteVal for &str {
+    fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()> {
+        w.writer.string_value(self).map_err(io_err)
+    }
+}
+
+impl WriteVal for bool {
+    fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()> {
+        w.writer.bool_value(self).map_err(io_err)
+    }
+}
+
+impl WriteVal for u8 {
+    fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()> {
+        w.writer.number_value(self).map_err(io_err)
+    }
+}
+
 impl<'a, W: Write> BlockNoteWriter<'a, W> {
+    fn begin_array(&mut self) -> Result<()> {
+        self.writer.begin_array().map_err(io_err)
+    }
+
+    fn begin_object(&mut self) -> Result<()> {
+        self.writer.begin_object().map_err(io_err)
+    }
+
     fn close_blockquote_for_sibling(&mut self) -> Result<()> {
         self.close_content_block()?;
         self.blockquote_depth = self.blockquote_depth.saturating_sub(1);
@@ -96,11 +148,10 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn close_content_block(&mut self) -> Result<()> {
-        self.writer.end_array().map_err(io_err)?;
-        self.writer.name("children").map_err(io_err)?;
-        self.writer.begin_array().map_err(io_err)?;
-        self.writer.end_array().map_err(io_err)?;
-        self.writer.end_object().map_err(io_err)?;
+        self.end_array()?;
+        self.entry("children", StartArray)?;
+        self.end_array()?;
+        self.end_object()?;
         Ok(())
     }
 
@@ -115,13 +166,24 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Ok(())
     }
 
+    fn end_array(&mut self) -> Result<()> {
+        self.writer.end_array().map_err(io_err)
+    }
+
+    fn end_object(&mut self) -> Result<()> {
+        self.writer.end_object().map_err(io_err)
+    }
+
+    fn entry<V: WriteVal>(&mut self, key: &str, value: V) -> Result<()> {
+        self.writer.name(key).map_err(io_err)?;
+        value.write_val(self)
+    }
+
     fn handle_blockquote(&mut self, id: Option<&String>) -> Result<()> {
-        self.writer.begin_object().map_err(io_err)?;
-        self.writer.name("type").map_err(io_err)?;
-        self.writer.string_value("quote").map_err(io_err)?;
+        self.begin_object()?;
+        self.entry("type", "quote")?;
         self.write_id(id)?;
-        self.writer.name("content").map_err(io_err)?;
-        self.writer.begin_array().map_err(io_err)?;
+        self.entry("content", StartArray)?;
         self.blockquote_depth = self.blockquote_depth.saturating_add(1);
         self.blockquote_has_content = false;
         self.in_text_block = true;
@@ -129,28 +191,22 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_divider(&mut self, id: Option<&String>) -> Result<()> {
-        self.writer.begin_object().map_err(io_err)?;
-        self.writer.name("type").map_err(io_err)?;
-        self.writer.string_value("divider").map_err(io_err)?;
+        self.begin_object()?;
+        self.entry("type", "divider")?;
         self.write_id(id)?;
-        self.writer.end_object().map_err(io_err)?;
+        self.end_object()?;
         Ok(())
     }
 
     fn handle_heading(&mut self, level: u8, id: Option<&String>) -> Result<()> {
-        self.writer.begin_object().map_err(io_err)?;
-        self.writer.name("type").map_err(io_err)?;
-        self.writer.string_value("heading").map_err(io_err)?;
+        self.begin_object()?;
+        self.entry("type", "heading")?;
         self.write_id(id)?;
-        self.writer.name("props").map_err(io_err)?;
-        self.writer.begin_object().map_err(io_err)?;
-        self.writer.name("level").map_err(io_err)?;
-        self.writer.number_value(level).map_err(io_err)?;
-        self.writer.name("textAlignment").map_err(io_err)?;
-        self.writer.string_value("left").map_err(io_err)?;
-        self.writer.end_object().map_err(io_err)?;
-        self.writer.name("content").map_err(io_err)?;
-        self.writer.begin_array().map_err(io_err)?;
+        self.entry("props", StartObject)?;
+        self.entry("level", level)?;
+        self.entry("textAlignment", "left")?;
+        self.end_object()?;
+        self.entry("content", StartArray)?;
         self.in_text_block = true;
         Ok(())
     }
@@ -194,23 +250,17 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         };
         let caption = alt.unwrap_or_default();
 
-        self.writer.begin_object().map_err(io_err)?;
+        self.begin_object()?;
         self.write_id(id)?;
-        self.writer.name("type").map_err(io_err)?;
-        self.writer.string_value("image").map_err(io_err)?;
-        self.writer.name("props").map_err(io_err)?;
-        self.writer.begin_object().map_err(io_err)?;
-        self.writer.name("url").map_err(io_err)?;
-        self.writer.string_value(&url).map_err(io_err)?;
-        self.writer.name("caption").map_err(io_err)?;
-        self.writer.string_value(&caption).map_err(io_err)?;
-        self.writer.end_object().map_err(io_err)?;
-        self.writer.name("content").map_err(io_err)?;
-        self.writer.null_value().map_err(io_err)?;
-        self.writer.name("children").map_err(io_err)?;
-        self.writer.begin_array().map_err(io_err)?;
-        self.writer.end_array().map_err(io_err)?;
-        self.writer.end_object().map_err(io_err)?;
+        self.entry("type", "image")?;
+        self.entry("props", StartObject)?;
+        self.entry("url", url.as_str())?;
+        self.entry("caption", caption.as_str())?;
+        self.end_object()?;
+        self.entry("content", Null)?;
+        self.entry("children", StartArray)?;
+        self.end_array()?;
+        self.end_object()?;
 
         Ok(())
     }
@@ -222,35 +272,27 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             }
             return Ok(());
         }
-        self.writer.begin_object().map_err(io_err)?;
+        self.begin_object()?;
         self.write_id(id)?;
-        self.writer.name("type").map_err(io_err)?;
-        self.writer.string_value("paragraph").map_err(io_err)?;
-        self.writer.name("props").map_err(io_err)?;
-        self.writer.begin_object().map_err(io_err)?;
-        self.writer.name("textAlignment").map_err(io_err)?;
-        self.writer.string_value("left").map_err(io_err)?;
-        self.writer.end_object().map_err(io_err)?;
-        self.writer.name("content").map_err(io_err)?;
-        self.writer.begin_array().map_err(io_err)?;
+        self.entry("type", "paragraph")?;
+        self.entry("props", StartObject)?;
+        self.entry("textAlignment", "left")?;
+        self.end_object()?;
+        self.entry("content", StartArray)?;
         self.in_text_block = true;
         Ok(())
     }
 
     fn handle_preformatted(&mut self, id: Option<&String>, syntax: Option<&String>) -> Result<()> {
-        self.writer.begin_object().map_err(io_err)?;
-        self.writer.name("type").map_err(io_err)?;
-        self.writer.string_value("codeBlock").map_err(io_err)?;
+        self.begin_object()?;
+        self.entry("type", "codeBlock")?;
         self.write_id(id)?;
         if let Some(lang) = syntax {
-            self.writer.name("props").map_err(io_err)?;
-            self.writer.begin_object().map_err(io_err)?;
-            self.writer.name("language").map_err(io_err)?;
-            self.writer.string_value(lang).map_err(io_err)?;
-            self.writer.end_object().map_err(io_err)?;
+            self.entry("props", StartObject)?;
+            self.entry("language", lang.as_str())?;
+            self.end_object()?;
         }
-        self.writer.name("content").map_err(io_err)?;
-        self.writer.begin_array().map_err(io_err)?;
+        self.entry("content", StartArray)?;
         self.in_text_block = true;
         Ok(())
     }
@@ -262,35 +304,23 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if self.blockquote_depth > 0 {
             self.blockquote_has_content = true;
         }
-        self.writer.begin_object().map_err(io_err)?;
-        self.writer.name("type").map_err(io_err)?;
-        self.writer.string_value("text").map_err(io_err)?;
-        self.writer.name("text").map_err(io_err)?;
-        self.writer.string_value(content).map_err(io_err)?;
-        self.writer.name("styles").map_err(io_err)?;
-        self.writer.begin_object().map_err(io_err)?;
-        if style.bold {
-            self.writer.name("bold").map_err(io_err)?;
-            self.writer.bool_value(true).map_err(io_err)?;
+        self.begin_object()?;
+        self.entry("type", "text")?;
+        self.entry("text", content)?;
+        self.entry("styles", StartObject)?;
+        for (key, enabled) in [
+            ("bold", style.bold),
+            ("italic", style.italic),
+            ("code", style.code),
+            ("strike", style.strikethrough),
+            ("underline", style.underline),
+        ] {
+            if enabled {
+                self.entry(key, true)?;
+            }
         }
-        if style.italic {
-            self.writer.name("italic").map_err(io_err)?;
-            self.writer.bool_value(true).map_err(io_err)?;
-        }
-        if style.code {
-            self.writer.name("code").map_err(io_err)?;
-            self.writer.bool_value(true).map_err(io_err)?;
-        }
-        if style.strikethrough {
-            self.writer.name("strike").map_err(io_err)?;
-            self.writer.bool_value(true).map_err(io_err)?;
-        }
-        if style.underline {
-            self.writer.name("underline").map_err(io_err)?;
-            self.writer.bool_value(true).map_err(io_err)?;
-        }
-        self.writer.end_object().map_err(io_err)?;
-        self.writer.end_object().map_err(io_err)?;
+        self.end_object()?;
+        self.end_object()?;
         Ok(())
     }
 
@@ -337,8 +367,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
 
     fn write_id(&mut self, id: Option<&String>) -> Result<()> {
         if let Some(id_val) = id {
-            self.writer.name("id").map_err(io_err)?;
-            self.writer.string_value(id_val).map_err(io_err)?;
+            self.entry("id", id_val.as_str())?;
         }
         Ok(())
     }
@@ -354,8 +383,8 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
     #[inline]
     fn handle_event(&mut self, event: Event) -> Result<()> {
         match event {
-            Event::StartDocument { .. } => self.writer.begin_array().map_err(io_err),
-            Event::EndDocument => self.writer.end_array().map_err(io_err),
+            Event::StartDocument { .. } => self.begin_array(),
+            Event::EndDocument => self.end_array(),
             Event::StartHeading { level, id, .. } => {
                 self.close_for_block_sibling()?;
                 self.handle_heading(level, id.as_ref())
