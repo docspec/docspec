@@ -88,7 +88,6 @@ pub struct BlockNoteWriter<'a, W: Write> {
 
 struct Null;
 struct StartArray;
-struct StartObject;
 
 trait WriteVal {
     fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()>;
@@ -103,12 +102,6 @@ impl WriteVal for Null {
 impl WriteVal for StartArray {
     fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()> {
         w.writer.begin_array().map_err(io_err)
-    }
-}
-
-impl WriteVal for StartObject {
-    fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()> {
-        w.writer.begin_object().map_err(io_err)
     }
 }
 
@@ -131,12 +124,30 @@ impl WriteVal for u8 {
 }
 
 impl<'a, W: Write> BlockNoteWriter<'a, W> {
+    fn array<F>(&mut self, key: &str, f: F) -> Result<()>
+    where
+        F: FnOnce(&mut Self) -> Result<()>,
+    {
+        self.entry(key, StartArray)?;
+        f(self)?;
+        self.end_array()
+    }
+
     fn begin_array(&mut self) -> Result<()> {
         self.writer.begin_array().map_err(io_err)
     }
 
     fn begin_object(&mut self) -> Result<()> {
         self.writer.begin_object().map_err(io_err)
+    }
+
+    fn block<F>(&mut self, f: F) -> Result<()>
+    where
+        F: FnOnce(&mut Self) -> Result<()>,
+    {
+        self.begin_object()?;
+        f(self)?;
+        self.end_object()
     }
 
     fn close_blockquote_for_sibling(&mut self) -> Result<()> {
@@ -149,10 +160,8 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
 
     fn close_content_block(&mut self) -> Result<()> {
         self.end_array()?;
-        self.entry("children", StartArray)?;
-        self.end_array()?;
-        self.end_object()?;
-        Ok(())
+        self.array("children", |_| Ok(()))?;
+        self.end_object()
     }
 
     fn close_for_block_sibling(&mut self) -> Result<()> {
@@ -191,21 +200,20 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_divider(&mut self, id: Option<&String>) -> Result<()> {
-        self.begin_object()?;
-        self.entry("type", "divider")?;
-        self.write_id(id)?;
-        self.end_object()?;
-        Ok(())
+        self.block(|w| {
+            w.entry("type", "divider")?;
+            w.write_id(id)
+        })
     }
 
     fn handle_heading(&mut self, level: u8, id: Option<&String>) -> Result<()> {
         self.begin_object()?;
         self.entry("type", "heading")?;
         self.write_id(id)?;
-        self.entry("props", StartObject)?;
-        self.entry("level", level)?;
-        self.entry("textAlignment", "left")?;
-        self.end_object()?;
+        self.object("props", |w| {
+            w.entry("level", level)?;
+            w.entry("textAlignment", "left")
+        })?;
         self.entry("content", StartArray)?;
         self.in_text_block = true;
         Ok(())
@@ -250,19 +258,16 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         };
         let caption = alt.unwrap_or_default();
 
-        self.begin_object()?;
-        self.write_id(id)?;
-        self.entry("type", "image")?;
-        self.entry("props", StartObject)?;
-        self.entry("url", url.as_str())?;
-        self.entry("caption", caption.as_str())?;
-        self.end_object()?;
-        self.entry("content", Null)?;
-        self.entry("children", StartArray)?;
-        self.end_array()?;
-        self.end_object()?;
-
-        Ok(())
+        self.block(|w| {
+            w.write_id(id)?;
+            w.entry("type", "image")?;
+            w.object("props", |p| {
+                p.entry("url", url.as_str())?;
+                p.entry("caption", caption.as_str())
+            })?;
+            w.entry("content", Null)?;
+            w.array("children", |_| Ok(()))
+        })
     }
 
     fn handle_paragraph(&mut self, id: Option<&String>) -> Result<()> {
@@ -275,9 +280,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.begin_object()?;
         self.write_id(id)?;
         self.entry("type", "paragraph")?;
-        self.entry("props", StartObject)?;
-        self.entry("textAlignment", "left")?;
-        self.end_object()?;
+        self.object("props", |w| w.entry("textAlignment", "left"))?;
         self.entry("content", StartArray)?;
         self.in_text_block = true;
         Ok(())
@@ -288,9 +291,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.entry("type", "codeBlock")?;
         self.write_id(id)?;
         if let Some(lang) = syntax {
-            self.entry("props", StartObject)?;
-            self.entry("language", lang.as_str())?;
-            self.end_object()?;
+            self.object("props", |w| w.entry("language", lang.as_str()))?;
         }
         self.entry("content", StartArray)?;
         self.in_text_block = true;
@@ -304,24 +305,24 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if self.blockquote_depth > 0 {
             self.blockquote_has_content = true;
         }
-        self.begin_object()?;
-        self.entry("type", "text")?;
-        self.entry("text", content)?;
-        self.entry("styles", StartObject)?;
-        for (key, enabled) in [
-            ("bold", style.bold),
-            ("italic", style.italic),
-            ("code", style.code),
-            ("strike", style.strikethrough),
-            ("underline", style.underline),
-        ] {
-            if enabled {
-                self.entry(key, true)?;
-            }
-        }
-        self.end_object()?;
-        self.end_object()?;
-        Ok(())
+        self.block(|w| {
+            w.entry("type", "text")?;
+            w.entry("text", content)?;
+            w.object("styles", |s| {
+                for (key, enabled) in [
+                    ("bold", style.bold),
+                    ("italic", style.italic),
+                    ("code", style.code),
+                    ("strike", style.strikethrough),
+                    ("underline", style.underline),
+                ] {
+                    if enabled {
+                        s.entry(key, true)?;
+                    }
+                }
+                Ok(())
+            })
+        })
     }
 
     /// Creates a new `BlockNoteWriter` that writes to the given writer.
@@ -340,6 +341,16 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             in_text_block: false,
             writer: JsonStreamWriter::new(writer),
         }
+    }
+
+    fn object<F>(&mut self, key: &str, f: F) -> Result<()>
+    where
+        F: FnOnce(&mut Self) -> Result<()>,
+    {
+        self.writer.name(key).map_err(io_err)?;
+        self.begin_object()?;
+        f(self)?;
+        self.end_object()
     }
 
     /// Creates a new `BlockNoteWriter` with an [`AssetProvider`] for resolving embedded assets.
