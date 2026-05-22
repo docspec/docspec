@@ -39,7 +39,8 @@
 //! - Bullet lists → `StartUnorderedListItem` / `EndUnorderedListItem`
 //! - Numbered lists → `StartOrderedListItem` / `EndOrderedListItem`
 //!   (`start: Option<u64>` is `Some(n)` on the first item of each list, `None` on subsequent items;
-//!   nesting is flat-by-level; task list markers (`- [ ]`/`- [x]`) are parsed as literal text)
+//!   child items may nest inside their parent's `Start*`/`End*` pair with `level` indicating
+//!   indent depth; task list markers (`- [ ]`/`- [x]`) are parsed as literal text)
 //!
 //! # Unsupported Elements
 //!
@@ -84,6 +85,8 @@ enum Phase {
 
 /// Context for a single list level tracked by [`MarkdownReader`].
 struct ListContext {
+    /// Whether the item at this list level is currently open (start emitted, end not yet emitted).
+    item_open: bool,
     /// Whether this list is ordered (numbered) rather than unordered (bulleted).
     ordered: bool,
     /// Start number to attach to the next item emitted; `Some(n)` only before the first
@@ -125,9 +128,6 @@ pub struct MarkdownReader<'a> {
     bold_depth: usize,
     /// Buffered code block text (accumulated until `EndCodeBlock` to strip trailing newline).
     code_block_buffer: Option<String>,
-    /// Whether a list item `Start*` event has been emitted but its matching `End*` not yet
-    /// emitted. Used to avoid double-close when a nested list prematurely closes the parent item.
-    current_item_open: bool,
     /// Buffered image being processed (alt text accumulation).
     image: Option<ImageBuffer>,
     /// Whether the parser is currently inside a table header row.
@@ -149,16 +149,16 @@ pub struct MarkdownReader<'a> {
 
 impl<'a> MarkdownReader<'a> {
     fn close_current_item_if_open(&mut self) {
-        if self.current_item_open {
-            if let Some(ctx) = self.list_stack.last() {
+        if let Some(ctx) = self.list_stack.last_mut() {
+            if ctx.item_open {
                 if ctx.ordered {
                     self.queue.push_back(Event::EndOrderedListItem);
                 } else {
                     self.queue.push_back(Event::EndUnorderedListItem);
                 }
+                ctx.item_open = false;
+                self.block_state = BlockState::None;
             }
-            self.current_item_open = false;
-            self.block_state = BlockState::None;
         }
     }
 
@@ -295,14 +295,14 @@ impl<'a> MarkdownReader<'a> {
                     id: None,
                 });
             }
-            self.current_item_open = true;
+            ctx.item_open = true;
             self.block_state = BlockState::Explicit;
         }
     }
 
     fn handle_list_start(&mut self, start_opt: Option<u64>) {
-        self.close_current_item_if_open();
         self.list_stack.push(ListContext {
+            item_open: false,
             ordered: start_opt.is_some(),
             pending_start: start_opt,
         });
@@ -438,7 +438,6 @@ impl<'a> MarkdownReader<'a> {
             block_state: BlockState::None,
             bold_depth: 0,
             code_block_buffer: None,
-            current_item_open: false,
             image: None,
             in_table_head: false,
             italic_depth: 0,

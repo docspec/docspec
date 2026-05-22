@@ -457,6 +457,34 @@ mod tests {
     }
 
     #[test]
+    fn nested_list_with_continuation_keeps_parent_item_open() {
+        let mut reader = MarkdownReader::new(
+            "- Outer A\n  - Inner nested\n\n  Continuation paragraph for Outer A\n- Outer B\n",
+        );
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(
+            events.get(1),
+            Some(Event::StartUnorderedListItem { level: 0, .. })
+        ));
+        assert!(matches!(events.get(2), Some(Event::StartParagraph { .. })));
+        assert!(matches!(events.get(4), Some(Event::EndParagraph)));
+        assert!(matches!(
+            events.get(5),
+            Some(Event::StartUnorderedListItem { level: 1, .. })
+        ));
+        assert!(matches!(events.get(7), Some(Event::EndUnorderedListItem)));
+        assert!(matches!(events.get(8), Some(Event::StartParagraph { .. })));
+        assert!(matches!(events.get(10), Some(Event::EndParagraph)));
+        assert!(matches!(events.get(11), Some(Event::EndUnorderedListItem)));
+        assert!(matches!(
+            events.get(12),
+            Some(Event::StartUnorderedListItem { level: 0, .. })
+        ));
+        assert_eq!(events.len(), 18);
+    }
+
+    #[test]
     fn next_event_returns_none_after_end_document() {
         let mut reader = MarkdownReader::new("");
         let events = collect_events(&mut reader);
@@ -1040,16 +1068,16 @@ mod tests {
             events.get(1),
             Some(Event::StartUnorderedListItem { level: 0, .. })
         ));
-        assert!(matches!(events.get(3), Some(Event::EndUnorderedListItem)));
         assert!(matches!(
-            events.get(4),
+            events.get(3),
             Some(Event::StartUnorderedListItem { level: 1, .. })
         ));
-        assert!(matches!(events.get(6), Some(Event::EndUnorderedListItem)));
+        assert!(matches!(events.get(5), Some(Event::EndUnorderedListItem)));
         assert!(matches!(
-            events.get(7),
+            events.get(6),
             Some(Event::StartUnorderedListItem { level: 1, .. })
         ));
+        assert!(matches!(events.get(8), Some(Event::EndUnorderedListItem)));
         assert!(matches!(events.get(9), Some(Event::EndUnorderedListItem)));
         assert!(matches!(
             events.get(10),
@@ -1067,30 +1095,61 @@ mod tests {
             events.get(1),
             Some(Event::StartUnorderedListItem { level: 0, .. })
         ));
-        assert!(matches!(events.get(3), Some(Event::EndUnorderedListItem)));
         assert!(matches!(
-            events.get(4),
+            events.get(3),
             Some(Event::StartOrderedListItem {
                 start: Some(1),
                 level: 1,
                 ..
             })
         ));
-        assert!(matches!(events.get(6), Some(Event::EndOrderedListItem)));
+        assert!(matches!(events.get(5), Some(Event::EndOrderedListItem)));
         assert!(matches!(
-            events.get(7),
+            events.get(6),
             Some(Event::StartOrderedListItem {
                 start: None,
                 level: 1,
                 ..
             })
         ));
-        assert!(matches!(events.get(9), Some(Event::EndOrderedListItem)));
+        assert!(matches!(events.get(8), Some(Event::EndOrderedListItem)));
+        assert!(matches!(events.get(9), Some(Event::EndUnorderedListItem)));
         assert!(matches!(
             events.get(10),
             Some(Event::StartUnorderedListItem { level: 0, .. })
         ));
         assert!(matches!(events.get(12), Some(Event::EndUnorderedListItem)));
+    }
+
+    #[test]
+    fn list_item_containing_only_nested_list_no_text() {
+        let mut reader = MarkdownReader::new("- \n  - Nested item\n- Sibling\n");
+        let events = collect_events(&mut reader);
+
+        // Outer item opens without any text of its own
+        assert!(matches!(
+            events.get(1),
+            Some(Event::StartUnorderedListItem { level: 0, .. })
+        ));
+        // Nested item opens immediately inside outer item
+        assert!(matches!(
+            events.get(2),
+            Some(Event::StartUnorderedListItem { level: 1, .. })
+        ));
+        assert!(matches!(
+            events.get(3),
+            Some(Event::Text { content, .. }) if content == "Nested item"
+        ));
+        assert!(matches!(events.get(4), Some(Event::EndUnorderedListItem)));
+        // Outer item closes after nested
+        assert!(matches!(events.get(5), Some(Event::EndUnorderedListItem)));
+        // Sibling item
+        assert!(matches!(
+            events.get(6),
+            Some(Event::StartUnorderedListItem { level: 0, .. })
+        ));
+        assert!(matches!(events.get(8), Some(Event::EndUnorderedListItem)));
+        assert_eq!(events.len(), 10);
     }
 
     #[test]
@@ -1122,5 +1181,56 @@ mod tests {
             })
         ));
         assert!(matches!(events.get(8), Some(Event::EndUnorderedListItem)));
+    }
+
+    #[test]
+    fn nested_list_with_hard_break_in_continuation() {
+        let mut reader = MarkdownReader::new("- A\n  - B\n\n  Line one  \n  Line two\n");
+        let events = collect_events(&mut reader);
+
+        // Continuation paragraph is inside parent item
+        assert!(matches!(events.get(8), Some(Event::StartParagraph { .. })));
+        assert!(matches!(
+            events.get(9),
+            Some(Event::Text { content, .. }) if content == "Line one"
+        ));
+        // Hard break is inside the continuation paragraph (not orphaned)
+        assert!(matches!(events.get(10), Some(Event::LineBreak)));
+        assert!(matches!(
+            events.get(11),
+            Some(Event::Text { content, .. }) if content == "Line two"
+        ));
+        assert!(matches!(events.get(12), Some(Event::EndParagraph)));
+        // Parent closes AFTER continuation
+        assert!(matches!(events.get(13), Some(Event::EndUnorderedListItem)));
+        assert_eq!(events.len(), 15);
+    }
+
+    #[test]
+    fn three_levels_deeply_nested_unordered_list() {
+        let mut reader = MarkdownReader::new("- A\n  - B\n    - C\n");
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(
+            events.get(1),
+            Some(Event::StartUnorderedListItem { level: 0, .. })
+        ));
+        assert!(matches!(
+            events.get(3),
+            Some(Event::StartUnorderedListItem { level: 1, .. })
+        ));
+        assert!(matches!(
+            events.get(5),
+            Some(Event::StartUnorderedListItem { level: 2, .. })
+        ));
+        assert!(matches!(
+            events.get(6),
+            Some(Event::Text { content, .. }) if content == "C"
+        ));
+        // All three levels close in reverse order
+        assert!(matches!(events.get(7), Some(Event::EndUnorderedListItem)));
+        assert!(matches!(events.get(8), Some(Event::EndUnorderedListItem)));
+        assert!(matches!(events.get(9), Some(Event::EndUnorderedListItem)));
+        assert_eq!(events.len(), 11);
     }
 }

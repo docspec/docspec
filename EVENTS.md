@@ -14,7 +14,7 @@ DocSpec documents are streams of typed events. Readers emit events. Writers cons
 
 **No warnings.** Errors are out-of-band via `Result`. Events carry content only.
 
-**Flat list model.** `StartOrderedListItem`/`StartUnorderedListItem` carry nesting level as a field. No `StartList`/`EndList`. Maps cleanly to DOCX/RTF where list structure is implicit.
+**Nested list items with level hints.** `StartOrderedListItem`/`StartUnorderedListItem` carry nesting level as a field and may nest in the event stream. No `StartList`/`EndList` exist. `level` is the authoritative indent depth — writers that do not build a tree may rely on it alone. Nesting in events lets continuation content (e.g., CommonMark paragraphs) sit naturally inside the owning parent item.
 
 ---
 
@@ -160,7 +160,7 @@ Every `Start*` has a matching `End*`. They nest but never overlap.
 
 **Heading.** Levels 1–6 are standard (HTML). DOCX/ODT/RTF support 1–9. Writers clamp higher levels. Heading levels are 1-based (range 1–9); list item `level` is 0-indexed (0 = top-level list).
 
-**List items.** Nesting is flat — children follow parents sequentially, distinguished by `level`. No `StartList`/`EndList` exists. `StartOrderedListItem` carries `start: Option<u64>` populated only on the first item of each ordered list (subsequent items: `None`). **Boundary rules:** a new list begins when (a) a non-list block intervenes, (b) ordered vs. unordered changes at the same level, or (c) level decreases then increases without a parent.
+**List items.** Child items may nest inside their parent's `Start*`/`End*` pair. The parent's `End*ListItem` appears AFTER all child items AND any continuation content (paragraphs, line breaks) that semantically belongs to the parent. `level` is 0-indexed (0 = top-level) and is the authoritative indent depth; writers that do not build a tree may rely on `level` alone. `StartOrderedListItem` carries `start: Option<u64>` populated only on the first item of each ordered list (subsequent items: `None`). **Boundary rules** (for sibling items at the same level): a new list begins when (a) a non-list block intervenes, (b) ordered vs. unordered changes at the same level, or (c) level decreases then increases without a parent.
 
 **Table.** `StartCaption` is optional, appears before rows. Header cells carry `scope`/`abbr` for accessibility; data cells omit these. Cells may contain any block element.
 
@@ -194,7 +194,7 @@ Readers MUST produce well-formed streams. Writers MAY assume well-formedness.
 2. Exactly one root: `StartDocument`. Empty containers (`Start*` immediately followed by `End*`) are valid.
 3. `Text` appears only inside containers, never at root.
 4. `StartLink` appears inside inline-accepting blocks (paragraphs, headings, list items, cells, definition details). Links do not nest.
-5. `StartOrderedListItem` and `StartUnorderedListItem` appear inside block containers. List items are flat — distinguished by `level` field.
+5. `StartOrderedListItem` and `StartUnorderedListItem` appear inside block containers. List items may nest (child items inside parent `Start*`/`End*` pairs); the `level` field indicates indentation depth and is 0-indexed.
 6. `StartCaption` appears at most once per table, before any rows.
 7. Each footnote ID appears in exactly one `FootnoteRef` and one `StartFootnote`.
 8. Table structure: `StartTableRow` appears only inside `StartTable`. `StartTableCell`/`StartTableHeader` appear only inside `StartTableRow`.
