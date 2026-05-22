@@ -200,7 +200,7 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "docspec-core",
- "struson",
+ "docspec-json",
 ]
 
 [[package]]
@@ -222,6 +222,14 @@ dependencies = [
 [[package]]
 name = "docspec-core"
 version = "0.1.0"
+
+[[package]]
+name = "docspec-json"
+version = "0.1.0"
+dependencies = [
+ "docspec-core",
+ "struson",
+]
 
 [[package]]
 name = "docspec-markdown-reader"
