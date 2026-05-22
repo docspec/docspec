@@ -32,8 +32,8 @@ pub enum BlockKind {
     Heading,
     /// A hyperlink container.
     Link,
-    /// A list item container.
-    ListItem,
+    /// An ordered (numbered) list item container.
+    OrderedListItem,
     /// A paragraph container.
     Paragraph,
     /// A preformatted (code) block container.
@@ -46,6 +46,8 @@ pub enum BlockKind {
     TableHeader,
     /// A table row container.
     TableRow,
+    /// An unordered (bulleted) list item container.
+    UnorderedListItem,
 }
 
 /// A wrapper around any [`EventSink`] that tracks the nesting stack of open block-level containers
@@ -79,7 +81,7 @@ impl<S: EventSink> StackTrackingSink<S> {
     /// block elements (paragraphs, headings, etc.), not inline text directly. Text inside
     /// a block quote without an explicit paragraph triggers auto-paragraph insertion.
     ///
-    /// Note: [`BlockKind::ListItem`], [`BlockKind::TableCell`], [`BlockKind::TableHeader`],
+    /// Note: [`BlockKind::OrderedListItem`], [`BlockKind::UnorderedListItem`], [`BlockKind::TableCell`], [`BlockKind::TableHeader`],
     /// and [`BlockKind::DefinitionDetail`] are NOT content-bearing despite being able to
     /// contain inline content per `EVENTS.md`. This is because downstream writers like
     /// `BlockNoteWriter` rely on auto-paragraph insertion for these container types.
@@ -277,8 +279,10 @@ pub fn block_kind_for_start(event: &Event) -> Option<BlockKind> {
         Some(BlockKind::Heading)
     } else if let Event::StartLink { .. } = event {
         Some(BlockKind::Link)
-    } else if let Event::StartListItem { .. } = event {
-        Some(BlockKind::ListItem)
+    } else if let Event::StartOrderedListItem { .. } = event {
+        Some(BlockKind::OrderedListItem)
+    } else if let Event::StartUnorderedListItem { .. } = event {
+        Some(BlockKind::UnorderedListItem)
     } else if let Event::StartParagraph { .. } = event {
         Some(BlockKind::Paragraph)
     } else if let Event::StartPreformatted { .. } = event {
@@ -320,8 +324,10 @@ pub fn block_kind_for_end(event: &Event) -> Option<BlockKind> {
         Some(BlockKind::Heading)
     } else if let Event::EndLink = event {
         Some(BlockKind::Link)
-    } else if let Event::EndListItem = event {
-        Some(BlockKind::ListItem)
+    } else if let Event::EndOrderedListItem = event {
+        Some(BlockKind::OrderedListItem)
+    } else if let Event::EndUnorderedListItem = event {
+        Some(BlockKind::UnorderedListItem)
     } else if let Event::EndParagraph = event {
         Some(BlockKind::Paragraph)
     } else if let Event::EndPreformatted = event {
@@ -356,8 +362,9 @@ pub fn end_event_for(kind: BlockKind) -> Event {
         BlockKind::Footnote => Event::EndFootnote,
         BlockKind::Heading => Event::EndHeading,
         BlockKind::Link => Event::EndLink,
-        BlockKind::ListItem => Event::EndListItem,
+        BlockKind::OrderedListItem => Event::EndOrderedListItem,
         BlockKind::Paragraph => Event::EndParagraph,
+        BlockKind::UnorderedListItem => Event::EndUnorderedListItem,
         BlockKind::Preformatted => Event::EndPreformatted,
         BlockKind::Table => Event::EndTable,
         BlockKind::TableCell => Event::EndTableCell,
@@ -849,7 +856,14 @@ mod tests {
         assert_eq!(end_event_for(BlockKind::Footnote), Event::EndFootnote);
         assert_eq!(end_event_for(BlockKind::Heading), Event::EndHeading);
         assert_eq!(end_event_for(BlockKind::Link), Event::EndLink);
-        assert_eq!(end_event_for(BlockKind::ListItem), Event::EndListItem);
+        assert_eq!(
+            end_event_for(BlockKind::OrderedListItem),
+            Event::EndOrderedListItem
+        );
+        assert_eq!(
+            end_event_for(BlockKind::UnorderedListItem),
+            Event::EndUnorderedListItem
+        );
         assert_eq!(end_event_for(BlockKind::Paragraph), Event::EndParagraph);
         assert_eq!(
             end_event_for(BlockKind::Preformatted),

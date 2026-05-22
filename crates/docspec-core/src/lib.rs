@@ -12,8 +12,8 @@
 //!
 //! # Event Types
 //!
-//! The [`Event`] enum has 37 variants covering all document structures defined in
-//! the `DocSpec` specification.
+//! The [`Event`] enum covers all document structures defined in the `DocSpec`
+//! specification. See `EVENTS.md` for the authoritative variant list and semantics.
 
 extern crate alloc;
 
@@ -28,6 +28,5 @@ pub use event::{Event, TextStyle};
 pub use stack::{block_kind_for_end, block_kind_for_start, BlockKind, StackTrackingSink};
 pub use traits::{AssetProvider, EventSink, EventSource};
 pub use types::{
-    Author, Color, DocumentMeta, ImageSource, ListStyleType, ListType, TableHeaderScope,
-    TextAlignment,
+    Author, Color, DocumentMeta, ImageSource, ListStyleType, TableHeaderScope, TextAlignment,
 };
