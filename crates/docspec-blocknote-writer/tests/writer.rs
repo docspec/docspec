@@ -690,18 +690,16 @@ mod tests {
                 language: None,
                 metadata: None,
             },
-            Event::StartListItem {
+            Event::StartUnorderedListItem {
                 id: None,
-                level: 1,
-                list_type: docspec_core::ListType::Unordered,
-                start: None,
-                style_type: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
             },
             Event::Text {
                 content: "Item".to_string(),
                 style: TextStyle::default(),
             },
-            Event::EndListItem,
+            Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
         assert_eq!(

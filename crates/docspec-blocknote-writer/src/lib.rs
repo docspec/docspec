@@ -23,7 +23,7 @@
 //! - `LineBreak` — line breaks within content blocks
 //! - `ThematicBreak` — divider blocks
 //!
-//! List and table structure events (`StartListItem`, `StartTable*`, etc.) are silently ignored
+//! List and table structure events (`StartOrderedListItem`, `StartUnorderedListItem`, `StartTable*`, etc.) are silently ignored
 //! by this writer. Use `StackTrackingSink` from `docspec_core` to wrap the writer for automatic
 //! paragraph insertion within list items and table cells.
 //!
@@ -463,7 +463,6 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             | Event::EndDefinitionDetail
             | Event::EndDefinitionList
             | Event::EndFootnote
-            | Event::EndListItem
             | Event::EndTable
             | Event::EndTableCell
             | Event::EndTableHeader
@@ -475,7 +474,6 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             | Event::StartDefinitionTerm { .. }
             | Event::StartFootnote { .. }
             | Event::StartLink { .. }
-            | Event::StartListItem { .. }
             | Event::StartTable { .. }
             | Event::StartTableCell { .. }
             | Event::StartTableHeader { .. }

@@ -179,19 +179,6 @@ mod tests {
     }
 
     #[test]
-    fn list_type_clone() {
-        let list_type = ListType::Ordered;
-        let cloned = list_type.clone();
-        assert_eq!(list_type, cloned);
-    }
-
-    #[test]
-    fn list_type_variants() {
-        assert_eq!(ListType::Ordered, ListType::Ordered);
-        assert_ne!(ListType::Ordered, ListType::Unordered);
-    }
-
-    #[test]
     fn table_header_scope_clone() {
         let scope = TableHeaderScope::Column;
         let cloned = scope.clone();
