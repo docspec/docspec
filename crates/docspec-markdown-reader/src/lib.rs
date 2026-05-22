@@ -530,3 +530,30 @@ impl EventSource for MarkdownReader<'_> {
         Ok(self.queue.pop_front())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn handle_code_without_open_block_auto_opens_paragraph() {
+        let mut reader = MarkdownReader::new("");
+        reader.handle_code("code".to_string());
+
+        assert_eq!(reader.queue.len(), 2);
+        assert_eq!(
+            reader.queue.front(),
+            Some(&Event::StartParagraph {
+                alignment: None,
+                id: None,
+            })
+        );
+        assert_eq!(
+            reader.queue.get(1),
+            Some(&Event::Text {
+                content: "code".to_string(),
+                style: TextStyle::default().code(),
+            })
+        );
+    }
+}
