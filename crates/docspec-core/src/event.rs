@@ -133,8 +133,8 @@ pub enum Event {
     /// End a hyperlink.
     EndLink,
 
-    /// End a list item.
-    EndListItem,
+    /// End an ordered (numbered) list item.
+    EndOrderedListItem,
 
     /// End a paragraph.
     EndParagraph,
@@ -153,6 +153,9 @@ pub enum Event {
 
     /// End a table row.
     EndTableRow,
+
+    /// End an unordered (bulleted) list item.
+    EndUnorderedListItem,
 
     /// A reference to a footnote.
     FootnoteRef {
@@ -241,18 +244,17 @@ pub enum Event {
         title: Option<String>,
     },
 
-    /// Begin a list item.
-    StartListItem {
+    /// Begin an ordered (numbered) list item.
+    StartOrderedListItem {
         /// Optional block identifier.
         id: Option<String>,
-        /// Nesting level (1 = top-level).
-        level: u8,
-        /// Whether the list is ordered or unordered.
-        list_type: crate::ListType,
-        /// Starting number for ordered lists (None = continue from previous).
-        start: Option<u32>,
-        /// Visual style for the list marker.
-        style_type: Option<crate::ListStyleType>,
+        /// Zero-indexed nesting depth (0 = top-level list).
+        level: u32,
+        /// Starting number for the list, populated only on the first item of an ordered list
+        /// (subsequent items in the same list: `None`).
+        start: Option<u64>,
+        /// Visual style of the list marker. Writers tolerate mismatches per `ListStyleType` convention.
+        style_type: crate::ListStyleType,
     },
 
     /// Begin a paragraph with optional alignment.
@@ -305,6 +307,16 @@ pub enum Event {
     StartTableRow {
         /// Optional block identifier.
         id: Option<String>,
+    },
+
+    /// Begin an unordered (bulleted) list item.
+    StartUnorderedListItem {
+        /// Optional block identifier.
+        id: Option<String>,
+        /// Zero-indexed nesting depth (0 = top-level list).
+        level: u32,
+        /// Visual style of the list marker. Writers tolerate mismatches per `ListStyleType` convention.
+        style_type: crate::ListStyleType,
     },
 
     /// A text run with formatting attributes.

@@ -4,8 +4,7 @@
 mod tests {
     use docspec_core::*;
     use docspec_core::{
-        Author, Color, DocumentMeta, ImageSource, ListStyleType, ListType, TableHeaderScope,
-        TextAlignment,
+        Author, Color, DocumentMeta, ImageSource, ListStyleType, TableHeaderScope, TextAlignment,
     };
 
     #[test]
@@ -72,8 +71,15 @@ mod tests {
     }
 
     #[test]
-    fn end_list_item() {
-        let event = Event::EndListItem;
+    fn end_ordered_list_item() {
+        let event = Event::EndOrderedListItem;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn end_unordered_list_item() {
+        let event = Event::EndUnorderedListItem;
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
@@ -357,35 +363,30 @@ mod tests {
     }
 
     #[test]
-    fn start_list_item_ordered() {
-        let event = Event::StartListItem {
+    fn start_ordered_list_item() {
+        let event = Event::StartOrderedListItem {
             id: None,
-            level: 1,
-            list_type: ListType::Ordered,
+            level: 0,
             start: Some(1),
-            style_type: Some(ListStyleType::Decimal),
+            style_type: ListStyleType::Decimal,
         };
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
 
     #[test]
-    fn start_list_item_unordered() {
-        let event = Event::StartListItem {
+    fn start_unordered_list_item() {
+        let event = Event::StartUnorderedListItem {
             id: None,
-            level: 2,
-            list_type: ListType::Unordered,
-            start: None,
-            style_type: Some(ListStyleType::Disc),
+            level: 1,
+            style_type: ListStyleType::Disc,
         };
         assert_eq!(
             event,
-            Event::StartListItem {
+            Event::StartUnorderedListItem {
                 id: None,
-                level: 2,
-                list_type: ListType::Unordered,
-                start: None,
-                style_type: Some(ListStyleType::Disc),
+                level: 1,
+                style_type: ListStyleType::Disc,
             }
         );
     }

@@ -2,7 +2,9 @@
 
 #[cfg(test)]
 mod tests {
-    use docspec_core::{Event, EventSource as _, ImageSource, TableHeaderScope, TextStyle};
+    use docspec_core::{
+        Event, EventSource as _, ImageSource, ListStyleType, TableHeaderScope, TextStyle,
+    };
     use docspec_markdown_reader::MarkdownReader;
 
     fn collect_events(reader: &mut MarkdownReader<'_>) -> Vec<Event> {
@@ -103,7 +105,8 @@ mod tests {
                 | Event::EndDefinitionTerm
                 | Event::EndFootnote
                 | Event::EndLink
-                | Event::EndListItem
+                | Event::EndOrderedListItem
+                | Event::EndUnorderedListItem
                 | Event::EndPreformatted
                 | Event::EndTable
                 | Event::EndTableCell
@@ -120,7 +123,8 @@ mod tests {
                 | Event::StartFootnote { .. }
                 | Event::StartHeading { .. }
                 | Event::StartLink { .. }
-                | Event::StartListItem { .. }
+                | Event::StartOrderedListItem { .. }
+                | Event::StartUnorderedListItem { .. }
                 | Event::StartPreformatted { .. }
                 | Event::StartTable { .. }
                 | Event::StartTableCell { .. }
@@ -422,10 +426,12 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(!events
+        assert!(events
             .iter()
-            .any(|e| matches!(e, Event::StartListItem { .. })));
-        assert!(!events.iter().any(|e| matches!(e, Event::EndListItem)));
+            .any(|e| matches!(e, Event::StartUnorderedListItem { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, Event::EndUnorderedListItem)));
 
         let has_item_one = events
             .iter()
@@ -549,15 +555,20 @@ mod tests {
     }
 
     #[test]
-    fn list_item_text_wrapped_in_auto_paragraph() {
+    fn list_item_emits_start_text_end_directly() {
         let markdown = "- Item";
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(events
-            .iter()
-            .any(|e| matches!(e, Event::StartParagraph { .. })));
-        assert!(events.iter().any(|e| matches!(e, Event::EndParagraph)));
+        assert!(matches!(
+            events.get(1),
+            Some(Event::StartUnorderedListItem { level: 0, .. })
+        ));
+        assert!(matches!(
+            events.get(2),
+            Some(Event::Text { content, .. }) if content == "Item"
+        ));
+        assert!(matches!(events.get(3), Some(Event::EndUnorderedListItem)));
     }
 
     #[test]
@@ -900,5 +911,216 @@ mod tests {
         assert!(matches!(events.get(12), Some(Event::EndTable)));
         assert!(matches!(events.get(13), Some(Event::StartTable { .. })));
         assert!(matches!(events.get(24), Some(Event::EndTable)));
+    }
+
+    #[test]
+    fn simple_bullet_list_emits_unordered_items() {
+        let mut reader = MarkdownReader::new("- a\n- b\n- c");
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(
+            events.get(1),
+            Some(Event::StartUnorderedListItem {
+                style_type: ListStyleType::Disc,
+                level: 0,
+                id: None,
+            })
+        ));
+        assert!(matches!(events.get(2), Some(Event::Text { .. })));
+        assert!(matches!(events.get(3), Some(Event::EndUnorderedListItem)));
+        assert!(matches!(
+            events.get(4),
+            Some(Event::StartUnorderedListItem { level: 0, .. })
+        ));
+        assert!(matches!(events.get(6), Some(Event::EndUnorderedListItem)));
+        assert!(matches!(
+            events.get(7),
+            Some(Event::StartUnorderedListItem { level: 0, .. })
+        ));
+        assert!(matches!(events.get(9), Some(Event::EndUnorderedListItem)));
+    }
+
+    #[test]
+    fn simple_numbered_list_emits_ordered_items() {
+        let mut reader = MarkdownReader::new("1. a\n2. b\n3. c");
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(
+            events.get(1),
+            Some(Event::StartOrderedListItem {
+                start: Some(1),
+                level: 0,
+                ..
+            })
+        ));
+        assert!(matches!(events.get(3), Some(Event::EndOrderedListItem)));
+        assert!(matches!(
+            events.get(4),
+            Some(Event::StartOrderedListItem {
+                start: None,
+                level: 0,
+                ..
+            })
+        ));
+        assert!(matches!(
+            events.get(7),
+            Some(Event::StartOrderedListItem {
+                start: None,
+                level: 0,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn numbered_list_with_explicit_start() {
+        let mut reader = MarkdownReader::new("5. a\n6. b\n7. c");
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(
+            events.get(1),
+            Some(Event::StartOrderedListItem {
+                start: Some(5),
+                level: 0,
+                ..
+            })
+        ));
+        assert!(matches!(
+            events.get(4),
+            Some(Event::StartOrderedListItem {
+                start: None,
+                level: 0,
+                ..
+            })
+        ));
+        assert!(matches!(
+            events.get(7),
+            Some(Event::StartOrderedListItem {
+                start: None,
+                level: 0,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn bullet_list_emits_disc_style() {
+        let mut reader = MarkdownReader::new("- a");
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(
+            events.get(1),
+            Some(Event::StartUnorderedListItem {
+                style_type: ListStyleType::Disc,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn ordered_list_emits_decimal_style() {
+        let mut reader = MarkdownReader::new("1. a");
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(
+            events.get(1),
+            Some(Event::StartOrderedListItem {
+                style_type: ListStyleType::Decimal,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn nested_bullet_lists_emit_increasing_level() {
+        let mut reader = MarkdownReader::new("- A\n  - B\n  - C\n- D");
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(
+            events.get(1),
+            Some(Event::StartUnorderedListItem { level: 0, .. })
+        ));
+        assert!(matches!(events.get(3), Some(Event::EndUnorderedListItem)));
+        assert!(matches!(
+            events.get(4),
+            Some(Event::StartUnorderedListItem { level: 1, .. })
+        ));
+        assert!(matches!(events.get(6), Some(Event::EndUnorderedListItem)));
+        assert!(matches!(
+            events.get(7),
+            Some(Event::StartUnorderedListItem { level: 1, .. })
+        ));
+        assert!(matches!(events.get(9), Some(Event::EndUnorderedListItem)));
+        assert!(matches!(
+            events.get(10),
+            Some(Event::StartUnorderedListItem { level: 0, .. })
+        ));
+        assert!(matches!(events.get(12), Some(Event::EndUnorderedListItem)));
+    }
+
+    #[test]
+    fn mixed_nested_lists() {
+        let mut reader = MarkdownReader::new("- A\n  1. B\n  2. C\n- D");
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(
+            events.get(1),
+            Some(Event::StartUnorderedListItem { level: 0, .. })
+        ));
+        assert!(matches!(events.get(3), Some(Event::EndUnorderedListItem)));
+        assert!(matches!(
+            events.get(4),
+            Some(Event::StartOrderedListItem {
+                start: Some(1),
+                level: 1,
+                ..
+            })
+        ));
+        assert!(matches!(events.get(6), Some(Event::EndOrderedListItem)));
+        assert!(matches!(
+            events.get(7),
+            Some(Event::StartOrderedListItem {
+                start: None,
+                level: 1,
+                ..
+            })
+        ));
+        assert!(matches!(events.get(9), Some(Event::EndOrderedListItem)));
+        assert!(matches!(
+            events.get(10),
+            Some(Event::StartUnorderedListItem { level: 0, .. })
+        ));
+        assert!(matches!(events.get(12), Some(Event::EndUnorderedListItem)));
+    }
+
+    #[test]
+    fn list_items_with_inline_formatting() {
+        let mut reader = MarkdownReader::new("- **bold** item\n- *italic* item");
+        let events = collect_events(&mut reader);
+
+        assert!(matches!(
+            events.get(1),
+            Some(Event::StartUnorderedListItem { level: 0, .. })
+        ));
+        assert!(matches!(
+            events.get(2),
+            Some(Event::Text {
+                style: TextStyle { bold: true, .. },
+                ..
+            })
+        ));
+        assert!(matches!(events.get(4), Some(Event::EndUnorderedListItem)));
+        assert!(matches!(
+            events.get(5),
+            Some(Event::StartUnorderedListItem { level: 0, .. })
+        ));
+        assert!(matches!(
+            events.get(6),
+            Some(Event::Text {
+                style: TextStyle { italic: true, .. },
+                ..
+            })
+        ));
+        assert!(matches!(events.get(8), Some(Event::EndUnorderedListItem)));
     }
 }

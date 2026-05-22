@@ -13,15 +13,6 @@ pub enum TextAlignment {
     Right,
 }
 
-/// Whether a list is ordered (numbered) or unordered (bulleted).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ListType {
-    /// Numbered list.
-    Ordered,
-    /// Bulleted list.
-    Unordered,
-}
-
 /// The specific visual style for a list.
 ///
 /// Writers ignore mismatched styles (e.g., Disc on an ordered list).

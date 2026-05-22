@@ -115,9 +115,18 @@ mod tests {
     }
 
     #[test]
-    fn block_kind_for_end_list_item() {
-        let event = Event::EndListItem;
-        assert_eq!(block_kind_for_end(&event), Some(BlockKind::ListItem));
+    fn block_kind_for_end_ordered_list_item() {
+        let event = Event::EndOrderedListItem;
+        assert_eq!(block_kind_for_end(&event), Some(BlockKind::OrderedListItem));
+    }
+
+    #[test]
+    fn block_kind_for_end_unordered_list_item() {
+        let event = Event::EndUnorderedListItem;
+        assert_eq!(
+            block_kind_for_end(&event),
+            Some(BlockKind::UnorderedListItem)
+        );
     }
 
     #[test]
@@ -237,15 +246,30 @@ mod tests {
     }
 
     #[test]
-    fn block_kind_for_start_list_item() {
-        let event = Event::StartListItem {
+    fn block_kind_for_start_ordered_list_item() {
+        let event = Event::StartOrderedListItem {
             id: None,
-            level: 1,
-            list_type: docspec_core::ListType::Unordered,
-            start: None,
-            style_type: None,
+            level: 0,
+            start: Some(1),
+            style_type: docspec_core::ListStyleType::Decimal,
         };
-        assert_eq!(block_kind_for_start(&event), Some(BlockKind::ListItem));
+        assert_eq!(
+            block_kind_for_start(&event),
+            Some(BlockKind::OrderedListItem)
+        );
+    }
+
+    #[test]
+    fn block_kind_for_start_unordered_list_item() {
+        let event = Event::StartUnorderedListItem {
+            id: None,
+            level: 0,
+            style_type: docspec_core::ListStyleType::Disc,
+        };
+        assert_eq!(
+            block_kind_for_start(&event),
+            Some(BlockKind::UnorderedListItem)
+        );
     }
 
     #[test]

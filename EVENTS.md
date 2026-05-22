@@ -14,7 +14,7 @@ DocSpec documents are streams of typed events. Readers emit events. Writers cons
 
 **No warnings.** Errors are out-of-band via `Result`. Events carry content only.
 
-**Flat list model.** List items carry nesting level as a field. No `StartList`/`EndList`. Maps cleanly to DOCX/RTF where list structure is implicit.
+**Flat list model.** `StartOrderedListItem`/`StartUnorderedListItem` carry nesting level as a field. No `StartList`/`EndList`. Maps cleanly to DOCX/RTF where list structure is implicit.
 
 ---
 
@@ -54,8 +54,6 @@ Readers register assets as encountered. Writers call `stream_to()` on demand —
 
 ```rust
 enum TextAlignment { Left, Center, Right, Justify }
-
-enum ListType { Ordered, Unordered }
 
 enum ListStyleType {
     // Ordered list styles
@@ -108,9 +106,10 @@ All events in the `Event` enum, grouped by category.
 
 **Lists:**
 
-| Event            | Fields                                                                                         | Pair           |
-| ---------------- | ---------------------------------------------------------------------------------------------- | -------------- |
-| `StartListItem`  | `level: u8`, `list_type: ListType`, `start: Option<u32>`, `style_type: Option<ListStyleType>` | `EndListItem`  |
+| Event                  | Fields                                                                 | Pair                   |
+| ---------------------- | ---------------------------------------------------------------------- | ---------------------- |
+| `StartOrderedListItem` | `start: Option<u64>`, `style_type: ListStyleType`, `level: u32`, `id: Option<String>` | `EndOrderedListItem`   |
+| `StartUnorderedListItem` | `style_type: ListStyleType`, `level: u32`, `id: Option<String>`                       | `EndUnorderedListItem` |
 
 **Tables:**
 
@@ -159,9 +158,9 @@ Every `Start*` has a matching `End*`. They nest but never overlap.
 
 **Document.** The root container. `language` is a BCP 47 tag.
 
-**Heading.** Levels 1–6 are standard (HTML). DOCX/ODT/RTF support 1–9. Writers clamp higher levels. Both heading and list levels are 1-based (range 1–255); no format exceeds 9.
+**Heading.** Levels 1–6 are standard (HTML). DOCX/ODT/RTF support 1–9. Writers clamp higher levels. Heading levels are 1-based (range 1–9); list item `level` is 0-indexed (0 = top-level list).
 
-**List items.** Nesting is flat — children follow parents sequentially, distinguished by `level`. No `StartList`/`EndList` exists. The `start` field sets numbering base until another `start` appears. **Boundary rules:** a new list begins when (a) a non-list block intervenes, (b) `list_type` changes at the same level, or (c) level decreases then increases without a parent.
+**List items.** Nesting is flat — children follow parents sequentially, distinguished by `level`. No `StartList`/`EndList` exists. `StartOrderedListItem` carries `start: Option<u64>` populated only on the first item of each ordered list (subsequent items: `None`). **Boundary rules:** a new list begins when (a) a non-list block intervenes, (b) ordered vs. unordered changes at the same level, or (c) level decreases then increases without a parent.
 
 **Table.** `StartCaption` is optional, appears before rows. Header cells carry `scope`/`abbr` for accessibility; data cells omit these. Cells may contain any block element.
 
@@ -195,7 +194,7 @@ Readers MUST produce well-formed streams. Writers MAY assume well-formedness.
 2. Exactly one root: `StartDocument`. Empty containers (`Start*` immediately followed by `End*`) are valid.
 3. `Text` appears only inside containers, never at root.
 4. `StartLink` appears inside inline-accepting blocks (paragraphs, headings, list items, cells, definition details). Links do not nest.
-5. `StartListItem` appears inside block containers. List items are flat — distinguished by `level` field.
+5. `StartOrderedListItem` and `StartUnorderedListItem` appear inside block containers. List items are flat — distinguished by `level` field.
 6. `StartCaption` appears at most once per table, before any rows.
 7. Each footnote ID appears in exactly one `FootnoteRef` and one `StartFootnote`.
 8. Table structure: `StartTableRow` appears only inside `StartTable`. `StartTableCell`/`StartTableHeader` appear only inside `StartTableRow`.

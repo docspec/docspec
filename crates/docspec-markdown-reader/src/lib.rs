@@ -36,13 +36,17 @@
 //! - Tables → `StartTable` / `EndTable`, `StartTableRow` / `EndTableRow`,
 //!   `StartTableHeader` / `EndTableHeader`, `StartTableCell` / `EndTableCell`
 //!   (GFM column alignment syntax is parsed, but alignment data is discarded)
+//! - Bullet lists → `StartUnorderedListItem` / `EndUnorderedListItem`
+//! - Numbered lists → `StartOrderedListItem` / `EndOrderedListItem`
+//!   (`start: Option<u64>` is `Some(n)` on the first item of each list, `None` on subsequent items;
+//!   nesting is flat-by-level; task list markers (`- [ ]`/`- [x]`) are parsed as literal text)
 //!
 //! # Unsupported Elements
 //!
 //! The following elements are not emitted as structured events. Text content is
 //! recursively extracted where applicable; structure is silently dropped:
 //!
-//! - Lists and links (text extracted, structure dropped)
+//! - Links (text extracted, structure dropped)
 //! - Definition lists and footnotes
 //! - HTML blocks and inline HTML
 //! - Math blocks and inline math
@@ -53,7 +57,7 @@ extern crate alloc;
 use alloc::collections::VecDeque;
 
 pub use docspec_core::EventSource;
-use docspec_core::{Event, ImageSource, Result, TableHeaderScope, TextStyle};
+use docspec_core::{Event, ImageSource, ListStyleType, Result, TableHeaderScope, TextStyle};
 use pulldown_cmark::{CodeBlockKind, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 /// Whether content is inside a block-level element.
@@ -76,6 +80,15 @@ enum Phase {
     NotStarted,
     /// Processing events between `StartDocument` and `EndDocument`.
     Running,
+}
+
+/// Context for a single list level tracked by [`MarkdownReader`].
+struct ListContext {
+    /// Whether this list is ordered (numbered) rather than unordered (bulleted).
+    ordered: bool,
+    /// Start number to attach to the next item emitted; `Some(n)` only before the first
+    /// item is emitted, then `None` for all subsequent items in the same list.
+    pending_start: Option<u64>,
 }
 
 /// Buffered image state during image alt text collection.
@@ -112,12 +125,18 @@ pub struct MarkdownReader<'a> {
     bold_depth: usize,
     /// Buffered code block text (accumulated until `EndCodeBlock` to strip trailing newline).
     code_block_buffer: Option<String>,
+    /// Whether a list item `Start*` event has been emitted but its matching `End*` not yet
+    /// emitted. Used to avoid double-close when a nested list prematurely closes the parent item.
+    current_item_open: bool,
     /// Buffered image being processed (alt text accumulation).
     image: Option<ImageBuffer>,
     /// Whether the parser is currently inside a table header row.
     in_table_head: bool,
     /// Nesting depth for italic (emphasis) formatting.
     italic_depth: usize,
+    /// LIFO stack of list contexts. `len()` gives the current nesting depth;
+    /// `level = list_stack.len().saturating_sub(1)` at item-emit time.
+    list_stack: alloc::vec::Vec<ListContext>,
     /// The pulldown-cmark parser.
     parser: Parser<'a>,
     /// Document processing phase.
@@ -129,6 +148,20 @@ pub struct MarkdownReader<'a> {
 }
 
 impl<'a> MarkdownReader<'a> {
+    fn close_current_item_if_open(&mut self) {
+        if self.current_item_open {
+            if let Some(ctx) = self.list_stack.last() {
+                if ctx.ordered {
+                    self.queue.push_back(Event::EndOrderedListItem);
+                } else {
+                    self.queue.push_back(Event::EndUnorderedListItem);
+                }
+            }
+            self.current_item_open = false;
+            self.block_state = BlockState::None;
+        }
+    }
+
     fn current_text_style(&self) -> TextStyle {
         let mut style = TextStyle::default();
         if self.bold_depth > 0 {
@@ -168,8 +201,10 @@ impl<'a> MarkdownReader<'a> {
             TagEnd::BlockQuote(_) => self.push_event_end(Event::EndBlockQuote),
             TagEnd::Item => {
                 if self.block_state == BlockState::AutoParagraph {
-                    self.push_event_end(Event::EndParagraph);
+                    self.queue.push_back(Event::EndParagraph);
                 }
+                self.close_current_item_if_open();
+                self.block_state = BlockState::None;
             }
             TagEnd::Emphasis => {
                 self.italic_depth = self.italic_depth.saturating_sub(1);
@@ -212,13 +247,17 @@ impl<'a> MarkdownReader<'a> {
                 }
                 self.push_event_end(Event::EndPreformatted);
             }
+            TagEnd::List(_) => {
+                self.close_current_item_if_open();
+                self.list_stack.pop();
+                self.block_state = BlockState::None;
+            }
             TagEnd::DefinitionList
             | TagEnd::DefinitionListDefinition
             | TagEnd::DefinitionListTitle
             | TagEnd::FootnoteDefinition
             | TagEnd::HtmlBlock
             | TagEnd::Link
-            | TagEnd::List(_)
             | TagEnd::MetadataBlock(_)
             | TagEnd::Subscript
             | TagEnd::Superscript => {}
@@ -236,6 +275,37 @@ impl<'a> MarkdownReader<'a> {
                 }
             }
         }
+    }
+
+    fn handle_item_start(&mut self) {
+        let depth = self.list_stack.len().saturating_sub(1);
+        let level = u32::try_from(depth).map_or(u32::MAX, |v| v);
+        if let Some(ctx) = self.list_stack.last_mut() {
+            if ctx.ordered {
+                self.queue.push_back(Event::StartOrderedListItem {
+                    start: ctx.pending_start.take(),
+                    style_type: ListStyleType::Decimal,
+                    level,
+                    id: None,
+                });
+            } else {
+                self.queue.push_back(Event::StartUnorderedListItem {
+                    style_type: ListStyleType::Disc,
+                    level,
+                    id: None,
+                });
+            }
+            self.current_item_open = true;
+            self.block_state = BlockState::Explicit;
+        }
+    }
+
+    fn handle_list_start(&mut self, start_opt: Option<u64>) {
+        self.close_current_item_if_open();
+        self.list_stack.push(ListContext {
+            ordered: start_opt.is_some(),
+            pending_start: start_opt,
+        });
     }
 
     fn handle_start_tag(&mut self, tag: Tag<'a>) {
@@ -290,14 +360,14 @@ impl<'a> MarkdownReader<'a> {
                     url: dest_url.into_string(),
                 });
             }
+            Tag::List(start_opt) => self.handle_list_start(start_opt),
+            Tag::Item => self.handle_item_start(),
             Tag::DefinitionList
             | Tag::DefinitionListDefinition
             | Tag::DefinitionListTitle
             | Tag::FootnoteDefinition(_)
             | Tag::HtmlBlock
-            | Tag::Item
             | Tag::Link { .. }
-            | Tag::List(_)
             | Tag::MetadataBlock(_)
             | Tag::Subscript
             | Tag::Superscript => {}
@@ -368,9 +438,11 @@ impl<'a> MarkdownReader<'a> {
             block_state: BlockState::None,
             bold_depth: 0,
             code_block_buffer: None,
-            in_table_head: false,
+            current_item_open: false,
             image: None,
+            in_table_head: false,
             italic_depth: 0,
+            list_stack: Vec::new(),
             parser,
             phase: Phase::NotStarted,
             queue: VecDeque::new(),
