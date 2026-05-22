@@ -807,6 +807,86 @@ mod tests {
     }
 
     #[test]
+    fn start_block_closes_open_paragraph() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        );
+        send(&mut sink, Event::StartHeading { id: None, level: 1 });
+
+        assert_eq!(sink.sink().events.get(2), Some(&Event::EndParagraph));
+        assert!(matches!(
+            sink.sink().events.get(3),
+            Some(Event::StartHeading { .. })
+        ));
+    }
+
+    #[test]
+    fn start_document_while_document_open_returns_error() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        let result = sink.handle_event(Event::StartDocument {
+            id: None,
+            language: None,
+            metadata: None,
+        });
+
+        assert!(matches!(result, Err(Error::InvalidSequence { .. })));
+    }
+
+    #[test]
+    fn thematic_break_closes_open_paragraph() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        );
+        send(&mut sink, Event::ThematicBreak { id: None });
+
+        assert_eq!(sink.sink().events.get(2), Some(&Event::EndParagraph));
+        assert!(matches!(
+            sink.sink().events.get(3),
+            Some(Event::ThematicBreak { .. })
+        ));
+    }
+
+    #[test]
     fn end_document_closes_all() {
         let mock = MockSink::new();
         let mut sink = StackTrackingSink::new(mock);

@@ -7,9 +7,10 @@
 //! # Design
 //!
 //! The writer emits JSON tokens directly to the underlying `Write` as events arrive using
-//! `struson` for streaming JSON output. For text and URI-based images, memory usage is constant
-//! regardless of document size. Asset-based images (`ImageSource::Asset`) are base64-encoded
-//! into an in-memory data URI before writing, so memory scales with individual asset size.
+//! `docspec-json` for streaming JSON output. For text and URI-based images, memory usage is
+//! constant regardless of document size. Asset-based images (`ImageSource::Asset`) are
+//! base64-encoded into an in-memory data URI before writing, so memory scales with individual
+//! asset size.
 //!
 //! # Supported Events
 //!
@@ -58,11 +59,11 @@ use std::io::Write;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::write::EncoderWriter as Base64Encoder;
 use docspec_core::{AssetProvider, Error, Event, EventSink, ImageSource, Result, TextStyle};
-use struson::writer::{JsonStreamWriter, JsonWriter as _};
+use docspec_json::{JsonEmitter, Null, StrusonBackend};
 
 /// A streaming `BlockNote` JSON writer.
 ///
-/// Writes JSON tokens directly to the underlying `Write` as events arrive using `struson`.
+/// Writes JSON tokens directly to the underlying `Write` as events arrive using `docspec-json`.
 /// Implements [`EventSink`] for integration with the `DocSpec` pipeline.
 ///
 /// Use [`BlockNoteWriter::with_assets`] to provide an [`AssetProvider`] for resolving
@@ -72,84 +73,15 @@ use struson::writer::{JsonStreamWriter, JsonWriter as _};
 ///
 /// * `W` - Any type implementing [`Write`]
 pub struct BlockNoteWriter<'a, W: Write> {
-    /// Optional asset provider for resolving embedded asset references.
     assets: Option<&'a dyn AssetProvider>,
-    /// Depth of blockquote nesting (0 = not inside blockquote).
     blockquote_depth: u32,
-    /// Count of blockquotes force-closed by sibling emission (`EndBlockQuote` events to ignore).
     blockquote_force_closed_count: usize,
-    /// Whether any inline content has been written to the current blockquote's content array.
     blockquote_has_content: bool,
-    /// Whether we are inside a text-bearing content block (heading, paragraph, preformatted, or blockquote).
     in_text_block: bool,
-    /// The underlying JSON stream writer.
-    writer: JsonStreamWriter<W>,
-}
-
-struct Null;
-struct StartArray;
-
-trait WriteVal {
-    fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()>;
-}
-
-impl WriteVal for Null {
-    fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()> {
-        w.writer.null_value().map_err(io_err)
-    }
-}
-
-impl WriteVal for StartArray {
-    fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()> {
-        w.writer.begin_array().map_err(io_err)
-    }
-}
-
-impl WriteVal for &str {
-    fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()> {
-        w.writer.string_value(self).map_err(io_err)
-    }
-}
-
-impl WriteVal for bool {
-    fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()> {
-        w.writer.bool_value(self).map_err(io_err)
-    }
-}
-
-impl WriteVal for u8 {
-    fn write_val<W: Write>(self, w: &mut BlockNoteWriter<'_, W>) -> Result<()> {
-        w.writer.number_value(self).map_err(io_err)
-    }
+    json: JsonEmitter<StrusonBackend<W>>,
 }
 
 impl<'a, W: Write> BlockNoteWriter<'a, W> {
-    fn array<F>(&mut self, key: &str, f: F) -> Result<()>
-    where
-        F: FnOnce(&mut Self) -> Result<()>,
-    {
-        self.entry(key, StartArray)?;
-        f(self)?;
-        self.end_array()
-    }
-
-    fn begin_array(&mut self) -> Result<()> {
-        self.writer.begin_array().map_err(io_err)
-    }
-
-    fn begin_object(&mut self) -> Result<()> {
-        self.writer.begin_object().map_err(io_err)
-    }
-
-    fn block<F>(&mut self, f: F) -> Result<()>
-    where
-        F: FnOnce(&mut Self) -> Result<()>,
-    {
-        self.begin_object()?;
-        f(self)?;
-        self.end_object()
-    }
-
     fn close_blockquote_for_sibling(&mut self) -> Result<()> {
         self.close_content_block()?;
         self.blockquote_depth = self.blockquote_depth.saturating_sub(1);
@@ -159,9 +91,9 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn close_content_block(&mut self) -> Result<()> {
-        self.end_array()?;
-        self.array("children", |_| Ok(()))?;
-        self.end_object()
+        self.json.close_array()?;
+        self.json.key("children").array(|_| Ok(()))?;
+        self.json.close_object()
     }
 
     fn close_for_block_sibling(&mut self) -> Result<()> {
@@ -175,24 +107,11 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Ok(())
     }
 
-    fn end_array(&mut self) -> Result<()> {
-        self.writer.end_array().map_err(io_err)
-    }
-
-    fn end_object(&mut self) -> Result<()> {
-        self.writer.end_object().map_err(io_err)
-    }
-
-    fn entry<V: WriteVal>(&mut self, key: &str, value: V) -> Result<()> {
-        self.writer.name(key).map_err(io_err)?;
-        value.write_val(self)
-    }
-
     fn handle_blockquote(&mut self, id: Option<&String>) -> Result<()> {
-        self.begin_object()?;
-        self.entry("type", "quote")?;
+        self.json.open_object()?;
+        self.json.key("type").value("quote")?;
         self.write_id(id)?;
-        self.entry("content", StartArray)?;
+        self.json.key("content").open_array()?;
         self.blockquote_depth = self.blockquote_depth.saturating_add(1);
         self.blockquote_has_content = false;
         self.in_text_block = true;
@@ -200,21 +119,24 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_divider(&mut self, id: Option<&String>) -> Result<()> {
-        self.block(|w| {
-            w.entry("type", "divider")?;
-            w.write_id(id)
+        self.json.object(|j| {
+            j.key("type").value("divider")?;
+            if let Some(id_val) = id {
+                j.key("id").value(id_val.as_str())?;
+            }
+            Ok(())
         })
     }
 
     fn handle_heading(&mut self, level: u8, id: Option<&String>) -> Result<()> {
-        self.begin_object()?;
-        self.entry("type", "heading")?;
+        self.json.open_object()?;
+        self.json.key("type").value("heading")?;
         self.write_id(id)?;
-        self.object("props", |w| {
-            w.entry("level", level)?;
-            w.entry("textAlignment", "left")
+        self.json.key("props").object(|j| {
+            j.key("level").value(level)?;
+            j.key("textAlignment").value("left")
         })?;
-        self.entry("content", StartArray)?;
+        self.json.key("content").open_array()?;
         self.in_text_block = true;
         Ok(())
     }
@@ -248,8 +170,8 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
                         .ok_or_else(|| Error::Other {
                             message: format!("asset not found: {asset_id}"),
                         })?
-                        .map_err(|e| Error::Io { source: e })?;
-                    enc.finish().map_err(|e| Error::Io { source: e })?
+                        .map_err(io_err)?;
+                    enc.finish().map_err(io_err)?
                 };
                 String::from_utf8(data_uri).map_err(|e| Error::Other {
                     message: format!("base64 encoding produced invalid UTF-8: {e}"),
@@ -258,15 +180,17 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         };
         let caption = alt.unwrap_or_default();
 
-        self.block(|w| {
-            w.write_id(id)?;
-            w.entry("type", "image")?;
-            w.object("props", |p| {
-                p.entry("url", url.as_str())?;
-                p.entry("caption", caption.as_str())
+        self.json.object(|j| {
+            if let Some(id_val) = id {
+                j.key("id").value(id_val.as_str())?;
+            }
+            j.key("type").value("image")?;
+            j.key("props").object(|p| {
+                p.key("url").value(url.as_str())?;
+                p.key("caption").value(caption.as_str())
             })?;
-            w.entry("content", Null)?;
-            w.array("children", |_| Ok(()))
+            j.key("content").value(Null)?;
+            j.key("children").array(|_| Ok(()))
         })
     }
 
@@ -277,23 +201,27 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             }
             return Ok(());
         }
-        self.begin_object()?;
+        self.json.open_object()?;
         self.write_id(id)?;
-        self.entry("type", "paragraph")?;
-        self.object("props", |w| w.entry("textAlignment", "left"))?;
-        self.entry("content", StartArray)?;
+        self.json.key("type").value("paragraph")?;
+        self.json
+            .key("props")
+            .object(|j| j.key("textAlignment").value("left"))?;
+        self.json.key("content").open_array()?;
         self.in_text_block = true;
         Ok(())
     }
 
     fn handle_preformatted(&mut self, id: Option<&String>, syntax: Option<&String>) -> Result<()> {
-        self.begin_object()?;
-        self.entry("type", "codeBlock")?;
+        self.json.open_object()?;
+        self.json.key("type").value("codeBlock")?;
         self.write_id(id)?;
         if let Some(lang) = syntax {
-            self.object("props", |w| w.entry("language", lang.as_str()))?;
+            self.json
+                .key("props")
+                .object(|j| j.key("language").value(lang.as_str()))?;
         }
-        self.entry("content", StartArray)?;
+        self.json.key("content").open_array()?;
         self.in_text_block = true;
         Ok(())
     }
@@ -305,10 +233,10 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if self.blockquote_depth > 0 {
             self.blockquote_has_content = true;
         }
-        self.block(|w| {
-            w.entry("type", "text")?;
-            w.entry("text", content)?;
-            w.object("styles", |s| {
+        self.json.object(|j| {
+            j.key("type").value("text")?;
+            j.key("text").value(content)?;
+            j.key("styles").object(|s| {
                 for (key, enabled) in [
                     ("bold", style.bold),
                     ("italic", style.italic),
@@ -317,7 +245,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
                     ("underline", style.underline),
                 ] {
                     if enabled {
-                        s.entry(key, true)?;
+                        s.key(key).value(true)?;
                     }
                 }
                 Ok(())
@@ -339,18 +267,8 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             blockquote_force_closed_count: 0,
             blockquote_has_content: false,
             in_text_block: false,
-            writer: JsonStreamWriter::new(writer),
+            json: JsonEmitter::new(StrusonBackend::new(writer)),
         }
-    }
-
-    fn object<F>(&mut self, key: &str, f: F) -> Result<()>
-    where
-        F: FnOnce(&mut Self) -> Result<()>,
-    {
-        self.writer.name(key).map_err(io_err)?;
-        self.begin_object()?;
-        f(self)?;
-        self.end_object()
     }
 
     /// Creates a new `BlockNoteWriter` with an [`AssetProvider`] for resolving embedded assets.
@@ -372,13 +290,13 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             blockquote_force_closed_count: 0,
             blockquote_has_content: false,
             in_text_block: false,
-            writer: JsonStreamWriter::new(writer),
+            json: JsonEmitter::new(StrusonBackend::new(writer)),
         }
     }
 
     fn write_id(&mut self, id: Option<&String>) -> Result<()> {
         if let Some(id_val) = id {
-            self.entry("id", id_val.as_str())?;
+            self.json.key("id").value(id_val.as_str())?;
         }
         Ok(())
     }
@@ -387,15 +305,14 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
 impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
     #[inline]
     fn finish(self) -> Result<()> {
-        self.writer.finish_document().map_err(io_err)?;
-        Ok(())
+        self.json.finish().map(|_| ())
     }
 
     #[inline]
     fn handle_event(&mut self, event: Event) -> Result<()> {
         match event {
-            Event::StartDocument { .. } => self.begin_array(),
-            Event::EndDocument => self.end_array(),
+            Event::StartDocument { .. } => self.json.open_array(),
+            Event::EndDocument => self.json.close_array(),
             Event::StartHeading { level, id, .. } => {
                 self.close_for_block_sibling()?;
                 self.handle_heading(level, id.as_ref())
@@ -483,7 +400,7 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
     }
 }
 
-/// Maps a struson I/O error to a docspec error.
+/// Maps an I/O error to a `DocSpec` error.
 fn io_err(e: std::io::Error) -> Error {
     Error::Io { source: e }
 }
