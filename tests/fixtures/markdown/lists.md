@@ -29,3 +29,10 @@
 - **Bold** item
 - *Italic* item
 - `Code` item
+
+<!-- variant 7: nested list with continuation paragraph -->
+- Outer A
+  - Inner nested
+
+  Continuation paragraph for Outer A
+- Outer B

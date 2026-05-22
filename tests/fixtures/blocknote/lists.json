@@ -299,6 +299,61 @@
       }
     ],
     "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Outer A",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Inner nested",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Continuation paragraph for Outer A",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Outer B",
+        "styles": {}
+      }
+    ],
+    "children": []
   }
 ]
-
