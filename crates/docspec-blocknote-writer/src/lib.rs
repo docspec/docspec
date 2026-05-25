@@ -26,7 +26,10 @@
 //!
 //! List and table structure events (`StartOrderedListItem`, `StartUnorderedListItem`, `StartTable*`, etc.) are silently ignored
 //! by this writer. Use `StackTrackingSink` from `docspec_core` to wrap the writer for automatic
-//! paragraph insertion within list items and table cells.
+//! paragraph insertion within list items and table cells. As a consequence, GFM tables are emitted
+//! as a sequence of `paragraph` blocks (one per cell) rather than a `BlockNote` `table` block;
+//! cell content is preserved but table structure (rows, columns, headers, captions) is lost.
+//! See the crate README for the full rationale and future-work status.
 //!
 //! # Example
 //!
