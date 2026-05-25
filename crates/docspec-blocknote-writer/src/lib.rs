@@ -19,17 +19,34 @@
 //! - `StartParagraph` / `EndParagraph` — paragraph blocks
 //! - `StartBlockQuote` / `EndBlockQuote` — quote blocks
 //! - `StartPreformatted` / `EndPreformatted` — code blocks
+//! - `StartTable` / `EndTable` — table blocks
+//! - `StartTableRow` / `EndTableRow` — table rows
+//! - `StartTableCell` / `EndTableCell` — table cells (data)
+//! - `StartTableHeader` / `EndTableHeader` — table cells (header, emitted identically to data cells)
 //! - `Text` — inline text content with bold/italic/code/strikethrough/underline styles
 //! - `Image` — image blocks
 //! - `LineBreak` — line breaks within content blocks
 //! - `ThematicBreak` — divider blocks
 //!
-//! List and table structure events (`StartOrderedListItem`, `StartUnorderedListItem`, `StartTable*`, etc.) are silently ignored
+//! List structure events (`StartOrderedListItem`, `StartUnorderedListItem`, etc.) are silently ignored
 //! by this writer. Use `StackTrackingSink` from `docspec_core` to wrap the writer for automatic
-//! paragraph insertion within list items and table cells. As a consequence, GFM tables are emitted
-//! as a sequence of `paragraph` blocks (one per cell) rather than a `BlockNote` `table` block;
-//! cell content is preserved but table structure (rows, columns, headers, captions) is lost.
-//! See the crate README for the full rationale and future-work status.
+//! paragraph insertion within list items. As a consequence, list items are emitted as `paragraph`
+//! blocks and list structure (ordered/unordered nesting) is lost.
+//!
+//! # Table Cell Content Semantics
+//!
+//! `BlockNote`'s `tableCell.content` is `InlineContent[]` — it cannot hold block-level types.
+//! `EVENTS.md` declares that `DocSpec` cells may contain any block element, so this writer
+//! flattens block-level events that appear inside a cell:
+//!
+//! - **Preserved**: [`Text`](docspec_core::Event::Text) (with all inline styles), [`LineBreak`](docspec_core::Event::LineBreak)
+//! - **Absorbed silently**: [`StartParagraph`](docspec_core::Event::StartParagraph) / [`EndParagraph`](docspec_core::Event::EndParagraph) (paragraph boundaries are dropped — adjacent paragraphs concatenate without separator)
+//! - **Dropped**: [`Image`](docspec_core::Event::Image), [`StartBlockQuote`](docspec_core::Event::StartBlockQuote), [`StartPreformatted`](docspec_core::Event::StartPreformatted), [`StartHeading`](docspec_core::Event::StartHeading), [`ThematicBreak`](docspec_core::Event::ThematicBreak), nested [`StartTable`](docspec_core::Event::StartTable) and their children — silently discarded
+//!
+//! Nested tables (a `StartTable` inside a cell) are entirely dropped: their rows, cells, text,
+//! and closing events are all absorbed. Only the outer table is emitted. The current markdown
+//! reader never produces multi-block cell content or nested tables — these guards exist for
+//! future DOCX/ODT readers.
 //!
 //! # Example
 //!
@@ -64,6 +81,22 @@ use base64::write::EncoderWriter as Base64Encoder;
 use docspec_core::{AssetProvider, Error, Event, EventSink, ImageSource, Result, TextStyle};
 use docspec_json::{JsonEmitter, Null, StrusonBackend};
 
+macro_rules! close_text_block {
+    ($writer:expr) => {{
+        $writer.close_content_block()?;
+        $writer.in_text_block = false;
+        Ok(())
+    }};
+}
+
+macro_rules! return_if_table_cell {
+    ($writer:expr) => {
+        if $writer.in_table_cell {
+            return Ok(());
+        }
+    };
+}
+
 /// A streaming `BlockNote` JSON writer.
 ///
 /// Writes JSON tokens directly to the underlying `Write` as events arrive using `docspec-json`.
@@ -80,8 +113,10 @@ pub struct BlockNoteWriter<'a, W: Write> {
     blockquote_depth: u32,
     blockquote_force_closed_count: usize,
     blockquote_has_content: bool,
+    in_table_cell: bool,
     in_text_block: bool,
     json: JsonEmitter<StrusonBackend<W>>,
+    table_depth: u32,
 }
 
 impl<'a, W: Write> BlockNoteWriter<'a, W> {
@@ -131,6 +166,40 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         })
     }
 
+    fn handle_end_table(&mut self) -> Result<()> {
+        if self.table_depth == 0 {
+            return Ok(());
+        }
+        if self.table_depth > 1 {
+            self.table_depth = self.table_depth.saturating_sub(1);
+            return Ok(());
+        }
+        self.json.close_array()?;
+        self.json.close_object()?;
+        self.json.key("children").array(|_| Ok(()))?;
+        self.json.close_object()?;
+        self.table_depth = 0;
+        Ok(())
+    }
+
+    fn handle_end_table_cell(&mut self) -> Result<()> {
+        if self.table_depth > 1 {
+            return Ok(());
+        }
+        self.json.close_array()?;
+        self.json.close_object()?;
+        self.in_table_cell = false;
+        Ok(())
+    }
+
+    fn handle_end_table_row(&mut self) -> Result<()> {
+        if self.table_depth > 1 {
+            return Ok(());
+        }
+        self.json.close_array()?;
+        self.json.close_object()
+    }
+
     fn handle_heading(&mut self, level: u8, id: Option<&String>) -> Result<()> {
         self.json.open_object()?;
         self.json.key("type").value("heading")?;
@@ -150,6 +219,9 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         alt: Option<String>,
         id: Option<&String>,
     ) -> Result<()> {
+        if self.in_table_cell {
+            return Ok(());
+        }
         self.close_for_block_sibling()?;
         let url = match source {
             ImageSource::Uri { uri } => uri,
@@ -198,6 +270,10 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_paragraph(&mut self, id: Option<&String>) -> Result<()> {
+        // Inside a table cell, BlockNote's content type is InlineContent[] — block-level events are dropped.
+        if self.in_table_cell {
+            return Ok(());
+        }
         if self.blockquote_depth > 0 {
             if self.blockquote_has_content {
                 self.handle_text("\n\n", &TextStyle::default())?;
@@ -229,8 +305,56 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Ok(())
     }
 
+    fn handle_start_table(&mut self, id: Option<&String>) -> Result<()> {
+        if self.table_depth > 0 {
+            self.table_depth = self.table_depth.saturating_add(1);
+            return Ok(());
+        }
+        self.close_for_block_sibling()?;
+        self.json.open_object()?;
+        self.json.key("type").value("table")?;
+        self.write_id(id)?;
+        self.json
+            .key("props")
+            .object(|p| p.key("textColor").value("default"))?;
+        self.json.key("content").open_object()?;
+        self.json.key("type").value("tableContent")?;
+        self.json.key("columnWidths").array(|_| Ok(()))?;
+        self.json.key("rows").open_array()?;
+        self.table_depth = 1;
+        self.in_text_block = false;
+        Ok(())
+    }
+
+    fn handle_start_table_row(&mut self, id: Option<&String>) -> Result<()> {
+        if self.table_depth > 1 {
+            return Ok(());
+        }
+        self.json.open_object()?;
+        self.write_id(id)?;
+        self.json.key("cells").open_array()
+    }
+
+    fn handle_table_cell(&mut self, id: Option<&String>) -> Result<()> {
+        if self.table_depth > 1 {
+            return Ok(());
+        }
+        self.json.open_object()?;
+        self.json.key("type").value("tableCell")?;
+        self.write_id(id)?;
+        self.json.key("props").object(|p| {
+            p.key("backgroundColor").value("default")?;
+            p.key("textColor").value("default")?;
+            p.key("textAlignment").value("left")
+        })?;
+        self.json.key("content").open_array()?;
+        self.in_table_cell = true;
+        self.in_text_block = false;
+        Ok(())
+    }
+
     fn handle_text(&mut self, content: &str, style: &TextStyle) -> Result<()> {
-        if !self.in_text_block {
+        if (!self.in_text_block && !self.in_table_cell) || self.table_depth > 1 {
             return Ok(());
         }
         if self.blockquote_depth > 0 {
@@ -269,8 +393,10 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             blockquote_depth: 0,
             blockquote_force_closed_count: 0,
             blockquote_has_content: false,
+            in_table_cell: false,
             in_text_block: false,
             json: JsonEmitter::new(StrusonBackend::new(writer)),
+            table_depth: 0,
         }
     }
 
@@ -292,8 +418,10 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             blockquote_depth: 0,
             blockquote_force_closed_count: 0,
             blockquote_has_content: false,
+            in_table_cell: false,
             in_text_block: false,
             json: JsonEmitter::new(StrusonBackend::new(writer)),
+            table_depth: 0,
         }
     }
 
@@ -317,31 +445,37 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             Event::StartDocument { .. } => self.json.open_array(),
             Event::EndDocument => self.json.close_array(),
             Event::StartHeading { level, id, .. } => {
+                return_if_table_cell!(self);
                 self.close_for_block_sibling()?;
                 self.handle_heading(level, id.as_ref())
             }
-            Event::EndHeading | Event::EndPreformatted => {
+            Event::EndHeading => {
                 if !self.in_text_block {
                     return Ok(());
                 }
-                self.close_content_block()?;
-                self.in_text_block = false;
-                Ok(())
+                close_text_block!(self)
+            }
+            Event::EndPreformatted => {
+                return_if_table_cell!(self);
+                if !self.in_text_block {
+                    return Ok(());
+                }
+                close_text_block!(self)
             }
             Event::StartParagraph { id, .. } => self.handle_paragraph(id.as_ref()),
             Event::EndParagraph => {
-                if self.blockquote_depth > 0 || !self.in_text_block {
+                if self.blockquote_depth > 0 || !self.in_text_block || self.in_table_cell {
                     return Ok(());
                 }
-                self.close_content_block()?;
-                self.in_text_block = false;
-                Ok(())
+                close_text_block!(self)
             }
             Event::StartBlockQuote { id, .. } => {
+                return_if_table_cell!(self);
                 self.close_for_block_sibling()?;
                 self.handle_blockquote(id.as_ref())
             }
             Event::EndBlockQuote => {
+                return_if_table_cell!(self);
                 if self.blockquote_force_closed_count > 0 {
                     self.blockquote_force_closed_count =
                         self.blockquote_force_closed_count.saturating_sub(1);
@@ -353,16 +487,18 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 Ok(())
             }
             Event::StartPreformatted { id, syntax, .. } => {
+                return_if_table_cell!(self);
                 self.close_for_block_sibling()?;
                 self.handle_preformatted(id.as_ref(), syntax.as_ref())
             }
             Event::ThematicBreak { id, .. } => {
+                return_if_table_cell!(self);
                 self.close_for_block_sibling()?;
                 self.handle_divider(id.as_ref())
             }
             Event::Text { content, style, .. } => {
                 // Auto-open paragraph for orphan text (e.g., text after image closed paragraph)
-                if !self.in_text_block && self.blockquote_depth == 0 {
+                if !self.in_text_block && self.blockquote_depth == 0 && !self.in_table_cell {
                     self.handle_paragraph(None)?;
                 }
                 self.handle_text(&content, &style)
@@ -371,22 +507,28 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 source, alt, id, ..
             } => self.handle_image(source, alt, id.as_ref()),
             Event::LineBreak => {
-                if self.in_text_block {
+                if (self.in_text_block || self.in_table_cell) && self.table_depth <= 1 {
                     self.handle_text("\n", &TextStyle::default())
                 } else {
                     Ok(())
                 }
             }
+            Event::StartTable { id, .. } => self.handle_start_table(id.as_ref()),
+            Event::EndTable => self.handle_end_table(),
+            Event::StartTableRow { id, .. } => self.handle_start_table_row(id.as_ref()),
+            Event::EndTableRow => self.handle_end_table_row(),
+            Event::StartTableCell { id, .. } | Event::StartTableHeader { id, .. } => {
+                self.handle_table_cell(id.as_ref())
+            }
+            Event::EndTableCell | Event::EndTableHeader => self.handle_end_table_cell(),
             Event::EndCaption
-            | Event::EndDefinitionTerm
-            | Event::EndLink
             | Event::EndDefinitionDetail
             | Event::EndDefinitionList
+            | Event::EndDefinitionTerm
             | Event::EndFootnote
-            | Event::EndTable
-            | Event::EndTableCell
-            | Event::EndTableHeader
-            | Event::EndTableRow
+            | Event::EndLink
+            | Event::EndOrderedListItem
+            | Event::EndUnorderedListItem
             | Event::FootnoteRef { .. }
             | Event::StartCaption { .. }
             | Event::StartDefinitionDetail { .. }
@@ -394,10 +536,8 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             | Event::StartDefinitionTerm { .. }
             | Event::StartFootnote { .. }
             | Event::StartLink { .. }
-            | Event::StartTable { .. }
-            | Event::StartTableCell { .. }
-            | Event::StartTableHeader { .. }
-            | Event::StartTableRow { .. }
+            | Event::StartOrderedListItem { .. }
+            | Event::StartUnorderedListItem { .. }
             | _ => Ok(()),
         }
     }
