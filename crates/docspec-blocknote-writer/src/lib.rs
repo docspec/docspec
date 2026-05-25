@@ -145,6 +145,39 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Ok(())
     }
 
+    /// Resolves `asset_id` through the configured provider and encodes the asset bytes
+    /// as a `data:<content-type>;base64,…` URI.
+    ///
+    /// Returns `Err` if no `AssetProvider` is configured, the asset cannot be found,
+    /// or the underlying I/O fails while streaming the asset bytes through the
+    /// base64 encoder.
+    fn encode_asset_as_data_uri(&self, asset_id: &str) -> Result<String> {
+        let provider = self.assets.ok_or_else(|| Error::Other {
+            message: "no AssetProvider configured".to_string(),
+        })?;
+        let content_type = provider
+            .content_type(asset_id)
+            .ok_or_else(|| Error::Other {
+                message: format!("asset not found: {asset_id}"),
+            })?;
+        let prefix = format!("data:{content_type};base64,");
+        let mut data_uri = Vec::with_capacity(prefix.len());
+        data_uri.extend_from_slice(prefix.as_bytes());
+        {
+            let mut enc = Base64Encoder::new(&mut data_uri, &BASE64_STANDARD);
+            provider
+                .stream_to(asset_id, &mut enc)
+                .ok_or_else(|| Error::Other {
+                    message: format!("asset not found: {asset_id}"),
+                })?
+                .map_err(io_err)?;
+            enc.finish().map_err(io_err)?
+        };
+        String::from_utf8(data_uri).map_err(|e| Error::Other {
+            message: format!("base64 encoding produced invalid UTF-8: {e}"),
+        })
+    }
+
     fn handle_blockquote(&mut self, id: Option<&String>) -> Result<()> {
         self.json.open_object()?;
         self.json.key("type").value("quote")?;
@@ -225,33 +258,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.close_for_block_sibling()?;
         let url = match source {
             ImageSource::Uri { uri } => uri,
-            ImageSource::Asset { asset_id } => {
-                let provider = self.assets.ok_or_else(|| Error::Other {
-                    message: "no AssetProvider configured".to_string(),
-                })?;
-                let content_type =
-                    provider
-                        .content_type(&asset_id)
-                        .ok_or_else(|| Error::Other {
-                            message: format!("asset not found: {asset_id}"),
-                        })?;
-                let prefix = format!("data:{content_type};base64,");
-                let mut data_uri = Vec::with_capacity(prefix.len());
-                data_uri.extend_from_slice(prefix.as_bytes());
-                {
-                    let mut enc = Base64Encoder::new(&mut data_uri, &BASE64_STANDARD);
-                    provider
-                        .stream_to(&asset_id, &mut enc)
-                        .ok_or_else(|| Error::Other {
-                            message: format!("asset not found: {asset_id}"),
-                        })?
-                        .map_err(io_err)?;
-                    enc.finish().map_err(io_err)?
-                };
-                String::from_utf8(data_uri).map_err(|e| Error::Other {
-                    message: format!("base64 encoding produced invalid UTF-8: {e}"),
-                })?
-            }
+            ImageSource::Asset { asset_id } => self.encode_asset_as_data_uri(&asset_id)?,
         };
         let caption = alt.unwrap_or_default();
 
