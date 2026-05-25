@@ -47,22 +47,12 @@ impl StateStack {
     pub fn expect_key_allowed(&self) -> Result<()> {
         match self.stack.last() {
             Some(Frame::Object(KeyState::ExpectingKey)) => Ok(()),
-            Some(Frame::Object(KeyState::ExpectingValue)) => Err(Error::Json {
-                message: "key not allowed: previous key has no value yet".to_string(),
-                position: None,
-            }),
-            Some(Frame::Array) => Err(Error::Json {
-                message: "key not allowed: inside an array".to_string(),
-                position: None,
-            }),
-            Some(Frame::Root) => Err(Error::Json {
-                message: "key not allowed: not inside an object".to_string(),
-                position: None,
-            }),
-            None => Err(Error::Json {
-                message: "key not allowed: no current frame".to_string(),
-                position: None,
-            }),
+            Some(Frame::Object(KeyState::ExpectingValue)) => Err(Self::json_err(
+                "key not allowed: previous key has no value yet",
+            )),
+            Some(Frame::Array) => Err(Self::json_err("key not allowed: inside an array")),
+            Some(Frame::Root) => Err(Self::json_err("key not allowed: not inside an object")),
+            None => Err(Self::json_err("key not allowed: no current frame")),
         }
     }
 
@@ -75,14 +65,10 @@ impl StateStack {
     pub fn expect_value_allowed(&self) -> Result<()> {
         match self.stack.last() {
             Some(Frame::Object(KeyState::ExpectingValue) | Frame::Array | Frame::Root) => Ok(()),
-            Some(Frame::Object(KeyState::ExpectingKey)) => Err(Error::Json {
-                message: "value not allowed: object expects a key first".to_string(),
-                position: None,
-            }),
-            None => Err(Error::Json {
-                message: "value not allowed: no current frame".to_string(),
-                position: None,
-            }),
+            Some(Frame::Object(KeyState::ExpectingKey)) => Err(Self::json_err(
+                "value not allowed: object expects a key first",
+            )),
+            None => Err(Self::json_err("value not allowed: no current frame")),
         }
     }
 
@@ -91,6 +77,18 @@ impl StateStack {
     #[must_use]
     pub fn is_finished(&self) -> bool {
         self.stack.is_empty()
+    }
+
+    /// Builds an `Error::Json` with `position: None`. Wrap in `Err(...)` at
+    /// match-arm sites or pass `|| Self::json_err(...)` to `ok_or_else`.
+    /// Centralises the `position: None` and `.to_string()` boilerplate so
+    /// validation methods stay focused on the message that distinguishes each case.
+    #[inline]
+    fn json_err(msg: &str) -> Error {
+        Error::Json {
+            message: msg.to_string(),
+            position: None,
+        }
     }
 
     /// Mark a key as written — transition Object from `ExpectingKey` to `ExpectingValue`.
@@ -105,14 +103,10 @@ impl StateStack {
                 *ks = KeyState::ExpectingValue;
                 Ok(())
             }
-            Some(Frame::Object(_)) => Err(Error::Json {
-                message: "key already written; expected a value next".to_string(),
-                position: None,
-            }),
-            _ => Err(Error::Json {
-                message: "cannot write key: not inside an object".to_string(),
-                position: None,
-            }),
+            Some(Frame::Object(_)) => {
+                Err(Self::json_err("key already written; expected a value next"))
+            }
+            _ => Err(Self::json_err("cannot write key: not inside an object")),
         }
     }
 
@@ -130,19 +124,15 @@ impl StateStack {
                 *ks = KeyState::ExpectingKey;
                 Ok(())
             }
-            Some(Frame::Object(_)) => Err(Error::Json {
-                message: "value without key: object expects a key".to_string(),
-                position: None,
-            }),
+            Some(Frame::Object(_)) => {
+                Err(Self::json_err("value without key: object expects a key"))
+            }
             Some(Frame::Array) => Ok(()),
             Some(Frame::Root) => {
                 self.stack.pop();
                 Ok(())
             }
-            None => Err(Error::Json {
-                message: "no current frame for value".to_string(),
-                position: None,
-            }),
+            None => Err(Self::json_err("no current frame for value")),
         }
     }
 
@@ -164,14 +154,10 @@ impl StateStack {
     pub fn peek_array(&self) -> Result<()> {
         match self.stack.last() {
             Some(Frame::Array) => Ok(()),
-            Some(Frame::Object(_)) => Err(Error::Json {
-                message: "cannot close array: current frame is an object".to_string(),
-                position: None,
-            }),
-            _ => Err(Error::Json {
-                message: "cannot close array: no open array".to_string(),
-                position: None,
-            }),
+            Some(Frame::Object(_)) => Err(Self::json_err(
+                "cannot close array: current frame is an object",
+            )),
+            _ => Err(Self::json_err("cannot close array: no open array")),
         }
     }
 
@@ -185,18 +171,13 @@ impl StateStack {
     pub fn peek_object(&self) -> Result<()> {
         match self.stack.last() {
             Some(Frame::Object(KeyState::ExpectingKey)) => Ok(()),
-            Some(Frame::Object(KeyState::ExpectingValue)) => Err(Error::Json {
-                message: "cannot close object: last key has no value".to_string(),
-                position: None,
-            }),
-            Some(Frame::Array) => Err(Error::Json {
-                message: "cannot close object: current frame is an array".to_string(),
-                position: None,
-            }),
-            _ => Err(Error::Json {
-                message: "cannot close object: no open object".to_string(),
-                position: None,
-            }),
+            Some(Frame::Object(KeyState::ExpectingValue)) => {
+                Err(Self::json_err("cannot close object: last key has no value"))
+            }
+            Some(Frame::Array) => Err(Self::json_err(
+                "cannot close object: current frame is an array",
+            )),
+            _ => Err(Self::json_err("cannot close object: no open object")),
         }
     }
 
@@ -207,10 +188,9 @@ impl StateStack {
     /// Returns `Err` if there is no open container to close.
     #[inline]
     pub fn pop(&mut self) -> Result<Frame> {
-        self.stack.pop().ok_or_else(|| Error::Json {
-            message: "cannot close: no open container".to_string(),
-            position: None,
-        })
+        self.stack
+            .pop()
+            .ok_or_else(|| Self::json_err("cannot close: no open container"))
     }
 
     /// Pop the top frame, asserting it is an Array. Returns `Err` if it is not.
@@ -225,14 +205,10 @@ impl StateStack {
                 self.stack.pop();
                 Ok(())
             }
-            Some(Frame::Object(_)) => Err(Error::Json {
-                message: "cannot close array: current frame is an object".to_string(),
-                position: None,
-            }),
-            _ => Err(Error::Json {
-                message: "cannot close array: no open array".to_string(),
-                position: None,
-            }),
+            Some(Frame::Object(_)) => Err(Self::json_err(
+                "cannot close array: current frame is an object",
+            )),
+            _ => Err(Self::json_err("cannot close array: no open array")),
         }
     }
 
@@ -248,18 +224,13 @@ impl StateStack {
                 self.stack.pop();
                 Ok(())
             }
-            Some(Frame::Object(KeyState::ExpectingValue)) => Err(Error::Json {
-                message: "cannot close object: last key has no value".to_string(),
-                position: None,
-            }),
-            Some(Frame::Array) => Err(Error::Json {
-                message: "cannot close object: current frame is an array".to_string(),
-                position: None,
-            }),
-            _ => Err(Error::Json {
-                message: "cannot close object: no open object".to_string(),
-                position: None,
-            }),
+            Some(Frame::Object(KeyState::ExpectingValue)) => {
+                Err(Self::json_err("cannot close object: last key has no value"))
+            }
+            Some(Frame::Array) => Err(Self::json_err(
+                "cannot close object: current frame is an array",
+            )),
+            _ => Err(Self::json_err("cannot close object: no open object")),
         }
     }
 
