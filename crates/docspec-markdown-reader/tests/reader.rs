@@ -1,8 +1,94 @@
 //! Unit tests for `MarkdownReader`.
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+mod helpers {
+    #![allow(clippy::single_call_fn)]
+
+    use docspec_core::{Event, ListStyleType};
+
+    /// Returns a `StartDocument` event with all optional fields set to `None`.
+    /// Use in tests that do not exercise document-level metadata.
+    pub fn start_document() -> Event {
+        Event::StartDocument {
+            id: None,
+            language: None,
+            metadata: None,
+        }
+    }
+
+    /// Returns a `StartTable` event with no id.
+    pub fn start_table() -> Event {
+        Event::StartTable { id: None }
+    }
+
+    /// Returns a `StartTableRow` event with no id.
+    pub fn start_table_row() -> Event {
+        Event::StartTableRow { id: None }
+    }
+
+    /// Returns a `StartUnorderedListItem` event with `Disc` style at the given level and no id.
+    pub fn start_unordered_list_item(level: u32) -> Event {
+        Event::StartUnorderedListItem {
+            style_type: ListStyleType::Disc,
+            level,
+            id: None,
+        }
+    }
+
+    /// Maps a `DocSpec` event to a short type-name string for use in
+    /// document-structure assertions. Returns `"Other"` for any variant not
+    /// explicitly listed (including future variants added to `docspec_core::Event`).
+    pub fn event_type_name(e: &Event) -> &'static str {
+        match e {
+            Event::StartDocument { .. } => "StartDocument",
+            Event::EndDocument => "EndDocument",
+            Event::StartHeading { level: 1, .. } => "StartHeading(1)",
+            Event::StartHeading { level: 2, .. } => "StartHeading(2)",
+            Event::EndHeading => "EndHeading",
+            Event::StartParagraph { .. } => "StartParagraph",
+            Event::EndParagraph => "EndParagraph",
+            Event::Text { .. } => "Text",
+            Event::EndBlockQuote
+            | Event::EndCaption
+            | Event::EndDefinitionDetail
+            | Event::EndDefinitionList
+            | Event::EndDefinitionTerm
+            | Event::EndFootnote
+            | Event::EndLink
+            | Event::EndOrderedListItem
+            | Event::EndUnorderedListItem
+            | Event::EndPreformatted
+            | Event::EndTable
+            | Event::EndTableCell
+            | Event::EndTableHeader
+            | Event::EndTableRow
+            | Event::FootnoteRef { .. }
+            | Event::Image { .. }
+            | Event::LineBreak
+            | Event::StartBlockQuote { .. }
+            | Event::StartCaption { .. }
+            | Event::StartDefinitionDetail { .. }
+            | Event::StartDefinitionList { .. }
+            | Event::StartDefinitionTerm { .. }
+            | Event::StartFootnote { .. }
+            | Event::StartHeading { .. }
+            | Event::StartLink { .. }
+            | Event::StartOrderedListItem { .. }
+            | Event::StartUnorderedListItem { .. }
+            | Event::StartPreformatted { .. }
+            | Event::StartTable { .. }
+            | Event::StartTableCell { .. }
+            | Event::StartTableHeader { .. }
+            | Event::StartTableRow { .. }
+            | Event::ThematicBreak { .. }
+            | _ => "Other",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::helpers;
     use docspec_core::{
         Event, EventSource as _, ImageSource, ListStyleType, TableHeaderScope, TextStyle,
     };
@@ -88,53 +174,7 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        let event_types: Vec<&str> = events
-            .iter()
-            .map(|e| match e {
-                Event::StartDocument { .. } => "StartDocument",
-                Event::EndDocument => "EndDocument",
-                Event::StartHeading { level: 1, .. } => "StartHeading(1)",
-                Event::StartHeading { level: 2, .. } => "StartHeading(2)",
-                Event::EndHeading => "EndHeading",
-                Event::StartParagraph { .. } => "StartParagraph",
-                Event::EndParagraph => "EndParagraph",
-                Event::Text { .. } => "Text",
-                Event::EndBlockQuote
-                | Event::EndCaption
-                | Event::EndDefinitionDetail
-                | Event::EndDefinitionList
-                | Event::EndDefinitionTerm
-                | Event::EndFootnote
-                | Event::EndLink
-                | Event::EndOrderedListItem
-                | Event::EndUnorderedListItem
-                | Event::EndPreformatted
-                | Event::EndTable
-                | Event::EndTableCell
-                | Event::EndTableHeader
-                | Event::EndTableRow
-                | Event::FootnoteRef { .. }
-                | Event::Image { .. }
-                | Event::LineBreak
-                | Event::StartBlockQuote { .. }
-                | Event::StartCaption { .. }
-                | Event::StartDefinitionDetail { .. }
-                | Event::StartDefinitionList { .. }
-                | Event::StartDefinitionTerm { .. }
-                | Event::StartFootnote { .. }
-                | Event::StartHeading { .. }
-                | Event::StartLink { .. }
-                | Event::StartOrderedListItem { .. }
-                | Event::StartUnorderedListItem { .. }
-                | Event::StartPreformatted { .. }
-                | Event::StartTable { .. }
-                | Event::StartTableCell { .. }
-                | Event::StartTableHeader { .. }
-                | Event::StartTableRow { .. }
-                | Event::ThematicBreak { .. }
-                | _ => "Other",
-            })
-            .collect();
+        let event_types: Vec<&str> = events.iter().map(helpers::event_type_name).collect();
 
         assert_eq!(
             event_types,
@@ -161,14 +201,7 @@ mod tests {
         let events = collect_events(&mut reader);
 
         assert_eq!(events.len(), 2);
-        assert!(matches!(
-            events.first(),
-            Some(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None
-            })
-        ));
+        assert_eq!(events.first(), Some(&helpers::start_document()));
         assert!(matches!(events.get(1), Some(Event::EndDocument)));
     }
 
@@ -185,14 +218,7 @@ mod tests {
         let mut reader = MarkdownReader::new("# Hello");
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
-            events.first(),
-            Some(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None
-            })
-        ));
+        assert_eq!(events.first(), Some(&helpers::start_document()));
         assert!(matches!(
             events.get(1),
             Some(Event::StartHeading { level: 1, .. })
@@ -800,23 +826,14 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
-            events.get(1),
-            Some(Event::StartTable { id: None })
-        ));
-        assert!(matches!(
-            events.get(2),
-            Some(Event::StartTableRow { id: None })
-        ));
+        assert_eq!(events.get(1), Some(&helpers::start_table()));
+        assert_eq!(events.get(2), Some(&helpers::start_table_row()));
         assert!(matches!(
             events.get(3),
             Some(Event::StartTableHeader { .. })
         ));
         assert!(matches!(events.get(9), Some(Event::EndTableRow)));
-        assert!(matches!(
-            events.get(10),
-            Some(Event::StartTableRow { id: None })
-        ));
+        assert_eq!(events.get(10), Some(&helpers::start_table_row()));
         assert!(matches!(events.get(18), Some(Event::EndTable)));
     }
 
@@ -852,10 +869,7 @@ mod tests {
             events.get(3),
             Some(Event::StartTableHeader { .. })
         ));
-        assert!(matches!(
-            events.get(7),
-            Some(Event::StartTableRow { id: None })
-        ));
+        assert_eq!(events.get(7), Some(&helpers::start_table_row()));
         assert!(matches!(events.get(8), Some(Event::StartTableCell { .. })));
     }
 
@@ -947,14 +961,7 @@ mod tests {
         let mut reader = MarkdownReader::new("- a\n- b\n- c");
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
-            events.get(1),
-            Some(Event::StartUnorderedListItem {
-                style_type: ListStyleType::Disc,
-                level: 0,
-                id: None,
-            })
-        ));
+        assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
         assert!(matches!(events.get(2), Some(Event::Text { .. })));
         assert!(matches!(events.get(3), Some(Event::EndUnorderedListItem)));
         assert!(matches!(
