@@ -1,4 +1,5 @@
 //! Unit tests for `MarkdownReader`.
+#![allow(clippy::expect_used, clippy::unwrap_used)]
 
 #[cfg(test)]
 mod tests {
@@ -1232,5 +1233,30 @@ mod tests {
         assert!(matches!(events.get(8), Some(Event::EndUnorderedListItem)));
         assert!(matches!(events.get(9), Some(Event::EndUnorderedListItem)));
         assert_eq!(events.len(), 11);
+    }
+
+    #[test]
+    fn list_inside_blockquote_inside_list_item() {
+        // Regression: list nested inside a blockquote inside a list item must produce
+        // a well-formed event stream. The outer item's EndOrderedListItem must be
+        // emitted AFTER the inner EndBlockQuote, not before.
+        let markdown = "5) I2\n   > text\n   > - [f]\n";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        let end_blockquote_idx = events
+            .iter()
+            .position(|e| matches!(e, Event::EndBlockQuote))
+            .expect("EndBlockQuote must be present");
+        let end_outer_item_idx = events
+            .iter()
+            .rposition(|e| matches!(e, Event::EndOrderedListItem))
+            .expect("EndOrderedListItem must be present");
+
+        assert!(
+            end_blockquote_idx < end_outer_item_idx,
+            "EndBlockQuote (at {end_blockquote_idx}) must precede outer EndOrderedListItem \
+             (at {end_outer_item_idx}); events: {events:#?}"
+        );
     }
 }
