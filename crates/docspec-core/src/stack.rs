@@ -72,6 +72,121 @@ pub struct StackTrackingSink<S: EventSink> {
 }
 
 impl<S: EventSink> StackTrackingSink<S> {
+    /// Handles an `EndDocument` event: drains all remaining open blocks in reverse order,
+    /// emits their close events, sets `document_finished`, then forwards `EndDocument`.
+    fn handle_end_document(&mut self) -> Result<()> {
+        if !self.stack.contains(&BlockKind::Document) {
+            return Err(Error::InvalidSequence {
+                expected: "open Document".to_string(),
+                found: "EndDocument".to_string(),
+                message: "EndDocument received without StartDocument".to_string(),
+            });
+        }
+        while let Some(kind) = self.stack.pop() {
+            if kind != BlockKind::Document {
+                self.sink.handle_event(end_event_for(kind))?;
+            }
+        }
+        self.document_finished = true;
+        self.sink.handle_event(Event::EndDocument)
+    }
+
+    /// Handles any intermediate End event (not `EndDocument`): validates the stack,
+    /// auto-closes intervening blocks, pops the target frame, and forwards the event.
+    fn handle_end_event(&mut self, event: Event) -> Result<()> {
+        let Some(target_kind) = block_kind_for_end(&event) else {
+            return Err(Error::InvalidSequence {
+                expected: "valid End event".to_string(),
+                found: format!("{event:?}"),
+                message: "handle_end_event called with non-End event".to_string(),
+            });
+        };
+        if self.stack.is_empty() {
+            return Err(Error::InvalidSequence {
+                expected: "open block".to_string(),
+                found: format!("{target_kind:?}"),
+                message: "received End event with empty stack".to_string(),
+            });
+        }
+        if self.stack.contains(&target_kind) {
+            while self.stack.last() != Some(&target_kind) {
+                if let Some(popped_kind) = self.stack.pop() {
+                    self.sink.handle_event(end_event_for(popped_kind))?;
+                }
+            }
+            self.stack.pop();
+            return self.sink.handle_event(event);
+        }
+        Err(Error::InvalidSequence {
+            expected: self
+                .stack
+                .last()
+                .map_or("empty".to_string(), |k| format!("{k:?}")),
+            found: format!("{target_kind:?}"),
+            message: format!("End event for {target_kind:?} does not match any open block"),
+        })
+    }
+
+    /// Handles `ThematicBreak` and `Text` events (all non-block, non-End events).
+    ///
+    /// `ThematicBreak`: auto-closes an open `Paragraph` if present.
+    /// `Text`: auto-inserts a `StartParagraph` when no content-bearing block is open.
+    /// All other leaf events are forwarded directly.
+    fn handle_other_event(&mut self, event: Event) -> Result<()> {
+        if matches!(event, Event::ThematicBreak { .. })
+            && self.stack.last() == Some(&BlockKind::Paragraph)
+        {
+            self.stack.pop();
+            self.sink.handle_event(Event::EndParagraph)?;
+        }
+
+        if matches!(event, Event::Text { .. }) && !self.has_open_content() {
+            let para = Event::StartParagraph {
+                alignment: None,
+                id: None,
+            };
+            self.stack.push(BlockKind::Paragraph);
+            self.sink.handle_event(para)?;
+        }
+
+        self.sink.handle_event(event)
+    }
+
+    /// Handles any Start event: validates Document/Link nesting constraints,
+    /// auto-closes an open Paragraph when needed, pushes the new block, and forwards the event.
+    fn handle_start_event(&mut self, kind: BlockKind, event: Event) -> Result<()> {
+        if kind == BlockKind::Document {
+            if self.stack.contains(&BlockKind::Document) {
+                return Err(Error::InvalidSequence {
+                    expected: "single Document".to_string(),
+                    found: "StartDocument".to_string(),
+                    message: "StartDocument received while Document already open".to_string(),
+                });
+            }
+            if self.document_finished {
+                return Err(Error::InvalidSequence {
+                    expected: "end of stream".to_string(),
+                    found: "StartDocument".to_string(),
+                    message: "StartDocument received after document already finished".to_string(),
+                });
+            }
+        }
+        // Links cannot nest per EVENTS.md
+        if kind == BlockKind::Link && self.stack.contains(&BlockKind::Link) {
+            return Err(Error::InvalidSequence {
+                expected: "no nested links".to_string(),
+                found: "StartLink".to_string(),
+                message: "StartLink received while another link is already open".to_string(),
+            });
+        }
+        if kind != BlockKind::Link && self.stack.last() == Some(&BlockKind::Paragraph) {
+            self.stack.pop();
+            self.sink.handle_event(Event::EndParagraph)?;
+        }
+        self.stack.push(kind);
+        self.sink.handle_event(event)
+    }
+
     /// Returns `true` if the stack contains any content-bearing block.
     ///
     /// Content-bearing blocks are: [`BlockKind::Heading`], [`BlockKind::Paragraph`],
@@ -145,8 +260,8 @@ impl<S: EventSink> EventSink for StackTrackingSink<S> {
 
     #[inline]
     fn handle_event(&mut self, event: Event) -> Result<()> {
-        // Reject all events after document has finished (except we already handle StartDocument
-        // specially below for a clearer error message)
+        // Reject all events after document has finished (except StartDocument gets a
+        // clearer error message from handle_start_event)
         if self.document_finished && !matches!(event, Event::StartDocument { .. }) {
             return Err(Error::InvalidSequence {
                 expected: "end of stream".to_string(),
@@ -156,102 +271,18 @@ impl<S: EventSink> EventSink for StackTrackingSink<S> {
         }
 
         if let Some(kind) = block_kind_for_start(&event) {
-            if kind == BlockKind::Document {
-                if self.stack.contains(&BlockKind::Document) {
-                    return Err(Error::InvalidSequence {
-                        expected: "single Document".to_string(),
-                        found: "StartDocument".to_string(),
-                        message: "StartDocument received while Document already open".to_string(),
-                    });
-                }
-                if self.document_finished {
-                    return Err(Error::InvalidSequence {
-                        expected: "end of stream".to_string(),
-                        found: "StartDocument".to_string(),
-                        message: "StartDocument received after document already finished"
-                            .to_string(),
-                    });
-                }
-            }
-            // Links cannot nest per EVENTS.md
-            if kind == BlockKind::Link && self.stack.contains(&BlockKind::Link) {
-                return Err(Error::InvalidSequence {
-                    expected: "no nested links".to_string(),
-                    found: "StartLink".to_string(),
-                    message: "StartLink received while another link is already open".to_string(),
-                });
-            }
-            if kind != BlockKind::Link && self.stack.last() == Some(&BlockKind::Paragraph) {
-                self.stack.pop();
-                self.sink.handle_event(Event::EndParagraph)?;
-            }
-            self.stack.push(kind);
-            return self.sink.handle_event(event);
+            return self.handle_start_event(kind, event);
         }
 
         if matches!(event, Event::EndDocument) {
-            if !self.stack.contains(&BlockKind::Document) {
-                return Err(Error::InvalidSequence {
-                    expected: "open Document".to_string(),
-                    found: "EndDocument".to_string(),
-                    message: "EndDocument received without StartDocument".to_string(),
-                });
-            }
-            while let Some(kind) = self.stack.pop() {
-                if kind != BlockKind::Document {
-                    self.sink.handle_event(end_event_for(kind))?;
-                }
-            }
-            self.document_finished = true;
-            return self.sink.handle_event(event);
+            return self.handle_end_document();
         }
 
-        if let Some(target_kind) = block_kind_for_end(&event) {
-            if self.stack.is_empty() {
-                return Err(Error::InvalidSequence {
-                    expected: "open block".to_string(),
-                    found: format!("{target_kind:?}"),
-                    message: "received End event with empty stack".to_string(),
-                });
-            }
-
-            if self.stack.contains(&target_kind) {
-                while self.stack.last() != Some(&target_kind) {
-                    if let Some(popped_kind) = self.stack.pop() {
-                        self.sink.handle_event(end_event_for(popped_kind))?;
-                    }
-                }
-                self.stack.pop();
-                return self.sink.handle_event(event);
-            }
-
-            return Err(Error::InvalidSequence {
-                expected: self
-                    .stack
-                    .last()
-                    .map_or("empty".to_string(), |k| format!("{k:?}")),
-                found: format!("{target_kind:?}"),
-                message: format!("End event for {target_kind:?} does not match any open block"),
-            });
+        if block_kind_for_end(&event).is_some() {
+            return self.handle_end_event(event);
         }
 
-        if matches!(event, Event::ThematicBreak { .. })
-            && self.stack.last() == Some(&BlockKind::Paragraph)
-        {
-            self.stack.pop();
-            self.sink.handle_event(Event::EndParagraph)?;
-        }
-
-        if matches!(event, Event::Text { .. }) && !self.has_open_content() {
-            let para = Event::StartParagraph {
-                alignment: None,
-                id: None,
-            };
-            self.stack.push(BlockKind::Paragraph);
-            self.sink.handle_event(para)?;
-        }
-
-        self.sink.handle_event(event)
+        self.handle_other_event(event)
     }
 }
 
@@ -261,42 +292,46 @@ impl<S: EventSink> EventSink for StackTrackingSink<S> {
 #[inline]
 #[must_use]
 pub fn block_kind_for_start(event: &Event) -> Option<BlockKind> {
-    if let Event::StartBlockQuote { .. } = event {
-        Some(BlockKind::Blockquote)
-    } else if let Event::StartCaption { .. } = event {
-        Some(BlockKind::Caption)
-    } else if let Event::StartDefinitionDetail { .. } = event {
-        Some(BlockKind::DefinitionDetail)
-    } else if let Event::StartDefinitionList { .. } = event {
-        Some(BlockKind::DefinitionList)
-    } else if let Event::StartDefinitionTerm { .. } = event {
-        Some(BlockKind::DefinitionTerm)
-    } else if let Event::StartDocument { .. } = event {
-        Some(BlockKind::Document)
-    } else if let Event::StartFootnote { .. } = event {
-        Some(BlockKind::Footnote)
-    } else if let Event::StartHeading { .. } = event {
-        Some(BlockKind::Heading)
-    } else if let Event::StartLink { .. } = event {
-        Some(BlockKind::Link)
-    } else if let Event::StartOrderedListItem { .. } = event {
-        Some(BlockKind::OrderedListItem)
-    } else if let Event::StartUnorderedListItem { .. } = event {
-        Some(BlockKind::UnorderedListItem)
-    } else if let Event::StartParagraph { .. } = event {
-        Some(BlockKind::Paragraph)
-    } else if let Event::StartPreformatted { .. } = event {
-        Some(BlockKind::Preformatted)
-    } else if let Event::StartTable { .. } = event {
-        Some(BlockKind::Table)
-    } else if let Event::StartTableCell { .. } = event {
-        Some(BlockKind::TableCell)
-    } else if let Event::StartTableHeader { .. } = event {
-        Some(BlockKind::TableHeader)
-    } else if let Event::StartTableRow { .. } = event {
-        Some(BlockKind::TableRow)
-    } else {
-        None
+    match event {
+        Event::StartBlockQuote { .. } => Some(BlockKind::Blockquote),
+        Event::StartCaption { .. } => Some(BlockKind::Caption),
+        Event::StartDefinitionDetail { .. } => Some(BlockKind::DefinitionDetail),
+        Event::StartDefinitionList { .. } => Some(BlockKind::DefinitionList),
+        Event::StartDefinitionTerm { .. } => Some(BlockKind::DefinitionTerm),
+        Event::StartDocument { .. } => Some(BlockKind::Document),
+        Event::StartFootnote { .. } => Some(BlockKind::Footnote),
+        Event::StartHeading { .. } => Some(BlockKind::Heading),
+        Event::StartLink { .. } => Some(BlockKind::Link),
+        Event::StartOrderedListItem { .. } => Some(BlockKind::OrderedListItem),
+        Event::StartParagraph { .. } => Some(BlockKind::Paragraph),
+        Event::StartPreformatted { .. } => Some(BlockKind::Preformatted),
+        Event::StartTable { .. } => Some(BlockKind::Table),
+        Event::StartTableCell { .. } => Some(BlockKind::TableCell),
+        Event::StartTableHeader { .. } => Some(BlockKind::TableHeader),
+        Event::StartTableRow { .. } => Some(BlockKind::TableRow),
+        Event::StartUnorderedListItem { .. } => Some(BlockKind::UnorderedListItem),
+        Event::EndBlockQuote
+        | Event::EndCaption
+        | Event::EndDefinitionDetail
+        | Event::EndDefinitionList
+        | Event::EndDefinitionTerm
+        | Event::EndDocument
+        | Event::EndFootnote
+        | Event::EndHeading
+        | Event::EndLink
+        | Event::EndOrderedListItem
+        | Event::EndParagraph
+        | Event::EndPreformatted
+        | Event::EndTable
+        | Event::EndTableCell
+        | Event::EndTableHeader
+        | Event::EndTableRow
+        | Event::EndUnorderedListItem
+        | Event::FootnoteRef { .. }
+        | Event::Image { .. }
+        | Event::LineBreak
+        | Event::Text { .. }
+        | Event::ThematicBreak { .. } => None,
     }
 }
 
@@ -306,42 +341,46 @@ pub fn block_kind_for_start(event: &Event) -> Option<BlockKind> {
 #[inline]
 #[must_use]
 pub fn block_kind_for_end(event: &Event) -> Option<BlockKind> {
-    if let Event::EndBlockQuote = event {
-        Some(BlockKind::Blockquote)
-    } else if let Event::EndCaption = event {
-        Some(BlockKind::Caption)
-    } else if let Event::EndDefinitionDetail = event {
-        Some(BlockKind::DefinitionDetail)
-    } else if let Event::EndDefinitionList = event {
-        Some(BlockKind::DefinitionList)
-    } else if let Event::EndDefinitionTerm = event {
-        Some(BlockKind::DefinitionTerm)
-    } else if let Event::EndDocument = event {
-        Some(BlockKind::Document)
-    } else if let Event::EndFootnote = event {
-        Some(BlockKind::Footnote)
-    } else if let Event::EndHeading = event {
-        Some(BlockKind::Heading)
-    } else if let Event::EndLink = event {
-        Some(BlockKind::Link)
-    } else if let Event::EndOrderedListItem = event {
-        Some(BlockKind::OrderedListItem)
-    } else if let Event::EndUnorderedListItem = event {
-        Some(BlockKind::UnorderedListItem)
-    } else if let Event::EndParagraph = event {
-        Some(BlockKind::Paragraph)
-    } else if let Event::EndPreformatted = event {
-        Some(BlockKind::Preformatted)
-    } else if let Event::EndTable = event {
-        Some(BlockKind::Table)
-    } else if let Event::EndTableCell = event {
-        Some(BlockKind::TableCell)
-    } else if let Event::EndTableHeader = event {
-        Some(BlockKind::TableHeader)
-    } else if let Event::EndTableRow = event {
-        Some(BlockKind::TableRow)
-    } else {
-        None
+    match event {
+        Event::EndBlockQuote => Some(BlockKind::Blockquote),
+        Event::EndCaption => Some(BlockKind::Caption),
+        Event::EndDefinitionDetail => Some(BlockKind::DefinitionDetail),
+        Event::EndDefinitionList => Some(BlockKind::DefinitionList),
+        Event::EndDefinitionTerm => Some(BlockKind::DefinitionTerm),
+        Event::EndDocument => Some(BlockKind::Document),
+        Event::EndFootnote => Some(BlockKind::Footnote),
+        Event::EndHeading => Some(BlockKind::Heading),
+        Event::EndLink => Some(BlockKind::Link),
+        Event::EndOrderedListItem => Some(BlockKind::OrderedListItem),
+        Event::EndParagraph => Some(BlockKind::Paragraph),
+        Event::EndPreformatted => Some(BlockKind::Preformatted),
+        Event::EndTable => Some(BlockKind::Table),
+        Event::EndTableCell => Some(BlockKind::TableCell),
+        Event::EndTableHeader => Some(BlockKind::TableHeader),
+        Event::EndTableRow => Some(BlockKind::TableRow),
+        Event::EndUnorderedListItem => Some(BlockKind::UnorderedListItem),
+        Event::FootnoteRef { .. }
+        | Event::Image { .. }
+        | Event::LineBreak
+        | Event::StartBlockQuote { .. }
+        | Event::StartCaption { .. }
+        | Event::StartDefinitionDetail { .. }
+        | Event::StartDefinitionList { .. }
+        | Event::StartDefinitionTerm { .. }
+        | Event::StartDocument { .. }
+        | Event::StartFootnote { .. }
+        | Event::StartHeading { .. }
+        | Event::StartLink { .. }
+        | Event::StartOrderedListItem { .. }
+        | Event::StartParagraph { .. }
+        | Event::StartPreformatted { .. }
+        | Event::StartTable { .. }
+        | Event::StartTableCell { .. }
+        | Event::StartTableHeader { .. }
+        | Event::StartTableRow { .. }
+        | Event::StartUnorderedListItem { .. }
+        | Event::Text { .. }
+        | Event::ThematicBreak { .. } => None,
     }
 }
 
