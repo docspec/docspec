@@ -27,7 +27,9 @@ missing_docs = "deny"
 # --- Existing explicit denials (kept for clarity) ---
 unwrap_used = "deny"
 expect_used = "deny"
-allow_attributes = "deny"
+# Reason: Test files (tests/**) opt out of `unwrap_used` / `expect_used`
+# via crate-level `#![allow(...)]`. Production code remains strictly enforced.
+allow_attributes = "allow"
 
 # --- Promote default-warn groups to deny ---
 suspicious = { level = "deny", priority = -1 }
@@ -67,7 +69,8 @@ missing_trait_methods = "allow"
 pattern_type_mismatch = "allow"
 # Reason: Separate impl blocks for grouping related methods improves readability
 multiple_inherent_impl = "allow"
-# Reason: Redundant with allow_attributes = "deny" which already forbids all #[allow]
+# Reason: Reasons live in dedicated `# Reason:` comments above each lint setting,
+# not inline in the attribute; this lint is too noisy and conflicts with that style
 allow_attributes_without_reason = "allow"
 
 # --- Selective allows: restriction group (practicality) ---

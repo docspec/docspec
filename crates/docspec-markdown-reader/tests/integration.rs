@@ -1,36 +1,25 @@
 //! Markdown to `BlockNote` JSON pipeline integration tests.
+#![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use docspec_blocknote_writer::BlockNoteWriter;
 use docspec_core::{EventSink as _, EventSource as _, StackTrackingSink};
 use docspec_markdown_reader::MarkdownReader;
 
-fn run_pipeline(markdown: &str) -> String {
+fn try_run_pipeline(markdown: &str) -> Result<String, String> {
     let mut reader = MarkdownReader::new(markdown);
     let mut buf = Vec::<u8>::new();
     let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 
-    let mut next = reader.next_event();
-    while let Ok(Some(event)) = next {
-        let handle_result = writer.handle_event(event);
-        assert!(
-            handle_result.is_ok(),
-            "handle_event failed: {:?}",
-            handle_result.err()
-        );
-        next = reader.next_event();
+    while let Some(event) = reader.next_event().map_err(|e| format!("{e:?}"))? {
+        writer.handle_event(event).map_err(|e| format!("{e:?}"))?;
     }
-    assert!(next.is_ok(), "next_event failed: {:?}", next.err());
+    writer.finish().map_err(|e| format!("{e:?}"))?;
 
-    let finish_result = writer.finish();
-    assert!(
-        finish_result.is_ok(),
-        "finish failed: {:?}",
-        finish_result.err()
-    );
+    String::from_utf8(buf).map_err(|e| format!("{e}"))
+}
 
-    let string_result = String::from_utf8(buf);
-    assert!(string_result.is_ok(), "invalid UTF-8 output");
-    string_result.unwrap_or_default()
+fn run_pipeline(markdown: &str) -> String {
+    try_run_pipeline(markdown).expect("pipeline failed")
 }
 
 fn assert_json_eq(actual: &str, expected: &str) {
@@ -146,5 +135,19 @@ mod tests {
         let expected = include_str!("../../../tests/fixtures/blocknote/lists.json");
         let actual = run_pipeline(markdown);
         assert_json_eq(&actual, expected);
+    }
+
+    #[test]
+    fn pipeline_list_inside_blockquote_inside_list_item_is_well_formed() {
+        // Regression for cmark-gfm/test.md edge case.
+        // A list nested inside a blockquote that is itself inside a list item
+        // must NOT cause premature emission of the outer list item's End event.
+        let markdown = "5) I2\n   > text\n   > - [f]\n";
+        let result = super::try_run_pipeline(markdown);
+        assert!(
+            result.is_ok(),
+            "Expected well-formed event stream for list-in-blockquote-in-item; got: {:?}",
+            result.err()
+        );
     }
 }
