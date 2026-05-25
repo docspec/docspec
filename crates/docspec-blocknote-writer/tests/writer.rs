@@ -1897,4 +1897,382 @@ mod tests {
             r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"combined","styles":{"bold":true,"code":true,"strike":true}}],"children":[]}]"#
         );
     }
+
+    #[test]
+    fn empty_table_emits_table_block_with_no_rows() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartTable { id: None },
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn simple_table_with_one_data_row_and_two_cells() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartTable { id: None },
+            Event::StartTableRow { id: None },
+            Event::StartTableCell {
+                id: None,
+                colspan: None,
+                rowspan: None,
+            },
+            Event::Text {
+                content: "Cell1".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndTableCell,
+            Event::StartTableCell {
+                id: None,
+                colspan: None,
+                rowspan: None,
+            },
+            Event::Text {
+                content: "Cell2".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"Cell1","styles":{}}]},{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"Cell2","styles":{}}]}]}]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn header_only_table() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartTable { id: None },
+            Event::StartTableRow { id: None },
+            Event::StartTableHeader {
+                id: None,
+                scope: None,
+                abbr: None,
+                colspan: None,
+                rowspan: None,
+            },
+            Event::Text {
+                content: "H1".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndTableHeader,
+            Event::StartTableHeader {
+                id: None,
+                scope: None,
+                abbr: None,
+                colspan: None,
+                rowspan: None,
+            },
+            Event::Text {
+                content: "H2".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndTableHeader,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"H1","styles":{}}]},{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"H2","styles":{}}]}]}]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn table_cell_with_bold_text() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartTable { id: None },
+            Event::StartTableRow { id: None },
+            Event::StartTableCell {
+                id: None,
+                colspan: None,
+                rowspan: None,
+            },
+            Event::Text {
+                content: "bold".to_string(),
+                style: TextStyle::default().bold(),
+            },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"bold","styles":{"bold":true}}]}]}]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn table_preceded_by_paragraph_closes_paragraph() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "before".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndParagraph,
+            Event::StartTable { id: None },
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"before","styles":{}}],"children":[]},{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn table_followed_by_paragraph_opens_new_block() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartTable { id: None },
+            Event::EndTable,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "after".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[]},"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"after","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn end_table_without_start_table_is_noop() {
+        // Drives EndTable when table_depth == 0 (orphan close). Covers the
+        // defensive guard in handle_end_table that returns early when no
+        // table is open. Bypasses StackTrackingSink to drive a hand-crafted
+        // sequence the stack tracker would otherwise reject.
+        let mut buf = Vec::<u8>::new();
+        let mut writer = BlockNoteWriter::new(&mut buf);
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        let result = writer.handle_event(Event::EndTable);
+        assert!(result.is_ok(), "orphan EndTable must be silently absorbed");
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        assert_eq!(json, "[]");
+    }
+
+    #[test]
+    fn nested_table_inner_structure_is_dropped() {
+        // Drives a nested StartTable inside an outer table cell. The writer's
+        // depth guards drop every inner table event (start, row, cell, text,
+        // and their closes); only the outer table is emitted with the outer
+        // cell's text intact. Bypasses StackTrackingSink to drive a hand-
+        // crafted sequence that no current reader produces but DOCX/ODT
+        // readers may produce in the future.
+        let mut buf = Vec::<u8>::new();
+        let mut writer = BlockNoteWriter::new(&mut buf);
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::StartTable { id: None }).is_ok());
+        assert!(writer
+            .handle_event(Event::StartTableRow { id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartTableCell {
+                id: None,
+                colspan: None,
+                rowspan: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::Text {
+                content: "outer".to_string(),
+                style: TextStyle::default(),
+            })
+            .is_ok());
+        // Nested inner table — every event below is silently absorbed by guards
+        assert!(writer.handle_event(Event::StartTable { id: None }).is_ok());
+        assert!(writer
+            .handle_event(Event::StartTableRow { id: None })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartTableCell {
+                id: None,
+                colspan: None,
+                rowspan: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::Text {
+                content: "inner".to_string(),
+                style: TextStyle::default(),
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndTableCell).is_ok());
+        assert!(writer.handle_event(Event::EndTableRow).is_ok());
+        assert!(writer.handle_event(Event::EndTable).is_ok());
+        assert!(writer.handle_event(Event::EndTableCell).is_ok());
+        assert!(writer.handle_event(Event::EndTableRow).is_ok());
+        assert!(writer.handle_event(Event::EndTable).is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"outer","styles":{}}]}]}]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn thematic_break_with_id_emits_id_field() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::ThematicBreak {
+                id: Some("hr-1".to_string()),
+            },
+            Event::EndDocument,
+        ]);
+        assert_eq!(json, r#"[{"type":"divider","id":"hr-1"}]"#);
+    }
+
+    #[test]
+    fn image_with_id_emits_id_field() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/img.png".to_string(),
+                },
+                alt: None,
+                title: None,
+                decorative: false,
+                id: Some("img-1".to_string()),
+            },
+            Event::EndDocument,
+        ]);
+        assert!(json.contains(r#""id":"img-1""#));
+    }
+
+    #[test]
+    fn end_preformatted_without_open_block_is_noop() {
+        // Drives EndPreformatted when in_text_block == false (no open preformatted
+        // block). Covers the guard that returns early when the close has no
+        // matching open. Bypasses StackTrackingSink since the stack tracker
+        // rejects orphan close events.
+        let mut buf = Vec::<u8>::new();
+        let mut writer = BlockNoteWriter::new(&mut buf);
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        let result = writer.handle_event(Event::EndPreformatted);
+        assert!(
+            result.is_ok(),
+            "orphan EndPreformatted must be silently absorbed"
+        );
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        assert_eq!(json, "[]");
+    }
+
+    #[test]
+    fn image_inside_table_cell_is_dropped() {
+        // Drives an Image event between StartTableCell / EndTableCell. BlockNote
+        // cell content is InlineContent[] — block-level events (including images)
+        // are silently dropped per the documented cell-content semantics.
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartTable { id: None },
+            Event::StartTableRow { id: None },
+            Event::StartTableCell {
+                id: None,
+                colspan: None,
+                rowspan: None,
+            },
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/img.png".to_string(),
+                },
+                alt: Some("dropped".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[]}]}]},"children":[]}]"#
+        );
+    }
 }
