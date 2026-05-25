@@ -59,7 +59,7 @@ use alloc::collections::VecDeque;
 
 pub use docspec_core::EventSource;
 use docspec_core::{Event, ImageSource, ListStyleType, Result, TableHeaderScope, TextStyle};
-use pulldown_cmark::{CodeBlockKind, HeadingLevel, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{CodeBlockKind, CowStr, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 /// Whether content is inside a block-level element.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -194,64 +194,137 @@ impl<'a> MarkdownReader<'a> {
         }
     }
 
+    /// Emits `EndBlockQuote` for a blockquote closing tag.
+    fn handle_end_blockquote(&mut self) {
+        self.push_event_end(Event::EndBlockQuote);
+    }
+
+    /// Emits the buffered code block content (stripping the parser-added trailing newline)
+    /// followed by `EndPreformatted`. Skips the text event if the buffer is empty.
+    fn handle_end_code_block(&mut self) {
+        if let Some(buf) = self.code_block_buffer.take() {
+            let content = buf.strip_suffix('\n').unwrap_or(&buf).to_owned();
+            if !content.is_empty() {
+                self.queue.push_back(Event::Text {
+                    content,
+                    style: TextStyle::default().code(),
+                });
+            }
+        }
+        self.push_event_end(Event::EndPreformatted);
+    }
+
+    /// Decrements italic depth for an emphasis (italic) closing tag.
+    fn handle_end_emphasis(&mut self) {
+        self.italic_depth = self.italic_depth.saturating_sub(1);
+    }
+
+    /// Emits `EndHeading` for a heading closing tag.
+    fn handle_end_heading(&mut self) {
+        self.push_event_end(Event::EndHeading);
+    }
+
+    /// Emits an `Image` event from the accumulated image buffer, deriving
+    /// `decorative = true` when the trimmed alt text is empty. Consumes the
+    /// in-progress image state; does nothing if no image is in progress.
+    fn handle_end_image(&mut self) {
+        let Some(img) = self.image.take() else { return };
+        let trimmed = img.alt_buf.trim();
+        let alt = if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_owned())
+        };
+        let decorative = alt.is_none();
+        self.queue.push_back(Event::Image {
+            source: ImageSource::Uri { uri: img.url },
+            alt,
+            title: img.title,
+            decorative,
+            id: None,
+        });
+    }
+
+    /// Closes an auto-opened paragraph if one is open, then closes the current
+    /// list item and resets block state.
+    fn handle_end_item(&mut self) {
+        if self.block_state == BlockState::AutoParagraph {
+            self.queue.push_back(Event::EndParagraph);
+        }
+        self.close_current_item_if_open();
+        self.block_state = BlockState::None;
+    }
+
+    /// Closes the current list item if open, pops the list context, and resets block state.
+    fn handle_end_list(&mut self) {
+        self.close_current_item_if_open();
+        self.list_stack.pop();
+        self.block_state = BlockState::None;
+    }
+
+    /// Emits `EndParagraph` for a paragraph closing tag.
+    fn handle_end_paragraph(&mut self) {
+        self.push_event_end(Event::EndParagraph);
+    }
+
+    /// Decrements strikethrough depth for a strikethrough closing tag.
+    fn handle_end_strikethrough(&mut self) {
+        self.strikethrough_depth = self.strikethrough_depth.saturating_sub(1);
+    }
+
+    /// Decrements bold depth for a strong (bold) closing tag.
+    fn handle_end_strong(&mut self) {
+        self.bold_depth = self.bold_depth.saturating_sub(1);
+    }
+
+    /// Emits `EndTable` for a table closing tag.
+    fn handle_end_table(&mut self) {
+        self.push_event_end(Event::EndTable);
+    }
+
+    /// Emits `EndTableCell` or `EndTableHeader` depending on whether the parser
+    /// is currently inside a table header row.
+    fn handle_end_table_cell(&mut self) {
+        if self.in_table_head {
+            self.push_event_end(Event::EndTableHeader);
+        } else {
+            self.push_event_end(Event::EndTableCell);
+        }
+    }
+
+    /// Emits `EndTableRow` and clears the table-head flag for a table head closing tag.
+    fn handle_end_table_head(&mut self) {
+        self.push_event_end(Event::EndTableRow);
+        self.in_table_head = false;
+    }
+
+    /// Emits `EndTableRow` for a table row closing tag.
+    fn handle_end_table_row(&mut self) {
+        self.push_event_end(Event::EndTableRow);
+    }
+
+    /// Dispatches a `pulldown-cmark` end tag to the appropriate per-tag handler.
+    ///
+    /// Tags in the explicit ignore list below are known-unsupported elements whose
+    /// structure is intentionally dropped (text content may still be extracted by
+    /// other event handlers).
     fn handle_end_tag(&mut self, tag_end: TagEnd) {
         match tag_end {
-            TagEnd::Heading(_) => self.push_event_end(Event::EndHeading),
-            TagEnd::Paragraph => self.push_event_end(Event::EndParagraph),
-            TagEnd::BlockQuote(_) => self.push_event_end(Event::EndBlockQuote),
-            TagEnd::Item => {
-                if self.block_state == BlockState::AutoParagraph {
-                    self.queue.push_back(Event::EndParagraph);
-                }
-                self.close_current_item_if_open();
-                self.block_state = BlockState::None;
-            }
-            TagEnd::Emphasis => {
-                self.italic_depth = self.italic_depth.saturating_sub(1);
-            }
-            TagEnd::Strong => {
-                self.bold_depth = self.bold_depth.saturating_sub(1);
-            }
-            TagEnd::Strikethrough => {
-                self.strikethrough_depth = self.strikethrough_depth.saturating_sub(1);
-            }
-            TagEnd::Image => {
-                if let Some(img) = self.image.take() {
-                    let alt = {
-                        let trimmed = img.alt_buf.trim();
-                        if trimmed.is_empty() {
-                            None
-                        } else {
-                            Some(trimmed.to_owned())
-                        }
-                    };
-                    let decorative = alt.is_none();
-                    self.queue.push_back(Event::Image {
-                        source: ImageSource::Uri { uri: img.url },
-                        alt,
-                        title: img.title,
-                        decorative,
-                        id: None,
-                    });
-                }
-            }
-            TagEnd::CodeBlock => {
-                if let Some(buf) = self.code_block_buffer.take() {
-                    let content = buf.strip_suffix('\n').unwrap_or(&buf).to_owned();
-                    if !content.is_empty() {
-                        self.queue.push_back(Event::Text {
-                            content,
-                            style: TextStyle::default().code(),
-                        });
-                    }
-                }
-                self.push_event_end(Event::EndPreformatted);
-            }
-            TagEnd::List(_) => {
-                self.close_current_item_if_open();
-                self.list_stack.pop();
-                self.block_state = BlockState::None;
-            }
+            TagEnd::BlockQuote(_) => self.handle_end_blockquote(),
+            TagEnd::CodeBlock => self.handle_end_code_block(),
+            TagEnd::Emphasis => self.handle_end_emphasis(),
+            TagEnd::Heading(_) => self.handle_end_heading(),
+            TagEnd::Image => self.handle_end_image(),
+            TagEnd::Item => self.handle_end_item(),
+            TagEnd::List(_) => self.handle_end_list(),
+            TagEnd::Paragraph => self.handle_end_paragraph(),
+            TagEnd::Strikethrough => self.handle_end_strikethrough(),
+            TagEnd::Strong => self.handle_end_strong(),
+            TagEnd::Table => self.handle_end_table(),
+            TagEnd::TableCell => self.handle_end_table_cell(),
+            TagEnd::TableHead => self.handle_end_table_head(),
+            TagEnd::TableRow => self.handle_end_table_row(),
+            // Tags intentionally ignored (structure dropped, text extracted elsewhere):
             TagEnd::DefinitionList
             | TagEnd::DefinitionListDefinition
             | TagEnd::DefinitionListTitle
@@ -261,19 +334,6 @@ impl<'a> MarkdownReader<'a> {
             | TagEnd::MetadataBlock(_)
             | TagEnd::Subscript
             | TagEnd::Superscript => {}
-            TagEnd::Table => self.push_event_end(Event::EndTable),
-            TagEnd::TableHead => {
-                self.push_event_end(Event::EndTableRow);
-                self.in_table_head = false;
-            }
-            TagEnd::TableRow => self.push_event_end(Event::EndTableRow),
-            TagEnd::TableCell => {
-                if self.in_table_head {
-                    self.push_event_end(Event::EndTableHeader);
-                } else {
-                    self.push_event_end(Event::EndTableCell);
-                }
-            }
         }
     }
 
@@ -308,60 +368,136 @@ impl<'a> MarkdownReader<'a> {
         });
     }
 
+    /// Emits `StartBlockQuote` for a blockquote opening tag.
+    fn handle_start_blockquote(&mut self) {
+        self.push_event_start(Event::StartBlockQuote { id: None });
+    }
+
+    /// Emits `StartPreformatted` for a code block opening tag, initialising
+    /// the internal code-block buffer for content accumulation.
+    fn handle_start_code_block(&mut self, kind: CodeBlockKind<'a>) {
+        let syntax = match kind {
+            CodeBlockKind::Fenced(lang) if !lang.is_empty() => Some(lang.into_string()),
+            CodeBlockKind::Fenced(_) | CodeBlockKind::Indented => None,
+        };
+        self.code_block_buffer = Some(String::new());
+        self.push_event_start(Event::StartPreformatted { id: None, syntax });
+    }
+
+    /// Increments italic depth for an emphasis (italic) opening tag.
+    fn handle_start_emphasis(&mut self) {
+        self.italic_depth = self.italic_depth.saturating_add(1);
+    }
+
+    /// Emits `StartHeading` after mapping a `pulldown-cmark` `HeadingLevel` to a `u8` level.
+    fn handle_start_heading(&mut self, level: HeadingLevel) {
+        let level_u8 = match level {
+            HeadingLevel::H1 => 1,
+            HeadingLevel::H2 => 2,
+            HeadingLevel::H3 => 3,
+            HeadingLevel::H4 => 4,
+            HeadingLevel::H5 => 5,
+            HeadingLevel::H6 => 6,
+        };
+        self.push_event_start(Event::StartHeading {
+            level: level_u8,
+            id: None,
+        });
+    }
+
+    /// Initialises image state for alt-text accumulation when an image opening tag is
+    /// encountered. The title is stored as `None` when the pulldown-cmark title string
+    /// is empty.
+    fn handle_start_image(&mut self, dest_url: CowStr<'a>, title: CowStr<'a>) {
+        self.image = Some(ImageBuffer {
+            alt_buf: String::new(),
+            title: if title.is_empty() {
+                None
+            } else {
+                Some(title.into_string())
+            },
+            url: dest_url.into_string(),
+        });
+    }
+
+    /// Emits `StartParagraph` for a paragraph opening tag.
+    fn handle_start_paragraph(&mut self) {
+        self.push_event_start(Event::StartParagraph {
+            alignment: None,
+            id: None,
+        });
+    }
+
+    /// Increments strikethrough depth for a strikethrough opening tag.
+    fn handle_start_strikethrough(&mut self) {
+        self.strikethrough_depth = self.strikethrough_depth.saturating_add(1);
+    }
+
+    /// Increments bold depth for a strong (bold) opening tag.
+    fn handle_start_strong(&mut self) {
+        self.bold_depth = self.bold_depth.saturating_add(1);
+    }
+
+    /// Emits `StartTable` for a table opening tag.
+    fn handle_start_table(&mut self) {
+        self.push_event_start(Event::StartTable { id: None });
+    }
+
+    /// Emits `StartTableHeader` or `StartTableCell` depending on whether the parser
+    /// is currently inside a table header row.
+    fn handle_start_table_cell(&mut self) {
+        if self.in_table_head {
+            self.push_event_start(Event::StartTableHeader {
+                scope: Some(TableHeaderScope::Column),
+                abbr: None,
+                colspan: None,
+                rowspan: None,
+                id: None,
+            });
+        } else {
+            self.push_event_start(Event::StartTableCell {
+                colspan: None,
+                rowspan: None,
+                id: None,
+            });
+        }
+    }
+
+    /// Sets the table-head flag and emits `StartTableRow` for a table head opening tag.
+    fn handle_start_table_head(&mut self) {
+        self.in_table_head = true;
+        self.push_event_start(Event::StartTableRow { id: None });
+    }
+
+    /// Emits `StartTableRow` for a table row opening tag.
+    fn handle_start_table_row(&mut self) {
+        self.push_event_start(Event::StartTableRow { id: None });
+    }
+
+    /// Dispatches a `pulldown-cmark` start tag to the appropriate per-tag handler.
+    ///
+    /// Tags in the explicit ignore list below are known-unsupported elements whose
+    /// structure is intentionally dropped (text content may still be extracted by
+    /// other event handlers).
     fn handle_start_tag(&mut self, tag: Tag<'a>) {
         match tag {
-            Tag::Heading { level, .. } => {
-                let level_u8 = match level {
-                    HeadingLevel::H1 => 1,
-                    HeadingLevel::H2 => 2,
-                    HeadingLevel::H3 => 3,
-                    HeadingLevel::H4 => 4,
-                    HeadingLevel::H5 => 5,
-                    HeadingLevel::H6 => 6,
-                };
-
-                self.push_event_start(Event::StartHeading {
-                    level: level_u8,
-                    id: None,
-                });
-            }
-            Tag::Paragraph => self.push_event_start(Event::StartParagraph {
-                alignment: None,
-                id: None,
-            }),
-            Tag::BlockQuote(_) => self.push_event_start(Event::StartBlockQuote { id: None }),
-            Tag::CodeBlock(kind) => {
-                let syntax = match kind {
-                    CodeBlockKind::Fenced(lang) if !lang.is_empty() => Some(lang.into_string()),
-                    CodeBlockKind::Fenced(_) | CodeBlockKind::Indented => None,
-                };
-                self.code_block_buffer = Some(String::new());
-                self.push_event_start(Event::StartPreformatted { id: None, syntax });
-            }
-            Tag::Emphasis => {
-                self.italic_depth = self.italic_depth.saturating_add(1);
-            }
-            Tag::Strong => {
-                self.bold_depth = self.bold_depth.saturating_add(1);
-            }
-            Tag::Strikethrough => {
-                self.strikethrough_depth = self.strikethrough_depth.saturating_add(1);
-            }
+            Tag::BlockQuote(_) => self.handle_start_blockquote(),
+            Tag::CodeBlock(kind) => self.handle_start_code_block(kind),
+            Tag::Emphasis => self.handle_start_emphasis(),
+            Tag::Heading { level, .. } => self.handle_start_heading(level),
             Tag::Image {
                 dest_url, title, ..
-            } => {
-                self.image = Some(ImageBuffer {
-                    alt_buf: String::new(),
-                    title: if title.is_empty() {
-                        None
-                    } else {
-                        Some(title.into_string())
-                    },
-                    url: dest_url.into_string(),
-                });
-            }
-            Tag::List(start_opt) => self.handle_list_start(start_opt),
+            } => self.handle_start_image(dest_url, title),
             Tag::Item => self.handle_item_start(),
+            Tag::List(start_opt) => self.handle_list_start(start_opt),
+            Tag::Paragraph => self.handle_start_paragraph(),
+            Tag::Strikethrough => self.handle_start_strikethrough(),
+            Tag::Strong => self.handle_start_strong(),
+            Tag::Table(_) => self.handle_start_table(),
+            Tag::TableCell => self.handle_start_table_cell(),
+            Tag::TableHead => self.handle_start_table_head(),
+            Tag::TableRow => self.handle_start_table_row(),
+            // Tags intentionally ignored (structure dropped, text extracted elsewhere):
             Tag::DefinitionList
             | Tag::DefinitionListDefinition
             | Tag::DefinitionListTitle
@@ -371,29 +507,6 @@ impl<'a> MarkdownReader<'a> {
             | Tag::MetadataBlock(_)
             | Tag::Subscript
             | Tag::Superscript => {}
-            Tag::Table(_) => self.push_event_start(Event::StartTable { id: None }),
-            Tag::TableHead => {
-                self.in_table_head = true;
-                self.push_event_start(Event::StartTableRow { id: None });
-            }
-            Tag::TableRow => self.push_event_start(Event::StartTableRow { id: None }),
-            Tag::TableCell => {
-                if self.in_table_head {
-                    self.push_event_start(Event::StartTableHeader {
-                        scope: Some(TableHeaderScope::Column),
-                        abbr: None,
-                        colspan: None,
-                        rowspan: None,
-                        id: None,
-                    });
-                } else {
-                    self.push_event_start(Event::StartTableCell {
-                        colspan: None,
-                        rowspan: None,
-                        id: None,
-                    });
-                }
-            }
         }
     }
 
