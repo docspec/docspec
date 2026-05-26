@@ -14,5 +14,9 @@ base64 = "0.22"
 docspec-core = { path = "../docspec-core" }
 docspec-json = { path = "../docspec-json" }
 
+[dev-dependencies]
+docspec-markdown-reader = { path = "../docspec-markdown-reader" }
+serde_json = "1"
+
 [lints]
 workspace = true

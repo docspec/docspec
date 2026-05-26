@@ -34,6 +34,13 @@ impl WriteVal for bool {
 impl WriteVal for u8 {
     #[inline]
     fn write_to<B: JsonBackend>(self, backend: &mut B) -> Result<()> {
+        backend.write_number(u32::from(self))
+    }
+}
+
+impl WriteVal for u32 {
+    #[inline]
+    fn write_to<B: JsonBackend>(self, backend: &mut B) -> Result<()> {
         backend.write_number(self)
     }
 }
@@ -55,7 +62,7 @@ mod tests {
         fail: bool,
         last_bool: Option<bool>,
         last_call: &'static str,
-        last_number: Option<u8>,
+        last_number: Option<u32>,
         last_string: Option<String>,
     }
 
@@ -97,7 +104,7 @@ mod tests {
             Ok(())
         }
 
-        fn write_number(&mut self, n: u8) -> docspec_core::Result<()> {
+        fn write_number(&mut self, n: u32) -> docspec_core::Result<()> {
             self.last_call = "write_number";
             self.last_number = Some(n);
             Ok(())
@@ -176,6 +183,15 @@ mod tests {
     fn write_val_u8_calls_write_number() {
         let mut b = MockBackend::default();
         let n: u8 = 42;
+        assert!(n.write_to(&mut b).is_ok());
+        assert_eq!(b.last_call, "write_number");
+        assert_eq!(b.last_number, Some(42));
+    }
+
+    #[test]
+    fn write_val_u32_calls_write_number() {
+        let mut b = MockBackend::default();
+        let n: u32 = 42;
         assert!(n.write_to(&mut b).is_ok());
         assert_eq!(b.last_call, "write_number");
         assert_eq!(b.last_number, Some(42));

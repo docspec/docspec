@@ -27,11 +27,8 @@
 //! - `Image` — image blocks
 //! - `LineBreak` — line breaks within content blocks
 //! - `ThematicBreak` — divider blocks
-//!
-//! List structure events (`StartOrderedListItem`, `StartUnorderedListItem`, etc.) are silently ignored
-//! by this writer. Use `StackTrackingSink` from `docspec_core` to wrap the writer for automatic
-//! paragraph insertion within list items. As a consequence, list items are emitted as `paragraph`
-//! blocks and list structure (ordered/unordered nesting) is lost.
+//! - `StartOrderedListItem` / `EndOrderedListItem` — `numberedListItem` blocks with optional `start` prop
+//! - `StartUnorderedListItem` / `EndUnorderedListItem` — `bulletListItem` blocks
 //!
 //! # Table Cell Content Semantics
 //!
@@ -48,22 +45,95 @@
 //! reader never produces multi-block cell content or nested tables — these guards exist for
 //! future DOCX/ODT readers.
 //!
+//! # List Support
+//!
+//! **Required**: wrap `BlockNoteWriter` in [`StackTrackingSink`](docspec_core::StackTrackingSink)
+//! before feeding list events. Raw list events without that wrapper are undefined behavior.
+//! `StackTrackingSink` auto-inserts `StartParagraph` inside list items, which is how the writer
+//! knows where each item's inline content begins.
+//!
+//! `DocSpec` list events translate to `BlockNote` block types as follows:
+//!
+//! - [`StartUnorderedListItem`](docspec_core::Event::StartUnorderedListItem) → `bulletListItem`
+//! - [`StartOrderedListItem`](docspec_core::Event::StartOrderedListItem) → `numberedListItem`
+//!   (the `start` field, when present on the first item, becomes the `start` prop)
+//!
+//! Nesting uses `BlockNote`'s native `children: Block[]` arrays. `DocSpec`'s `level: u32` field
+//! drives the nesting depth: a level increase opens a new `children` array; a level decrease
+//! closes the appropriate number of open items and children arrays.
+//!
+//! **Multi-paragraph items**: the first paragraph's inline content populates the list item's
+//! `content[]` array. Each subsequent paragraph becomes a child `paragraph` block inside the
+//! item's `children[]` array.
+//!
+//! **Non-paragraph blocks inside list items** (headings, images, code blocks, blockquotes,
+//! tables, thematic breaks) are dropped silently along with all of their inline contents —
+//! including any `Text` events nested within them. The drop applies anywhere inside a list
+//! item: both in the inline `content[]` slot (around the first paragraph) and after the item
+//! has transitioned to `children[]` (for multi-paragraph items or items containing nested
+//! lists). This differs from the table cell policy: cells preserve `Text` while absorbing
+//! block boundaries (so a heading inside a cell becomes plain text), whereas list items
+//! suppress text inside dropped blocks entirely.
+//!
+//! ## Container Interactions
+//!
+//! - **Inside a table cell**: list items are dropped entirely, consistent with other block-level
+//!   content inside cells.
+//! - **Inside a blockquote**: the blockquote is force-closed and the list item is emitted at the
+//!   top level as a sibling. This matches the existing sibling-emit behavior for headings and
+//!   images inside blockquotes.
+//!
+//! ## Out of Scope
+//!
+//! - **`checkListItem`**: requires upstream `DocSpec` event support not yet defined.
+//! - **`toggleListItem`**: no `DocSpec` event equivalent exists.
+//! - **Custom `style_type` markers**: `BlockNote`'s default schema has no equivalent field; the
+//!   `style_type` value from `StartOrderedListItem` / `StartUnorderedListItem` is silently dropped.
+//!
 //! # Example
 //!
 //! ```
 //! use docspec_blocknote_writer::BlockNoteWriter;
-//! use docspec_core::{Event, EventSink, StackTrackingSink, TextStyle};
+//! use docspec_core::{Event, EventSink, ListStyleType, StackTrackingSink, TextStyle};
 //!
 //! let mut buf = Vec::<u8>::new();
 //! let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 //!
 //! writer.handle_event(Event::StartDocument { id: None, language: None, metadata: None })?;
+//!
+//! // Plain paragraph
 //! writer.handle_event(Event::StartParagraph { alignment: None, id: None })?;
 //! writer.handle_event(Event::Text {
 //!     content: "Hello".to_string(),
 //!     style: TextStyle::default(),
 //! })?;
 //! writer.handle_event(Event::EndParagraph)?;
+//!
+//! // Unordered list item (StackTrackingSink auto-inserts the paragraph)
+//! writer.handle_event(Event::StartUnorderedListItem {
+//!     id: None,
+//!     level: 0,
+//!     style_type: ListStyleType::Disc,
+//! })?;
+//! writer.handle_event(Event::Text {
+//!     content: "First bullet".to_string(),
+//!     style: TextStyle::default(),
+//! })?;
+//! writer.handle_event(Event::EndUnorderedListItem)?;
+//!
+//! // Ordered list item with explicit start number
+//! writer.handle_event(Event::StartOrderedListItem {
+//!     id: None,
+//!     level: 0,
+//!     start: Some(1),
+//!     style_type: ListStyleType::Decimal,
+//! })?;
+//! writer.handle_event(Event::Text {
+//!     content: "Step one".to_string(),
+//!     style: TextStyle::default(),
+//! })?;
+//! writer.handle_event(Event::EndOrderedListItem)?;
+//!
 //! writer.handle_event(Event::EndDocument)?;
 //! writer.finish()?;
 //!
@@ -97,6 +167,48 @@ macro_rules! return_if_table_cell {
     };
 }
 
+macro_rules! drop_block_in_list_start {
+    ($writer:expr) => {
+        if $writer.in_any_list_item() || $writer.drop_inside_list_depth > 0 {
+            $writer.drop_inside_list_depth = $writer.drop_inside_list_depth.saturating_add(1);
+            return Ok(());
+        }
+    };
+}
+
+macro_rules! drop_block_in_list_end {
+    ($writer:expr) => {
+        if $writer.drop_inside_list_depth > 0 {
+            $writer.drop_inside_list_depth = $writer.drop_inside_list_depth.saturating_sub(1);
+            return Ok(());
+        }
+    };
+}
+
+/// Represents the kind of list (ordered or unordered).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ListKind {
+    /// Ordered list (numbered).
+    Ordered,
+    /// Unordered list (bulleted).
+    Unordered,
+}
+
+/// Represents a single entry in the list stack, tracking list nesting state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ListStackEntry {
+    /// Whether the children array for this list has been opened.
+    children_array_open: bool,
+    /// Whether the content array for this list has been opened.
+    content_array_open: bool,
+    /// Whether the first paragraph in this list item has been consumed.
+    first_paragraph_consumed: bool,
+    /// The kind of list (ordered or unordered).
+    kind: ListKind,
+    /// The nesting level of this list (0-based).
+    level: u32,
+}
+
 /// A streaming `BlockNote` JSON writer.
 ///
 /// Writes JSON tokens directly to the underlying `Write` as events arrive using `docspec-json`.
@@ -113,9 +225,12 @@ pub struct BlockNoteWriter<'a, W: Write> {
     blockquote_depth: u32,
     blockquote_force_closed_count: usize,
     blockquote_has_content: bool,
+    drop_inside_list_depth: u32,
+    dropped_list_depth: u32,
     in_table_cell: bool,
     in_text_block: bool,
     json: JsonEmitter<StrusonBackend<W>>,
+    list_stack: Vec<ListStackEntry>,
     table_depth: u32,
 }
 
@@ -134,13 +249,39 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.json.close_object()
     }
 
+    fn close_current_list_item_object(&mut self) -> Result<()> {
+        let popped_entry = self.list_stack.pop();
+        if let Some(list_entry) = popped_entry {
+            if list_entry.content_array_open {
+                self.json.close_array()?;
+            }
+            if list_entry.children_array_open {
+                self.json.close_array()?;
+            } else {
+                self.json.key("children").array(|_| Ok(()))?;
+            }
+            self.json.close_object()?;
+        }
+        Ok(())
+    }
+
     fn close_for_block_sibling(&mut self) -> Result<()> {
+        if !self.list_stack.is_empty() {
+            self.close_open_list_items()?;
+        }
         if self.blockquote_depth > 0 {
             return self.close_blockquote_for_sibling();
         }
         if self.in_text_block {
             self.close_content_block()?;
             self.in_text_block = false;
+        }
+        Ok(())
+    }
+
+    fn close_open_list_items(&mut self) -> Result<()> {
+        while !self.list_stack.is_empty() {
+            self.close_current_list_item_object()?;
         }
         Ok(())
     }
@@ -199,7 +340,48 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         })
     }
 
+    fn handle_end_list_item(&mut self) -> Result<()> {
+        if self.dropped_list_depth > 0 {
+            self.dropped_list_depth = self.dropped_list_depth.saturating_sub(1);
+            return Ok(());
+        }
+        if self.list_stack.is_empty() {
+            return Ok(());
+        }
+        self.close_current_list_item_object()
+    }
+
+    fn handle_end_paragraph(&mut self) -> Result<()> {
+        if self.drop_inside_list_depth > 0 || self.dropped_list_depth > 0 {
+            return Ok(());
+        }
+        if !self.list_stack.is_empty()
+            && self
+                .list_stack
+                .last()
+                .is_some_and(|e| e.first_paragraph_consumed)
+            && self.in_text_block
+        {
+            self.json.close_array()?;
+            self.json.key("children").array(|_| Ok(()))?;
+            self.json.close_object()?;
+            self.in_text_block = false;
+            return Ok(());
+        }
+        if self.in_list_item_content() {
+            if let Some(entry) = self.list_stack.last_mut() {
+                entry.first_paragraph_consumed = true;
+            }
+            return Ok(());
+        }
+        if self.blockquote_depth > 0 || !self.in_text_block || self.in_table_cell {
+            return Ok(());
+        }
+        close_text_block!(self)
+    }
+
     fn handle_end_table(&mut self) -> Result<()> {
+        drop_block_in_list_end!(self);
         if self.table_depth == 0 {
             return Ok(());
         }
@@ -216,7 +398,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_end_table_cell(&mut self) -> Result<()> {
-        if self.table_depth > 1 {
+        if self.drop_inside_list_depth > 0 || self.table_depth > 1 {
             return Ok(());
         }
         self.json.close_array()?;
@@ -226,7 +408,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_end_table_row(&mut self) -> Result<()> {
-        if self.table_depth > 1 {
+        if self.drop_inside_list_depth > 0 || self.table_depth > 1 {
             return Ok(());
         }
         self.json.close_array()?;
@@ -252,7 +434,10 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         alt: Option<String>,
         id: Option<&String>,
     ) -> Result<()> {
-        if self.in_table_cell {
+        if self.in_table_cell || self.drop_inside_list_depth > 0 {
+            return Ok(());
+        }
+        if self.in_any_list_item() {
             return Ok(());
         }
         self.close_for_block_sibling()?;
@@ -276,10 +461,68 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         })
     }
 
+    fn handle_line_break(&mut self) -> Result<()> {
+        if self.drop_inside_list_depth > 0 {
+            return Ok(());
+        }
+        if (self.in_text_block || self.in_table_cell || self.in_list_item_content())
+            && self.table_depth <= 1
+        {
+            self.handle_text("\n", &TextStyle::default())
+        } else {
+            Ok(())
+        }
+    }
+
     fn handle_paragraph(&mut self, id: Option<&String>) -> Result<()> {
         // Inside a table cell, BlockNote's content type is InlineContent[] — block-level events are dropped.
         if self.in_table_cell {
             return Ok(());
+        }
+        // Paragraphs nested inside a dropped block must not mutate list state or emit JSON;
+        // they are absorbed along with the surrounding dropped block.
+        if self.drop_inside_list_depth > 0 || self.dropped_list_depth > 0 {
+            return Ok(());
+        }
+        // Second and subsequent paragraphs inside a list item dispatch as child paragraph blocks
+        // in the item's children[] array (T11). Must be checked before in_list_item_content()
+        // because content_array_open may still be true when first_paragraph_consumed is set.
+        if !self.list_stack.is_empty()
+            && self
+                .list_stack
+                .last()
+                .is_some_and(|e| e.first_paragraph_consumed)
+        {
+            if self.list_stack.last().is_some_and(|e| e.content_array_open) {
+                self.json.close_array()?;
+                if let Some(e) = self.list_stack.last_mut() {
+                    e.content_array_open = false;
+                }
+            }
+            if !self
+                .list_stack
+                .last()
+                .is_some_and(|e| e.children_array_open)
+            {
+                self.json.key("children").open_array()?;
+                if let Some(e) = self.list_stack.last_mut() {
+                    e.children_array_open = true;
+                }
+            }
+            self.json.open_object()?;
+            self.json.key("type").value("paragraph")?;
+            self.json
+                .key("props")
+                .object(|j| j.key("textAlignment").value("left"))?;
+            self.json.key("content").open_array()?;
+            self.in_text_block = true;
+            return Ok(());
+        }
+        if self.in_list_item_content() {
+            return Ok(());
+        }
+        if !self.list_stack.is_empty() {
+            self.close_open_list_items()?;
         }
         if self.blockquote_depth > 0 {
             if self.blockquote_has_content {
@@ -312,7 +555,68 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Ok(())
     }
 
+    fn handle_start_list_item(
+        &mut self,
+        kind: ListKind,
+        id: Option<&String>,
+        level: u32,
+        start: Option<u64>,
+    ) -> Result<()> {
+        if self.in_table_cell || self.table_depth > 1 || self.drop_inside_list_depth > 0 {
+            self.dropped_list_depth = self.dropped_list_depth.saturating_add(1);
+            return Ok(());
+        }
+        if self.blockquote_depth > 0 {
+            self.close_blockquote_for_sibling()?;
+        }
+        if self.list_stack.is_empty() {
+            self.close_for_block_sibling()?;
+            self.open_list_item_object(kind, id, level, start)?;
+            return Ok(());
+        }
+
+        let stack_top_level = self.list_stack.last().map_or(0, |entry| entry.level);
+
+        // Level-jump clamping: silently absorb invalid multi-level forward jumps from broken
+        // source documents by treating any skip-ahead as a single step beyond the current top.
+        let effective_level = if level > stack_top_level.saturating_add(1) {
+            stack_top_level.saturating_add(1)
+        } else {
+            level
+        };
+
+        if effective_level > stack_top_level {
+            self.open_current_list_item_children()?;
+            self.open_list_item_object(kind, id, effective_level, start)?;
+            return Ok(());
+        }
+
+        if effective_level == stack_top_level {
+            self.close_current_list_item_object()?;
+            if self.list_stack.is_empty() {
+                self.close_for_block_sibling()?;
+            }
+            self.open_list_item_object(kind, id, effective_level, start)?;
+            return Ok(());
+        }
+
+        // Level-down: pop stack entries until the top's level is strictly below effective_level
+        // (i.e., at effective_level - 1, the parent). Then open the new item as a sibling.
+        while let Some(top) = self.list_stack.last() {
+            if top.level < effective_level {
+                break;
+            }
+            self.close_current_list_item_object()?;
+        }
+        if self.list_stack.is_empty() {
+            self.close_for_block_sibling()?;
+        }
+        self.open_list_item_object(kind, id, effective_level, start)?;
+        Ok(())
+    }
+
     fn handle_start_table(&mut self, id: Option<&String>) -> Result<()> {
+        drop_block_in_list_start!(self);
         if self.table_depth > 0 {
             self.table_depth = self.table_depth.saturating_add(1);
             return Ok(());
@@ -334,7 +638,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_start_table_row(&mut self, id: Option<&String>) -> Result<()> {
-        if self.table_depth > 1 {
+        if self.drop_inside_list_depth > 0 || self.table_depth > 1 {
             return Ok(());
         }
         self.json.open_object()?;
@@ -343,7 +647,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_table_cell(&mut self, id: Option<&String>) -> Result<()> {
-        if self.table_depth > 1 {
+        if self.drop_inside_list_depth > 0 || self.table_depth > 1 {
             return Ok(());
         }
         self.json.open_object()?;
@@ -361,7 +665,11 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_text(&mut self, content: &str, style: &TextStyle) -> Result<()> {
-        if (!self.in_text_block && !self.in_table_cell) || self.table_depth > 1 {
+        if self.drop_inside_list_depth > 0
+            || self.dropped_list_depth > 0
+            || (!self.in_text_block && !self.in_table_cell && !self.in_list_item_content())
+            || self.table_depth > 1
+        {
             return Ok(());
         }
         if self.blockquote_depth > 0 {
@@ -387,6 +695,35 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         })
     }
 
+    fn handle_text_event(&mut self, content: &str, style: &TextStyle) -> Result<()> {
+        // Auto-open paragraph for orphan text (e.g., text after image closed paragraph)
+        if !self.in_text_block
+            && self.blockquote_depth == 0
+            && !self.in_table_cell
+            && !self.in_list_item_content()
+        {
+            self.handle_paragraph(None)?;
+        }
+        self.handle_text(content, style)
+    }
+
+    /// Returns true when any list item is currently open on the stack, regardless of whether
+    /// its `content[]` or `children[]` array is the active emission target. Drop trigger for
+    /// non-paragraph block events that must be suppressed anywhere inside a list item per the
+    /// module-level policy (headings, images, code blocks, blockquotes, tables, thematic
+    /// breaks). Broader than `in_list_item_content`, which is true only while `content[]` is
+    /// open — `in_any_list_item` also returns true after a multi-paragraph or nested-list
+    /// transition has moved emission into `children[]`.
+    fn in_any_list_item(&self) -> bool {
+        !self.list_stack.is_empty()
+    }
+
+    fn in_list_item_content(&self) -> bool {
+        self.list_stack
+            .last()
+            .is_some_and(|entry| entry.content_array_open)
+    }
+
     /// Creates a new `BlockNoteWriter` that writes to the given writer.
     ///
     /// # Arguments
@@ -400,11 +737,80 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             blockquote_depth: 0,
             blockquote_force_closed_count: 0,
             blockquote_has_content: false,
+            drop_inside_list_depth: 0,
+            dropped_list_depth: 0,
             in_table_cell: false,
             in_text_block: false,
             json: JsonEmitter::new(StrusonBackend::new(writer)),
+            list_stack: Vec::new(),
             table_depth: 0,
         }
+    }
+
+    fn open_current_list_item_children(&mut self) -> Result<()> {
+        let content_array_open = self
+            .list_stack
+            .last()
+            .is_some_and(|entry| entry.content_array_open);
+        if content_array_open {
+            self.json.close_array()?;
+            if let Some(entry) = self.list_stack.last_mut() {
+                entry.content_array_open = false;
+            }
+        }
+
+        let children_array_open = self
+            .list_stack
+            .last()
+            .is_some_and(|entry| entry.children_array_open);
+        if !children_array_open {
+            self.json.key("children").open_array()?;
+            if let Some(entry) = self.list_stack.last_mut() {
+                entry.children_array_open = true;
+            }
+        }
+        Ok(())
+    }
+
+    fn open_list_item_object(
+        &mut self,
+        kind: ListKind,
+        id: Option<&String>,
+        level: u32,
+        start: Option<u64>,
+    ) -> Result<()> {
+        self.json.open_object()?;
+        self.write_id(id)?;
+        let type_name = match kind {
+            ListKind::Ordered => "numberedListItem",
+            ListKind::Unordered => "bulletListItem",
+        };
+        self.json.key("type").value(type_name)?;
+        self.json.key("props").object(|j| {
+            j.key("backgroundColor").value("default")?;
+            j.key("textColor").value("default")?;
+            j.key("textAlignment").value("left")?;
+            if kind == ListKind::Ordered {
+                if let Some(start_value) = start {
+                    let start_prop = u32::try_from(start_value).map_err(|err| Error::Other {
+                        message: format!(
+                            "ordered list start value out of range: {start_value}: {err}"
+                        ),
+                    })?;
+                    j.key("start").value(start_prop)?;
+                }
+            }
+            Ok(())
+        })?;
+        self.json.key("content").open_array()?;
+        self.list_stack.push(ListStackEntry {
+            children_array_open: false,
+            content_array_open: true,
+            first_paragraph_consumed: false,
+            kind,
+            level,
+        });
+        Ok(())
     }
 
     /// Creates a new `BlockNoteWriter` with an [`AssetProvider`] for resolving embedded assets.
@@ -425,9 +831,12 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             blockquote_depth: 0,
             blockquote_force_closed_count: 0,
             blockquote_has_content: false,
+            drop_inside_list_depth: 0,
+            dropped_list_depth: 0,
             in_table_cell: false,
             in_text_block: false,
             json: JsonEmitter::new(StrusonBackend::new(writer)),
+            list_stack: Vec::new(),
             table_depth: 0,
         }
     }
@@ -450,19 +859,27 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
     fn handle_event(&mut self, event: Event) -> Result<()> {
         match event {
             Event::StartDocument { .. } => self.json.open_array(),
-            Event::EndDocument => self.json.close_array(),
+            Event::EndDocument => {
+                while !self.list_stack.is_empty() {
+                    self.close_current_list_item_object()?;
+                }
+                self.json.close_array()
+            }
             Event::StartHeading { level, id, .. } => {
                 return_if_table_cell!(self);
+                drop_block_in_list_start!(self);
                 self.close_for_block_sibling()?;
                 self.handle_heading(level, id.as_ref())
             }
             Event::EndHeading => {
+                drop_block_in_list_end!(self);
                 if !self.in_text_block {
                     return Ok(());
                 }
                 close_text_block!(self)
             }
             Event::EndPreformatted => {
+                drop_block_in_list_end!(self);
                 return_if_table_cell!(self);
                 if !self.in_text_block {
                     return Ok(());
@@ -470,18 +887,15 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 close_text_block!(self)
             }
             Event::StartParagraph { id, .. } => self.handle_paragraph(id.as_ref()),
-            Event::EndParagraph => {
-                if self.blockquote_depth > 0 || !self.in_text_block || self.in_table_cell {
-                    return Ok(());
-                }
-                close_text_block!(self)
-            }
+            Event::EndParagraph => self.handle_end_paragraph(),
             Event::StartBlockQuote { id, .. } => {
                 return_if_table_cell!(self);
+                drop_block_in_list_start!(self);
                 self.close_for_block_sibling()?;
                 self.handle_blockquote(id.as_ref())
             }
             Event::EndBlockQuote => {
+                drop_block_in_list_end!(self);
                 return_if_table_cell!(self);
                 if self.blockquote_force_closed_count > 0 {
                     self.blockquote_force_closed_count =
@@ -495,31 +909,30 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             }
             Event::StartPreformatted { id, syntax, .. } => {
                 return_if_table_cell!(self);
+                drop_block_in_list_start!(self);
                 self.close_for_block_sibling()?;
                 self.handle_preformatted(id.as_ref(), syntax.as_ref())
             }
             Event::ThematicBreak { id, .. } => {
                 return_if_table_cell!(self);
+                if self.in_any_list_item() || self.drop_inside_list_depth > 0 {
+                    return Ok(());
+                }
                 self.close_for_block_sibling()?;
                 self.handle_divider(id.as_ref())
             }
-            Event::Text { content, style, .. } => {
-                // Auto-open paragraph for orphan text (e.g., text after image closed paragraph)
-                if !self.in_text_block && self.blockquote_depth == 0 && !self.in_table_cell {
-                    self.handle_paragraph(None)?;
-                }
-                self.handle_text(&content, &style)
-            }
+            Event::Text { content, style, .. } => self.handle_text_event(&content, &style),
             Event::Image {
                 source, alt, id, ..
             } => self.handle_image(source, alt, id.as_ref()),
-            Event::LineBreak => {
-                if (self.in_text_block || self.in_table_cell) && self.table_depth <= 1 {
-                    self.handle_text("\n", &TextStyle::default())
-                } else {
-                    Ok(())
-                }
+            Event::LineBreak => self.handle_line_break(),
+            Event::StartOrderedListItem {
+                id, level, start, ..
+            } => self.handle_start_list_item(ListKind::Ordered, id.as_ref(), level, start),
+            Event::StartUnorderedListItem { id, level, .. } => {
+                self.handle_start_list_item(ListKind::Unordered, id.as_ref(), level, None)
             }
+            Event::EndOrderedListItem | Event::EndUnorderedListItem => self.handle_end_list_item(),
             Event::StartTable { id, .. } => self.handle_start_table(id.as_ref()),
             Event::EndTable => self.handle_end_table(),
             Event::StartTableRow { id, .. } => self.handle_start_table_row(id.as_ref()),
@@ -534,8 +947,6 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             | Event::EndDefinitionTerm
             | Event::EndFootnote
             | Event::EndLink
-            | Event::EndOrderedListItem
-            | Event::EndUnorderedListItem
             | Event::FootnoteRef { .. }
             | Event::StartCaption { .. }
             | Event::StartDefinitionDetail { .. }
@@ -543,8 +954,6 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             | Event::StartDefinitionTerm { .. }
             | Event::StartFootnote { .. }
             | Event::StartLink { .. }
-            | Event::StartOrderedListItem { .. }
-            | Event::StartUnorderedListItem { .. }
             | _ => Ok(()),
         }
     }
@@ -564,5 +973,46 @@ mod tests {
         let io_error = std::io::Error::other("test");
         let docspec_error = super::io_err(io_error);
         assert!(matches!(docspec_error, Error::Io { .. }));
+    }
+
+    #[test]
+    fn list_stack_empty_after_new() {
+        let mut buf = Vec::new();
+        let writer = BlockNoteWriter::new(&mut buf);
+        assert!(writer.list_stack.is_empty());
+    }
+
+    #[test]
+    fn close_for_block_sibling_with_nonempty_list_stack_closes_all_items() {
+        // Drives close_open_list_items call inside close_for_block_sibling (line 264).
+        // After opening a list item, list_stack is non-empty; calling the private
+        // method directly exercises the !list_stack.is_empty() branch.
+        let mut buf = Vec::new();
+        let mut writer = BlockNoteWriter::new(&mut buf);
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            })
+            .is_ok());
+        assert!(
+            !writer.list_stack.is_empty(),
+            "list_stack must be non-empty before calling close_for_block_sibling"
+        );
+        assert!(writer.close_for_block_sibling().is_ok());
+        assert!(
+            writer.list_stack.is_empty(),
+            "close_for_block_sibling must drain list_stack via close_open_list_items"
+        );
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
     }
 }
