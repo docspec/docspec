@@ -6,7 +6,7 @@ mod error;
 mod format;
 
 use std::fs::File;
-use std::io::{IsTerminal as _, Read as _, Write};
+use std::io::{BufWriter, IsTerminal as _, Read as _, Write};
 
 use clap::Parser as _;
 use docspec_blocknote_writer::BlockNoteWriter;
@@ -86,7 +86,12 @@ fn main() {
 
         cli.output.as_ref().map_or_else(
             || run_pipeline(&content, std::io::stdout().lock()),
-            |path| run_pipeline(&content, File::create(path)?),
+            |path| {
+                let mut writer = BufWriter::new(File::create(path)?);
+                run_pipeline(&content, &mut writer)?;
+                writer.flush()?;
+                Ok(())
+            },
         )
     })();
 
