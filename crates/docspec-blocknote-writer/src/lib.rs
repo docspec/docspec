@@ -153,15 +153,16 @@ use docspec_json::{JsonEmitter, Null, StrusonBackend};
 
 macro_rules! close_text_block {
     ($writer:expr) => {{
+        $writer.close_open_link_if_any()?;
         $writer.close_content_block()?;
-        $writer.in_text_block = false;
+        $writer.context.in_text_block = false;
         Ok(())
     }};
 }
 
 macro_rules! return_if_table_cell {
     ($writer:expr) => {
-        if $writer.in_table_cell {
+        if $writer.context.in_table_cell {
             return Ok(());
         }
     };
@@ -209,6 +210,13 @@ struct ListStackEntry {
     level: u32,
 }
 
+#[derive(Default)]
+struct BlockContext {
+    blockquote_has_content: bool,
+    in_table_cell: bool,
+    in_text_block: bool,
+}
+
 /// A streaming `BlockNote` JSON writer.
 ///
 /// Writes JSON tokens directly to the underlying `Write` as events arrive using `docspec-json`.
@@ -224,22 +232,25 @@ pub struct BlockNoteWriter<'a, W: Write> {
     assets: Option<&'a dyn AssetProvider>,
     blockquote_depth: u32,
     blockquote_force_closed_count: usize,
-    blockquote_has_content: bool,
+    context: BlockContext,
     drop_inside_list_depth: u32,
     dropped_list_depth: u32,
-    in_table_cell: bool,
-    in_text_block: bool,
+    /// Whether the writer is currently inside an open link inline container.
+    in_link: bool,
     json: JsonEmitter<StrusonBackend<W>>,
+    /// Whether at least one `StyledText` has been emitted into the current link's content array.
+    link_emitted_styled_text: bool,
     list_stack: Vec<ListStackEntry>,
     table_depth: u32,
 }
 
 impl<'a, W: Write> BlockNoteWriter<'a, W> {
     fn close_blockquote_for_sibling(&mut self) -> Result<()> {
+        self.close_open_link_if_any()?;
         self.close_content_block()?;
         self.blockquote_depth = self.blockquote_depth.saturating_sub(1);
         self.blockquote_force_closed_count = self.blockquote_force_closed_count.saturating_add(1);
-        self.in_text_block = self.blockquote_depth > 0;
+        self.context.in_text_block = self.blockquote_depth > 0;
         Ok(())
     }
 
@@ -253,6 +264,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         let popped_entry = self.list_stack.pop();
         if let Some(list_entry) = popped_entry {
             if list_entry.content_array_open {
+                self.close_open_link_if_any()?;
                 self.json.close_array()?;
             }
             if list_entry.children_array_open {
@@ -272,9 +284,22 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if self.blockquote_depth > 0 {
             return self.close_blockquote_for_sibling();
         }
-        if self.in_text_block {
+        if self.context.in_text_block {
+            self.close_open_link_if_any()?;
             self.close_content_block()?;
-            self.in_text_block = false;
+            self.context.in_text_block = false;
+        }
+        Ok(())
+    }
+
+    /// Defensive: close any open inline link before closing a surrounding block.
+    ///
+    /// Under the canonical reader + `StackTrackingSink` contract this is a no-op,
+    /// but it hardens the writer against direct API misuse where a block may end
+    /// while a link is still open.
+    fn close_open_link_if_any(&mut self) -> Result<()> {
+        if self.in_link {
+            self.handle_end_link()?;
         }
         Ok(())
     }
@@ -325,8 +350,8 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.write_id(id)?;
         self.json.key("content").open_array()?;
         self.blockquote_depth = self.blockquote_depth.saturating_add(1);
-        self.blockquote_has_content = false;
-        self.in_text_block = true;
+        self.context.blockquote_has_content = false;
+        self.context.in_text_block = true;
         Ok(())
     }
 
@@ -338,6 +363,30 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             }
             Ok(())
         })
+    }
+
+    /// Closes the current inline link object.
+    ///
+    /// If no `StyledText` was emitted into the link's `content` array, inserts an empty
+    /// `StyledText` (`{"type":"text","text":"","styles":{}}`) to satisfy the `BlockNote`
+    /// schema (links must have at least one content item).
+    fn handle_end_link(&mut self) -> Result<()> {
+        if !self.in_link {
+            return Ok(());
+        }
+        if !self.link_emitted_styled_text {
+            self.json.open_object()?;
+            self.json.key("type").value("text")?;
+            self.json.key("text").value("")?;
+            self.json.key("styles").open_object()?;
+            self.json.close_object()?;
+            self.json.close_object()?;
+        }
+        self.json.close_array()?;
+        self.json.close_object()?;
+        self.in_link = false;
+        self.link_emitted_styled_text = false;
+        Ok(())
     }
 
     fn handle_end_list_item(&mut self) -> Result<()> {
@@ -360,12 +409,13 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
                 .list_stack
                 .last()
                 .is_some_and(|e| e.first_paragraph_consumed)
-            && self.in_text_block
+            && self.context.in_text_block
         {
+            self.close_open_link_if_any()?;
             self.json.close_array()?;
             self.json.key("children").array(|_| Ok(()))?;
             self.json.close_object()?;
-            self.in_text_block = false;
+            self.context.in_text_block = false;
             return Ok(());
         }
         if self.in_list_item_content() {
@@ -374,7 +424,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             }
             return Ok(());
         }
-        if self.blockquote_depth > 0 || !self.in_text_block || self.in_table_cell {
+        if self.blockquote_depth > 0 || !self.context.in_text_block || self.context.in_table_cell {
             return Ok(());
         }
         close_text_block!(self)
@@ -401,9 +451,10 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if self.drop_inside_list_depth > 0 || self.table_depth > 1 {
             return Ok(());
         }
+        self.close_open_link_if_any()?;
         self.json.close_array()?;
         self.json.close_object()?;
-        self.in_table_cell = false;
+        self.context.in_table_cell = false;
         Ok(())
     }
 
@@ -424,7 +475,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             j.key("textAlignment").value("left")
         })?;
         self.json.key("content").open_array()?;
-        self.in_text_block = true;
+        self.context.in_text_block = true;
         Ok(())
     }
 
@@ -434,7 +485,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         alt: Option<String>,
         id: Option<&String>,
     ) -> Result<()> {
-        if self.in_table_cell || self.drop_inside_list_depth > 0 {
+        if self.context.in_table_cell || self.drop_inside_list_depth > 0 {
             return Ok(());
         }
         if self.in_any_list_item() {
@@ -465,7 +516,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if self.drop_inside_list_depth > 0 {
             return Ok(());
         }
-        if (self.in_text_block || self.in_table_cell || self.in_list_item_content())
+        if (self.context.in_text_block || self.context.in_table_cell || self.in_list_item_content())
             && self.table_depth <= 1
         {
             self.handle_text("\n", &TextStyle::default())
@@ -476,7 +527,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
 
     fn handle_paragraph(&mut self, id: Option<&String>) -> Result<()> {
         // Inside a table cell, BlockNote's content type is InlineContent[] — block-level events are dropped.
-        if self.in_table_cell {
+        if self.context.in_table_cell {
             return Ok(());
         }
         // Paragraphs nested inside a dropped block must not mutate list state or emit JSON;
@@ -515,7 +566,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
                 .key("props")
                 .object(|j| j.key("textAlignment").value("left"))?;
             self.json.key("content").open_array()?;
-            self.in_text_block = true;
+            self.context.in_text_block = true;
             return Ok(());
         }
         if self.in_list_item_content() {
@@ -525,7 +576,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             self.close_open_list_items()?;
         }
         if self.blockquote_depth > 0 {
-            if self.blockquote_has_content {
+            if self.context.blockquote_has_content {
                 self.handle_text("\n\n", &TextStyle::default())?;
             }
             return Ok(());
@@ -537,7 +588,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             .key("props")
             .object(|j| j.key("textAlignment").value("left"))?;
         self.json.key("content").open_array()?;
-        self.in_text_block = true;
+        self.context.in_text_block = true;
         Ok(())
     }
 
@@ -551,7 +602,35 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
                 .object(|j| j.key("language").value(lang.as_str()))?;
         }
         self.json.key("content").open_array()?;
-        self.in_text_block = true;
+        self.context.in_text_block = true;
+        Ok(())
+    }
+
+    /// Opens a `BlockNote` inline link object and its `content` array.
+    ///
+    /// Drops `title` and `id` — `BlockNote`'s inline link schema has no slot for these.
+    fn handle_start_link(&mut self, href: &str) -> Result<()> {
+        if self.drop_inside_list_depth > 0
+            || self.dropped_list_depth > 0
+            || (!self.context.in_text_block
+                && !self.context.in_table_cell
+                && !self.in_list_item_content())
+            || self.table_depth > 1
+        {
+            return Ok(());
+        }
+        if self.in_link {
+            return Ok(());
+        }
+        if self.blockquote_depth > 0 {
+            self.context.blockquote_has_content = true;
+        }
+        self.json.open_object()?;
+        self.json.key("type").value("link")?;
+        self.json.key("href").value(href)?;
+        self.json.key("content").open_array()?;
+        self.in_link = true;
+        self.link_emitted_styled_text = false;
         Ok(())
     }
 
@@ -562,7 +641,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         level: u32,
         start: Option<u64>,
     ) -> Result<()> {
-        if self.in_table_cell || self.table_depth > 1 || self.drop_inside_list_depth > 0 {
+        if self.context.in_table_cell || self.table_depth > 1 || self.drop_inside_list_depth > 0 {
             self.dropped_list_depth = self.dropped_list_depth.saturating_add(1);
             return Ok(());
         }
@@ -633,7 +712,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.json.key("columnWidths").array(|_| Ok(()))?;
         self.json.key("rows").open_array()?;
         self.table_depth = 1;
-        self.in_text_block = false;
+        self.context.in_text_block = false;
         Ok(())
     }
 
@@ -659,21 +738,23 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             p.key("textAlignment").value("left")
         })?;
         self.json.key("content").open_array()?;
-        self.in_table_cell = true;
-        self.in_text_block = false;
+        self.context.in_table_cell = true;
+        self.context.in_text_block = false;
         Ok(())
     }
 
     fn handle_text(&mut self, content: &str, style: &TextStyle) -> Result<()> {
         if self.drop_inside_list_depth > 0
             || self.dropped_list_depth > 0
-            || (!self.in_text_block && !self.in_table_cell && !self.in_list_item_content())
+            || (!self.context.in_text_block
+                && !self.context.in_table_cell
+                && !self.in_list_item_content())
             || self.table_depth > 1
         {
             return Ok(());
         }
         if self.blockquote_depth > 0 {
-            self.blockquote_has_content = true;
+            self.context.blockquote_has_content = true;
         }
         self.json.object(|j| {
             j.key("type").value("text")?;
@@ -692,14 +773,18 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
                 }
                 Ok(())
             })
-        })
+        })?;
+        if self.in_link {
+            self.link_emitted_styled_text = true;
+        }
+        Ok(())
     }
 
     fn handle_text_event(&mut self, content: &str, style: &TextStyle) -> Result<()> {
         // Auto-open paragraph for orphan text (e.g., text after image closed paragraph)
-        if !self.in_text_block
+        if !self.context.in_text_block
             && self.blockquote_depth == 0
-            && !self.in_table_cell
+            && !self.context.in_table_cell
             && !self.in_list_item_content()
         {
             self.handle_paragraph(None)?;
@@ -736,12 +821,12 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             assets: None,
             blockquote_depth: 0,
             blockquote_force_closed_count: 0,
-            blockquote_has_content: false,
+            context: BlockContext::default(),
             drop_inside_list_depth: 0,
             dropped_list_depth: 0,
-            in_table_cell: false,
-            in_text_block: false,
+            in_link: false,
             json: JsonEmitter::new(StrusonBackend::new(writer)),
+            link_emitted_styled_text: false,
             list_stack: Vec::new(),
             table_depth: 0,
         }
@@ -830,12 +915,12 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             assets: Some(assets),
             blockquote_depth: 0,
             blockquote_force_closed_count: 0,
-            blockquote_has_content: false,
+            context: BlockContext::default(),
             drop_inside_list_depth: 0,
             dropped_list_depth: 0,
-            in_table_cell: false,
-            in_text_block: false,
+            in_link: false,
             json: JsonEmitter::new(StrusonBackend::new(writer)),
+            link_emitted_styled_text: false,
             list_stack: Vec::new(),
             table_depth: 0,
         }
@@ -873,7 +958,7 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             }
             Event::EndHeading => {
                 drop_block_in_list_end!(self);
-                if !self.in_text_block {
+                if !self.context.in_text_block {
                     return Ok(());
                 }
                 close_text_block!(self)
@@ -881,7 +966,7 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             Event::EndPreformatted => {
                 drop_block_in_list_end!(self);
                 return_if_table_cell!(self);
-                if !self.in_text_block {
+                if !self.context.in_text_block {
                     return Ok(());
                 }
                 close_text_block!(self)
@@ -902,9 +987,10 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                         self.blockquote_force_closed_count.saturating_sub(1);
                     return Ok(());
                 }
+                self.close_open_link_if_any()?;
                 self.close_content_block()?;
                 self.blockquote_depth = self.blockquote_depth.saturating_sub(1);
-                self.in_text_block = self.blockquote_depth > 0;
+                self.context.in_text_block = self.blockquote_depth > 0;
                 Ok(())
             }
             Event::StartPreformatted { id, syntax, .. } => {
@@ -941,19 +1027,19 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 self.handle_table_cell(id.as_ref())
             }
             Event::EndTableCell | Event::EndTableHeader => self.handle_end_table_cell(),
+            Event::StartLink { href, .. } => self.handle_start_link(&href),
+            Event::EndLink => self.handle_end_link(),
             Event::EndCaption
             | Event::EndDefinitionDetail
             | Event::EndDefinitionList
             | Event::EndDefinitionTerm
             | Event::EndFootnote
-            | Event::EndLink
             | Event::FootnoteRef { .. }
             | Event::StartCaption { .. }
             | Event::StartDefinitionDetail { .. }
             | Event::StartDefinitionList { .. }
             | Event::StartDefinitionTerm { .. }
             | Event::StartFootnote { .. }
-            | Event::StartLink { .. }
             | _ => Ok(()),
         }
     }

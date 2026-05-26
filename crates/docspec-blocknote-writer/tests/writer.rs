@@ -133,6 +133,20 @@ mod tests {
         string_result.unwrap_or_default()
     }
 
+    fn run_direct_writer_events(events: &[Event]) -> String {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = BlockNoteWriter::new(&mut buf);
+        for event in events {
+            let handle_result = writer.handle_event(event.clone());
+            assert!(handle_result.is_ok(), "handle_event failed");
+        }
+        let finish_result = writer.finish();
+        assert!(finish_result.is_ok(), "finish failed");
+        let string_result = String::from_utf8(buf);
+        assert!(string_result.is_ok(), "invalid UTF-8 output");
+        string_result.unwrap_or_default()
+    }
+
     #[test]
     fn empty_document() {
         let json = run_events(&[
@@ -4073,44 +4087,6 @@ mod tests {
     }
 
     #[test]
-    fn link_events_in_paragraph_are_silently_ignored_by_writer() {
-        // Drives the wildcard catch-all arm (StartLink / EndLink and related events).
-        // BlockNoteWriter has no link block type; these events are silently dropped
-        // while text inside the link is still emitted as inline content.
-        let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::StartLink {
-                id: None,
-                href: "https://example.com".to_string(),
-                title: None,
-            },
-            Event::Text {
-                content: "click".to_string(),
-                style: TextStyle::default(),
-            },
-            Event::EndLink,
-            Event::EndParagraph,
-            Event::EndDocument,
-        ]);
-        assert!(
-            json.contains("\"text\":\"click\""),
-            "text inside link must appear in output"
-        );
-        assert!(
-            !json.contains("link"),
-            "no link structure should be emitted"
-        );
-    }
-
-    #[test]
     fn end_heading_without_open_heading_is_noop() {
         // Drives EndHeading when in_text_block is false and drop_inside_list_depth
         // is zero — the !in_text_block guard returns Ok(()) silently.
@@ -4208,18 +4184,12 @@ mod tests {
             Event::EndDefinitionList,
             Event::EndDefinitionTerm,
             Event::EndFootnote,
-            Event::EndLink,
             Event::FootnoteRef { id: 1 },
             Event::StartCaption { id: None },
             Event::StartDefinitionDetail { id: None },
             Event::StartDefinitionList { id: None },
             Event::StartDefinitionTerm { id: None },
             Event::StartFootnote { id: 1 },
-            Event::StartLink {
-                id: None,
-                href: "https://example.com".to_string(),
-                title: None,
-            },
         ] {
             assert!(
                 writer.handle_event(event).is_ok(),
@@ -5047,7 +5017,6 @@ mod tests {
             Event::EndDefinitionList,
             Event::EndDefinitionTerm,
             Event::EndFootnote,
-            Event::EndLink,
             Event::FootnoteRef { id: 99 },
             Event::StartCaption {
                 id: Some("c".to_string()),
@@ -5056,11 +5025,6 @@ mod tests {
             Event::StartDefinitionList { id: None },
             Event::StartDefinitionTerm { id: None },
             Event::StartFootnote { id: 7 },
-            Event::StartLink {
-                id: None,
-                href: "https://x.com".to_string(),
-                title: Some("title".to_string()),
-            },
         ] {
             let mut buf = Vec::<u8>::new();
             let mut writer = BlockNoteWriter::new(&mut buf);
@@ -5681,6 +5645,497 @@ mod tests {
         assert!(
             json.contains(&expected_children),
             "continuation paragraph must be a sibling of the nested item inside the outer item's children[], not nested inside the nested item's children[]: {json}"
+        );
+    }
+
+    // ============================================================================
+    // LINK TESTS
+    // ============================================================================
+
+    #[test]
+    fn link_simple() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::StartLink {
+                href: "https://example.com".to_string(),
+                title: None,
+                id: None,
+            },
+            Event::Text {
+                content: "text".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndLink,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"text","styles":{}}]}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn nested_start_link_is_silently_ignored() {
+        let json = run_direct_writer_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::StartLink {
+                href: "https://a.example".to_string(),
+                title: None,
+                id: None,
+            },
+            Event::StartLink {
+                href: "https://b.example".to_string(),
+                title: None,
+                id: None,
+            },
+            Event::Text {
+                content: "inner".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndLink,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        let parsed_result: Result<serde_json::Value, _> = serde_json::from_str(&json);
+        assert!(parsed_result.is_ok(), "output must be valid JSON: {json}");
+        assert_eq!(json.matches(r#""type":"link""#).count(), 1);
+        assert!(json.contains(r#""href":"https://a.example""#));
+        assert!(!json.contains(r#""href":"https://b.example""#));
+        assert!(
+            json.contains(r#""content":[{"type":"link","href":"https://a.example","content":[{"type":"text","text":"inner","styles":{}}]}]"#),
+            "text must remain inside the outer link content: {json}"
+        );
+    }
+
+    #[test]
+    fn link_left_open_at_paragraph_end_is_defensively_closed() {
+        let json = run_direct_writer_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::StartLink {
+                href: "https://x.example".to_string(),
+                title: None,
+                id: None,
+            },
+            Event::Text {
+                content: "label".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        let parsed_result: Result<serde_json::Value, _> = serde_json::from_str(&json);
+        assert!(parsed_result.is_ok(), "output must be valid JSON: {json}");
+        assert_eq!(json.matches(r#""type":"link""#).count(), 1);
+        assert!(json.contains(r#""href":"https://x.example""#));
+        assert!(
+            json.contains(r#"{"type":"text","text":"label","styles":{}}"#),
+            "link label text must be preserved: {json}"
+        );
+    }
+
+    #[test]
+    fn link_left_open_at_table_cell_end_is_defensively_closed() {
+        let json = run_direct_writer_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartTable { id: None },
+            Event::StartTableRow { id: None },
+            Event::StartTableCell {
+                id: None,
+                colspan: None,
+                rowspan: None,
+            },
+            Event::StartLink {
+                href: "https://cell.example".to_string(),
+                title: None,
+                id: None,
+            },
+            Event::Text {
+                content: "cell".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        let parsed_result: Result<serde_json::Value, _> = serde_json::from_str(&json);
+        assert!(parsed_result.is_ok(), "output must be valid JSON: {json}");
+        assert_eq!(json.matches(r#""type":"link""#).count(), 1);
+        assert!(json.contains(r#""href":"https://cell.example""#));
+        assert!(
+            json.contains(r#"{"type":"text","text":"cell","styles":{}}"#),
+            "table cell link text must be preserved: {json}"
+        );
+    }
+
+    #[test]
+    fn link_empty_content_emits_empty_styled_text() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::StartLink {
+                href: "https://example.com".to_string(),
+                title: None,
+                id: None,
+            },
+            Event::EndLink,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"","styles":{}}]}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn link_drops_title_field() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::StartLink {
+                href: "https://example.com".to_string(),
+                title: Some("a title".to_string()),
+                id: None,
+            },
+            Event::Text {
+                content: "text".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndLink,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert!(
+            !json.contains(r#""title""#),
+            "title field must not appear in BlockNote link JSON, got: {json}"
+        );
+        assert!(
+            json.contains(r#""type":"link""#),
+            "link object must be present"
+        );
+        assert!(
+            json.contains(r#""href":"https://example.com""#),
+            "href must be present"
+        );
+    }
+
+    #[test]
+    fn link_with_styled_content_array() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::StartLink {
+                href: "https://example.com".to_string(),
+                title: None,
+                id: None,
+            },
+            Event::Text {
+                content: "bold".to_string(),
+                style: TextStyle::default().bold(),
+            },
+            Event::Text {
+                content: "italic".to_string(),
+                style: TextStyle::default().italic(),
+            },
+            Event::Text {
+                content: "plain".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndLink,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"bold","styles":{"bold":true}},{"type":"text","text":"italic","styles":{"italic":true}},{"type":"text","text":"plain","styles":{}}]}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn link_in_paragraph_alongside_other_text() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "before ".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::StartLink {
+                href: "https://example.com".to_string(),
+                title: None,
+                id: None,
+            },
+            Event::Text {
+                content: "link".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndLink,
+            Event::Text {
+                content: " after".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"before ","styles":{}},{"type":"link","href":"https://example.com","content":[{"type":"text","text":"link","styles":{}}]},{"type":"text","text":" after","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn link_in_heading() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartHeading { level: 1, id: None },
+            Event::StartLink {
+                href: "https://example.com".to_string(),
+                title: None,
+                id: None,
+            },
+            Event::Text {
+                content: "title link".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndLink,
+            Event::EndHeading,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"title link","styles":{}}]}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn link_in_list_item() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            Event::StartLink {
+                href: "https://example.com".to_string(),
+                title: None,
+                id: None,
+            },
+            Event::Text {
+                content: "link".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndLink,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert!(json.contains(r#""type":"bulletListItem""#));
+        assert!(json.contains(r#""type":"link""#));
+        assert!(json.contains(r#""href":"https://example.com""#));
+        assert!(
+            json.contains(r#"{"type":"text","text":"link","styles":{}}"#),
+            "link content must preserve styled text: {json}"
+        );
+    }
+
+    #[test]
+    fn link_in_blockquote() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartBlockQuote { id: None },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::StartLink {
+                href: "https://example.com".to_string(),
+                title: None,
+                id: None,
+            },
+            Event::Text {
+                content: "link".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndLink,
+            Event::EndParagraph,
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
+        assert!(json.contains(r#""type":"quote""#));
+        assert!(json.contains(r#""type":"link""#));
+        assert!(json.contains(r#""href":"https://example.com""#));
+    }
+
+    #[test]
+    fn empty_link_in_blockquote() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartBlockQuote { id: None },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::StartLink {
+                href: "https://example.com".to_string(),
+                title: None,
+                id: None,
+            },
+            Event::EndLink,
+            Event::EndParagraph,
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
+        assert!(json.contains(r#""type":"quote""#));
+        assert!(
+            json.contains(r#""content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"","styles":{}}]}]"#),
+            "quote content must contain the empty link fallback: {json}"
+        );
+    }
+
+    #[test]
+    fn link_in_table_cell() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartTable { id: None },
+            Event::StartTableRow { id: None },
+            Event::StartTableCell {
+                id: None,
+                colspan: None,
+                rowspan: None,
+            },
+            Event::StartLink {
+                href: "https://example.com".to_string(),
+                title: None,
+                id: None,
+            },
+            Event::Text {
+                content: "link".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndLink,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert!(json.contains(r#""type":"table""#));
+        assert!(json.contains(r#""type":"link""#));
+        assert!(json.contains(r#""href":"https://example.com""#));
+    }
+
+    #[test]
+    fn link_in_dropped_heading_inside_list_emits_no_link() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            Event::StartHeading { level: 1, id: None },
+            Event::StartLink {
+                href: "https://x".to_string(),
+                title: None,
+                id: None,
+            },
+            Event::Text {
+                content: "hidden".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndLink,
+            Event::EndHeading,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert!(
+            json.contains(r#""type":"bulletListItem""#),
+            "list item must still be emitted: {json}"
+        );
+        assert!(
+            !json.contains(r#""type":"link""#),
+            "dropped heading content must not leak a phantom link: {json}"
         );
     }
 }

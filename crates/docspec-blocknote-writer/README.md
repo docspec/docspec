@@ -15,14 +15,15 @@ Converts a DocSpec event stream into [BlockNote](https://www.blocknotejs.org/) J
 | Thematic break | `divider` |
 | Unordered list item | `bulletListItem` |
 | Ordered list item | `numberedListItem` |
+| Inline link | `link` inline type with `href` (title is dropped) |
 
 Inline styles supported within text content: bold, italic, code, strikethrough, underline.
+Inline links (`StartLink`/`EndLink`) emit a `link` inline type with the `href`. The optional `title` field is dropped (BlockNote's default link schema has no title).
 
 List items support arbitrary nesting via BlockNote's native `children: Block[]` arrays. The `start` prop on `numberedListItem` is preserved when the first item in a sequence carries an explicit start number.
 
 ## Not Yet Supported
 
-- Links — `StartLink`/`EndLink` are silently ignored, so link metadata (`href`, `title`) is not emitted; `Text` events nested between them are still emitted as plain text in the surrounding inline content
 - Footnotes — `StartFootnote`/`EndFootnote`/`FootnoteRef` are silently ignored; BlockNote's default schema has no equivalent
 - Definition lists — `StartDefinitionList`/`StartDefinitionTerm`/`StartDefinitionDetail` (and their `End*` pairs) are silently ignored; BlockNote's default schema has no equivalent
 - Captions — `StartCaption`/`EndCaption` are silently ignored
@@ -94,6 +95,8 @@ let json = String::from_utf8(buf)?;
 **Non-paragraph children inside list items**: headings, images, code blocks, and blockquotes that appear as children of a list item are dropped. The first paragraph's inline content populates the item's `content[]` array; each subsequent paragraph becomes a child `paragraph` block in `children[]`.
 
 **Blockquote + list interaction**: a list item encountered while inside a blockquote force-closes the blockquote and emits the list item at the top level as a sibling.
+
+**Image-in-link**: BlockNote does not allow block-level images inside inline links. The reader closes the link before emitting the image as a sibling block, and the writer serialises that sequence directly. Content preceding the image stays inside the link; the image becomes a sibling block after the link closes; content following the image appears outside the link, losing its link wrapper. The link is empty only when the image is the sole link label, e.g. `[![alt](img.png)](url)`. All variants are lossy mappings of the original "image-inside-link" structure.
 
 ## API Documentation
 
