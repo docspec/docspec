@@ -57,12 +57,12 @@ pub trait JsonBackend {
     ///
     /// Returns any error produced by the underlying backend.
     fn write_null(&mut self) -> Result<()>;
-    /// Write a `u8` numeric value.
+    /// Write a `u32` numeric value.
     ///
     /// # Errors
     ///
     /// Returns any error produced by the underlying backend.
-    fn write_number(&mut self, n: u8) -> Result<()>;
+    fn write_number(&mut self, n: u32) -> Result<()>;
     /// Write a string value.
     ///
     /// # Errors
@@ -88,8 +88,8 @@ pub enum Token {
     Name(String),
     /// A `null` value.
     NullValue,
-    /// A `u8` numeric value.
-    NumberValue(u8),
+    /// A `u32` numeric value.
+    NumberValue(u32),
     /// A string value.
     StringValue(String),
 }
@@ -170,7 +170,7 @@ impl JsonBackend for CapturingBackend {
     }
 
     #[inline]
-    fn write_number(&mut self, n: u8) -> Result<()> {
+    fn write_number(&mut self, n: u32) -> Result<()> {
         self.tokens.push(Token::NumberValue(n));
         Ok(())
     }

@@ -201,6 +201,8 @@ dependencies = [
  "base64",
  "docspec-core",
  "docspec-json",
+ "docspec-markdown-reader",
+ "serde_json",
 ]
 
 [[package]]
