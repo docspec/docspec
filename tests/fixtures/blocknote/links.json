@@ -1,0 +1,316 @@
+[
+  {
+    "type": "heading",
+    "props": {
+      "textAlignment": "left",
+      "level": 1
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "Heading with ",
+        "styles": {}
+      },
+      {
+        "type": "link",
+        "href": "https://example.com",
+        "content": [
+          {
+            "type": "text",
+            "text": "an inline link",
+            "styles": {}
+          }
+        ]
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "A paragraph with ",
+        "styles": {}
+      },
+      {
+        "type": "link",
+        "href": "https://example.com",
+        "content": [
+          {
+            "type": "text",
+            "text": "a link",
+            "styles": {}
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "text": " inline.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "A paragraph with ",
+        "styles": {}
+      },
+      {
+        "type": "link",
+        "href": "https://example.com",
+        "content": [
+          {
+            "type": "text",
+            "text": "a ",
+            "styles": {}
+          },
+          {
+            "type": "text",
+            "text": "bold",
+            "styles": {
+              "bold": true
+            }
+          },
+          {
+            "type": "text",
+            "text": " link",
+            "styles": {}
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "text": " styled inside.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "A paragraph with an autolink: ",
+        "styles": {}
+      },
+      {
+        "type": "link",
+        "href": "https://autolink.example.com",
+        "content": [
+          {
+            "type": "text",
+            "text": "https://autolink.example.com",
+            "styles": {}
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "text": ".",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "A paragraph with ",
+        "styles": {}
+      },
+      {
+        "type": "link",
+        "href": "https://titled.example.com",
+        "content": [
+          {
+            "type": "text",
+            "text": "a link with title",
+            "styles": {}
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "text": ".",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "An empty-text link: ",
+        "styles": {}
+      },
+      {
+        "type": "link",
+        "href": "https://empty.example.com",
+        "content": [
+          {
+            "type": "text",
+            "text": "",
+            "styles": {}
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "text": ".",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "A paragraph with ",
+        "styles": {}
+      },
+      {
+        "type": "link",
+        "href": "https://code.example.com",
+        "content": [
+          {
+            "type": "text",
+            "text": "inline code",
+            "styles": {
+              "code": true
+            }
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "text": " inside a link.",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "An image-in-link: ",
+        "styles": {}
+      },
+      {
+        "type": "link",
+        "href": "https://wrapper.example.com",
+        "content": [
+          {
+            "type": "text",
+            "text": "",
+            "styles": {}
+          }
+        ]
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "image",
+    "props": {
+      "url": "https://img.example.com/pic.png",
+      "caption": "alt text"
+    },
+    "content": null,
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": ".",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "A paragraph with multiple links: see ",
+        "styles": {}
+      },
+      {
+        "type": "link",
+        "href": "https://one.example.com",
+        "content": [
+          {
+            "type": "text",
+            "text": "first",
+            "styles": {}
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "text": " and ",
+        "styles": {}
+      },
+      {
+        "type": "link",
+        "href": "https://two.example.com",
+        "content": [
+          {
+            "type": "text",
+            "text": "second",
+            "styles": {}
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "text": ".",
+        "styles": {}
+      }
+    ],
+    "children": []
+  }
+]

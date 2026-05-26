@@ -41,13 +41,17 @@
 //!   (`start: Option<u64>` is `Some(n)` on the first item of each list, `None` on subsequent items;
 //!   child items may nest inside their parent's `Start*`/`End*` pair with `level` indicating
 //!   indent depth; task list markers (`- [ ]`/`- [x]`) are parsed as literal text)
+//! - Links → `StartLink { href, title }` / `EndLink` (inline, reference, collapsed,
+//!   shortcut, autolink, and email autolink variants — all resolved to inline form
+//!   by pulldown-cmark; image-inside-link closes the link before emitting the image
+//!   as a sibling block: content preceding the image stays inside the link, content
+//!   following the image is outside the link, and the link is empty only when the
+//!   image is the sole link label, e.g. `[![alt](img)](url)`)
 //!
 //! # Unsupported Elements
 //!
 //! The following elements are not emitted as structured events. Text content is
 //! recursively extracted where applicable; structure is silently dropped:
-//!
-//! - Links (text extracted, structure dropped)
 //! - Definition lists and footnotes
 //! - HTML blocks and inline HTML
 //! - Math blocks and inline math
@@ -104,6 +108,16 @@ struct ImageBuffer {
     url: String,
 }
 
+/// Buffered link state during link inline content collection.
+struct LinkBuffer {
+    /// Link target URL.
+    href: String,
+    /// Whether `StartLink` has been emitted yet (deferred until first inline event arrives).
+    started: bool,
+    /// Optional link title (from `CommonMark` `[text](url "title")` syntax).
+    title: Option<String>,
+}
+
 /// A streaming Markdown reader that implements [`EventSource`].
 ///
 /// `MarkdownReader` parses Markdown using `pulldown-cmark` and emits `DocSpec` events
@@ -134,6 +148,8 @@ pub struct MarkdownReader<'a> {
     in_table_head: bool,
     /// Nesting depth for italic (emphasis) formatting.
     italic_depth: usize,
+    /// Buffered link being processed (deferred Start emission for image-in-link extraction).
+    link: Option<LinkBuffer>,
     /// LIFO stack of list contexts. `len()` gives the current nesting depth;
     /// `level = list_stack.len().saturating_sub(1)` at item-emit time.
     list_stack: alloc::vec::Vec<ListContext>,
@@ -176,10 +192,26 @@ impl<'a> MarkdownReader<'a> {
         style
     }
 
+    /// Emits `StartLink` for the buffered link if it hasn't been emitted yet.
+    /// Called before any inline event that would belong inside a link.
+    fn emit_pending_link_start(&mut self) {
+        if let Some(link) = self.link.as_mut() {
+            if !link.started {
+                self.queue.push_back(Event::StartLink {
+                    href: link.href.clone(),
+                    id: None,
+                    title: link.title.clone(),
+                });
+                link.started = true;
+            }
+        }
+    }
+
     fn handle_code(&mut self, content: String) {
         if let Some(img) = &mut self.image {
             img.alt_buf.push_str(&content);
         } else {
+            self.emit_pending_link_start();
             if self.block_state == BlockState::None {
                 self.queue.push_back(Event::StartParagraph {
                     alignment: None,
@@ -255,6 +287,21 @@ impl<'a> MarkdownReader<'a> {
         self.block_state = BlockState::None;
     }
 
+    /// Emits `EndLink` (and `StartLink` if not yet emitted) for the buffered link.
+    fn handle_end_link(&mut self) {
+        let Some(link) = self.link.take() else { return };
+        if link.started {
+            self.queue.push_back(Event::EndLink);
+        } else {
+            self.queue.push_back(Event::StartLink {
+                href: link.href,
+                id: None,
+                title: link.title,
+            });
+            self.queue.push_back(Event::EndLink);
+        }
+    }
+
     /// Closes the current list item if open, pops the list context, and resets block state.
     fn handle_end_list(&mut self) {
         self.close_current_item_if_open();
@@ -316,6 +363,7 @@ impl<'a> MarkdownReader<'a> {
             TagEnd::Heading(_) => self.handle_end_heading(),
             TagEnd::Image => self.handle_end_image(),
             TagEnd::Item => self.handle_end_item(),
+            TagEnd::Link => self.handle_end_link(),
             TagEnd::List(_) => self.handle_end_list(),
             TagEnd::Paragraph => self.handle_end_paragraph(),
             TagEnd::Strikethrough => self.handle_end_strikethrough(),
@@ -330,7 +378,6 @@ impl<'a> MarkdownReader<'a> {
             | TagEnd::DefinitionListTitle
             | TagEnd::FootnoteDefinition
             | TagEnd::HtmlBlock
-            | TagEnd::Link
             | TagEnd::MetadataBlock(_)
             | TagEnd::Subscript
             | TagEnd::Superscript => {}
@@ -409,6 +456,27 @@ impl<'a> MarkdownReader<'a> {
     /// encountered. The title is stored as `None` when the pulldown-cmark title string
     /// is empty.
     fn handle_start_image(&mut self, dest_url: CowStr<'a>, title: CowStr<'a>) {
+        // Image-in-link extraction: close the link before processing the image so the
+        // image can be emitted as a sibling block (BlockNote and similar schemas do not
+        // allow block-level images inside inline links). When `link.started` is true, the
+        // link already contains preceding inline content — emit only `EndLink`. When it
+        // is false (image is the sole link label, e.g. `[![alt](img)](url)`), emit an
+        // empty `StartLink`/`EndLink` pair so the URL is preserved. `TagEnd::Image` fires
+        // `Event::Image` before `TagEnd::Paragraph`, so downstream writers close the
+        // surrounding paragraph before serialising the image as a sibling block.
+        if let Some(link) = self.link.take() {
+            if link.started {
+                self.queue.push_back(Event::EndLink);
+            } else {
+                self.queue.push_back(Event::StartLink {
+                    href: link.href,
+                    id: None,
+                    title: link.title,
+                });
+                self.queue.push_back(Event::EndLink);
+            }
+        }
+
         self.image = Some(ImageBuffer {
             alt_buf: String::new(),
             title: if title.is_empty() {
@@ -417,6 +485,22 @@ impl<'a> MarkdownReader<'a> {
                 Some(title.into_string())
             },
             url: dest_url.into_string(),
+        });
+    }
+
+    /// Stores link state for deferred `StartLink` emission.
+    ///
+    /// Emission is deferred until the first inline event arrives (lazy emission).
+    /// This allows image-in-link to be detected before any `StartLink` is emitted.
+    fn handle_start_link(&mut self, dest_url: CowStr<'a>, title: CowStr<'a>) {
+        self.link = Some(LinkBuffer {
+            href: dest_url.into_string(),
+            started: false,
+            title: if title.is_empty() {
+                None
+            } else {
+                Some(title.into_string())
+            },
         });
     }
 
@@ -489,6 +573,9 @@ impl<'a> MarkdownReader<'a> {
                 dest_url, title, ..
             } => self.handle_start_image(dest_url, title),
             Tag::Item => self.handle_item_start(),
+            Tag::Link {
+                dest_url, title, ..
+            } => self.handle_start_link(dest_url, title),
             Tag::List(start_opt) => self.handle_list_start(start_opt),
             Tag::Paragraph => self.handle_start_paragraph(),
             Tag::Strikethrough => self.handle_start_strikethrough(),
@@ -503,7 +590,6 @@ impl<'a> MarkdownReader<'a> {
             | Tag::DefinitionListTitle
             | Tag::FootnoteDefinition(_)
             | Tag::HtmlBlock
-            | Tag::Link { .. }
             | Tag::MetadataBlock(_)
             | Tag::Subscript
             | Tag::Superscript => {}
@@ -516,6 +602,7 @@ impl<'a> MarkdownReader<'a> {
         } else if let Some(buf) = &mut self.code_block_buffer {
             buf.push_str(&content);
         } else {
+            self.emit_pending_link_start();
             if self.block_state == BlockState::None {
                 self.queue.push_back(Event::StartParagraph {
                     alignment: None,
@@ -554,6 +641,7 @@ impl<'a> MarkdownReader<'a> {
             image: None,
             in_table_head: false,
             italic_depth: 0,
+            link: None,
             list_stack: Vec::new(),
             parser,
             phase: Phase::NotStarted,
@@ -580,6 +668,7 @@ impl<'a> MarkdownReader<'a> {
                 if let Some(img) = &mut self.image {
                     img.alt_buf.push(' ');
                 } else {
+                    self.emit_pending_link_start();
                     self.queue.push_back(Event::LineBreak);
                 }
             }
@@ -587,6 +676,7 @@ impl<'a> MarkdownReader<'a> {
                 if let Some(img) = &mut self.image {
                     img.alt_buf.push(' ');
                 } else {
+                    self.emit_pending_link_start();
                     self.queue.push_back(Event::Text {
                         content: " ".to_string(),
                         style: self.current_text_style(),
