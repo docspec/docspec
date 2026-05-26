@@ -1,5 +1,5 @@
 //! Unit tests for `MarkdownReader`.
-#![allow(clippy::expect_used, clippy::unwrap_used)]
+#![allow(clippy::expect_used, clippy::indexing_slicing, clippy::unwrap_used)]
 
 mod helpers {
     #![allow(clippy::single_call_fn)]
@@ -1264,6 +1264,206 @@ mod tests {
             end_blockquote_idx < end_outer_item_idx,
             "EndBlockQuote (at {end_blockquote_idx}) must precede outer EndOrderedListItem \
              (at {end_outer_item_idx}); events: {events:#?}"
+        );
+    }
+
+    #[test]
+    fn link_simple() {
+        let markdown = "[text](https://example.com)";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+        let start_link_pos = events.iter().position(
+            |e| matches!(e, Event::StartLink { href, .. } if href == "https://example.com"),
+        );
+        assert!(start_link_pos.is_some(), "StartLink not found");
+        let pos = start_link_pos.unwrap();
+        assert!(
+            matches!(&events[pos], Event::StartLink { href, title, id } if href == "https://example.com" && title.is_none() && id.is_none())
+        );
+        assert!(matches!(&events[pos + 1], Event::Text { content, .. } if content == "text"));
+        assert!(matches!(&events[pos + 2], Event::EndLink));
+    }
+
+    #[test]
+    fn link_with_title() {
+        let markdown = r#"[text](https://example.com "a title")"#;
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+        let start_link = events.iter().find(|e| matches!(e, Event::StartLink { .. }));
+        assert!(start_link.is_some(), "StartLink not found");
+        assert!(
+            matches!(start_link.unwrap(), Event::StartLink { href, title, .. } if href == "https://example.com" && title.as_deref() == Some("a title"))
+        );
+    }
+
+    #[test]
+    fn link_empty_text() {
+        let markdown = "[](https://example.com)";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+        let start_link_pos = events
+            .iter()
+            .position(|e| matches!(e, Event::StartLink { .. }));
+        assert!(start_link_pos.is_some(), "StartLink not found");
+        let pos = start_link_pos.unwrap();
+        assert!(
+            matches!(&events[pos + 1], Event::EndLink),
+            "Expected EndLink immediately after StartLink for empty link"
+        );
+    }
+
+    #[test]
+    fn link_styled_content() {
+        let markdown = "[**bold** text](https://example.com)";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+        let start_link_pos = events
+            .iter()
+            .position(|e| matches!(e, Event::StartLink { .. }));
+        assert!(start_link_pos.is_some(), "StartLink not found");
+        let pos = start_link_pos.unwrap();
+        let end_link_pos = events[pos..]
+            .iter()
+            .position(|e| matches!(e, Event::EndLink))
+            .map(|i| i + pos);
+        assert!(end_link_pos.is_some(), "EndLink not found after StartLink");
+        let end_pos = end_link_pos.unwrap();
+        let has_bold = events[pos + 1..end_pos]
+            .iter()
+            .any(|e| matches!(e, Event::Text { style, .. } if style.bold));
+        assert!(has_bold, "Expected bold Text between StartLink and EndLink");
+    }
+
+    #[test]
+    fn link_with_code_span() {
+        let markdown = "[`code`](https://example.com)";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+        let start_link_pos = events
+            .iter()
+            .position(|e| matches!(e, Event::StartLink { .. }));
+        assert!(start_link_pos.is_some(), "StartLink not found");
+        let pos = start_link_pos.unwrap();
+        let end_link_pos = events[pos..]
+            .iter()
+            .position(|e| matches!(e, Event::EndLink))
+            .map(|i| i + pos);
+        assert!(end_link_pos.is_some(), "EndLink not found");
+        let end_pos = end_link_pos.unwrap();
+        let has_code = events[pos + 1..end_pos].iter().any(
+            |e| matches!(e, Event::Text { content, style, .. } if content == "code" && style.code),
+        );
+        assert!(
+            has_code,
+            "Expected code-styled Text between StartLink and EndLink"
+        );
+    }
+
+    #[test]
+    fn autolink() {
+        let markdown = "<https://example.com>";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+        let start_link_pos = events.iter().position(
+            |e| matches!(e, Event::StartLink { href, .. } if href == "https://example.com"),
+        );
+        assert!(start_link_pos.is_some(), "StartLink not found for autolink");
+        let pos = start_link_pos.unwrap();
+        let end_link_pos = events[pos..]
+            .iter()
+            .position(|e| matches!(e, Event::EndLink))
+            .map(|i| i + pos);
+        assert!(end_link_pos.is_some(), "EndLink not found");
+        let end_pos = end_link_pos.unwrap();
+        let has_url_text = events[pos + 1..end_pos]
+            .iter()
+            .any(|e| matches!(e, Event::Text { content, .. } if content == "https://example.com"));
+        assert!(has_url_text, "Expected URL as Text content inside autolink");
+    }
+
+    #[test]
+    fn link_in_heading() {
+        let markdown = "# [text](https://example.com)";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+        let heading_pos = events
+            .iter()
+            .position(|e| matches!(e, Event::StartHeading { level: 1, .. }));
+        assert!(heading_pos.is_some(), "StartHeading not found");
+        let h_pos = heading_pos.unwrap();
+        let end_heading_pos = events[h_pos..]
+            .iter()
+            .position(|e| matches!(e, Event::EndHeading))
+            .map(|i| i + h_pos);
+        assert!(end_heading_pos.is_some(), "EndHeading not found");
+        let eh_pos = end_heading_pos.unwrap();
+        let has_link = events[h_pos..eh_pos]
+            .iter()
+            .any(|e| matches!(e, Event::StartLink { .. }));
+        assert!(has_link, "Expected StartLink inside heading");
+        let has_end_link = events[h_pos..eh_pos]
+            .iter()
+            .any(|e| matches!(e, Event::EndLink));
+        assert!(has_end_link, "Expected EndLink inside heading");
+    }
+
+    #[test]
+    fn link_in_paragraph_with_surrounding_text() {
+        let markdown = "before [link text](https://example.com) after";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+        let start_link_pos = events
+            .iter()
+            .position(|e| matches!(e, Event::StartLink { .. }));
+        assert!(start_link_pos.is_some(), "StartLink not found");
+        let pos = start_link_pos.unwrap();
+        assert!(pos > 0, "Expected text before StartLink");
+        assert!(
+            matches!(&events[pos - 1], Event::Text { content, .. } if content.contains("before")),
+            "Expected 'before' text before StartLink"
+        );
+        assert!(
+            matches!(&events[pos + 1], Event::Text { content, .. } if content == "link text"),
+            "Expected link text inside link"
+        );
+        assert!(
+            matches!(&events[pos + 2], Event::EndLink),
+            "Expected EndLink after link text"
+        );
+        assert!(
+            matches!(&events[pos + 3], Event::Text { content, .. } if content.contains("after")),
+            "Expected 'after' text after EndLink"
+        );
+    }
+
+    #[test]
+    fn image_in_link_extracts_image_as_sibling() {
+        // pulldown-cmark event sequence: Tag::Link > Tag::Image > Text("alt") > TagEnd::Image > TagEnd::Link
+        // Reader should emit: StartParagraph, StartLink, EndLink, Image, EndParagraph
+        // (Image appears BEFORE EndParagraph because pulldown fires End(Image) before End(Paragraph))
+        let markdown = "[![alt](img.png)](https://example.com)";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+        let para_pos = events
+            .iter()
+            .position(|e| matches!(e, Event::StartParagraph { .. }));
+        assert!(para_pos.is_some(), "StartParagraph not found");
+        let p = para_pos.unwrap();
+        assert!(
+            matches!(&events[p + 1], Event::StartLink { href, .. } if href == "https://example.com"),
+            "Expected StartLink after StartParagraph"
+        );
+        assert!(
+            matches!(&events[p + 2], Event::EndLink),
+            "Expected EndLink immediately after StartLink (image-in-link extraction)"
+        );
+        assert!(
+            matches!(&events[p + 3], Event::Image { .. }),
+            "Expected Image event after EndLink"
+        );
+        assert!(
+            matches!(&events[p + 4], Event::EndParagraph),
+            "Expected EndParagraph after Image"
         );
     }
 }
