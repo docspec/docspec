@@ -1,0 +1,5 @@
+[
+  {"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"bullet","styles":{}}],"children":[]},
+  {"type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left","start":1},"content":[{"type":"text","text":"numbered","styles":{}}],"children":[]},
+  {"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"another bullet","styles":{}}],"children":[]}
+]

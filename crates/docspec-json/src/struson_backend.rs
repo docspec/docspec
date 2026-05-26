@@ -69,7 +69,7 @@ impl<W: Write> JsonBackend for StrusonBackend<W> {
     }
 
     #[inline]
-    fn write_number(&mut self, n: u8) -> Result<()> {
+    fn write_number(&mut self, n: u32) -> Result<()> {
         self.writer.number_value(n).map_err(io_err)
     }
 
