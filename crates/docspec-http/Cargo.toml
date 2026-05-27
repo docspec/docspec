@@ -15,6 +15,7 @@ path = "src/bin/docspec-http.rs"
 
 [dependencies]
 axum = "0.8"
+clap = { version = "4", features = ["derive"] }
 tokio = { version = "1", features = [
   "rt-multi-thread",
   "macros",

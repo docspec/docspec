@@ -327,6 +327,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "bytes",
+ "clap",
  "docspec-blocknote-writer",
  "docspec-core",
  "docspec-markdown-reader",
