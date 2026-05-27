@@ -98,6 +98,12 @@ let json = String::from_utf8(buf)?;
 
 **Image-in-link**: BlockNote does not allow block-level images inside inline links. The reader closes the link before emitting the image as a sibling block, and the writer serialises that sequence directly. Content preceding the image stays inside the link; the image becomes a sibling block after the link closes; content following the image appears outside the link, losing its link wrapper. The link is empty only when the image is the sole link label, e.g. `[![alt](img.png)](url)`. All variants are lossy mappings of the original "image-inside-link" structure.
 
+## Asset Streaming
+
+When an `AssetProvider` is configured, image assets are encoded as `data:<mime>;base64,…` URIs and streamed directly into the JSON output — no intermediate `Vec<u8>` buffer. The `base64::write::EncoderWriter` uses a fixed 4 KB stack buffer. Heap usage is proportional to parser overhead, not asset size. Verified by `tests/asset_memory.rs`.
+
+On `AssetProvider` failure mid-stream, the JSON string is closed (structurally valid) but the content is truncated (semantically incomplete). The error propagates — callers must discard partial output.
+
 ## API Documentation
 
 See the [module-level docs](https://docs.rs/docspec-blocknote-writer) for the full API surface, including `BlockNoteWriter` and its `EventSink` implementation.
