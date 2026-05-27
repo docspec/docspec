@@ -200,16 +200,9 @@ impl StateStack {
     /// Returns `Err` if the current frame is not an Array.
     #[inline]
     pub fn pop_array(&mut self) -> Result<()> {
-        match self.stack.last() {
-            Some(Frame::Array) => {
-                self.stack.pop();
-                Ok(())
-            }
-            Some(Frame::Object(_)) => Err(Self::json_err(
-                "cannot close array: current frame is an object",
-            )),
-            _ => Err(Self::json_err("cannot close array: no open array")),
-        }
+        self.peek_array()?;
+        let _ = self.stack.pop();
+        Ok(())
     }
 
     /// Pop the top frame, asserting it is an Object expecting a key. Returns `Err` if it is not.
@@ -219,19 +212,9 @@ impl StateStack {
     /// Returns `Err` if the current frame is not an Object expecting a key.
     #[inline]
     pub fn pop_object(&mut self) -> Result<()> {
-        match self.stack.last() {
-            Some(Frame::Object(KeyState::ExpectingKey)) => {
-                self.stack.pop();
-                Ok(())
-            }
-            Some(Frame::Object(KeyState::ExpectingValue)) => {
-                Err(Self::json_err("cannot close object: last key has no value"))
-            }
-            Some(Frame::Array) => Err(Self::json_err(
-                "cannot close object: current frame is an array",
-            )),
-            _ => Err(Self::json_err("cannot close object: no open object")),
-        }
+        self.peek_object()?;
+        let _ = self.stack.pop();
+        Ok(())
     }
 
     /// Push a new Array frame.

@@ -62,7 +62,7 @@ extern crate alloc;
 use alloc::collections::VecDeque;
 
 pub use docspec_core::EventSource;
-use docspec_core::{Event, ImageSource, ListStyleType, Result, TableHeaderScope, TextStyle};
+use docspec_core::{Depth, Event, ImageSource, ListStyleType, Result, TableHeaderScope, TextStyle};
 use pulldown_cmark::{CodeBlockKind, CowStr, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 /// Whether content is inside a block-level element.
@@ -139,7 +139,7 @@ pub struct MarkdownReader<'a> {
     /// Current block-level context.
     block_state: BlockState,
     /// Nesting depth for bold (strong) formatting.
-    bold_depth: usize,
+    bold_depth: Depth,
     /// Buffered code block text (accumulated until `EndCodeBlock` to strip trailing newline).
     code_block_buffer: Option<String>,
     /// Buffered image being processed (alt text accumulation).
@@ -147,7 +147,7 @@ pub struct MarkdownReader<'a> {
     /// Whether the parser is currently inside a table header row.
     in_table_head: bool,
     /// Nesting depth for italic (emphasis) formatting.
-    italic_depth: usize,
+    italic_depth: Depth,
     /// Buffered link being processed (deferred Start emission for image-in-link extraction).
     link: Option<LinkBuffer>,
     /// LIFO stack of list contexts. `len()` gives the current nesting depth;
@@ -160,7 +160,7 @@ pub struct MarkdownReader<'a> {
     /// Queue of `DocSpec` events to emit.
     queue: VecDeque<Event>,
     /// Nesting depth for strikethrough formatting.
-    strikethrough_depth: usize,
+    strikethrough_depth: Depth,
 }
 
 impl<'a> MarkdownReader<'a> {
@@ -180,13 +180,13 @@ impl<'a> MarkdownReader<'a> {
 
     fn current_text_style(&self) -> TextStyle {
         let mut style = TextStyle::default();
-        if self.bold_depth > 0 {
+        if self.bold_depth.is_positive() {
             style = style.bold();
         }
-        if self.italic_depth > 0 {
+        if self.italic_depth.is_positive() {
             style = style.italic();
         }
-        if self.strikethrough_depth > 0 {
+        if self.strikethrough_depth.is_positive() {
             style = style.strikethrough();
         }
         style
@@ -226,11 +226,6 @@ impl<'a> MarkdownReader<'a> {
         }
     }
 
-    /// Emits `EndBlockQuote` for a blockquote closing tag.
-    fn handle_end_blockquote(&mut self) {
-        self.push_event_end(Event::EndBlockQuote);
-    }
-
     /// Emits the buffered code block content (stripping the parser-added trailing newline)
     /// followed by `EndPreformatted`. Skips the text event if the buffer is empty.
     fn handle_end_code_block(&mut self) {
@@ -244,16 +239,6 @@ impl<'a> MarkdownReader<'a> {
             }
         }
         self.push_event_end(Event::EndPreformatted);
-    }
-
-    /// Decrements italic depth for an emphasis (italic) closing tag.
-    fn handle_end_emphasis(&mut self) {
-        self.italic_depth = self.italic_depth.saturating_sub(1);
-    }
-
-    /// Emits `EndHeading` for a heading closing tag.
-    fn handle_end_heading(&mut self) {
-        self.push_event_end(Event::EndHeading);
     }
 
     /// Emits an `Image` event from the accumulated image buffer, deriving
@@ -309,26 +294,6 @@ impl<'a> MarkdownReader<'a> {
         self.block_state = BlockState::None;
     }
 
-    /// Emits `EndParagraph` for a paragraph closing tag.
-    fn handle_end_paragraph(&mut self) {
-        self.push_event_end(Event::EndParagraph);
-    }
-
-    /// Decrements strikethrough depth for a strikethrough closing tag.
-    fn handle_end_strikethrough(&mut self) {
-        self.strikethrough_depth = self.strikethrough_depth.saturating_sub(1);
-    }
-
-    /// Decrements bold depth for a strong (bold) closing tag.
-    fn handle_end_strong(&mut self) {
-        self.bold_depth = self.bold_depth.saturating_sub(1);
-    }
-
-    /// Emits `EndTable` for a table closing tag.
-    fn handle_end_table(&mut self) {
-        self.push_event_end(Event::EndTable);
-    }
-
     /// Emits `EndTableCell` or `EndTableHeader` depending on whether the parser
     /// is currently inside a table header row.
     fn handle_end_table_cell(&mut self) {
@@ -345,11 +310,6 @@ impl<'a> MarkdownReader<'a> {
         self.in_table_head = false;
     }
 
-    /// Emits `EndTableRow` for a table row closing tag.
-    fn handle_end_table_row(&mut self) {
-        self.push_event_end(Event::EndTableRow);
-    }
-
     /// Dispatches a `pulldown-cmark` end tag to the appropriate per-tag handler.
     ///
     /// Tags in the explicit ignore list below are known-unsupported elements whose
@@ -357,21 +317,21 @@ impl<'a> MarkdownReader<'a> {
     /// other event handlers).
     fn handle_end_tag(&mut self, tag_end: TagEnd) {
         match tag_end {
-            TagEnd::BlockQuote(_) => self.handle_end_blockquote(),
+            TagEnd::BlockQuote(_) => self.push_event_end(Event::EndBlockQuote),
             TagEnd::CodeBlock => self.handle_end_code_block(),
-            TagEnd::Emphasis => self.handle_end_emphasis(),
-            TagEnd::Heading(_) => self.handle_end_heading(),
+            TagEnd::Emphasis => self.italic_depth.dec(),
+            TagEnd::Heading(_) => self.push_event_end(Event::EndHeading),
             TagEnd::Image => self.handle_end_image(),
             TagEnd::Item => self.handle_end_item(),
             TagEnd::Link => self.handle_end_link(),
             TagEnd::List(_) => self.handle_end_list(),
-            TagEnd::Paragraph => self.handle_end_paragraph(),
-            TagEnd::Strikethrough => self.handle_end_strikethrough(),
-            TagEnd::Strong => self.handle_end_strong(),
-            TagEnd::Table => self.handle_end_table(),
+            TagEnd::Paragraph => self.push_event_end(Event::EndParagraph),
+            TagEnd::Strikethrough => self.strikethrough_depth.dec(),
+            TagEnd::Strong => self.bold_depth.dec(),
+            TagEnd::Table => self.push_event_end(Event::EndTable),
             TagEnd::TableCell => self.handle_end_table_cell(),
             TagEnd::TableHead => self.handle_end_table_head(),
-            TagEnd::TableRow => self.handle_end_table_row(),
+            TagEnd::TableRow => self.push_event_end(Event::EndTableRow),
             // Tags intentionally ignored (structure dropped, text extracted elsewhere):
             TagEnd::DefinitionList
             | TagEnd::DefinitionListDefinition
@@ -415,11 +375,6 @@ impl<'a> MarkdownReader<'a> {
         });
     }
 
-    /// Emits `StartBlockQuote` for a blockquote opening tag.
-    fn handle_start_blockquote(&mut self) {
-        self.push_event_start(Event::StartBlockQuote { id: None });
-    }
-
     /// Emits `StartPreformatted` for a code block opening tag, initialising
     /// the internal code-block buffer for content accumulation.
     fn handle_start_code_block(&mut self, kind: CodeBlockKind<'a>) {
@@ -429,11 +384,6 @@ impl<'a> MarkdownReader<'a> {
         };
         self.code_block_buffer = Some(String::new());
         self.push_event_start(Event::StartPreformatted { id: None, syntax });
-    }
-
-    /// Increments italic depth for an emphasis (italic) opening tag.
-    fn handle_start_emphasis(&mut self) {
-        self.italic_depth = self.italic_depth.saturating_add(1);
     }
 
     /// Emits `StartHeading` after mapping a `pulldown-cmark` `HeadingLevel` to a `u8` level.
@@ -504,29 +454,6 @@ impl<'a> MarkdownReader<'a> {
         });
     }
 
-    /// Emits `StartParagraph` for a paragraph opening tag.
-    fn handle_start_paragraph(&mut self) {
-        self.push_event_start(Event::StartParagraph {
-            alignment: None,
-            id: None,
-        });
-    }
-
-    /// Increments strikethrough depth for a strikethrough opening tag.
-    fn handle_start_strikethrough(&mut self) {
-        self.strikethrough_depth = self.strikethrough_depth.saturating_add(1);
-    }
-
-    /// Increments bold depth for a strong (bold) opening tag.
-    fn handle_start_strong(&mut self) {
-        self.bold_depth = self.bold_depth.saturating_add(1);
-    }
-
-    /// Emits `StartTable` for a table opening tag.
-    fn handle_start_table(&mut self) {
-        self.push_event_start(Event::StartTable { id: None });
-    }
-
     /// Emits `StartTableHeader` or `StartTableCell` depending on whether the parser
     /// is currently inside a table header row.
     fn handle_start_table_cell(&mut self) {
@@ -553,11 +480,6 @@ impl<'a> MarkdownReader<'a> {
         self.push_event_start(Event::StartTableRow { id: None });
     }
 
-    /// Emits `StartTableRow` for a table row opening tag.
-    fn handle_start_table_row(&mut self) {
-        self.push_event_start(Event::StartTableRow { id: None });
-    }
-
     /// Dispatches a `pulldown-cmark` start tag to the appropriate per-tag handler.
     ///
     /// Tags in the explicit ignore list below are known-unsupported elements whose
@@ -565,9 +487,9 @@ impl<'a> MarkdownReader<'a> {
     /// other event handlers).
     fn handle_start_tag(&mut self, tag: Tag<'a>) {
         match tag {
-            Tag::BlockQuote(_) => self.handle_start_blockquote(),
+            Tag::BlockQuote(_) => self.push_event_start(Event::StartBlockQuote { id: None }),
             Tag::CodeBlock(kind) => self.handle_start_code_block(kind),
-            Tag::Emphasis => self.handle_start_emphasis(),
+            Tag::Emphasis => self.italic_depth.inc(),
             Tag::Heading { level, .. } => self.handle_start_heading(level),
             Tag::Image {
                 dest_url, title, ..
@@ -577,13 +499,16 @@ impl<'a> MarkdownReader<'a> {
                 dest_url, title, ..
             } => self.handle_start_link(dest_url, title),
             Tag::List(start_opt) => self.handle_list_start(start_opt),
-            Tag::Paragraph => self.handle_start_paragraph(),
-            Tag::Strikethrough => self.handle_start_strikethrough(),
-            Tag::Strong => self.handle_start_strong(),
-            Tag::Table(_) => self.handle_start_table(),
+            Tag::Paragraph => self.push_event_start(Event::StartParagraph {
+                alignment: None,
+                id: None,
+            }),
+            Tag::Strikethrough => self.strikethrough_depth.inc(),
+            Tag::Strong => self.bold_depth.inc(),
+            Tag::Table(_) => self.push_event_start(Event::StartTable { id: None }),
             Tag::TableCell => self.handle_start_table_cell(),
             Tag::TableHead => self.handle_start_table_head(),
-            Tag::TableRow => self.handle_start_table_row(),
+            Tag::TableRow => self.push_event_start(Event::StartTableRow { id: None }),
             // Tags intentionally ignored (structure dropped, text extracted elsewhere):
             Tag::DefinitionList
             | Tag::DefinitionListDefinition
@@ -636,17 +561,17 @@ impl<'a> MarkdownReader<'a> {
         let parser = Parser::new_ext(markdown, options);
         Self {
             block_state: BlockState::None,
-            bold_depth: 0,
+            bold_depth: Depth::default(),
             code_block_buffer: None,
             image: None,
             in_table_head: false,
-            italic_depth: 0,
+            italic_depth: Depth::default(),
             link: None,
             list_stack: Vec::new(),
             parser,
             phase: Phase::NotStarted,
             queue: VecDeque::new(),
-            strikethrough_depth: 0,
+            strikethrough_depth: Depth::default(),
         }
     }
 
