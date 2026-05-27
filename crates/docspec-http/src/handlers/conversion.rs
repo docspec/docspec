@@ -97,10 +97,10 @@ pub async fn options_conversion() -> impl IntoResponse {
 ///
 /// Returns [`HttpError`] when request headers or body are invalid, or when the
 /// response cannot be constructed.
+// Reason: Axum handlers must be async to satisfy the Handler trait even if they don't await.
 #[allow(clippy::unused_async)]
+// Reason: The SAFETY comment documents the intentional fire-and-forget JoinHandle design.
 #[allow(clippy::unnecessary_safety_comment)]
-// Reason: Axum handlers are async for route consistency even when no await is needed.
-// Reason: The task requires a SAFETY comment for this fire-and-forget JoinHandle.
 #[inline]
 pub async fn post_conversion(headers: HeaderMap, body: Bytes) -> Result<Response<Body>, HttpError> {
     format::validate_content_type(headers.get(header::CONTENT_TYPE))?;
