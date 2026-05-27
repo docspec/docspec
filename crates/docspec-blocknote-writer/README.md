@@ -95,6 +95,12 @@ let json = String::from_utf8(buf)?;
 
 **Blockquote + list interaction**: a list item encountered while inside a blockquote force-closes the blockquote and emits the list item at the top level as a sibling.
 
+## Asset Streaming
+
+When an `AssetProvider` is configured, image assets are encoded as `data:<mime>;base64,…` URIs and streamed directly into the JSON output — no intermediate `Vec<u8>` buffer. The `base64::write::EncoderWriter` uses a fixed 4 KB stack buffer. Heap usage is proportional to parser overhead, not asset size. Verified by `tests/asset_memory.rs`.
+
+On `AssetProvider` failure mid-stream, the JSON string is closed (structurally valid) but the content is truncated (semantically incomplete). The error propagates — callers must discard partial output.
+
 ## API Documentation
 
 See the [module-level docs](https://docs.rs/docspec-blocknote-writer) for the full API surface, including `BlockNoteWriter` and its `EventSink` implementation.
