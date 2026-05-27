@@ -9,8 +9,7 @@
 //! The writer emits JSON tokens directly to the underlying `Write` as events arrive using
 //! `docspec-json` for streaming JSON output. For text and URI-based images, memory usage is
 //! constant regardless of document size. Asset-based images (`ImageSource::Asset`) are
-//! base64-encoded into an in-memory data URI before writing, so memory scales with individual
-//! asset size.
+//! base64-encoded directly into the JSON string value slot while streaming asset bytes.
 //!
 //! # Supported Events
 //!
@@ -311,39 +310,6 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Ok(())
     }
 
-    /// Resolves `asset_id` through the configured provider and encodes the asset bytes
-    /// as a `data:<content-type>;base64,…` URI.
-    ///
-    /// Returns `Err` if no `AssetProvider` is configured, the asset cannot be found,
-    /// or the underlying I/O fails while streaming the asset bytes through the
-    /// base64 encoder.
-    fn encode_asset_as_data_uri(&self, asset_id: &str) -> Result<String> {
-        let provider = self.assets.ok_or_else(|| Error::Other {
-            message: "no AssetProvider configured".to_string(),
-        })?;
-        let content_type = provider
-            .content_type(asset_id)
-            .ok_or_else(|| Error::Other {
-                message: format!("asset not found: {asset_id}"),
-            })?;
-        let prefix = format!("data:{content_type};base64,");
-        let mut data_uri = Vec::with_capacity(prefix.len());
-        data_uri.extend_from_slice(prefix.as_bytes());
-        {
-            let mut enc = Base64Encoder::new(&mut data_uri, &BASE64_STANDARD);
-            provider
-                .stream_to(asset_id, &mut enc)
-                .ok_or_else(|| Error::Other {
-                    message: format!("asset not found: {asset_id}"),
-                })?
-                .map_err(Error::from)?;
-            enc.finish().map_err(Error::from)?
-        };
-        String::from_utf8(data_uri).map_err(|e| Error::Other {
-            message: format!("base64 encoding produced invalid UTF-8: {e}"),
-        })
-    }
-
     fn handle_blockquote(&mut self, id: Option<&String>) -> Result<()> {
         self.json.open_object()?;
         self.json.key("type").value("quote")?;
@@ -495,24 +461,29 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             return Ok(());
         }
         self.close_for_block_sibling()?;
-        let url = match source {
-            ImageSource::Uri { uri } => uri,
-            ImageSource::Asset { asset_id } => self.encode_asset_as_data_uri(&asset_id)?,
-        };
         let caption = alt.unwrap_or_default();
 
-        self.json.object(|j| {
-            if let Some(id_val) = id {
-                j.key("id").value(id_val.as_str())?;
+        self.json.open_object()?;
+        if let Some(id_val) = id {
+            self.json.key("id").value(id_val.as_str())?;
+        }
+        self.json.key("type").value("image")?;
+        self.json.key("props").open_object()?;
+        match source {
+            ImageSource::Uri { uri } => {
+                self.json.key("url").value(uri.as_str())?;
             }
-            j.key("type").value("image")?;
-            j.key("props").object(|p| {
-                p.key("url").value(url.as_str())?;
-                p.key("caption").value(caption.as_str())
-            })?;
-            j.key("content").value(Null)?;
-            j.key("children").array(|_| Ok(()))
-        })
+            ImageSource::Asset { asset_id } => {
+                self.write_asset_as_data_uri_keyed("url", &asset_id)?;
+            }
+        }
+        self.json.key("caption").value(caption.as_str())?;
+        self.json.close_object()?;
+        self.json.key("content").value(Null)?;
+        self.json.key("children").open_array()?;
+        self.json.close_array()?;
+        self.json.close_object()?;
+        Ok(())
     }
 
     fn handle_line_break(&mut self) -> Result<()> {
@@ -930,6 +901,45 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             list_stack: Vec::new(),
             table_depth: Depth::default(),
         }
+    }
+
+    /// Writes the asset as a `data:<content-type>;base64,…` URI into the JSON key `key`.
+    ///
+    /// Streams base64-encoded asset bytes directly into the JSON string value slot —
+    /// no `Vec<u8>` intermediate buffer. Uses `base64::write::EncoderWriter` which has
+    /// a fixed 4 KB stack buffer and no internal heap allocation.
+    ///
+    /// **Error contract**: on `AssetProvider` failure mid-stream, the JSON string is
+    /// closed (per the always-close-string contract from `JsonBackend::write_string_streaming`),
+    /// the data URI content is truncated, and the error propagates. **Callers MUST discard
+    /// partial output** — `DocSpec`'s fail-fast philosophy: a failed conversion is better
+    /// than a wrong conversion.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if no `AssetProvider` is configured, the asset cannot be found,
+    /// or the underlying I/O fails while streaming the asset bytes.
+    fn write_asset_as_data_uri_keyed(&mut self, key: &str, asset_id: &str) -> Result<()> {
+        let provider = self.assets.ok_or_else(|| Error::Other {
+            message: "no AssetProvider configured".into(),
+        })?;
+        let content_type = provider
+            .content_type(asset_id)
+            .ok_or_else(|| Error::Other {
+                message: format!("asset not found: {asset_id}"),
+            })?;
+        self.json.key(key).value_streaming(|out| {
+            write!(out, "data:{content_type};base64,").map_err(Error::from)?;
+            let mut enc = Base64Encoder::new(out, &BASE64_STANDARD);
+            provider
+                .stream_to(asset_id, &mut enc)
+                .ok_or_else(|| Error::Other {
+                    message: format!("asset not found: {asset_id}"),
+                })?
+                .map_err(Error::from)?;
+            enc.finish().map_err(Error::from)?;
+            Ok(())
+        })
     }
 
     fn write_id(&mut self, id: Option<&String>) -> Result<()> {
