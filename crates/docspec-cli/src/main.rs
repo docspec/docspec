@@ -1,27 +1,13 @@
 #![warn(missing_docs)]
 //! Command-line interface for `DocSpec` document conversion.
 
-mod args;
-mod error;
-mod format;
-
 use std::fs::File;
-use std::io::{BufWriter, IsTerminal as _, Read as _, Write};
+use std::io::IsTerminal as _;
 
 use clap::Parser as _;
-use docspec_blocknote_writer::BlockNoteWriter;
-use docspec_core::StackTrackingSink;
-use docspec_markdown_reader::MarkdownReader;
-
-use crate::args::{Cli, ColorChoice, Format};
-use crate::error::{CliError, Result};
-
-/// Runs the streaming conversion pipeline from markdown to `BlockNote`.
-fn run_pipeline<W: Write>(content: &str, output: W) -> Result<()> {
-    let reader = MarkdownReader::new(content);
-    let sink = StackTrackingSink::new(BlockNoteWriter::new(output));
-    docspec_core::pipe(reader, sink).map_err(Into::into)
-}
+use docspec_cli::{
+    load_input, resolve_format, run_pipeline, Cli, CliError, ColorChoice, Format, Result,
+};
 
 /// Main entry point.
 fn main() {
@@ -34,34 +20,19 @@ fn main() {
             }
         }
 
-        let input_format = format::resolve_format(
+        let input_format = resolve_format(
             cli.from,
             cli.input.as_deref(),
             "cannot detect input format: use --from",
         )?;
-        let output_format = format::resolve_format(
+        let output_format = resolve_format(
             cli.to,
             cli.output.as_deref(),
             "cannot detect output format: use --to",
         )?;
 
-        let raw_content = match cli.input.as_ref() {
-            None => {
-                let mut buf = String::new();
-                std::io::stdin().lock().read_to_string(&mut buf)?;
-                buf
-            }
-            Some(path) if path.as_os_str() == "-" => {
-                let mut buf = String::new();
-                std::io::stdin().lock().read_to_string(&mut buf)?;
-                buf
-            }
-            Some(path) => std::fs::read_to_string(path)?,
-        };
-        let content = raw_content
-            .strip_prefix('\u{FEFF}')
-            .unwrap_or(&raw_content)
-            .to_string();
+        let loaded = load_input(cli.input.as_deref())?;
+        let content = loaded.as_str();
 
         if matches!(input_format, Format::Blocknote) {
             return Err(CliError::FormatNotSupported {
@@ -75,13 +46,8 @@ fn main() {
         }
 
         cli.output.as_ref().map_or_else(
-            || run_pipeline(&content, std::io::stdout().lock()),
-            |path| {
-                let mut writer = BufWriter::new(File::create(path)?);
-                run_pipeline(&content, &mut writer)?;
-                writer.flush()?;
-                Ok(())
-            },
+            || run_pipeline(content, std::io::stdout().lock()),
+            |path| run_pipeline(content, File::create(path)?),
         )
     })();
 

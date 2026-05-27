@@ -121,6 +121,13 @@ mod tests {
                 Ok(())
             }
         }
+
+        fn write_string_streaming(
+            &mut self,
+            _f: &mut dyn FnMut(&mut dyn std::io::Write) -> docspec_core::Result<()>,
+        ) -> docspec_core::Result<()> {
+            Ok(())
+        }
     }
 
     #[test]
@@ -137,6 +144,13 @@ mod tests {
     fn mock_backend_finish_callable() {
         let b = MockBackend::default();
         assert!(b.finish().is_ok());
+    }
+
+    #[test]
+    fn mock_backend_write_string_streaming_is_callable() {
+        let mut b = MockBackend::default();
+        let mut callback = |_out: &mut dyn std::io::Write| -> docspec_core::Result<()> { Ok(()) };
+        assert!(b.write_string_streaming(&mut callback).is_ok());
     }
 
     #[test]

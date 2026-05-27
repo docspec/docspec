@@ -13,10 +13,14 @@ categories = ["encoding", "wasm"]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+js-sys = "0.3"
 wasm-bindgen = "0.2"
 docspec-core = { path = "../docspec-core" }
 docspec-markdown-reader = { path = "../docspec-markdown-reader" }
 docspec-blocknote-writer = { path = "../docspec-blocknote-writer" }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
 
 [lints.rust]
 unsafe_code = "forbid"
