@@ -2,8 +2,8 @@
 
 use std::path::Path;
 
+use crate::args::Format;
 use crate::error::{CliError, Result};
-use crate::Format;
 
 /// Resolves format from explicit flag or path detection.
 ///
@@ -30,6 +30,20 @@ pub fn resolve_format(
     Err(CliError::FormatDetection {
         message: error_message.to_string(),
     })
+}
+
+// Reason: Used by run_convert for --list-input-formats (T7). Called once per invocation by design.
+#[allow(clippy::single_call_fn)]
+/// Returns the names of all supported input formats.
+pub fn input_format_names() -> &'static [&'static str] {
+    &["markdown"]
+}
+
+// Reason: Used by run_convert for --list-output-formats (T7). Called once per invocation by design.
+#[allow(clippy::single_call_fn)]
+/// Returns the names of all supported output formats.
+pub fn output_format_names() -> &'static [&'static str] {
+    &["blocknote"]
 }
 
 #[cfg(test)]

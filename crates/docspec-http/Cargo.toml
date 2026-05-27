@@ -1,0 +1,47 @@
+[package]
+name = "docspec-http"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+description = "HTTP API server for DocSpec document conversion"
+keywords = ["document", "conversion", "streaming", "http"]
+categories = ["encoding", "network-programming"]
+
+[dependencies]
+docspec-core = { path = "../docspec-core" }
+docspec-markdown-reader = { path = "../docspec-markdown-reader" }
+docspec-blocknote-writer = { path = "../docspec-blocknote-writer" }
+axum = "0.8"
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "macros",
+  "net",
+  "signal",
+  "sync",
+  "time",
+  "io-util",
+] }
+tokio-stream = "0.1"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "request-id", "util"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = [
+  "env-filter",
+  "json",
+  "fmt",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bytes = "1"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+http-body-util = "0.1"
+nix = { version = "0.29", features = ["signal"] }
+serde_json = "1"
+tower = { version = "0.5", features = ["util"] }
+
+[lints]
+workspace = true

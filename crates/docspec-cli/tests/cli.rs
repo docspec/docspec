@@ -30,6 +30,7 @@ mod tests {
         let output_path = output.path().to_path_buf();
 
         docspec_cmd()
+            .arg("convert")
             .arg(input.path())
             .args(["-o", output_path.to_str().unwrap_or("")])
             .assert()
@@ -46,6 +47,7 @@ mod tests {
             .args([
                 "--color",
                 "always",
+                "convert",
                 "/tmp/nonexistent-docspec-test-file-xyz.md",
                 "-t",
                 "blocknote",
@@ -61,6 +63,7 @@ mod tests {
             .args([
                 "--color",
                 "never",
+                "convert",
                 "/tmp/nonexistent-docspec-test-file-xyz.md",
                 "-t",
                 "blocknote",
@@ -84,6 +87,7 @@ mod tests {
         let output_path = output.path().to_path_buf();
 
         docspec_cmd()
+            .arg("convert")
             .arg(input.path())
             .args(["-o", output_path.to_str().unwrap_or("")])
             .assert()
@@ -102,7 +106,7 @@ mod tests {
     #[test]
     fn convert_stdin_to_stdout() {
         docspec_cmd()
-            .args(["--from", "markdown", "--to", "blocknote"])
+            .args(["convert", "--from", "markdown", "--to", "blocknote"])
             .write_stdin("# Hello\n")
             .assert()
             .success()
@@ -112,7 +116,7 @@ mod tests {
     #[test]
     fn dash_means_stdin() {
         docspec_cmd()
-            .args(["-", "--from", "markdown", "--to", "blocknote"])
+            .args(["convert", "-", "--from", "markdown", "--to", "blocknote"])
             .write_stdin("# Dash Input\n")
             .assert()
             .success()
@@ -131,6 +135,7 @@ mod tests {
         let output_path = output.path().to_path_buf();
 
         docspec_cmd()
+            .arg("convert")
             .arg(input.path())
             .args(["-o", output_path.to_str().unwrap_or("")])
             .assert()
@@ -155,6 +160,7 @@ mod tests {
         let output_path = output.path().to_path_buf();
 
         docspec_cmd()
+            .arg("convert")
             .arg(input.path())
             .args([
                 "--from",
@@ -180,7 +186,7 @@ mod tests {
         );
 
         docspec_cmd()
-            .args([fixture, "--to", "blocknote"])
+            .args(["convert", fixture, "--to", "blocknote"])
             .assert()
             .success()
             .stdout(contains("heading"));
@@ -189,7 +195,7 @@ mod tests {
     #[test]
     fn help_flag() {
         docspec_cmd()
-            .arg("--help")
+            .args(["convert", "--help"])
             .assert()
             .success()
             .stdout(contains("--from"))
@@ -201,7 +207,7 @@ mod tests {
     #[test]
     fn invalid_arguments_exits_2() {
         docspec_cmd()
-            .arg("--invalid-flag-xyz")
+            .args(["convert", "--invalid-flag-xyz"])
             .assert()
             .failure()
             .code(2);
@@ -211,6 +217,7 @@ mod tests {
     fn missing_input_file_exits_1() {
         docspec_cmd()
             .args([
+                "convert",
                 "/tmp/nonexistent-docspec-test-file-xyz.md",
                 "-t",
                 "blocknote",
@@ -226,6 +233,7 @@ mod tests {
         docspec_cmd()
             .env("NO_COLOR", "1")
             .args([
+                "convert",
                 "/tmp/nonexistent-docspec-test-file-xyz.md",
                 "-t",
                 "blocknote",
@@ -243,7 +251,7 @@ mod tests {
         );
 
         docspec_cmd()
-            .args([fixture, "--to", "blocknote"])
+            .args(["convert", fixture, "--to", "blocknote"])
             .assert()
             .success()
             .stdout(contains("paragraph"));
@@ -259,7 +267,7 @@ mod tests {
         let path_str = input.path().to_str().unwrap_or("");
 
         docspec_cmd()
-            .args([path_str, "-o", path_str])
+            .args(["convert", path_str, "-o", path_str])
             .assert()
             .failure()
             .code(1)
@@ -275,6 +283,7 @@ mod tests {
         assert!(write_result.is_ok(), "failed to write to tempfile");
 
         docspec_cmd()
+            .arg("convert")
             .arg(input.path())
             .args(["-t", "blocknote"])
             .assert()
@@ -291,6 +300,7 @@ mod tests {
         assert!(write_result.is_ok(), "failed to write to tempfile");
 
         docspec_cmd()
+            .arg("convert")
             .arg(input.path())
             .args(["-t", "blocknote"])
             .assert()

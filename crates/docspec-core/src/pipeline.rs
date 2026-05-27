@@ -109,14 +109,8 @@ mod tests {
         let probe = Probe::default();
         let result = pipe(VecSource::new(vec![]), CollectingSink::new(probe.clone()));
         assert!(result.is_ok());
-        assert!(
-            probe.finished.get(),
-            "finish() must be called when source drains cleanly"
-        );
-        assert!(
-            probe.events.borrow().is_empty(),
-            "no events should reach the sink from an empty source"
-        );
+        assert!(probe.finished.get());
+        assert!(probe.events.borrow().is_empty());
     }
 
     #[test]
@@ -132,18 +126,12 @@ mod tests {
         ];
         let result = pipe(VecSource::new(events), CollectingSink::new(probe.clone()));
         assert!(result.is_ok());
-        assert!(
-            probe.finished.get(),
-            "finish() must be called after all events are forwarded"
-        );
+        assert!(probe.finished.get());
         let collected = probe.events.borrow();
-        assert!(
-            matches!(
-                collected.as_slice(),
-                [Event::StartDocument { .. }, Event::EndDocument]
-            ),
-            "expected exactly [StartDocument, EndDocument], got {collected:?}"
-        );
+        assert!(matches!(
+            collected.as_slice(),
+            [Event::StartDocument { .. }, Event::EndDocument]
+        ));
     }
 
     #[test]
@@ -151,10 +139,7 @@ mod tests {
         let probe = Probe::default();
         let result = pipe(ErroringSource, CollectingSink::new(probe.clone()));
         assert!(matches!(result, Err(Error::Other { .. })));
-        assert!(
-            !probe.finished.get(),
-            "finish() must be skipped when the source errors"
-        );
+        assert!(!probe.finished.get());
     }
 
     #[test]
@@ -172,9 +157,16 @@ mod tests {
             },
         );
         assert!(matches!(result, Err(Error::Other { .. })));
-        assert!(
-            !finished.get(),
-            "finish() must be skipped when the sink errors during handle_event"
-        );
+        assert!(!finished.get());
+    }
+
+    #[test]
+    fn erroring_sink_finish_is_callable() {
+        let finished = Rc::new(Cell::new(false));
+        let sink = ErroringSink {
+            finished: Rc::clone(&finished),
+        };
+        assert!(sink.finish().is_ok());
+        assert!(finished.get());
     }
 }

@@ -156,3 +156,62 @@ Extension is straightforward through well-defined interfaces. New formats implem
 The same code runs natively on servers, in WebAssembly in browsers, on embedded microcontrollers. Portability is a consequence of good design. Constraints force clarity. Clarity produces quality that lasts.
 
 For the philosophy behind these architectural choices, see the [Manifesto](MANIFESTO.md).
+
+---
+
+## HTTP Server (`docspec-http`)
+
+The `docspec-http` crate exposes the DocSpec streaming pipeline over HTTP using [Axum 0.8](https://docs.rs/axum/0.8) and [tokio](https://docs.rs/tokio).
+
+### Sync/Async Bridge
+
+The core challenge is bridging DocSpec's synchronous `EventSource`/`EventSink` pipeline to Axum's async request handling. The solution uses a bounded channel:
+
+```
+HTTP request → convert_handler (async)
+                    │
+                    ├─ Validate Content-Type, Accept, UTF-8
+                    │
+                    ├─ Create mpsc::channel::<Result<Bytes, io::Error>>(32)
+                    │
+                    ├─ spawn_blocking (fire-and-forget, NO .await):
+                    │       MarkdownReader::new(&body_str)
+                    │       → StackTrackingSink<BlockNoteWriter<ChannelWriter>>
+                    │       → ChannelWriter::blocking_send(chunk) per 8 KB
+                    │
+                    └─ Return Response immediately:
+                            Body::from_stream(ReceiverStream::new(rx))
+```
+
+The response is returned **before** conversion completes. Axum streams the response body as the blocking task produces chunks. The bounded channel (capacity 32) provides backpressure without deadlock because the receiver is actively drained by Axum's writer.
+
+**Critical**: Never `.await` the `JoinHandle` from `spawn_blocking` before returning the response. Doing so causes a deadlock: the handle waits for the blocking task, the blocking task fills the channel and blocks on `blocking_send`, and the channel never drains because the response hasn't started.
+
+### Why Request Body Is Buffered
+
+`MarkdownReader<'a>` holds a `pulldown-cmark` `Parser<'a>` that borrows from `&'a str`. This makes it impossible to own the `String` and hold a borrow from it simultaneously in safe Rust (self-referential struct). The HTTP handler buffers the request body to a `String` and passes `&body_str` to `MarkdownReader::new`. This is an accepted memory trade-off for the HTTP use case.
+
+### Accepted Risk Profile
+
+By design, `docspec-http` enforces:
+- **No body size limit** — unlimited request bodies accepted
+- **No request timeout** — conversions run to completion
+- **No shutdown timeout** — in-flight requests drain unbounded on SIGINT/SIGTERM
+
+These risks are accepted and documented. Deploy behind a reverse proxy (nginx, Caddy, etc.) for production use.
+
+### MIME Types
+
+| Direction | MIME Type |
+|-----------|-----------|
+| Input | `text/markdown` (with optional `; charset=...` parameter) |
+| Output | `application/vnd.docspec.blocknote+json` |
+| Errors | `application/problem+json` (RFC 7807) |
+
+### Error Responses
+
+All errors return [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) problem+json with:
+- `type`: `https://docspec.dev/errors/{code}` URI
+- `title`: Human-readable error category
+- `status`: HTTP status code
+- `detail`: Occurrence-specific description

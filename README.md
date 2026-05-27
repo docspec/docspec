@@ -1,6 +1,9 @@
 # DocSpec
 
-DocSpec is a streaming document conversion library. It converts DOCX, ODT, RTF, HTML, Markdown, and BlockNote JSON — event by event, byte by byte, without buffering the world. Built in Rust for memory-conscious systems, from microcontrollers to servers.
+DocSpec is a streaming document conversion library. It converts DOCX, ODT, RTF, HTML, Markdown, and BlockNote JSON, event by event, byte by byte, without buffering the world. Built in Rust for memory-conscious systems, from microcontrollers to servers.
+
+> **BREAKING CHANGE**: The CLI has been restructured to use subcommands.
+> `docspec input.md -o out.json` is now `docspec convert input.md -o out.json`.
 
 ## Philosophy
 
@@ -23,14 +26,73 @@ DocSpec works through a pipeline of readers and writers. A reader (EventSource) 
 
 The architecture is fully decoupled. Any reader connects to any writer. A DOCX reader can feed a Markdown writer. An HTML reader can feed BlockNote JSON. The events are the contract.
 
-To convert a document:
+### CLI: Convert a file
 
-1. Create a reader for your input format
-2. Create a writer for your output format
-3. Connect them through the event pipeline
-4. Let the events flow
+```sh
+docspec convert input.md -o out.json
+```
 
-No buffering. No intermediate representations. No loading the entire document into memory. The document streams through, event by event.
+Specify formats explicitly when the file extension is ambiguous:
+
+```sh
+docspec convert --from markdown --to blocknote input.md -o out.json
+```
+
+### HTTP API: Start the server
+
+```sh
+docspec http --host 127.0.0.1 --port 3000
+```
+
+Then convert a document over HTTP:
+
+```sh
+curl -X POST http://localhost:3000/convert \
+  -H 'Content-Type: text/markdown' \
+  --data-binary '# Hello'
+```
+
+Check server health:
+
+```sh
+curl -i http://localhost:3000/health
+# HTTP/1.1 204 No Content
+```
+
+## HTTP API
+
+### Endpoints
+
+**`POST /convert`** — Convert a document. Send the source document as the request body.
+
+**`GET /health`** — Returns `204 No Content` when the server is ready.
+
+### MIME Types
+
+| Direction | MIME Type |
+|-----------|-----------|
+| Input | `text/markdown` |
+| Output | `application/vnd.docspec.blocknote+json` |
+| Errors | `application/problem+json` |
+
+### Error Format
+
+Errors follow [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) problem+json. Each error includes a `type` URI of the form `https://docspec.dev/errors/{code}`, a human-readable `title`, and an HTTP `status` code.
+
+Example:
+
+```json
+{
+  "type": "https://docspec.dev/errors/unsupported-media-type",
+  "title": "Unsupported Media Type",
+  "status": 415,
+  "detail": "Content-Type 'application/json' is not supported. Use text/markdown."
+}
+```
+
+### Security Note
+
+No body size limit or request timeout is enforced. Deploy behind a reverse proxy (nginx, Caddy, etc.) for production use.
 
 ## Documentation
 
