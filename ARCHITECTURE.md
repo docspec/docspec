@@ -139,6 +139,22 @@ The same code path executes regardless of target. There are no conditional compi
 
 ---
 
+## HTTP Boundary
+
+The `docspec-http` crate exposes DocSpec's sync conversion pipeline over HTTP using Axum 0.8 + tokio.
+
+**Crate**: `docspec-http`
+**Binary**: `docspec-http`
+**Endpoint**: `POST /conversion` — accepts `text/markdown`, returns streaming `application/vnd.docspec.blocknote+json`
+
+**Sync/async bridge**: The conversion pipeline (`MarkdownReader → StackTrackingSink → BlockNoteWriter`) runs synchronously inside `tokio::task::spawn_blocking`. A bounded `mpsc::channel(32)` connects the blocking task to the async response body stream. The `JoinHandle` is intentionally dropped without awaiting to avoid deadlock between the channel consumer and the blocking task.
+
+**Async crate**: `docspec-http` is the only crate in the workspace that uses async Rust. It is explicitly excluded from the `docspec-wasm` dependency graph (adding it would pull in tokio and break the WASM target).
+
+**Wire contract**: Mirrors `github.com/docspecio/api` v3.0.2 where feasible — same endpoint path, RFC 7807 errors, `X-Request-ID`/`X-Trace-ID` header echo. Diverges in input MIME (`text/markdown` vs DOCX) and adds `Cache-Control` on all responses.
+
+---
+
 ## Summary
 
 DocSpec converts documents through a streaming event pipeline. Documents enter as bytes, become events flowing through the pipeline, exit as bytes in the target format. Nothing accumulates in memory. Everything flows through and is immediately processed.

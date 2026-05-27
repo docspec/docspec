@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `docspec-json`: `JsonEmitter::value_streaming` and `KeyedEmitter::value_streaming` — emitter-level streaming API.
 - `docspec-cli`: `load_input()` helper in `src/input.rs` — encapsulates mmap/stdin logic, exposed for integration tests.
 - `docspec-wasm`: `convert_markdown_to_blocknote_streaming` — streaming WASM export with JS callback.
+- **docspec-http** (new crate): HTTP API server exposing markdown→BlockNote conversion via `POST /conversion`. RFC 7807 errors, `X-Request-ID` generation/echo, `X-Trace-ID` echo-only, `Cache-Control: max-age=0, private, must-revalidate` on all responses. Graceful SIGINT/SIGTERM shutdown. Binary `docspec-http` with `--host`/`--port` flags. Issue #15.
 
 ### Changed
 
