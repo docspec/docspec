@@ -1,6 +1,6 @@
 //! Error types for the CLI.
 
-use core::fmt;
+use thiserror::Error;
 
 /// Result type alias for CLI operations.
 pub type Result<T> = core::result::Result<T, CliError>;
@@ -8,68 +8,33 @@ pub type Result<T> = core::result::Result<T, CliError>;
 /// CLI-specific error types.
 ///
 /// Wraps underlying library errors and adds CLI-specific error conditions.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum CliError {
     /// Conversion pipeline error from `docspec_core`.
-    Conversion(docspec_core::Error),
+    #[error(transparent)]
+    Conversion(#[from] docspec_core::Error),
 
     /// Cannot detect format from path or explicit flag.
+    #[error("{message}")]
     FormatDetection {
         /// Human-readable description of the detection failure.
         message: String,
     },
 
     /// Format reader or writer is not yet implemented.
+    #[error("{format} reader not yet implemented")]
     FormatNotSupported {
         /// The format that is not supported.
         format: String,
     },
 
     /// I/O error from file operations.
-    Io(std::io::Error),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 
     /// Input and output paths are the same file.
+    #[error("input and output paths refer to the same file")]
     SameInputOutput,
-}
-
-impl fmt::Display for CliError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Conversion(err) => write!(f, "{err}"),
-            Self::FormatDetection { message } => write!(f, "{message}"),
-            Self::FormatNotSupported { format } => {
-                write!(f, "{format} reader not yet implemented")
-            }
-            Self::Io(err) => write!(f, "{err}"),
-            Self::SameInputOutput => {
-                write!(f, "input and output paths refer to the same file")
-            }
-        }
-    }
-}
-
-impl core::error::Error for CliError {
-    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        match self {
-            Self::Conversion(err) => Some(err),
-            Self::FormatDetection { .. }
-            | Self::FormatNotSupported { .. }
-            | Self::SameInputOutput => None,
-            Self::Io(err) => Some(err),
-        }
-    }
-}
-
-impl From<docspec_core::Error> for CliError {
-    fn from(err: docspec_core::Error) -> Self {
-        Self::Conversion(err)
-    }
-}
-
-impl From<std::io::Error> for CliError {
-    fn from(err: std::io::Error) -> Self {
-        Self::Io(err)
-    }
 }
 
 #[cfg(test)]

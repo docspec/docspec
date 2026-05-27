@@ -18,6 +18,7 @@ clap = { version = "4", features = ["derive", "color"] }
 docspec-core = { path = "../docspec-core" }
 docspec-markdown-reader = { path = "../docspec-markdown-reader" }
 docspec-blocknote-writer = { path = "../docspec-blocknote-writer" }
+thiserror = "2"
 
 [dev-dependencies]
 assert_cmd = "2"

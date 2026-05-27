@@ -10,7 +10,7 @@ use std::io::{BufWriter, IsTerminal as _, Read as _, Write};
 
 use clap::Parser as _;
 use docspec_blocknote_writer::BlockNoteWriter;
-use docspec_core::{EventSink as _, EventSource as _, StackTrackingSink};
+use docspec_core::StackTrackingSink;
 use docspec_markdown_reader::MarkdownReader;
 
 use crate::args::{Cli, ColorChoice, Format};
@@ -18,19 +18,9 @@ use crate::error::{CliError, Result};
 
 /// Runs the streaming conversion pipeline from markdown to `BlockNote`.
 fn run_pipeline<W: Write>(content: &str, output: W) -> Result<()> {
-    let mut reader = MarkdownReader::new(content);
-    let mut sink = StackTrackingSink::new(BlockNoteWriter::new(output));
-
-    let mut next = reader.next_event();
-    while let Ok(Some(event)) = next {
-        sink.handle_event(event)?;
-        next = reader.next_event();
-    }
-    if let Err(e) = next {
-        return Err(e.into());
-    }
-    sink.finish()?;
-    Ok(())
+    let reader = MarkdownReader::new(content);
+    let sink = StackTrackingSink::new(BlockNoteWriter::new(output));
+    docspec_core::pipe(reader, sink).map_err(Into::into)
 }
 
 /// Main entry point.

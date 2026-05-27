@@ -30,57 +30,53 @@ impl<W: Write> JsonBackend for StrusonBackend<W> {
 
     #[inline]
     fn begin_array(&mut self) -> Result<()> {
-        self.writer.begin_array().map_err(io_err)
+        self.writer.begin_array().map_err(Error::from)
     }
 
     #[inline]
     fn begin_object(&mut self) -> Result<()> {
-        self.writer.begin_object().map_err(io_err)
+        self.writer.begin_object().map_err(Error::from)
     }
 
     #[inline]
     fn end_array(&mut self) -> Result<()> {
-        self.writer.end_array().map_err(io_err)
+        self.writer.end_array().map_err(Error::from)
     }
 
     #[inline]
     fn end_object(&mut self) -> Result<()> {
-        self.writer.end_object().map_err(io_err)
+        self.writer.end_object().map_err(Error::from)
     }
 
     #[inline]
     fn finish(self) -> Result<W> {
-        self.writer.finish_document().map_err(io_err)
+        self.writer.finish_document().map_err(Error::from)
     }
 
     #[inline]
     fn write_bool(&mut self, b: bool) -> Result<()> {
-        self.writer.bool_value(b).map_err(io_err)
+        self.writer.bool_value(b).map_err(Error::from)
     }
 
     #[inline]
     fn write_name(&mut self, name: &str) -> Result<()> {
-        self.writer.name(name).map_err(io_err)
+        self.writer.name(name).map_err(Error::from)
     }
 
     #[inline]
     fn write_null(&mut self) -> Result<()> {
-        self.writer.null_value().map_err(io_err)
+        self.writer.null_value().map_err(Error::from)
     }
 
     #[inline]
     fn write_number(&mut self, n: u32) -> Result<()> {
-        self.writer.number_value(n).map_err(io_err)
+        self.writer.number_value(n).map_err(Error::from)
     }
 
     #[inline]
     fn write_string(&mut self, s: &str) -> Result<()> {
-        self.writer.string_value(s).map_err(io_err)
+        self.writer.string_value(s).map_err(Error::from)
     }
-}
-
-fn io_err(e: std::io::Error) -> Error {
-    Error::Io { source: e }
 }
 
 #[cfg(test)]

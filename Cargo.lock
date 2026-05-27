@@ -219,11 +219,15 @@ dependencies = [
  "predicates",
  "serde_json",
  "tempfile",
+ "thiserror",
 ]
 
 [[package]]
 name = "docspec-core"
 version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
 
 [[package]]
 name = "docspec-json"

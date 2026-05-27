@@ -8,6 +8,47 @@ use alloc::vec::Vec;
 
 use crate::{Error, Event, EventSink, Result};
 
+/// Declarative macro that generates three block-kind lookup functions from a single table.
+///
+/// Expands to:
+/// - `block_kind_for_start(event: &Event) -> Option<BlockKind>`
+/// - `block_kind_for_end(event: &Event) -> Option<BlockKind>`
+/// - `end_event_for(kind: BlockKind) -> Event`
+///
+/// Each function is marked `#[inline]` and `#[must_use]`.
+macro_rules! block_kinds {
+    ( $( $kind:ident => ( $start:ident, $end:ident ) ),+ $(,)? ) => {
+        /// Returns the [`BlockKind`] for a start event, or `None` if the event is not a block start.
+        #[inline]
+        #[must_use]
+        pub fn block_kind_for_start(event: &Event) -> Option<BlockKind> {
+            match event {
+                $( Event::$start { .. } => Some(BlockKind::$kind), )+
+                _ => None,
+            }
+        }
+
+        /// Returns the [`BlockKind`] for an end event, or `None` if the event is not a block end.
+        #[inline]
+        #[must_use]
+        pub fn block_kind_for_end(event: &Event) -> Option<BlockKind> {
+            match event {
+                $( Event::$end => Some(BlockKind::$kind), )+
+                _ => None,
+            }
+        }
+
+        /// Returns the end event for a given [`BlockKind`].
+        #[inline]
+        #[must_use]
+        pub fn end_event_for(kind: BlockKind) -> Event {
+            match kind {
+                $( BlockKind::$kind => Event::$end, )+
+            }
+        }
+    };
+}
+
 /// Identifies the kind of block-level container in a document event stream.
 ///
 /// Each variant corresponds to a Start/End event pair. The stack tracker uses this
@@ -286,130 +327,24 @@ impl<S: EventSink> EventSink for StackTrackingSink<S> {
     }
 }
 
-/// Maps a Start event to its corresponding [`BlockKind`].
-///
-/// Returns `Some(kind)` for Start event variants, `None` for all other events.
-#[inline]
-#[must_use]
-pub fn block_kind_for_start(event: &Event) -> Option<BlockKind> {
-    match event {
-        Event::StartBlockQuote { .. } => Some(BlockKind::Blockquote),
-        Event::StartCaption { .. } => Some(BlockKind::Caption),
-        Event::StartDefinitionDetail { .. } => Some(BlockKind::DefinitionDetail),
-        Event::StartDefinitionList { .. } => Some(BlockKind::DefinitionList),
-        Event::StartDefinitionTerm { .. } => Some(BlockKind::DefinitionTerm),
-        Event::StartDocument { .. } => Some(BlockKind::Document),
-        Event::StartFootnote { .. } => Some(BlockKind::Footnote),
-        Event::StartHeading { .. } => Some(BlockKind::Heading),
-        Event::StartLink { .. } => Some(BlockKind::Link),
-        Event::StartOrderedListItem { .. } => Some(BlockKind::OrderedListItem),
-        Event::StartParagraph { .. } => Some(BlockKind::Paragraph),
-        Event::StartPreformatted { .. } => Some(BlockKind::Preformatted),
-        Event::StartTable { .. } => Some(BlockKind::Table),
-        Event::StartTableCell { .. } => Some(BlockKind::TableCell),
-        Event::StartTableHeader { .. } => Some(BlockKind::TableHeader),
-        Event::StartTableRow { .. } => Some(BlockKind::TableRow),
-        Event::StartUnorderedListItem { .. } => Some(BlockKind::UnorderedListItem),
-        Event::EndBlockQuote
-        | Event::EndCaption
-        | Event::EndDefinitionDetail
-        | Event::EndDefinitionList
-        | Event::EndDefinitionTerm
-        | Event::EndDocument
-        | Event::EndFootnote
-        | Event::EndHeading
-        | Event::EndLink
-        | Event::EndOrderedListItem
-        | Event::EndParagraph
-        | Event::EndPreformatted
-        | Event::EndTable
-        | Event::EndTableCell
-        | Event::EndTableHeader
-        | Event::EndTableRow
-        | Event::EndUnorderedListItem
-        | Event::FootnoteRef { .. }
-        | Event::Image { .. }
-        | Event::LineBreak
-        | Event::Text { .. }
-        | Event::ThematicBreak { .. } => None,
-    }
-}
-
-/// Maps an End event to its corresponding [`BlockKind`].
-///
-/// Returns `Some(kind)` for End event variants, `None` for all other events.
-#[inline]
-#[must_use]
-pub fn block_kind_for_end(event: &Event) -> Option<BlockKind> {
-    match event {
-        Event::EndBlockQuote => Some(BlockKind::Blockquote),
-        Event::EndCaption => Some(BlockKind::Caption),
-        Event::EndDefinitionDetail => Some(BlockKind::DefinitionDetail),
-        Event::EndDefinitionList => Some(BlockKind::DefinitionList),
-        Event::EndDefinitionTerm => Some(BlockKind::DefinitionTerm),
-        Event::EndDocument => Some(BlockKind::Document),
-        Event::EndFootnote => Some(BlockKind::Footnote),
-        Event::EndHeading => Some(BlockKind::Heading),
-        Event::EndLink => Some(BlockKind::Link),
-        Event::EndOrderedListItem => Some(BlockKind::OrderedListItem),
-        Event::EndParagraph => Some(BlockKind::Paragraph),
-        Event::EndPreformatted => Some(BlockKind::Preformatted),
-        Event::EndTable => Some(BlockKind::Table),
-        Event::EndTableCell => Some(BlockKind::TableCell),
-        Event::EndTableHeader => Some(BlockKind::TableHeader),
-        Event::EndTableRow => Some(BlockKind::TableRow),
-        Event::EndUnorderedListItem => Some(BlockKind::UnorderedListItem),
-        Event::FootnoteRef { .. }
-        | Event::Image { .. }
-        | Event::LineBreak
-        | Event::StartBlockQuote { .. }
-        | Event::StartCaption { .. }
-        | Event::StartDefinitionDetail { .. }
-        | Event::StartDefinitionList { .. }
-        | Event::StartDefinitionTerm { .. }
-        | Event::StartDocument { .. }
-        | Event::StartFootnote { .. }
-        | Event::StartHeading { .. }
-        | Event::StartLink { .. }
-        | Event::StartOrderedListItem { .. }
-        | Event::StartParagraph { .. }
-        | Event::StartPreformatted { .. }
-        | Event::StartTable { .. }
-        | Event::StartTableCell { .. }
-        | Event::StartTableHeader { .. }
-        | Event::StartTableRow { .. }
-        | Event::StartUnorderedListItem { .. }
-        | Event::Text { .. }
-        | Event::ThematicBreak { .. } => None,
-    }
-}
-
-/// Maps a [`BlockKind`] back to its corresponding End event.
-///
-/// This is the inverse of [`block_kind_for_end`]. Used when auto-closing blocks
-/// that were not explicitly closed by the event stream.
-#[inline]
-#[must_use]
-pub fn end_event_for(kind: BlockKind) -> Event {
-    match kind {
-        BlockKind::Blockquote => Event::EndBlockQuote,
-        BlockKind::Caption => Event::EndCaption,
-        BlockKind::DefinitionDetail => Event::EndDefinitionDetail,
-        BlockKind::DefinitionList => Event::EndDefinitionList,
-        BlockKind::DefinitionTerm => Event::EndDefinitionTerm,
-        BlockKind::Document => Event::EndDocument,
-        BlockKind::Footnote => Event::EndFootnote,
-        BlockKind::Heading => Event::EndHeading,
-        BlockKind::Link => Event::EndLink,
-        BlockKind::OrderedListItem => Event::EndOrderedListItem,
-        BlockKind::Paragraph => Event::EndParagraph,
-        BlockKind::UnorderedListItem => Event::EndUnorderedListItem,
-        BlockKind::Preformatted => Event::EndPreformatted,
-        BlockKind::Table => Event::EndTable,
-        BlockKind::TableCell => Event::EndTableCell,
-        BlockKind::TableHeader => Event::EndTableHeader,
-        BlockKind::TableRow => Event::EndTableRow,
-    }
+block_kinds! {
+    Blockquote        => (StartBlockQuote,        EndBlockQuote),
+    Caption           => (StartCaption,           EndCaption),
+    DefinitionDetail  => (StartDefinitionDetail,  EndDefinitionDetail),
+    DefinitionList    => (StartDefinitionList,    EndDefinitionList),
+    DefinitionTerm    => (StartDefinitionTerm,    EndDefinitionTerm),
+    Document          => (StartDocument,          EndDocument),
+    Footnote          => (StartFootnote,          EndFootnote),
+    Heading           => (StartHeading,           EndHeading),
+    Link              => (StartLink,              EndLink),
+    OrderedListItem   => (StartOrderedListItem,   EndOrderedListItem),
+    Paragraph         => (StartParagraph,         EndParagraph),
+    Preformatted      => (StartPreformatted,      EndPreformatted),
+    Table             => (StartTable,             EndTable),
+    TableCell         => (StartTableCell,         EndTableCell),
+    TableHeader       => (StartTableHeader,       EndTableHeader),
+    TableRow          => (StartTableRow,          EndTableRow),
+    UnorderedListItem => (StartUnorderedListItem, EndUnorderedListItem),
 }
 
 #[cfg(test)]

@@ -3,6 +3,24 @@
 //! Events represent the atomic units of document structure. Sources emit events
 //! in document order; sinks consume them. This decouples all readers from all writers.
 
+/// Generates boolean builder methods for a struct field.
+///
+/// Each method takes `self`, sets the corresponding field to `true`, and returns `self`.
+/// Doc comments are auto-generated via `concat!` and `stringify!`.
+macro_rules! bool_setters {
+    ($($field:ident),+ $(,)?) => {
+        $(
+            #[inline]
+            #[must_use]
+            #[doc = concat!("Enables ", stringify!($field), " formatting.")]
+            pub fn $field(mut self) -> Self {
+                self.$field = true;
+                self
+            }
+        )+
+    };
+}
+
 /// Text formatting attributes for an [`Event::Text`] event.
 #[expect(
     clippy::struct_excessive_bools,
@@ -29,29 +47,7 @@ pub struct TextStyle {
 }
 
 impl TextStyle {
-    /// Enables bold formatting.
-    #[inline]
-    #[must_use]
-    pub fn bold(mut self) -> Self {
-        self.bold = true;
-        self
-    }
-
-    /// Enables monospace/code formatting.
-    #[inline]
-    #[must_use]
-    pub fn code(mut self) -> Self {
-        self.code = true;
-        self
-    }
-
-    /// Enables italic formatting.
-    #[inline]
-    #[must_use]
-    pub fn italic(mut self) -> Self {
-        self.italic = true;
-        self
-    }
+    bool_setters!(bold, code, italic);
 
     /// Sets the highlight/mark color.
     #[inline]
@@ -61,37 +57,7 @@ impl TextStyle {
         self
     }
 
-    /// Enables strikethrough formatting.
-    #[inline]
-    #[must_use]
-    pub fn strikethrough(mut self) -> Self {
-        self.strikethrough = true;
-        self
-    }
-
-    /// Enables subscript formatting.
-    #[inline]
-    #[must_use]
-    pub fn subscript(mut self) -> Self {
-        self.subscript = true;
-        self
-    }
-
-    /// Enables superscript formatting.
-    #[inline]
-    #[must_use]
-    pub fn superscript(mut self) -> Self {
-        self.superscript = true;
-        self
-    }
-
-    /// Enables underline formatting.
-    #[inline]
-    #[must_use]
-    pub fn underline(mut self) -> Self {
-        self.underline = true;
-        self
-    }
+    bool_setters!(strikethrough, subscript, superscript, underline);
 }
 
 /// A streaming document event.

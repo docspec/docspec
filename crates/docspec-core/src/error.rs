@@ -2,6 +2,8 @@
 
 use core::fmt;
 
+use thiserror::Error;
+
 /// The position in a source document where an error occurred.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Position {
@@ -14,10 +16,11 @@ pub struct Position {
 }
 
 /// Errors that can occur during document processing.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
     /// An event sequence violated the well-formedness rules.
+    #[error("invalid event sequence: expected {expected}, found {found}: {message}")]
     InvalidSequence {
         /// The event type that was expected.
         expected: String,
@@ -27,11 +30,14 @@ pub enum Error {
         message: String,
     },
     /// An I/O error from the underlying reader or writer.
+    #[error("I/O error: {source}")]
     Io {
         /// The underlying I/O error.
+        #[from]
         source: std::io::Error,
     },
     /// A JSON parse or serialization error.
+    #[error("{}", DisplayPos { label: "JSON error", message: message.as_str(), position: position.as_ref() })]
     Json {
         /// Human-readable description.
         message: String,
@@ -39,11 +45,13 @@ pub enum Error {
         position: Option<Position>,
     },
     /// An unclassified error.
+    #[error("{message}")]
     Other {
         /// Human-readable description.
         message: String,
     },
     /// A parse error, optionally with position information.
+    #[error("{}", DisplayPos { label: "parse error", message: message.as_str(), position: position.as_ref() })]
     Parse {
         /// Human-readable description of what went wrong.
         message: String,
@@ -52,88 +60,32 @@ pub enum Error {
     },
 }
 
-impl fmt::Display for Error {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidSequence {
-                message,
-                expected,
-                found,
-            } => {
-                write!(
-                    f,
-                    "invalid event sequence: expected {expected}, found {found}: {message}"
-                )
-            }
-            Self::Io { source } => {
-                write!(f, "I/O error: {source}")
-            }
-            Self::Json { message, position } => {
-                if let Some(pos) = position {
-                    match (pos.line, pos.column) {
-                        (Some(line), Some(col)) => write!(
-                            f,
-                            "JSON error at line {line}, column {col} (byte {byte}): {message}",
-                            byte = pos.byte_offset
-                        ),
-                        (Some(line), None) => write!(
-                            f,
-                            "JSON error at line {line} (byte {byte}): {message}",
-                            byte = pos.byte_offset
-                        ),
-                        _ => write!(
-                            f,
-                            "JSON error at byte {byte}: {message}",
-                            byte = pos.byte_offset
-                        ),
-                    }
-                } else {
-                    write!(f, "JSON error: {message}")
-                }
-            }
-            Self::Other { message } => {
-                write!(f, "{message}")
-            }
-            Self::Parse { message, position } => {
-                if let Some(pos) = position {
-                    match (pos.line, pos.column) {
-                        (Some(line), Some(col)) => write!(
-                            f,
-                            "parse error at line {line}, column {col} (byte {byte}): {message}",
-                            byte = pos.byte_offset
-                        ),
-                        (Some(line), None) => write!(
-                            f,
-                            "parse error at line {line} (byte {byte}): {message}",
-                            byte = pos.byte_offset
-                        ),
-                        _ => write!(
-                            f,
-                            "parse error at byte {byte}: {message}",
-                            byte = pos.byte_offset
-                        ),
-                    }
-                } else {
-                    write!(f, "parse error: {message}")
-                }
-            }
-        }
-    }
-}
-
-impl core::error::Error for Error {
-    #[inline]
-    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        match self {
-            Self::Io { source } => Some(source),
-            Self::InvalidSequence { .. }
-            | Self::Json { .. }
-            | Self::Other { .. }
-            | Self::Parse { .. } => None,
-        }
-    }
-}
-
 /// Result type alias for `DocSpec` operations.
 pub type Result<T> = core::result::Result<T, Error>;
+
+struct DisplayPos<'a> {
+    label: &'a str,
+    message: &'a str,
+    position: Option<&'a Position>,
+}
+
+impl fmt::Display for DisplayPos<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.label)?;
+        if let Some(pos) = self.position {
+            let byte = pos.byte_offset;
+            match (pos.line, pos.column) {
+                (Some(line), Some(col)) => {
+                    write!(f, " at line {line}, column {col} (byte {byte})")?;
+                }
+                (Some(line), _) => {
+                    write!(f, " at line {line} (byte {byte})")?;
+                }
+                _ => {
+                    write!(f, " at byte {byte}")?;
+                }
+            }
+        }
+        write!(f, ": {}", self.message)
+    }
+}
