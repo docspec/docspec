@@ -2,7 +2,7 @@
 
 use std::io::Write;
 
-use struson::writer::{JsonStreamWriter, JsonWriter as _};
+use struson::writer::{JsonStreamWriter, JsonWriter as _, StringValueWriter as _};
 
 use crate::JsonBackend;
 use docspec_core::{Error, Result};
@@ -76,6 +76,20 @@ impl<W: Write> JsonBackend for StrusonBackend<W> {
     #[inline]
     fn write_string(&mut self, s: &str) -> Result<()> {
         self.writer.string_value(s).map_err(io_err)
+    }
+
+    #[inline]
+    fn write_string_streaming(
+        &mut self,
+        f: &mut dyn FnMut(&mut dyn std::io::Write) -> Result<()>,
+    ) -> Result<()> {
+        let mut string_writer = self.writer.string_value_writer().map_err(io_err)?;
+        let callback_result = f(&mut string_writer);
+        let finish_result = string_writer.finish_value().map_err(io_err);
+        match (callback_result, finish_result) {
+            (Err(err), _) | (Ok(()), Err(err)) => Err(err),
+            (Ok(()), Ok(())) => Ok(()),
+        }
     }
 }
 

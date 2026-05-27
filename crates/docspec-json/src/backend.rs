@@ -38,7 +38,9 @@ pub trait JsonBackend {
     /// # Errors
     ///
     /// Returns any error produced by the underlying backend.
-    fn finish(self) -> Result<Self::Output>;
+    fn finish(self) -> Result<Self::Output>
+    where
+        Self: Sized;
     /// Write a boolean value.
     ///
     /// # Errors
@@ -69,6 +71,26 @@ pub trait JsonBackend {
     ///
     /// Returns any error produced by the underlying backend.
     fn write_string(&mut self, s: &str) -> Result<()>;
+    /// Write a JSON string value whose content is produced incrementally by the callback.
+    ///
+    /// The callback receives a `&mut dyn Write` positioned inside the JSON string slot.
+    /// All bytes written to it are the raw string content (JSON-escaping is the backend's responsibility).
+    ///
+    /// **Always-close-string contract**: the JSON string is ALWAYS closed (closing `"` written) when
+    /// this method returns, regardless of whether the callback returned `Ok` or `Err`. This is required
+    /// to keep the underlying JSON state machine consistent.
+    ///
+    /// **Fail-fast contract**: on callback `Err`, the produced JSON is *structurally valid*
+    /// (matching quotes) but *semantically incomplete* (truncated content). Callers MUST
+    /// discard partial output on error — `DocSpec`'s "no partial conversions" philosophy applies.
+    ///
+    /// # Errors
+    ///
+    /// Returns any error produced by the callback or the underlying backend.
+    fn write_string_streaming(
+        &mut self,
+        f: &mut dyn FnMut(&mut dyn std::io::Write) -> Result<()>,
+    ) -> Result<()>;
 }
 
 /// A token captured by [`CapturingBackend`].
@@ -180,11 +202,36 @@ impl JsonBackend for CapturingBackend {
         self.tokens.push(Token::StringValue(s.to_string()));
         Ok(())
     }
+
+    /// Accumulates the callback's writes into a `Vec<u8>`, then emits a `Token::StringValue`.
+    ///
+    /// **Test-only accumulation**: this is intentionally NOT streaming (it buffers into a Vec).
+    /// `CapturingBackend` is for verifying emitter state-machine behavior in unit tests only.
+    /// Production code uses `StrusonBackend`, which streams without buffering.
+    ///
+    /// **Always-emit-token contract**: a `Token::StringValue` is ALWAYS pushed to the token list
+    /// before returning, regardless of whether the callback returned `Ok` or `Err`. On `Err`,
+    /// the token contains the partial content (whatever bytes were written before the error).
+    /// The outer `Err` is then propagated. This mirrors struson's always-close-string behavior.
+    #[inline]
+    fn write_string_streaming(
+        &mut self,
+        f: &mut dyn FnMut(&mut dyn std::io::Write) -> Result<()>,
+    ) -> Result<()> {
+        let mut buf = Vec::new();
+        let callback_result = f(&mut buf);
+        // ALWAYS emit the token — even on Err (mirrors always-close-string contract)
+        self.tokens.push(Token::StringValue(
+            String::from_utf8_lossy(&buf).into_owned(),
+        ));
+        callback_result
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use docspec_core::Error;
 
     #[test]
     fn capturing_backend_starts_empty() {
@@ -236,5 +283,34 @@ mod tests {
         assert!(result.is_ok());
         let tokens = result.unwrap_or_default();
         assert!(tokens == vec![Token::BeginObject, Token::EndObject]);
+    }
+
+    #[test]
+    fn capturing_backend_streams_into_string_value() {
+        let mut b = CapturingBackend::new();
+        let result = b.write_string_streaming(&mut |w| {
+            w.write_all(b"hello").map_err(|e| Error::Io { source: e })?;
+            w.write_all(b" world")
+                .map_err(|e| Error::Io { source: e })?;
+            Ok(())
+        });
+        assert!(result.is_ok());
+        assert_eq!(b.tokens(), &[Token::StringValue("hello world".to_string())]);
+    }
+
+    #[test]
+    fn capturing_backend_streaming_error_emits_partial_token() {
+        let mut b = CapturingBackend::new();
+        let result = b.write_string_streaming(&mut |w| {
+            w.write_all(b"partial")
+                .map_err(|e| Error::Io { source: e })?;
+            Err(Error::Other {
+                message: "test error".to_string(),
+            })
+        });
+        // Outer call returns the Err
+        assert!(result.is_err());
+        // BUT Token::StringValue was still emitted with the partial content
+        assert_eq!(b.tokens(), &[Token::StringValue("partial".to_string())]);
     }
 }

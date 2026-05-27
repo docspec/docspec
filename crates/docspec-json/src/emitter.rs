@@ -161,6 +161,33 @@ impl<B: JsonBackend> JsonEmitter<B> {
         self.stack.mark_value_written()
     }
 
+    /// Write a JSON string value whose content is produced incrementally by the callback.
+    ///
+    /// **Always-close-string contract**: the JSON string is closed before this method returns,
+    /// regardless of whether the callback returned `Ok` or `Err` (mirrors
+    /// [`JsonBackend::write_string_streaming`]). The state machine is marked as 'value written'
+    /// in both cases — a value was produced, even if truncated.
+    ///
+    /// **Fail-fast for callers**: on `Err`, the produced JSON is structurally valid but
+    /// semantically incomplete (truncated content). Callers MUST discard partial output.
+    ///
+    /// # Errors
+    ///
+    /// Returns any error from the callback or the underlying backend.
+    #[inline]
+    pub fn value_streaming<F>(&mut self, mut f: F) -> Result<()>
+    where
+        F: FnMut(&mut dyn std::io::Write) -> Result<()>,
+    {
+        self.stack.expect_value_allowed()?;
+        let streaming_result = self.backend.write_string_streaming(&mut f);
+        // Always mark value written — the string was closed regardless of f's result,
+        // so a value IS present in the JSON output (truncated or not).
+        let mark_result = self.stack.mark_value_written();
+        // Prefer streaming error (more informative); fall back to mark error.
+        streaming_result.and(mark_result)
+    }
+
     /// Write a key name and transition the object state machine.
     fn write_key(&mut self, name: &str) -> Result<()> {
         self.stack.expect_key_allowed()?;
@@ -259,6 +286,27 @@ impl<B: JsonBackend> KeyedEmitter<'_, B> {
         emitter.write_key(name)?;
         v.write_to(&mut emitter.backend)?;
         emitter.stack.mark_value_written()
+    }
+
+    /// Write a JSON string value for this key whose content is produced incrementally by the callback.
+    ///
+    /// **Always-close-string contract**: mirrors [`JsonEmitter::value_streaming`].
+    /// The state machine marks the value as written regardless of callback result.
+    ///
+    /// # Errors
+    ///
+    /// Returns any error from writing the key, the callback, or the underlying backend.
+    #[inline]
+    pub fn value_streaming<F>(self, mut f: F) -> Result<()>
+    where
+        F: FnMut(&mut dyn std::io::Write) -> Result<()>,
+    {
+        let emitter = self.emitter;
+        let name = self.name;
+        emitter.write_key(name)?;
+        let streaming_result = emitter.backend.write_string_streaming(&mut f);
+        let mark_result = emitter.stack.mark_value_written();
+        streaming_result.and(mark_result)
     }
 }
 
@@ -482,6 +530,31 @@ mod tests {
         fn value_in_object_without_key_errors() {
             let mut e = make();
             assert!(e.object(|j| j.value("x")).is_err());
+        }
+
+        #[test]
+        fn value_streaming_without_key_errors() {
+            let mut e = make();
+            assert!(e.open_object().is_ok());
+            let result = e.value_streaming(|_| Ok(()));
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn value_streaming_always_closes_string_on_callback_error() {
+            let mut e = make();
+            assert!(e.open_object().is_ok());
+            let result = e.key("k").value_streaming(|w| {
+                w.write_all(b"partial")
+                    .map_err(|err| docspec_core::Error::Io { source: err })?;
+                Err(docspec_core::Error::Other {
+                    message: "callback error".to_string(),
+                })
+            });
+            assert!(result.is_err());
+            assert!(e.close_object().is_ok());
+            let tokens = finish_tokens(e);
+            assert!(tokens.contains(&Token::StringValue("partial".to_string())));
         }
     }
 
@@ -806,6 +879,30 @@ mod tests {
                     Token::EndArray,
                     Token::EndObject,
                     Token::EndArray,
+                ]
+            );
+        }
+
+        #[test]
+        fn keyed_value_streaming_happy_path() {
+            let mut e = make();
+            assert!(e.open_object().is_ok());
+            let result = e.key("k").value_streaming(|w| {
+                w.write_all(b"hello ")
+                    .map_err(|err| docspec_core::Error::Io { source: err })?;
+                w.write_all(b"world")
+                    .map_err(|err| docspec_core::Error::Io { source: err })
+            });
+            assert!(result.is_ok());
+            assert!(e.close_object().is_ok());
+            let t = finish_tokens(e);
+            assert_eq!(
+                t,
+                vec![
+                    Token::BeginObject,
+                    Token::Name("k".to_string()),
+                    Token::StringValue("hello world".to_string()),
+                    Token::EndObject,
                 ]
             );
         }

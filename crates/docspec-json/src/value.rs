@@ -121,6 +121,13 @@ mod tests {
                 Ok(())
             }
         }
+
+        fn write_string_streaming(
+            &mut self,
+            _f: &mut dyn FnMut(&mut dyn std::io::Write) -> docspec_core::Result<()>,
+        ) -> docspec_core::Result<()> {
+            Ok(())
+        }
     }
 
     #[test]

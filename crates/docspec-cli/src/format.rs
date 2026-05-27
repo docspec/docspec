@@ -9,6 +9,12 @@ use crate::Format;
 ///
 /// Uses explicit format if provided, otherwise detects from path extension.
 /// Returns an error with the provided message if format cannot be determined.
+///
+/// # Errors
+///
+/// Returns an error if no explicit format is provided and the path extension is
+/// missing or unrecognized.
+#[inline]
 pub fn resolve_format(
     explicit: Option<Format>,
     path: Option<&Path>,

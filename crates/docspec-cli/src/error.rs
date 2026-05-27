@@ -33,6 +33,7 @@ pub enum CliError {
 }
 
 impl fmt::Display for CliError {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Conversion(err) => write!(f, "{err}"),
@@ -49,6 +50,7 @@ impl fmt::Display for CliError {
 }
 
 impl core::error::Error for CliError {
+    #[inline]
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             Self::Conversion(err) => Some(err),
@@ -61,12 +63,14 @@ impl core::error::Error for CliError {
 }
 
 impl From<docspec_core::Error> for CliError {
+    #[inline]
     fn from(err: docspec_core::Error) -> Self {
         Self::Conversion(err)
     }
 }
 
 impl From<std::io::Error> for CliError {
+    #[inline]
     fn from(err: std::io::Error) -> Self {
         Self::Io(err)
     }
