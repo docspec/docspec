@@ -17,7 +17,10 @@ repository = "https://github.com/docspec/docspec"
 publish = false
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+# deny (not forbid) because docspec-cli requires one scoped `#[allow(unsafe_code)]`
+# for the OS memory-mapping call (memmap2::Mmap::map). See CODING_STANDARDS.md Section 2.
+# Library crates inherit this deny and contain zero `#[allow]` directives.
+unsafe_code = "deny"
 missing_docs = "deny"
 
 [workspace.lints.clippy]
