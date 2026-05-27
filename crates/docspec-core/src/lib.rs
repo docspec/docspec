@@ -17,14 +17,18 @@
 
 extern crate alloc;
 
+mod depth;
 mod error;
 mod event;
+mod pipeline;
 mod stack;
 mod traits;
 mod types;
 
+pub use depth::Depth;
 pub use error::{Error, Position, Result};
 pub use event::{Event, TextStyle};
+pub use pipeline::pipe;
 pub use stack::{block_kind_for_end, block_kind_for_start, BlockKind, StackTrackingSink};
 pub use traits::{AssetProvider, EventSink, EventSource};
 pub use types::{

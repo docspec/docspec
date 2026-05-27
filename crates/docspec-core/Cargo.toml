@@ -9,5 +9,8 @@ description = "Core event types and traits for DocSpec streaming document conver
 keywords = ["document", "conversion", "streaming"]
 categories = ["parsing", "encoding"]
 
+[dependencies]
+thiserror = { version = "2", default-features = false }
+
 [lints]
 workspace = true
