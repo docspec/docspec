@@ -14,9 +14,17 @@ Every rule exists because we have seen what happens when it is not followed: pro
 
 ## 2. Safety: No Unsafe Code
 
-`unsafe_code` is set to `"forbid"` in the workspace. No unsafe blocks. No exceptions.
+`unsafe_code` is set to `"deny"` at workspace level. No unsafe blocks. No exceptions in library crates.
 
 Unsafe code opts out of Rust's ownership model and type system. It opens the door to memory corruption, data races, undefined behavior. If you think you need unsafe, the design needs to change. Use safe abstractions. The streaming architecture was designed specifically to avoid unsafe.
+
+**Exception**: `docspec-cli` may use exactly ONE `#[allow(unsafe_code)]` attribute on the specific function or block calling `memmap2::Mmap::map` (a kernel-bridging operation that Rust convention treats as unsafe). The attribute MUST be accompanied by a `// SAFETY:` comment explaining the invariants maintained. Library crates (`docspec-core`, `docspec-json`, `docspec-markdown-reader`, `docspec-blocknote-writer`, `docspec-wasm`) remain 100% safe — verifiable via:
+
+```sh
+grep -rE '#\[allow\(unsafe_code' crates/docspec-{core,json,markdown-reader,blocknote-writer,wasm}/src
+```
+
+The above command must return zero matches.
 
 ---
 

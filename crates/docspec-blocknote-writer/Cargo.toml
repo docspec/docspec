@@ -17,6 +17,8 @@ docspec-json = { path = "../docspec-json" }
 [dev-dependencies]
 docspec-markdown-reader = { path = "../docspec-markdown-reader" }
 serde_json = "1"
+peak_alloc = "0.3"
+serial_test = "3"
 
 [lints]
 workspace = true
