@@ -6,6 +6,7 @@ members = [
   "crates/docspec-blocknote-writer",
   "crates/docspec-json",
   "crates/docspec-cli",
+  "crates/docspec-http",
   "crates/docspec-wasm",
 ]
 
