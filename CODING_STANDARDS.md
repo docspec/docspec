@@ -64,6 +64,8 @@ Rust has well-established naming conventions. We follow them without deviation:
 
 Names should describe what something IS or DOES, not how it works internally. `ConversionError`, not `InternalConversionResultWrapper`. Boolean names should read naturally in conditionals: `is_valid`, not `valid_flag`.
 
+Identifier length: prefer descriptive names of four or more characters. One-to-three-character identifiers such as `hv`, `s`, `tmp`, `buf` obscure intent in non-trivial scopes — use `header_val`, `header_str`, `temp_buffer`, `output` instead. New crates enforce this with `clippy::min_ident_chars` (threshold 3) plus a crate-local `clippy.toml`. Legacy crates retain short idiomatic identifiers (`id`, RGB color channels `r`/`g`/`b`, standard imports like `use std::io`) until incrementally migrated.
+
 ---
 
 ## 8. Fail-Fast Error Propagation
@@ -90,7 +92,7 @@ Review is the last line of defense. Automated tools catch mechanical issues. Rev
 
 ## 10. Testing: Verification Over Trust
 
-See [TESTING.md](TESTING.md) for our complete testing philosophy, coverage requirements, and test type guidelines.
+See [TESTING.md](TESTING.md) for our complete testing philosophy, coverage requirements, [exact-value assertion rules](TESTING.md#exact-value-assertions), and test type guidelines.
 
 ---
 

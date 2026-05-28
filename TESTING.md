@@ -104,6 +104,25 @@ When a test fails, you should know immediately what went wrong. You should not n
 
 Specific failures save time and prevent cascading failures. When a test fails early, you fix it before moving on.
 
+## Exact-Value Assertions
+
+Assertions check exact values. Substring matches, type-only checks, and structural-shape checks all hide changes the test did not intend to allow. A test that accepts more than the contract specifies is a test that has stopped doing its job.
+
+The rule is simple. For any value a test inspects, assert the entire expected value. Response bodies are compared byte-for-byte or as exact JSON values. Structured types are compared as a whole, not field by field. Enums with inner data are pinned to the inner value, not just the variant. Empty bodies are asserted explicitly.
+
+A handful of patterns are banned outright. Substring matches on response bodies (`body.contains(...)`) accept any superset of the expected text. Type-only checks (`json.is_array()`, `value.is_string()`) accept any value of the right shape. Structural-shape checks on JSON objects (`obj.contains_key(...)` paired with `obj.len()`) accept any object with the right keys but say nothing about the values. Custom shape-checking helpers (`assert_problem_json(...)`) hide the actual contract from the call site. Negative substring checks (`!detail.contains("secret")`) prove only that one substring is absent, not that the content is what was expected. Pattern matches with bare wildcards (`matches!(result, Variant { .. })`) accept any inner value. Each of these can be replaced by an exact-equality assertion that is strictly stronger.
+
+For request/response tests specifically, every test asserts three things: the exact status code, the exact relevant headers, and the exact body. A response that carries no body asserts the body is empty. A test that asserts only status, only headers, or only one field of a JSON body is incomplete.
+
+There are four narrow exceptions where non-exact assertions are permitted:
+
+- Generated values — UUIDs, timestamps, ports assigned by the operating system. Assert format or parseability, not the exact value. `Uuid::parse_str(...)` followed by a version check is sufficient.
+- Absence — `is_none()` and `is_empty()` are exact assertions when the contract is "must not exist".
+- Unit-variant results — `result.is_ok()` is the maximally tight assertion when the `Ok` variant carries no inner value.
+- Types without `PartialEq` — `matches!` patterns are permitted, but the inner fields must be pinned with `if` guards. Bare `{ .. }` patterns are banned.
+
+If a test cannot assert the exact value, the test documents why in a comment. Otherwise, the test writes the exact assertion.
+
 ## Test as Documentation
 
 A test is a specification. It says "given this input, I expect this output." Reading the tests tells you how the code is supposed to work. Test names matter: "converts_nested_list_to_html" is better than "test_1".

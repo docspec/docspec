@@ -1,0 +1,5 @@
+min-ident-chars-threshold = 3
+# Reason: `new` is the Rust constructor convention; `Cow`/`Uri` are stdlib/axum types.
+# Reason: `fmt` is `Debug`/`Display` trait method name; cannot be renamed.
+# Reason: `val` is emitted by the stdlib `assert!`/`assert_eq!`/`matches!` macros.
+allowed-idents-below-min-chars = ["Cow", "Uri", "new", "fmt", "val"]
