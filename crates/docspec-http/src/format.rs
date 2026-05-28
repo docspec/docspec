@@ -1,0 +1,16 @@
+//! MIME type and HTTP header constants for the conversion API.
+
+/// Cache-Control header value applied to all responses.
+pub const CACHE_CONTROL_VALUE: &str = "max-age=0, private, must-revalidate";
+
+/// Health endpoint response body.
+pub const HEALTH_BODY: &str = "Healthy.";
+
+/// The MIME type accepted as request body.
+pub const INPUT_MIME_MARKDOWN: &str = "text/markdown";
+
+/// Accepted alias for the output MIME type (input-only; server always returns primary).
+pub const OUTPUT_MIME_ALIAS: &str = "application/vnd.blocknote+json";
+
+/// The primary output MIME type returned on success.
+pub const OUTPUT_MIME_PRIMARY: &str = "application/vnd.docspec.blocknote+json";

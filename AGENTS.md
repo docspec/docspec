@@ -20,6 +20,7 @@ DocSpec is a streaming document conversion library in Rust. Documents are stream
 - **Never buffer full documents** — stream always
 - **Fail fast** — return errors immediately
 - **98% test coverage floor**
+- **Exact-value test assertions** — no substring, type-only, or shape-only checks, see [TESTING.md](TESTING.md#exact-value-assertions)
 
 See [CODING_STANDARDS.md](CODING_STANDARDS.md) for full details.
 
