@@ -210,6 +210,11 @@ impl IntoResponse for HttpError {
             ),
         };
 
+        if status == StatusCode::INTERNAL_SERVER_ERROR || status == StatusCode::UNPROCESSABLE_ENTITY
+        {
+            sentry::capture_message(detail.as_ref(), sentry::Level::Error);
+        }
+
         let body = ProblemJson {
             detail,
             status: status.as_u16(),
@@ -322,6 +327,51 @@ mod tests {
     fn no_allow_header_on_non_405_variants() {
         let response = HttpError::Internal.into_response();
         assert!(response.headers().get(ALLOW).is_none());
+    }
+
+    #[test]
+    fn internal_error_is_captured_by_sentry() {
+        let events = sentry::test::with_captured_events(|| {
+            let _response = HttpError::Internal.into_response();
+        });
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].level, sentry::Level::Error);
+        assert_eq!(
+            events[0].message.as_deref(),
+            Some("An unexpected error occurred during conversion")
+        );
+    }
+
+    #[test]
+    fn unprocessable_error_is_captured_by_sentry() {
+        let events = sentry::test::with_captured_events(|| {
+            let _response = HttpError::Unprocessable {
+                detail: "bad input".to_owned(),
+            }
+            .into_response();
+        });
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].level, sentry::Level::Error);
+        assert_eq!(events[0].message.as_deref(), Some("bad input"));
+    }
+
+    #[test]
+    fn client_errors_are_not_captured_by_sentry() {
+        let events = sentry::test::with_captured_events(|| {
+            drop(HttpError::EmptyBody.into_response());
+            drop(HttpError::BodyNotUtf8.into_response());
+            drop(
+                HttpError::NotFound {
+                    method: "GET".to_owned(),
+                    path: "/x".to_owned(),
+                }
+                .into_response(),
+            );
+            drop(HttpError::MethodNotAllowed { allowed: "GET" }.into_response());
+            drop(HttpError::NotAcceptable.into_response());
+            drop(HttpError::UnsupportedMediaType { received: None }.into_response());
+        });
+        assert_eq!(events.len(), 0, "4xx errors must not be captured");
     }
 
     #[tokio::test]

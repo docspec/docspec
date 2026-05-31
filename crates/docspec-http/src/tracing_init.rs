@@ -1,6 +1,6 @@
 //! Tracing subscriber initialization.
 
-use tracing_subscriber::FmtSubscriber;
+use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt as _, Layer as _};
 
 /// Installs a hardcoded tracing subscriber writing to stderr at INFO level with pretty format.
 ///
@@ -9,10 +9,14 @@ use tracing_subscriber::FmtSubscriber;
 /// Panics if a global subscriber has already been installed. In tests, use [`try_init`] instead.
 #[inline]
 pub fn init() {
-    FmtSubscriber::builder()
-        .with_writer(std::io::stderr)
-        .with_max_level(tracing::Level::INFO)
-        .pretty()
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_writer(std::io::stderr)
+                .pretty()
+                .with_filter(tracing::level_filters::LevelFilter::INFO),
+        )
+        .with(crate::telemetry::tracing_layer())
         .init();
 }
 
@@ -28,9 +32,14 @@ pub fn init() {
 // Reason: `std::error::Error` is not available in `core`; the `tracing_subscriber`
 // crate's `try_init` error type requires `std::error::Error + Send + Sync`.
 pub fn try_init() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    FmtSubscriber::builder()
-        .with_writer(std::io::stderr)
-        .with_max_level(tracing::Level::INFO)
-        .pretty()
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_writer(std::io::stderr)
+                .pretty()
+                .with_filter(tracing::level_filters::LevelFilter::INFO),
+        )
+        .with(crate::telemetry::tracing_layer())
         .try_init()
+        .map_err(Into::into)
 }

@@ -86,6 +86,58 @@ Accepted `Accept` values for `/conversion`: `*/*`, `application/*`, `application
 
 Logs go to stderr at INFO level in pretty format. There are no flags to change the log level or format.
 
+## Observability
+
+`docspec-http` integrates with [Sentry](https://sentry.io/) for error reporting.
+Activation is fully opt-in via environment variables — the binary has zero Sentry
+overhead when no DSN is configured.
+
+### Activation
+
+Set ONE of the following to enable Sentry:
+
+- `DOCSPEC_SENTRY_DSN` — docspec-specific override (preferred)
+- `SENTRY_DSN` — Sentry's standard convention (fallback)
+
+If both are set, `DOCSPEC_SENTRY_DSN` wins. An empty string or malformed DSN is
+treated as "not set" — the server starts normally and logs a warning to stderr.
+
+### Configuration (all optional)
+
+These follow Sentry's standard conventions:
+
+- `SENTRY_ENVIRONMENT` — environment name (default: `production`)
+- `SENTRY_RELEASE` — release identifier (default: auto, `docspec-http@<version>`)
+- `SENTRY_SAMPLE_RATE` — error sample rate `[0.0, 1.0]` (default: `1.0`)
+- `SENTRY_TRACES_SAMPLE_RATE` — performance trace sample rate `[0.0, 1.0]` (default: `0.0`, traces disabled)
+
+### What is captured
+
+| Signal | Captured? |
+|---|---|
+| `500 Internal Server Error` (`HttpError::Internal`) | yes (event) |
+| `422 Unprocessable Entity` (`HttpError::Unprocessable`) | yes (event) |
+| Other 4xx responses | no |
+| Panics | yes (event) |
+| `tracing::error!` calls | yes (event) |
+| `tracing::warn!` calls | yes (breadcrumb) |
+| `tracing::info!`/`debug!` calls | yes (breadcrumb) |
+| Performance transactions | only if `SENTRY_TRACES_SAMPLE_RATE > 0` |
+
+### Privacy
+
+`docspec-http` does NOT send the following to Sentry:
+
+- Request bodies (markdown documents)
+- Response bodies (BlockNote JSON)
+- PII (Sentry default: `send_default_pii = false`)
+- DSN values (never logged or echoed)
+
+Sentry's default header redaction (Authorization, Cookie, etc.) is preserved.
+
+Each captured event is tagged with `request_id` (UUID v4) and `trace_id`
+(`X-Trace-ID` header value, if present) for correlation with logs.
+
 ## Wire Contract
 
 Mirrors `github.com/docspecio/api` v3.0.2 where feasible: same endpoint path, RFC 7807 errors, `X-Request-ID`/`X-Trace-ID` header handling. Diverges in input MIME (`text/markdown` vs DOCX) and adds `Cache-Control` on all responses.

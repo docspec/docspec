@@ -32,6 +32,16 @@ tower-http = { version = "0.6", features = [
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt"] }
 mime = "0.3"
+sentry = { version = "0.48", default-features = false, features = [
+  "backtrace",
+  "contexts",
+  "panic",
+  "tower",
+  "tower-http",
+  "tracing",
+  "reqwest",
+  "rustls",
+] }
 docspec-core = { path = "../docspec-core" }
 docspec-json = { path = "../docspec-json" }
 docspec-markdown-reader = { path = "../docspec-markdown-reader" }
@@ -42,6 +52,17 @@ tower = { version = "0.5", features = ["util"] }
 serde_json = "1"
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 uuid = "1"
+sentry = { version = "0.48", default-features = false, features = [
+  "backtrace",
+  "contexts",
+  "panic",
+  "tower",
+  "tower-http",
+  "tracing",
+  "reqwest",
+  "rustls",
+  "test",
+] }
 
 [lints]
 workspace = true
