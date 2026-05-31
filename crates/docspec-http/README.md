@@ -93,3 +93,65 @@ Mirrors `github.com/docspecio/api` v3.0.2 where feasible: same endpoint path, RF
 ## Graceful Shutdown
 
 The server handles SIGINT and SIGTERM. In-flight requests complete before the process exits.
+
+## Docker
+
+### Build
+
+```bash
+DOCKER_BUILDKIT=1 docker build \
+  --build-arg IMAGE_VERSION=0.1.0 \
+  --build-arg IMAGE_REVISION=$(git rev-parse HEAD) \
+  -t docspec-http:local .
+```
+
+Supply `IMAGE_VERSION` and `IMAGE_REVISION` at build time to populate the OCI labels. Both default to `0.1.0` and `unknown` if omitted.
+
+### Run
+
+```bash
+docker run --rm -p 3000:3000 ghcr.io/docspec/api:0.1.0
+```
+
+The default `CMD` passes `--host 0.0.0.0 --port 3000`. Override it entirely to change the bind address or port:
+
+```bash
+docker run --rm -p 8080:8080 ghcr.io/docspec/api:0.1.0 --host 0.0.0.0 --port 8080
+```
+
+### Healthcheck
+
+The image ships a built-in `HEALTHCHECK` that probes `GET http://127.0.0.1:3000/health` every 30 seconds using busybox `wget --spider`. Docker reports the container status in `docker ps` and Compose surfaces it via `healthcheck:`.
+
+**The probe port is hardcoded to `3000` inside the image.** If you override `CMD` to bind a different `--port`, the built-in healthcheck will keep probing 3000 and report the container as `unhealthy` even though the server is fine. To run on a non-default port, either:
+
+- Keep the in-container port at `3000` and only remap the host port (`-p 8080:3000`), **or**
+- Override the healthcheck at runtime, e.g. `docker run --health-cmd='wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/health || exit 1' …`, **or**
+- Disable it with `docker run --no-healthcheck …` and rely on an external probe.
+
+Kubernetes users should configure a Pod-level `httpGet` liveness probe on `/health` port 3000 instead of relying on the Docker `HEALTHCHECK`.
+
+### Image tags
+
+Images are published to `ghcr.io/docspec/api` by the release workflow (managed by release-please). The following tags are maintained:
+
+| Tag | Meaning |
+|-----|---------|
+| `0.1.0` | Exact version |
+| `0.1` | Latest patch of 0.1 |
+| `0` | Latest minor of 0 |
+| `latest` | Most recent released version |
+
+`latest` follows the most recent GitHub release, not the `main` branch. The publish workflow is documented contract; it is not implemented in this repository.
+
+### Architecture
+
+The image is built for `linux/amd64` only. No multi-platform manifest is published.
+
+### User
+
+The container runs as non-root UID/GID `10001` (user `docspec`). No capabilities are required.
+
+### Reverse proxy
+
+TLS termination, CORS headers, authentication, and rate limiting are intentionally absent from the binary. Place a reverse proxy (nginx, Caddy, etc.) in front of the container for these concerns. See [Deployment Notes](#deployment-notes) for details.
