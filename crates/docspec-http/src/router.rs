@@ -21,8 +21,11 @@ impl MakeRequestId for EchoOnly {
 /// Build the HTTP API router with all routes and middleware.
 #[inline]
 pub fn router() -> Router {
+    use axum::body::Body;
     use axum::http::header::HeaderName;
+    use axum::middleware::{self, Next};
     use axum::routing::{get, post};
+    use tower::util::option_layer;
     use tower::ServiceBuilder;
     use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
     use tower_http::trace::TraceLayer;
@@ -32,6 +35,33 @@ pub fn router() -> Router {
         conversion::{options_conversion, post_conversion},
         fallback::{conversion_method_not_allowed, health_method_not_allowed, not_found},
         health::{get_health, head_health, options_health},
+    };
+    use crate::telemetry;
+
+    let attach_sentry_tags = |request: Request<Body>, next: Next| async move {
+        if sentry::Hub::current().client().is_some() {
+            let request_id = request
+                .extensions()
+                .get::<RequestId>()
+                .and_then(|req_id| req_id.header_value().to_str().ok())
+                .unwrap_or_default()
+                .to_owned();
+            let trace_id = request
+                .headers()
+                .get("x-trace-id")
+                .and_then(|head| head.to_str().ok())
+                .unwrap_or_default()
+                .to_owned();
+            sentry::configure_scope(|scope| {
+                if !request_id.is_empty() {
+                    scope.set_tag("request_id", &request_id);
+                }
+                if !trace_id.is_empty() {
+                    scope.set_tag("trace_id", &trace_id);
+                }
+            });
+        }
+        next.run(request).await
     };
 
     let x_request_id = HeaderName::from_static("x-request-id");
@@ -57,6 +87,9 @@ pub fn router() -> Router {
                     MakeRequestUuid,
                 ))
                 .layer(SetRequestIdLayer::new(x_trace_id.clone(), EchoOnly))
+                .layer(option_layer(telemetry::tower_new_layer()))
+                .layer(option_layer(telemetry::tower_http_layer()))
+                .layer(middleware::from_fn(attach_sentry_tags))
                 .layer(TraceLayer::new_for_http())
                 .layer(PropagateRequestIdLayer::new(x_request_id))
                 .layer(PropagateRequestIdLayer::new(x_trace_id))

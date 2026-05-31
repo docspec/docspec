@@ -82,7 +82,8 @@ default_numeric_fallback = "allow"
 # Reason: Targeting embedded — prefer core/alloc over std where possible
 std_instead_of_core = "warn"
 alloc_instead_of_core = "warn"
-std_instead_of_alloc = "warn"
+# Reason: std crates should use std paths where clearer than alloc aliases
+std_instead_of_alloc = "allow"
 # Reason: Public docs enforced by missing_docs = "deny"; private doc requirement too noisy
 missing_docs_in_private_items = "allow"
 # Reason: Mixed pub/private field visibility is normal Rust pattern
@@ -105,6 +106,10 @@ cfg_not_test = "allow"
 decimal_literal_representation = "allow"
 # Reason: Standard re-export pattern in Rust libraries (pub use in lib.rs)
 pub_use = "allow"
+# Reason: Early process startup failures may need stderr before tracing is initialized
+print_stderr = "allow"
+# Reason: Telemetry init helpers are intentionally factored for testability
+single_call_fn = "allow"
 
 # --- Selective allows: library API design (reassess at 1.0) ---
 # Reason: Event enum must be exhaustive for downstream pattern matching. Reassess at 1.0.
@@ -127,3 +132,5 @@ multiple_crate_versions = "allow"
 # --- Selective allows: pedantic group (continued) ---
 # Reason: Some internal helpers may use multiple bool parameters for clarity over struct wrapping.
 fn_params_excessive_bools = "allow"
+# Reason: Callback trait contracts may require Option return even when current implementation always keeps values.
+unnecessary_wraps = "allow"
