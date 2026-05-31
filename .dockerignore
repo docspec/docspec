@@ -1,0 +1,36 @@
+# Build artifacts
+target/
+**/target/
+
+# VCS
+.git/
+.gitignore
+.gitattributes
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Planning artifacts (this directory)
+.sisyphus/
+
+# Coverage artifacts
+*.profraw
+lcov.info
+coverage/
+
+# Documentation site sources (not needed for cargo build)
+docs/
+
+# CI configs (not needed for build)
+.github/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Existing container artifacts (none yet, but prevent recursion)
+Dockerfile
+.dockerignore
