@@ -23,16 +23,30 @@ struct Args {
 ///
 /// Parses CLI arguments, initializes tracing, and starts the HTTP server.
 /// Returns [`ExitCode::FAILURE`] on bind or serve errors.
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> ExitCode {
+fn main() -> ExitCode {
     let args = Args::parse();
-    docspec_http::tracing_init::init();
-    let config = ServerConfig::new(args.host, args.port);
-    match serve(config).await {
-        Ok(()) => ExitCode::SUCCESS,
+    let _telemetry = docspec_http::telemetry::init();
+
+    let runtime = match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(rt) => rt,
         Err(error) => {
-            tracing::error!(error = %error, "server error");
-            ExitCode::FAILURE
+            eprintln!("failed to build tokio runtime: {error}");
+            return ExitCode::FAILURE;
         }
-    }
+    };
+
+    runtime.block_on(async move {
+        docspec_http::tracing_init::init();
+        let config = ServerConfig::new(args.host, args.port);
+        match serve(config).await {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                tracing::error!(error = %error, "docspec-http server error");
+                ExitCode::FAILURE
+            }
+        }
+    })
 }
