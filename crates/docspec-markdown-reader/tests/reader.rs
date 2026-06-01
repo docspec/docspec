@@ -1493,4 +1493,131 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn inline_html_only_paragraph_emits_nothing() {
+        let mut reader = MarkdownReader::new("<span id=\"ferris\"></span>");
+        let events = collect_events(&mut reader);
+        assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
+    }
+
+    #[test]
+    fn inline_html_between_paragraphs_preserves_surrounding() {
+        let markdown = "Before\n\n<span id=\"ferris\"></span>\n\nAfter";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("Before", TextStyle::default()),
+                Event::EndParagraph,
+                helpers::start_paragraph(),
+                helpers::text("After", TextStyle::default()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_html_with_text_still_emits_paragraph() {
+        let markdown = "text <span></span> more";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("text ", TextStyle::default()),
+                helpers::text(" more", TextStyle::default()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_html_inside_emphasis_emits_nothing() {
+        // pulldown-cmark emits: Start(Paragraph), Start(Emphasis), InlineHtml(...), InlineHtml(...), End(Emphasis), End(Paragraph)
+        // No Text events are emitted, so the paragraph should be deferred and ultimately not emitted.
+        let mut reader = MarkdownReader::new("*<span></span>*");
+        let events = collect_events(&mut reader);
+        assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
+    }
+
+    #[test]
+    fn softbreak_only_after_html_filter_emits_nothing() {
+        let mut reader = MarkdownReader::new("<span></span>\n<span></span>");
+        let events = collect_events(&mut reader);
+        assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
+    }
+
+    #[test]
+    fn image_only_paragraph_emits_paragraph_wrapper() {
+        let mut reader = MarkdownReader::new("![alt](img.png)");
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::image_uri("img.png", Some("alt"), None, false),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hardbreak_only_paragraph_emits_nothing() {
+        let mut reader = MarkdownReader::new("  \n");
+        let events = collect_events(&mut reader);
+        assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
+    }
+
+    #[test]
+    fn inline_html_with_hardbreak_emits_nothing() {
+        let mut reader = MarkdownReader::new("<span></span>  \n<span></span>");
+        let events = collect_events(&mut reader);
+        assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
+    }
+
+    #[test]
+    fn list_item_with_only_softbreak_emits_softbreak() {
+        let mut reader = MarkdownReader::new("- <span></span>\n  <span></span>");
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_unordered_list_item(0),
+                Event::SoftBreak,
+                Event::EndUnorderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn list_item_with_text_and_softbreak_emits_text_and_break() {
+        let mut reader = MarkdownReader::new("- text\n  more");
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_unordered_list_item(0),
+                helpers::text("text", TextStyle::default()),
+                Event::SoftBreak,
+                helpers::text("more", TextStyle::default()),
+                Event::EndUnorderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
 }
