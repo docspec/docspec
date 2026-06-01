@@ -106,45 +106,36 @@ mod tests {
         let mut buf = Vec::<u8>::new();
         let mut writer = StackTrackingSink::new(BlockNoteWriter::with_assets(&mut buf, provider));
         for event in events {
-            let handle_result = writer.handle_event(event.clone());
-            assert!(
-                handle_result.is_ok(),
-                "handle_event failed: {handle_result:?}"
-            );
+            writer
+                .handle_event(event.clone())
+                .expect("handle_event should accept fixture event");
         }
-        let finish_result = writer.finish();
-        assert!(finish_result.is_ok(), "finish failed");
-        let string_result = String::from_utf8(buf);
-        assert!(string_result.is_ok(), "invalid UTF-8 output");
-        string_result.unwrap_or_default()
+        writer.finish().expect("writer should finish fixture");
+        String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8")
     }
 
     fn run_events(events: &[Event]) -> String {
         let mut buf = Vec::<u8>::new();
         let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
         for event in events {
-            let handle_result = writer.handle_event(event.clone());
-            assert!(handle_result.is_ok(), "handle_event failed");
+            writer
+                .handle_event(event.clone())
+                .expect("handle_event should accept fixture event");
         }
-        let finish_result = writer.finish();
-        assert!(finish_result.is_ok(), "finish failed");
-        let string_result = String::from_utf8(buf);
-        assert!(string_result.is_ok(), "invalid UTF-8 output");
-        string_result.unwrap_or_default()
+        writer.finish().expect("writer should finish fixture");
+        String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8")
     }
 
     fn run_direct_writer_events(events: &[Event]) -> String {
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
         for event in events {
-            let handle_result = writer.handle_event(event.clone());
-            assert!(handle_result.is_ok(), "handle_event failed");
+            writer
+                .handle_event(event.clone())
+                .expect("handle_event should accept fixture event");
         }
-        let finish_result = writer.finish();
-        assert!(finish_result.is_ok(), "finish failed");
-        let string_result = String::from_utf8(buf);
-        assert!(string_result.is_ok(), "invalid UTF-8 output");
-        string_result.unwrap_or_default()
+        writer.finish().expect("writer should finish fixture");
+        String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8")
     }
 
     #[test]
@@ -630,7 +621,8 @@ mod tests {
             decorative: false,
             id: None,
         });
-        assert!(result.is_err());
+        let err = result.expect_err("Image with asset source requires a provider");
+        assert_eq!(err.to_string(), "no AssetProvider configured");
     }
 
     #[test]
@@ -1756,7 +1748,8 @@ mod tests {
             language: None,
             metadata: None,
         });
-        assert!(result.is_err());
+        let err = result.expect_err("StartDocument must fail when writer fails immediately");
+        assert_eq!(err.to_string(), "I/O error: simulated write failure");
     }
 
     #[test]
@@ -1769,7 +1762,9 @@ mod tests {
         });
         assert!(start_result.is_ok(), "start should succeed");
         let end_result = writer.handle_event(Event::EndDocument);
-        assert!(end_result.is_err());
+        let err =
+            end_result.expect_err("EndDocument must fail when writer fails after first write");
+        assert_eq!(err.to_string(), "I/O error: simulated write failure");
     }
 
     #[test]
@@ -1782,7 +1777,9 @@ mod tests {
         });
         assert!(start_result.is_ok(), "start should succeed");
         let heading_result = writer.handle_event(Event::StartHeading { level: 1, id: None });
-        assert!(heading_result.is_err());
+        let err =
+            heading_result.expect_err("StartHeading must fail when writer fails after first write");
+        assert_eq!(err.to_string(), "I/O error: simulated write failure");
     }
 
     #[test]
@@ -1798,7 +1795,9 @@ mod tests {
             alignment: None,
             id: None,
         });
-        assert!(para_result.is_err());
+        let err =
+            para_result.expect_err("StartParagraph must fail when writer fails after first write");
+        assert_eq!(err.to_string(), "I/O error: simulated write failure");
     }
 
     #[test]
@@ -1827,7 +1826,7 @@ mod tests {
         assert!(end_result.is_ok(), "end should succeed");
         let finish_result = writer.finish();
         assert!(finish_result.is_ok(), "finish should succeed");
-        let json = String::from_utf8(buf).unwrap_or_default();
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
             r#"[{"type":"image","props":{"url":"data:image/png;base64,iVBORw==","caption":"Test image"},"content":null,"children":[]}]"#
@@ -1854,7 +1853,8 @@ mod tests {
             decorative: false,
             id: None,
         });
-        assert!(result.is_err());
+        let err = result.expect_err("image with missing asset must fail");
+        assert_eq!(err.to_string(), "asset not found: missing");
     }
 
     #[test]
@@ -1879,7 +1879,8 @@ mod tests {
             decorative: false,
             id: None,
         });
-        assert!(result.is_err());
+        let err = result.expect_err("image with failing stream must fail");
+        assert_eq!(err.to_string(), "I/O error: simulated stream failure");
     }
 
     #[test]
@@ -2085,7 +2086,8 @@ mod tests {
             decorative: false,
             id: None,
         });
-        assert!(result.is_err());
+        let err = result.expect_err("image with no stream must fail");
+        assert_eq!(err.to_string(), "asset not found: img1");
     }
 
     #[test]
@@ -2107,7 +2109,10 @@ mod tests {
             Event::EndHeading,
             Event::EndDocument,
         ]);
-        assert!(json.contains("\"id\":\"custom-id\""));
+        assert_eq!(
+            json,
+            r#"[{"type":"heading","id":"custom-id","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Title","styles":{}}],"children":[]}]"#
+        );
     }
 
     #[test]
@@ -2129,7 +2134,10 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert!(!json.contains("\"id\""));
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Body","styles":{}}],"children":[]}]"#
+        );
     }
 
     #[test]
@@ -2429,10 +2437,8 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         assert!(writer.finish().is_ok());
 
-        let string_result = String::from_utf8(buf);
-        assert!(string_result.is_ok(), "invalid UTF-8 output");
         assert_eq!(
-            string_result.unwrap_or_default(),
+            String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8"),
             r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[],"children":[]},{"type":"image","props":{"url":"https://example.com/logo.png","caption":"logo"},"content":null,"children":[]}]"#
         );
     }
@@ -2882,7 +2888,10 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert!(json.contains(r#""id":"img-1""#));
+        assert_eq!(
+            json,
+            r#"[{"id":"img-1","type":"image","props":{"url":"https://example.com/img.png","caption":""},"content":null,"children":[]}]"#
+        );
     }
 
     #[test]
@@ -3027,10 +3036,6 @@ mod tests {
             json,
             r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
         );
-        assert!(
-            !json.contains("\"start\""),
-            "bulletListItem must not emit start"
-        );
     }
 
     #[test]
@@ -3082,10 +3087,6 @@ mod tests {
         assert_eq!(
             json,
             r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
-        );
-        assert!(
-            !json.contains("\"id\""),
-            "list item without id must not emit id key"
         );
     }
 
@@ -3659,14 +3660,6 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert!(
-            !json.contains("\"text\":\"h\""),
-            "heading text must be dropped"
-        );
-        assert!(
-            json.contains("\"text\":\"item\""),
-            "item text must be preserved"
-        );
         assert_eq!(
             json,
             r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"item","styles":{}}],"children":[]}]"#
@@ -3698,7 +3691,6 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert!(!json.contains("image"), "image must be dropped");
         assert_eq!(
             json,
             r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[],"children":[]}]"#
@@ -3730,10 +3722,6 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert!(
-            !json.contains("\"text\":\"code\""),
-            "code text must be dropped"
-        );
         assert_eq!(
             json,
             r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[],"children":[]}]"#
@@ -3762,10 +3750,6 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert!(
-            !json.contains("\"text\":\"q\""),
-            "quote text must be dropped"
-        );
         assert_eq!(
             json,
             r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[],"children":[]}]"#
@@ -3789,7 +3773,6 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert!(!json.contains("divider"), "divider must be dropped");
         assert_eq!(
             json,
             r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[],"children":[]}]"#
@@ -3826,11 +3809,6 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert!(!json.contains("table"), "table must be dropped");
-        assert!(
-            !json.contains("\"text\":\"cell\""),
-            "cell text must be dropped"
-        );
         assert_eq!(
             json,
             r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[],"children":[]}]"#
@@ -3867,17 +3845,9 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert!(
-            !json.contains("\"text\":\"dropped\""),
-            "dropped text must not appear"
-        );
-        assert!(
-            json.contains("\"text\":\"before\""),
-            "before text must be preserved"
-        );
-        assert!(
-            json.contains("\"text\":\"after\""),
-            "after text must be preserved"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"before","styles":{}}],"children":[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -3913,14 +3883,6 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert!(
-            !json.contains("\"text\":\"dropped\""),
-            "dropped text must not appear"
-        );
-        assert!(
-            json.contains("\"text\":\"second\""),
-            "second item text must be preserved"
-        );
         assert_eq!(
             json,
             r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[],"children":[]},{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"second","styles":{}}],"children":[]}]"#
@@ -3933,89 +3895,64 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             name
         );
-        let read_result = std::fs::read_to_string(&path);
-        assert!(read_result.is_ok(), "fixture {name} not readable");
-        let parse_result: Result<serde_json::Value, _> =
-            serde_json::from_str(&read_result.unwrap_or_default());
-        assert!(parse_result.is_ok(), "fixture {name} not valid JSON");
-        parse_result.unwrap_or_default()
+        let content = std::fs::read_to_string(&path).expect("fixture should be readable");
+        serde_json::from_str(&content).expect("fixture should be valid JSON")
     }
 
     fn run_markdown(input: &str) -> String {
         let mut reader = MarkdownReader::new(input);
         let mut buf = Vec::<u8>::new();
         let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
-        loop {
-            let next = reader.next_event();
-            assert!(next.is_ok(), "markdown reader failed");
-            match next.unwrap_or_default() {
-                Some(event) => {
-                    let handle_result = writer.handle_event(event);
-                    assert!(handle_result.is_ok(), "handle_event failed");
-                }
-                None => break,
-            }
+        while let Some(event) = reader
+            .next_event()
+            .expect("markdown reader should not error")
+        {
+            writer
+                .handle_event(event)
+                .expect("handle_event should accept event");
         }
-        let finish_result = writer.finish();
-        assert!(finish_result.is_ok(), "pipeline finish failed");
-        let string_result = String::from_utf8(buf);
-        assert!(string_result.is_ok(), "invalid UTF-8 output");
-        string_result.unwrap_or_default()
+        writer.finish().expect("pipeline should finish cleanly");
+        String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8")
     }
 
     #[test]
     fn integration_simple_bullet_list_matches_fixture() {
         let json = run_markdown("- a\n- b\n- c");
-        let actual_result: Result<serde_json::Value, _> = serde_json::from_str(&json);
-        assert!(actual_result.is_ok(), "actual output not valid JSON");
-        assert_eq!(
-            actual_result.unwrap_or_default(),
-            load_fixture("lists_simple_bullet.json")
-        );
+        let actual: serde_json::Value =
+            serde_json::from_str(&json).expect("actual output must be valid JSON");
+        assert_eq!(actual, load_fixture("lists_simple_bullet.json"));
     }
 
     #[test]
     fn integration_simple_numbered_list_matches_fixture() {
         let json = run_markdown("1. one\n2. two\n3. three");
-        let actual_result: Result<serde_json::Value, _> = serde_json::from_str(&json);
-        assert!(actual_result.is_ok(), "actual output not valid JSON");
-        assert_eq!(
-            actual_result.unwrap_or_default(),
-            load_fixture("lists_simple_numbered.json"),
-        );
+        let actual: serde_json::Value =
+            serde_json::from_str(&json).expect("actual output must be valid JSON");
+        assert_eq!(actual, load_fixture("lists_simple_numbered.json"));
     }
 
     #[test]
     fn integration_nested_bullets_matches_fixture() {
         let json = run_markdown("- a\n  - b\n  - c\n- d");
-        let actual_result: Result<serde_json::Value, _> = serde_json::from_str(&json);
-        assert!(actual_result.is_ok(), "actual output not valid JSON");
-        assert_eq!(
-            actual_result.unwrap_or_default(),
-            load_fixture("lists_nested_bullets.json"),
-        );
+        let actual: serde_json::Value =
+            serde_json::from_str(&json).expect("actual output must be valid JSON");
+        assert_eq!(actual, load_fixture("lists_nested_bullets.json"));
     }
 
     #[test]
     fn integration_mixed_types_matches_fixture() {
         let json = run_markdown("- bullet\n1. numbered\n- another bullet");
-        let actual_result: Result<serde_json::Value, _> = serde_json::from_str(&json);
-        assert!(actual_result.is_ok(), "actual output not valid JSON");
-        assert_eq!(
-            actual_result.unwrap_or_default(),
-            load_fixture("lists_mixed_types.json"),
-        );
+        let actual: serde_json::Value =
+            serde_json::from_str(&json).expect("actual output must be valid JSON");
+        assert_eq!(actual, load_fixture("lists_mixed_types.json"));
     }
 
     #[test]
     fn integration_multi_paragraph_item_matches_fixture() {
         let json = run_markdown("- first para\n\n  second para\n- next item");
-        let actual_result: Result<serde_json::Value, _> = serde_json::from_str(&json);
-        assert!(actual_result.is_ok(), "actual output not valid JSON");
-        assert_eq!(
-            actual_result.unwrap_or_default(),
-            load_fixture("lists_multi_paragraph_item.json"),
-        );
+        let actual: serde_json::Value =
+            serde_json::from_str(&json).expect("actual output must be valid JSON");
+        assert_eq!(actual, load_fixture("lists_multi_paragraph_item.json"));
     }
 
     // ============================================================================
@@ -4052,14 +3989,10 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert!(
-            !json.contains("\"type\":\"heading\""),
-            "heading structure must not appear in table cell"
-        );
         // Text is flattened into cell inline content (BlockNote cell flattening policy).
-        assert!(
-            json.contains("\"text\":\"h\""),
-            "heading text is flattened into cell inline content"
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"h","styles":{}}]}]}]},"children":[]}]"#
         );
     }
 
@@ -4092,13 +4025,9 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert!(
-            !json.contains("\"type\":\"quote\""),
-            "blockquote structure must not appear in table cell"
-        );
-        assert!(
-            json.contains("\"text\":\"q\""),
-            "blockquote text is flattened into cell inline content"
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"q","styles":{}}]}]}]},"children":[]}]"#
         );
     }
 
@@ -4134,13 +4063,9 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert!(
-            !json.contains("\"type\":\"codeBlock\""),
-            "preformatted structure must not appear in table cell"
-        );
-        assert!(
-            json.contains("\"text\":\"code\""),
-            "preformatted text is flattened into cell inline content"
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"code","styles":{}}]}]}]},"children":[]}]"#
         );
     }
 
@@ -4179,17 +4104,9 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert!(
-            !json.contains("\"text\":\"head\""),
-            "heading text must be dropped"
-        );
-        assert!(
-            !json.contains("\"text\":\"\\n\""),
-            "line break inside dropped block must be dropped"
-        );
-        assert!(
-            json.contains("\"text\":\"item\""),
-            "item text must be preserved"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -4213,14 +4130,10 @@ mod tests {
             start: Some(u64::from(u32::MAX) + 1),
             style_type: docspec_core::ListStyleType::Decimal,
         });
-        assert!(
-            result.is_err(),
-            "start value exceeding u32::MAX must return an error"
-        );
-        let err_msg = format!("{result:?}");
-        assert!(
-            err_msg.contains("out of range"),
-            "error message must describe the range overflow"
+        let err = result.expect_err("start value exceeding u32::MAX must return an error");
+        assert_eq!(
+            err.to_string(),
+            "ordered list start value out of range: 4294967296: out of range integral type conversion attempted"
         );
     }
 
@@ -4254,17 +4167,9 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert!(
-            json.contains("\"type\":\"bulletListItem\""),
-            "empty list item must be emitted"
-        );
-        assert!(
-            json.contains("\"text\":\"after\""),
-            "paragraph after list must be emitted"
-        );
-        assert!(
-            json.contains("\"type\":\"paragraph\""),
-            "paragraph block must appear at top level"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"after","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -4295,17 +4200,9 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert!(
-            json.contains("\"text\":\"first\""),
-            "first paragraph content must appear"
-        );
-        assert!(
-            json.contains("\"text\":\"second\""),
-            "second paragraph content must appear"
-        );
-        assert!(
-            json.contains("\"text\":\"\\n\\n\""),
-            "paragraph separator \\n\\n must be emitted between paragraphs"
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[{"type":"text","text":"first","styles":{}},{"type":"text","text":"\n\n","styles":{}},{"type":"text","text":"second","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -4371,17 +4268,9 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert!(
-            json.contains("\"text\":\"before\""),
-            "text before image must appear"
-        );
-        assert!(
-            json.contains("\"text\":\"after\""),
-            "text after image must appear in auto-opened paragraph"
-        );
-        assert!(
-            json.contains("\"type\":\"image\""),
-            "image block must appear"
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"before","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/img.png","caption":""},"content":null,"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"after","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -4455,11 +4344,11 @@ mod tests {
         assert!(writer.handle_event(Event::EndTableRow).is_ok());
         assert!(writer.handle_event(Event::EndTable).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            !json.contains("\"type\":\"heading\""),
-            "no heading must appear inside table cell output"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[]}]}]},"children":[]}]"#
         );
     }
 
@@ -4488,15 +4377,11 @@ mod tests {
             .is_ok());
         assert!(writer.handle_event(Event::EndHeading).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            !json.contains("\"type\":\"heading\""),
-            "heading inside list must be dropped"
-        );
-        assert!(
-            json.contains("\"type\":\"bulletListItem\""),
-            "list item must still be emitted"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[],"children":[]}]"#
         );
     }
 
@@ -4523,19 +4408,11 @@ mod tests {
             .is_ok());
         assert!(writer.handle_event(Event::EndHeading).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            json.contains("\"type\":\"heading\""),
-            "heading block must be in output"
-        );
-        assert!(
-            json.contains("\"text\":\"Heading text\""),
-            "heading text must be in output"
-        );
-        assert!(
-            json.contains("\"children\":[]"),
-            "heading must be properly closed with children:[]"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"heading","props":{"level":2,"textAlignment":"left"},"content":[{"type":"text","text":"Heading text","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -4567,11 +4444,11 @@ mod tests {
             .is_ok());
         assert!(writer.handle_event(Event::EndPreformatted).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            !json.contains("\"type\":\"codeBlock\""),
-            "preformatted block must be dropped inside list"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[],"children":[]}]"#
         );
     }
 
@@ -4603,9 +4480,12 @@ mod tests {
         assert!(writer.handle_event(Event::EndTableRow).is_ok());
         assert!(writer.handle_event(Event::EndTable).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(json.contains("\"type\":\"table\""), "table must appear");
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[]}]}]},"children":[]}]"#
+        );
     }
 
     #[test]
@@ -4634,15 +4514,11 @@ mod tests {
             .is_ok());
         assert!(writer.handle_event(Event::EndPreformatted).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            json.contains("\"type\":\"codeBlock\""),
-            "code block must appear"
-        );
-        assert!(
-            json.contains("\"children\":[]"),
-            "code block must be properly closed"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"codeBlock","props":{"language":"rust"},"content":[{"type":"text","text":"let x = 1;","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -4676,11 +4552,11 @@ mod tests {
         assert!(writer.handle_event(Event::EndTableRow).is_ok());
         assert!(writer.handle_event(Event::EndTable).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            !json.contains("\"type\":\"quote\""),
-            "blockquote inside table cell must be dropped"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[]}]}]},"children":[]}]"#
         );
     }
 
@@ -4709,15 +4585,11 @@ mod tests {
             .is_ok());
         assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            !json.contains("\"type\":\"quote\""),
-            "blockquote inside list must be dropped"
-        );
-        assert!(
-            json.contains("\"type\":\"bulletListItem\""),
-            "list item must still be emitted"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[],"children":[]}]"#
         );
     }
 
@@ -4749,9 +4621,12 @@ mod tests {
         assert!(writer.handle_event(Event::EndTableRow).is_ok());
         assert!(writer.handle_event(Event::EndTable).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(json.contains("\"type\":\"table\""), "table must appear");
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[]}]}]},"children":[]}]"#
+        );
     }
 
     #[test]
@@ -4787,11 +4662,11 @@ mod tests {
         assert!(writer.handle_event(Event::EndTableRow).is_ok());
         assert!(writer.handle_event(Event::EndTable).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            !json.contains("\"type\":\"codeBlock\""),
-            "preformatted inside table cell must be dropped"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[]}]}]},"children":[]}]"#
         );
     }
 
@@ -4825,11 +4700,11 @@ mod tests {
         assert!(writer.handle_event(Event::EndTableRow).is_ok());
         assert!(writer.handle_event(Event::EndTable).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            !json.contains("\"type\":\"divider\""),
-            "thematic break inside table cell must be dropped"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[]}]}]},"children":[]}]"#
         );
     }
 
@@ -4856,15 +4731,11 @@ mod tests {
         assert!(writer.handle_event(Event::StartTable { id: None }).is_ok());
         assert!(writer.handle_event(Event::EndTable).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            !json.contains("\"type\":\"table\""),
-            "table inside list must be dropped"
-        );
-        assert!(
-            json.contains("\"type\":\"bulletListItem\""),
-            "list item must still be emitted"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[],"children":[]}]"#
         );
     }
 
@@ -4895,19 +4766,11 @@ mod tests {
             .is_ok());
         assert!(writer.handle_event(Event::EndParagraph).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            json.contains("\"type\":\"paragraph\""),
-            "paragraph block must be in output"
-        );
-        assert!(
-            json.contains("\"text\":\"plain text\""),
-            "paragraph text must be in output"
-        );
-        assert!(
-            json.contains("\"children\":[]"),
-            "paragraph must be properly closed with children:[]"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"plain text","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -4938,11 +4801,11 @@ mod tests {
             .is_ok());
         assert!(writer.handle_event(Event::EndParagraph).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            json.contains("\"text\":\"hello\""),
-            "paragraph text must appear when using with_assets writer"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"hello","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -4994,13 +4857,9 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert!(
-            json.contains("\"text\":\"a\""),
-            "root item text must appear"
-        );
-        assert!(
-            json.contains("\"text\":\"d\""),
-            "sibling item at level 1 must appear"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"c","styles":{}}],"children":[]}]},{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"d","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -5051,19 +4910,11 @@ mod tests {
             .is_ok());
         assert!(writer.handle_event(Event::EndParagraph).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            json.contains("\"text\":\"first\""),
-            "first paragraph text must appear in list item content"
-        );
-        assert!(
-            json.contains("\"text\":\"second\""),
-            "second paragraph text must appear in children"
-        );
-        assert!(
-            json.contains("\"type\":\"paragraph\""),
-            "child paragraph block must be emitted"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -5107,15 +4958,11 @@ mod tests {
             })
             .is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            json.contains("\"text\":\"parent\""),
-            "parent item text must appear"
-        );
-        assert!(
-            json.contains("\"text\":\"child\""),
-            "child item text must appear in children array"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"parent","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"child","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -5147,15 +4994,11 @@ mod tests {
             })
             .is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            json.contains("\"start\":42"),
-            "start prop must be emitted for ordered list with start=42"
-        );
-        assert!(
-            json.contains("\"text\":\"item 42\""),
-            "list item text must be emitted"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left","start":42},"content":[{"type":"text","text":"item 42","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -5183,17 +5026,12 @@ mod tests {
             })
             .is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(
-            json.contains("\"type\":\"image\""),
-            "image block must appear"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"id":"img-1","type":"image","props":{"url":"https://example.com/photo.jpg","caption":"alt text"},"content":null,"children":[]}]"#
         );
-        assert!(
-            json.contains("\"caption\":\"alt text\""),
-            "alt text must appear as caption"
-        );
-        assert!(json.contains("\"id\":\"img-1\""), "image id must appear");
     }
 
     #[test]
@@ -5225,10 +5063,12 @@ mod tests {
             .is_ok());
         assert!(writer.handle_event(Event::EndOrderedListItem).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        assert!(json.contains("\"id\":\"li-1\""), "list item id must appear");
-        assert!(json.contains("\"start\":5"), "start prop must appear");
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"id":"li-1","type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left","start":5},"content":[{"type":"text","text":"five","styles":{}}],"children":[]}]"#
+        );
     }
 
     #[test]
@@ -5322,29 +5162,10 @@ mod tests {
             Event::EndDocument,
         ]);
         // Only "before" and "after" should appear; all block content dropped
-        assert!(
-            json.contains("\"text\":\"before\""),
-            "before text must be preserved"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"before","styles":{}}],"children":[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
         );
-        assert!(
-            json.contains("\"text\":\"after\""),
-            "after text must be preserved"
-        );
-        assert!(
-            !json.contains("\"text\":\"heading\""),
-            "heading text must be dropped"
-        );
-        assert!(
-            !json.contains("\"text\":\"code\""),
-            "code text must be dropped"
-        );
-        assert!(
-            !json.contains("\"text\":\"quote\""),
-            "quote text must be dropped"
-        );
-        assert!(!json.contains("\"type\":\"heading\""), "no heading block");
-        assert!(!json.contains("\"type\":\"codeBlock\""), "no code block");
-        assert!(!json.contains("\"type\":\"quote\""), "no quote block");
     }
 
     fn list_item_with_children_transition_then(block_events: Vec<Event>) -> String {
@@ -5395,30 +5216,18 @@ mod tests {
             decorative: false,
             id: None,
         }]);
-        assert!(
-            !json.contains("\"type\":\"image\""),
-            "image after content\u{2192}children transition must be dropped: {json}"
-        );
-        assert!(
-            !json.contains("leaked"),
-            "image url/alt must not leak to output: {json}"
-        );
-        assert!(
-            json.starts_with("[{\"type\":\"bulletListItem\""),
-            "bulletListItem must remain the only top-level block: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
     #[test]
     fn thematic_break_after_children_transition_inside_list_item_is_dropped() {
         let json = list_item_with_children_transition_then(vec![Event::ThematicBreak { id: None }]);
-        assert!(
-            !json.contains("\"type\":\"divider\""),
-            "thematic break after content\u{2192}children transition must be dropped: {json}"
-        );
-        assert!(
-            json.starts_with("[{\"type\":\"bulletListItem\""),
-            "bulletListItem must remain the only top-level block: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -5432,17 +5241,9 @@ mod tests {
             },
             Event::EndHeading,
         ]);
-        assert!(
-            !json.contains("\"type\":\"heading\""),
-            "heading after content\u{2192}children transition must be dropped: {json}"
-        );
-        assert!(
-            !json.contains("leaked-heading"),
-            "heading text must not leak: {json}"
-        );
-        assert!(
-            json.starts_with("[{\"type\":\"bulletListItem\""),
-            "bulletListItem must remain the only top-level block: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -5456,17 +5257,9 @@ mod tests {
             },
             Event::EndBlockQuote,
         ]);
-        assert!(
-            !json.contains("\"type\":\"quote\""),
-            "blockquote after content\u{2192}children transition must be dropped: {json}"
-        );
-        assert!(
-            !json.contains("leaked-quote"),
-            "blockquote text must not leak: {json}"
-        );
-        assert!(
-            json.starts_with("[{\"type\":\"bulletListItem\""),
-            "bulletListItem must remain the only top-level block: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -5483,17 +5276,9 @@ mod tests {
             },
             Event::EndPreformatted,
         ]);
-        assert!(
-            !json.contains("\"type\":\"codeBlock\""),
-            "preformatted after content\u{2192}children transition must be dropped: {json}"
-        );
-        assert!(
-            !json.contains("leaked-code"),
-            "preformatted text must not leak: {json}"
-        );
-        assert!(
-            json.starts_with("[{\"type\":\"bulletListItem\""),
-            "bulletListItem must remain the only top-level block: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -5515,17 +5300,9 @@ mod tests {
             Event::EndTableRow,
             Event::EndTable,
         ]);
-        assert!(
-            !json.contains("\"type\":\"table\""),
-            "table after content\u{2192}children transition must be dropped: {json}"
-        );
-        assert!(
-            !json.contains("leaked-cell"),
-            "table cell text must not leak: {json}"
-        );
-        assert!(
-            json.starts_with("[{\"type\":\"bulletListItem\""),
-            "bulletListItem must remain the only top-level block: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -5551,13 +5328,9 @@ mod tests {
             Event::EndOrderedListItem,
             Event::EndDocument,
         ]);
-        assert!(
-            json.contains("\"start\":3"),
-            "start prop must be emitted with value 3"
-        );
-        assert!(
-            json.contains("\"type\":\"numberedListItem\""),
-            "must be numberedListItem"
+        assert_eq!(
+            json,
+            r#"[{"type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left","start":3},"content":[{"type":"text","text":"item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -5610,21 +5383,11 @@ mod tests {
         assert!(writer.handle_event(Event::EndParagraph).is_ok());
         assert!(writer.handle_event(Event::EndUnorderedListItem).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
-        let json = String::from_utf8(writer.finish().map(|()| buf.clone()).unwrap_or_default())
-            .unwrap_or_default();
-        // First paragraph inline content in item's content array
-        assert!(
-            json.contains("\"text\":\"first\""),
-            "first paragraph text must be in content"
-        );
-        // Second paragraph becomes a child block
-        assert!(
-            json.contains("\"children\":[{\"type\":\"paragraph\""),
-            "second paragraph must be a child block"
-        );
-        assert!(
-            json.contains("\"text\":\"second\""),
-            "second paragraph text must appear"
+        writer.finish().expect("writer should finish fixture");
+        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -5658,21 +5421,9 @@ mod tests {
             Event::ThematicBreak { id: None },
             Event::EndDocument,
         ]);
-        assert!(
-            json.contains("\"bulletListItem\""),
-            "list item must be emitted: {json}"
-        );
-        assert!(
-            json.contains("\"type\":\"image\""),
-            "image after EndListItem must drain the list stack and emit, not silently drop: {json}"
-        );
-        assert!(
-            json.contains("https://example.com/foo.png"),
-            "image url must appear: {json}"
-        );
-        assert!(
-            json.contains("\"type\":\"divider\""),
-            "thematic break after EndListItem must drain the list stack and emit, not silently drop: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"item","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/foo.png","caption":"Foo"},"content":null,"children":[]},{"type":"divider"}]"#
         );
     }
 
@@ -5702,17 +5453,9 @@ mod tests {
             Event::EndHeading,
             Event::EndDocument,
         ]);
-        assert!(
-            json.contains("\"bulletListItem\""),
-            "list item must be emitted: {json}"
-        );
-        assert!(
-            json.contains("\"type\":\"heading\""),
-            "heading after EndListItem must drain the list stack and emit, not silently drop: {json}"
-        );
-        assert!(
-            json.contains("\"text\":\"After list\""),
-            "heading inline content must appear: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"item","styles":{}}],"children":[]},{"type":"heading","props":{"level":2,"textAlignment":"left"},"content":[{"type":"text","text":"After list","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -5748,18 +5491,9 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert!(
-            json.contains("\"text\":\"outer\""),
-            "outer list item text must appear: {json}"
-        );
-        assert!(
-            !json.contains("\"text\":\"inner\""),
-            "inner list item inside dropped blockquote must not corrupt JSON or emit text: {json}"
-        );
-        let bullet_count = json.matches("\"bulletListItem\"").count();
         assert_eq!(
-            bullet_count, 1,
-            "only the outer list item must be emitted; inner is dropped: {json}"
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"outer","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -5799,17 +5533,9 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert!(
-            !json.contains("\"text\":\"dropped\""),
-            "text inside dropped blockquote must not appear: {json}"
-        );
-        assert!(
-            json.contains("\"text\":\"real\""),
-            "real text must appear after the dropped block: {json}"
-        );
-        assert!(
-            !json.contains("\"children\":[{\"type\":\"paragraph\""),
-            "real paragraph must populate content[] not children[]; the dropped paragraph events must not have set first_paragraph_consumed: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"real","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -5862,12 +5588,9 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        let nested_block = r#"{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"nested","styles":{}}],"children":[]}"#;
-        let continuation_block = r#"{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"continuation","styles":{}}],"children":[]}"#;
-        let expected_children = format!(r#""children":[{nested_block},{continuation_block}]"#);
-        assert!(
-            json.contains(&expected_children),
-            "continuation paragraph must be a sibling of the nested item inside the outer item's children[], not nested inside the nested item's children[]: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"outer","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"nested","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"continuation","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -5936,14 +5659,9 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        let parsed_result: Result<serde_json::Value, _> = serde_json::from_str(&json);
-        assert!(parsed_result.is_ok(), "output must be valid JSON: {json}");
-        assert_eq!(json.matches(r#""type":"link""#).count(), 1);
-        assert!(json.contains(r#""href":"https://a.example""#));
-        assert!(!json.contains(r#""href":"https://b.example""#));
-        assert!(
-            json.contains(r#""content":[{"type":"link","href":"https://a.example","content":[{"type":"text","text":"inner","styles":{}}]}]"#),
-            "text must remain inside the outer link content: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"link","href":"https://a.example","content":[{"type":"text","text":"inner","styles":{}}]}],"children":[]}]"#
         );
     }
 
@@ -5971,13 +5689,9 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        let parsed_result: Result<serde_json::Value, _> = serde_json::from_str(&json);
-        assert!(parsed_result.is_ok(), "output must be valid JSON: {json}");
-        assert_eq!(json.matches(r#""type":"link""#).count(), 1);
-        assert!(json.contains(r#""href":"https://x.example""#));
-        assert!(
-            json.contains(r#"{"type":"text","text":"label","styles":{}}"#),
-            "link label text must be preserved: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"link","href":"https://x.example","content":[{"type":"text","text":"label","styles":{}}]}],"children":[]}]"#
         );
     }
 
@@ -6010,13 +5724,9 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        let parsed_result: Result<serde_json::Value, _> = serde_json::from_str(&json);
-        assert!(parsed_result.is_ok(), "output must be valid JSON: {json}");
-        assert_eq!(json.matches(r#""type":"link""#).count(), 1);
-        assert!(json.contains(r#""href":"https://cell.example""#));
-        assert!(
-            json.contains(r#"{"type":"text","text":"cell","styles":{}}"#),
-            "table cell link text must be preserved: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"link","href":"https://cell.example","content":[{"type":"text","text":"cell","styles":{}}]}]}]}]},"children":[]}]"#
         );
     }
 
@@ -6072,17 +5782,9 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert!(
-            !json.contains(r#""title""#),
-            "title field must not appear in BlockNote link JSON, got: {json}"
-        );
-        assert!(
-            json.contains(r#""type":"link""#),
-            "link object must be present"
-        );
-        assert!(
-            json.contains(r#""href":"https://example.com""#),
-            "href must be present"
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"text","styles":{}}]}],"children":[]}]"#
         );
     }
 
@@ -6218,12 +5920,9 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert!(json.contains(r#""type":"bulletListItem""#));
-        assert!(json.contains(r#""type":"link""#));
-        assert!(json.contains(r#""href":"https://example.com""#));
-        assert!(
-            json.contains(r#"{"type":"text","text":"link","styles":{}}"#),
-            "link content must preserve styled text: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"link","styles":{}}]}],"children":[]}]"#
         );
     }
 
@@ -6254,9 +5953,10 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert!(json.contains(r#""type":"quote""#));
-        assert!(json.contains(r#""type":"link""#));
-        assert!(json.contains(r#""href":"https://example.com""#));
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"link","styles":{}}]}],"children":[]}]"#
+        );
     }
 
     #[test]
@@ -6282,10 +5982,9 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert!(json.contains(r#""type":"quote""#));
-        assert!(
-            json.contains(r#""content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"","styles":{}}]}]"#),
-            "quote content must contain the empty link fallback: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"","styles":{}}]}],"children":[]}]"#
         );
     }
 
@@ -6319,9 +6018,10 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert!(json.contains(r#""type":"table""#));
-        assert!(json.contains(r#""type":"link""#));
-        assert!(json.contains(r#""href":"https://example.com""#));
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"link","styles":{}}]}]}]}]},"children":[]}]"#
+        );
     }
 
     #[test]
@@ -6352,13 +6052,9 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert!(
-            json.contains(r#""type":"bulletListItem""#),
-            "list item must still be emitted: {json}"
-        );
-        assert!(
-            !json.contains(r#""type":"link""#),
-            "dropped heading content must not leak a phantom link: {json}"
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[],"children":[]}]"#
         );
     }
 }

@@ -97,7 +97,13 @@ mod tests {
             description: Some("A test document".to_string()),
         };
         assert_eq!(meta.title, Some("My Document".to_string()));
-        assert!(meta.authors.is_some());
+        assert_eq!(
+            meta.authors,
+            Some(vec![Author {
+                name: "Author One".to_string(),
+                email: Some("author@example.com".to_string()),
+            }])
+        );
         assert_eq!(meta.description, Some("A test document".to_string()));
     }
 
