@@ -97,3 +97,144 @@ pub fn validate_content_type(header_value: Option<&HeaderValue>) -> Result<(), H
     }
     Ok(())
 }
+
+/// Returns the bounded `input_mime_type` label value for a `Content-Type` header.
+///
+/// This function is intentionally MORE permissive than [`validate_content_type`]:
+/// it returns [`crate::metrics::INPUT_MIME_MARKDOWN`] for any `text/markdown`
+/// value regardless of charset or other parameters, because the label answers
+/// "what did the client try to send?" rather than "is it valid?".
+///
+/// # Label values
+///
+/// - [`crate::metrics::INPUT_MIME_NONE`] — header absent
+/// - [`crate::metrics::INPUT_MIME_MARKDOWN`] — `text/markdown` (any params)
+/// - [`crate::metrics::INPUT_MIME_UNSUPPORTED`] — anything else
+#[must_use]
+#[inline]
+pub fn bucket_input_mime(header_value: Option<&HeaderValue>) -> &'static str {
+    let Some(header_val) = header_value else {
+        return crate::metrics::INPUT_MIME_NONE;
+    };
+    let Ok(header_str) = header_val.to_str() else {
+        return crate::metrics::INPUT_MIME_UNSUPPORTED;
+    };
+    let Ok(parsed) = header_str.parse::<mime::Mime>() else {
+        return crate::metrics::INPUT_MIME_UNSUPPORTED;
+    };
+    if parsed.type_() == mime::TEXT && parsed.subtype().as_str() == "markdown" {
+        crate::metrics::INPUT_MIME_MARKDOWN
+    } else {
+        crate::metrics::INPUT_MIME_UNSUPPORTED
+    }
+}
+
+/// Returns the bounded `output_mime_type` label value for a conversion outcome.
+///
+/// When `conversion_ok` is `false`, no output was produced, so the label is
+/// always [`crate::metrics::OUTPUT_MIME_NONE`].
+///
+/// When `conversion_ok` is `true`, the output is always `BlockNote` JSON because
+/// the writer is fixed today.
+///
+/// # Label values
+///
+/// - [`crate::metrics::OUTPUT_MIME_NONE`] — conversion failed (no output)
+/// - [`crate::metrics::OUTPUT_MIME_BLOCKNOTE`] — conversion succeeded
+#[inline]
+#[must_use]
+pub fn bucket_output_mime(conversion_ok: bool) -> &'static str {
+    if conversion_ok {
+        crate::metrics::OUTPUT_MIME_BLOCKNOTE
+    } else {
+        crate::metrics::OUTPUT_MIME_NONE
+    }
+}
+
+#[cfg(test)]
+mod bucket_tests {
+    #![allow(
+        clippy::tests_outside_test_module,
+        clippy::unwrap_used,
+        clippy::expect_used
+    )]
+
+    use super::*;
+    use axum::http::HeaderValue;
+
+    // ─── bucket_input_mime tests ───────────────────────────────────────────
+
+    #[test]
+    fn bucket_input_mime_none_when_header_absent() {
+        assert_eq!(bucket_input_mime(None), crate::metrics::INPUT_MIME_NONE);
+    }
+
+    #[test]
+    fn bucket_input_mime_markdown_when_text_markdown() {
+        let val = HeaderValue::from_static("text/markdown");
+        assert_eq!(
+            bucket_input_mime(Some(&val)),
+            crate::metrics::INPUT_MIME_MARKDOWN
+        );
+    }
+
+    #[test]
+    fn bucket_input_mime_markdown_when_text_markdown_with_charset() {
+        let val = HeaderValue::from_static("text/markdown; charset=utf-8");
+        assert_eq!(
+            bucket_input_mime(Some(&val)),
+            crate::metrics::INPUT_MIME_MARKDOWN
+        );
+    }
+
+    #[test]
+    fn bucket_input_mime_markdown_case_insensitive() {
+        let val = HeaderValue::from_static("TEXT/MARKDOWN");
+        assert_eq!(
+            bucket_input_mime(Some(&val)),
+            crate::metrics::INPUT_MIME_MARKDOWN
+        );
+    }
+
+    #[test]
+    fn bucket_input_mime_unsupported_when_other_format() {
+        let val = HeaderValue::from_static("application/pdf");
+        assert_eq!(
+            bucket_input_mime(Some(&val)),
+            crate::metrics::INPUT_MIME_UNSUPPORTED
+        );
+    }
+
+    #[test]
+    fn bucket_input_mime_unsupported_when_malformed() {
+        let val = HeaderValue::from_static("not a mime type at all");
+        assert_eq!(
+            bucket_input_mime(Some(&val)),
+            crate::metrics::INPUT_MIME_UNSUPPORTED
+        );
+    }
+
+    #[test]
+    fn bucket_input_mime_unsupported_when_non_ascii() {
+        let val = HeaderValue::from_bytes(&[0xFF, 0xFE]).unwrap();
+        assert_eq!(
+            bucket_input_mime(Some(&val)),
+            crate::metrics::INPUT_MIME_UNSUPPORTED
+        );
+    }
+
+    // ─── bucket_output_mime tests ──────────────────────────────────────────
+
+    #[test]
+    fn bucket_output_mime_blocknote_when_success() {
+        assert_eq!(
+            bucket_output_mime(true),
+            crate::metrics::OUTPUT_MIME_BLOCKNOTE
+        );
+    }
+
+    #[test]
+    fn bucket_output_mime_none_when_failure() {
+        assert_eq!(bucket_output_mime(false), crate::metrics::OUTPUT_MIME_NONE);
+    }
+}
