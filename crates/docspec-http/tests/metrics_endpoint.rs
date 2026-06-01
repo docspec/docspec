@@ -8,8 +8,8 @@
 mod common;
 
 use axum::{
-    body::{to_bytes, Body},
-    http::{header::CONTENT_TYPE, Request, StatusCode},
+    body::to_bytes,
+    http::{header::CONTENT_TYPE, StatusCode},
 };
 use docspec_http::{
     metrics::{
@@ -26,11 +26,7 @@ use tower::ServiceExt as _;
 async fn get_metrics_returns_200() {
     let (_recorder, handle) = build_recorder().expect("recorder builds");
     let router = router_with_metrics(handle);
-    let request = Request::builder()
-        .method("GET")
-        .uri("/metrics")
-        .body(Body::empty())
-        .unwrap();
+    let request = common::empty_request("GET", "/metrics");
     let response = router.oneshot(request).await.expect("oneshot succeeds");
     assert_eq!(response.status(), StatusCode::OK);
 }
@@ -39,11 +35,7 @@ async fn get_metrics_returns_200() {
 async fn get_metrics_content_type_is_prometheus_text() {
     let (_recorder, handle) = build_recorder().expect("recorder builds");
     let router = router_with_metrics(handle);
-    let request = Request::builder()
-        .method("GET")
-        .uri("/metrics")
-        .body(Body::empty())
-        .unwrap();
+    let request = common::empty_request("GET", "/metrics");
     let response = router.oneshot(request).await.expect("oneshot succeeds");
     let content_type = response
         .headers()
@@ -85,11 +77,7 @@ async fn get_metrics_body_contains_help_and_type_lines_for_all_five_metrics() {
         metrics::histogram!(METRIC_CONVERSION_DURATION_SECONDS).record(0.001);
     });
 
-    let request = Request::builder()
-        .method("GET")
-        .uri("/metrics")
-        .body(Body::empty())
-        .unwrap();
+    let request = common::empty_request("GET", "/metrics");
     let response = router.oneshot(request).await.expect("oneshot succeeds");
 
     let body_bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
@@ -120,11 +108,7 @@ async fn get_metrics_body_contains_help_and_type_lines_for_all_five_metrics() {
 async fn get_metrics_body_contains_no_request_id_label_keys() {
     let (_recorder, handle) = build_recorder().expect("recorder builds");
     let router = router_with_metrics(handle);
-    let request = Request::builder()
-        .method("GET")
-        .uri("/metrics")
-        .body(Body::empty())
-        .unwrap();
+    let request = common::empty_request("GET", "/metrics");
     let response = router.oneshot(request).await.expect("oneshot succeeds");
 
     let body_bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
@@ -142,11 +126,7 @@ async fn get_metrics_body_contains_no_request_id_label_keys() {
 async fn delete_metrics_returns_405() {
     let (_recorder, handle) = build_recorder().expect("recorder builds");
     let router = router_with_metrics(handle);
-    let request = Request::builder()
-        .method("DELETE")
-        .uri("/metrics")
-        .body(Body::empty())
-        .unwrap();
+    let request = common::empty_request("DELETE", "/metrics");
     let response = router.oneshot(request).await.expect("oneshot succeeds");
     assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
 }
