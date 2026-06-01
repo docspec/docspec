@@ -5,11 +5,54 @@ use std::io::Write as _;
 use assert_cmd::Command;
 use predicates::prelude::PredicateBooleanExt as _;
 use predicates::str::contains;
+use tempfile::NamedTempFile;
 
 fn docspec_cmd() -> Command {
     let result = Command::cargo_bin("docspec");
-    assert!(result.is_ok(), "docspec binary not found");
-    result.unwrap_or_else(|_| Command::new(""))
+    assert!(
+        result.is_ok(),
+        "docspec binary should be built for integration tests: {:?}",
+        result.as_ref().err()
+    );
+    result.unwrap_or_else(|_| std::process::abort())
+}
+
+fn markdown_tempfile(content: &[u8], suffix: &str) -> NamedTempFile {
+    let result = tempfile::Builder::new().suffix(suffix).tempfile();
+    assert!(
+        result.is_ok(),
+        "test tempfile should be created: {:?}",
+        result.as_ref().err()
+    );
+    let mut file = result.unwrap_or_else(|_| std::process::abort());
+
+    let write_result = file.write_all(content);
+    assert!(
+        write_result.is_ok(),
+        "test tempfile content should be written: {:?}",
+        write_result.err()
+    );
+    file
+}
+
+fn empty_tempfile(suffix: &str) -> NamedTempFile {
+    let result = tempfile::Builder::new().suffix(suffix).tempfile();
+    assert!(
+        result.is_ok(),
+        "test tempfile should be created: {:?}",
+        result.as_ref().err()
+    );
+    result.unwrap_or_else(|_| std::process::abort())
+}
+
+fn read_output(path: &std::path::Path) -> String {
+    let result = std::fs::read_to_string(path);
+    assert!(
+        result.is_ok(),
+        "CLI output file should be readable: {:?}",
+        result.as_ref().err()
+    );
+    result.unwrap_or_else(|_| std::process::abort())
 }
 
 #[cfg(test)]
@@ -18,15 +61,8 @@ mod tests {
 
     #[test]
     fn auto_detect_from_extension() {
-        let input_result = tempfile::Builder::new().suffix(".md").tempfile();
-        assert!(input_result.is_ok(), "failed to create input tempfile");
-        let Ok(mut input) = input_result else { return };
-        let write_result = input.write_all(b"# Auto Detected\n");
-        assert!(write_result.is_ok(), "failed to write to tempfile");
-
-        let output_result = tempfile::Builder::new().suffix(".json").tempfile();
-        assert!(output_result.is_ok(), "failed to create output tempfile");
-        let Ok(output) = output_result else { return };
+        let input = markdown_tempfile(b"# Auto Detected\n", ".md");
+        let output = empty_tempfile(".json");
         let output_path = output.path().to_path_buf();
 
         docspec_cmd()
@@ -35,9 +71,10 @@ mod tests {
             .assert()
             .success();
 
-        let content = std::fs::read_to_string(&output_path).unwrap_or_default();
-        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap_or_default();
-        assert!(parsed.is_array(), "expected JSON array, got: {content}");
+        assert_eq!(
+            read_output(&output_path),
+            r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Auto Detected","styles":{}}],"children":[]}]"#
+        );
     }
 
     #[test]
@@ -72,15 +109,8 @@ mod tests {
 
     #[test]
     fn convert_markdown_file_to_json_file() {
-        let input_result = tempfile::Builder::new().suffix(".md").tempfile();
-        assert!(input_result.is_ok(), "failed to create input tempfile");
-        let Ok(mut input) = input_result else { return };
-        let write_result = input.write_all(b"# Hello World\n\nSome paragraph text.\n");
-        assert!(write_result.is_ok(), "failed to write to tempfile");
-
-        let output_result = tempfile::Builder::new().suffix(".json").tempfile();
-        assert!(output_result.is_ok(), "failed to create output tempfile");
-        let Ok(output) = output_result else { return };
+        let input = markdown_tempfile(b"# Hello World\n\nSome paragraph text.\n", ".md");
+        let output = empty_tempfile(".json");
         let output_path = output.path().to_path_buf();
 
         docspec_cmd()
@@ -89,13 +119,9 @@ mod tests {
             .assert()
             .success();
 
-        let content = std::fs::read_to_string(&output_path).unwrap_or_default();
-        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap_or_default();
-        assert!(parsed.is_array(), "expected JSON array, got: {content}");
-        let text = parsed.to_string();
-        assert!(
-            text.contains("heading") || text.contains("paragraph"),
-            "expected heading or paragraph in output"
+        assert_eq!(
+            read_output(&output_path),
+            r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Hello World","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Some paragraph text.","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -106,7 +132,7 @@ mod tests {
             .write_stdin("# Hello\n")
             .assert()
             .success()
-            .stdout(contains("heading"));
+            .stdout(r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#);
     }
 
     #[test]
@@ -116,18 +142,13 @@ mod tests {
             .write_stdin("# Dash Input\n")
             .assert()
             .success()
-            .stdout(contains("heading"));
+            .stdout(r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Dash Input","styles":{}}],"children":[]}]"#);
     }
 
     #[test]
     fn empty_markdown_file() {
-        let input_result = tempfile::Builder::new().suffix(".md").tempfile();
-        assert!(input_result.is_ok(), "failed to create input tempfile");
-        let Ok(input) = input_result else { return };
-
-        let output_result = tempfile::Builder::new().suffix(".json").tempfile();
-        assert!(output_result.is_ok(), "failed to create output tempfile");
-        let Ok(output) = output_result else { return };
+        let input = empty_tempfile(".md");
+        let output = empty_tempfile(".json");
         let output_path = output.path().to_path_buf();
 
         docspec_cmd()
@@ -136,22 +157,13 @@ mod tests {
             .assert()
             .success();
 
-        let content = std::fs::read_to_string(&output_path).unwrap_or_default();
-        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap_or_default();
-        assert!(parsed.is_array(), "expected JSON array, got: {content}");
+        assert_eq!(read_output(&output_path), "[]");
     }
 
     #[test]
     fn explicit_format_flags() {
-        let input_result = tempfile::Builder::new().suffix(".txt").tempfile();
-        assert!(input_result.is_ok(), "failed to create input tempfile");
-        let Ok(mut input) = input_result else { return };
-        let write_result = input.write_all(b"# Explicit\n");
-        assert!(write_result.is_ok(), "failed to write to tempfile");
-
-        let output_result = tempfile::Builder::new().suffix(".txt").tempfile();
-        assert!(output_result.is_ok(), "failed to create output tempfile");
-        let Ok(output) = output_result else { return };
+        let input = markdown_tempfile(b"# Explicit\n", ".txt");
+        let output = empty_tempfile(".txt");
         let output_path = output.path().to_path_buf();
 
         docspec_cmd()
@@ -167,9 +179,10 @@ mod tests {
             .assert()
             .success();
 
-        let content = std::fs::read_to_string(&output_path).unwrap_or_default();
-        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap_or_default();
-        assert!(parsed.is_array(), "expected JSON array, got: {content}");
+        assert_eq!(
+            read_output(&output_path),
+            r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Explicit","styles":{}}],"children":[]}]"#
+        );
     }
 
     #[test]
@@ -183,7 +196,7 @@ mod tests {
             .args([fixture, "--to", "blocknote"])
             .assert()
             .success()
-            .stdout(contains("heading"));
+            .stdout(r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 1","styles":{}}],"children":[]},{"type":"heading","props":{"level":2,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 2","styles":{}}],"children":[]},{"type":"heading","props":{"level":3,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 3","styles":{}}],"children":[]},{"type":"heading","props":{"level":4,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 4","styles":{}}],"children":[]},{"type":"heading","props":{"level":5,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 5","styles":{}}],"children":[]},{"type":"heading","props":{"level":6,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 6","styles":{}}],"children":[]}]"#);
     }
 
     #[test]
@@ -246,16 +259,12 @@ mod tests {
             .args([fixture, "--to", "blocknote"])
             .assert()
             .success()
-            .stdout(contains("paragraph"));
+            .stdout(r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Single paragraph with plain text.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Multiple paragraphs. This is the second paragraph.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"bold text","styles":{"bold":true}},{"type":"text","text":" in the middle.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"italic text","styles":{"italic":true}},{"type":"text","text":" in the middle.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"bold and italic text","styles":{"bold":true,"italic":true}},{"type":"text","text":" combined.","styles":{}}],"children":[]}]"#);
     }
 
     #[test]
     fn same_input_output_exits_1() {
-        let input_result = tempfile::Builder::new().suffix(".md").tempfile();
-        assert!(input_result.is_ok(), "failed to create tempfile");
-        let Ok(mut input) = input_result else { return };
-        let write_result = input.write_all(b"# Test\n");
-        assert!(write_result.is_ok(), "failed to write to tempfile");
+        let input = markdown_tempfile(b"# Test\n", ".md");
         let path_str = input.path().to_str().unwrap_or("");
 
         docspec_cmd()
@@ -268,11 +277,7 @@ mod tests {
 
     #[test]
     fn unknown_extension_requires_from_flag() {
-        let input_result = tempfile::Builder::new().suffix(".xyz").tempfile();
-        assert!(input_result.is_ok(), "failed to create tempfile");
-        let Ok(mut input) = input_result else { return };
-        let write_result = input.write_all(b"# Hello\n");
-        assert!(write_result.is_ok(), "failed to write to tempfile");
+        let input = markdown_tempfile(b"# Hello\n", ".xyz");
 
         docspec_cmd()
             .arg(input.path())
@@ -284,11 +289,7 @@ mod tests {
 
     #[test]
     fn unsupported_input_format_exits_1() {
-        let input_result = tempfile::Builder::new().suffix(".json").tempfile();
-        assert!(input_result.is_ok(), "failed to create tempfile");
-        let Ok(mut input) = input_result else { return };
-        let write_result = input.write_all(b"[]");
-        assert!(write_result.is_ok(), "failed to write to tempfile");
+        let input = markdown_tempfile(b"[]", ".json");
 
         docspec_cmd()
             .arg(input.path())

@@ -23,16 +23,12 @@ fn run_pipeline(markdown: &str) -> String {
 }
 
 fn assert_json_eq(actual: &str, expected: &str) {
-    let actual_parsed = serde_json::from_str::<serde_json::Value>(actual);
-    assert!(actual_parsed.is_ok(), "actual is not valid JSON: {actual}");
-    let expected_parsed = serde_json::from_str::<serde_json::Value>(expected);
-    assert!(
-        expected_parsed.is_ok(),
-        "expected fixture is not valid JSON"
-    );
+    let actual_parsed =
+        serde_json::from_str::<serde_json::Value>(actual).expect("actual is valid JSON");
+    let expected_parsed =
+        serde_json::from_str::<serde_json::Value>(expected).expect("fixture is valid JSON");
     assert_eq!(
-        actual_parsed.unwrap_or_default(),
-        expected_parsed.unwrap_or_default(),
+        actual_parsed, expected_parsed,
         "JSON mismatch\nActual:   {actual}\nExpected: {expected}"
     );
 }
@@ -159,11 +155,10 @@ mod tests {
         // A list nested inside a blockquote that is itself inside a list item
         // must NOT cause premature emission of the outer list item's End event.
         let markdown = "5) I2\n   > text\n   > - [f]\n";
-        let result = super::try_run_pipeline(markdown);
-        assert!(
-            result.is_ok(),
-            "Expected well-formed event stream for list-in-blockquote-in-item; got: {:?}",
-            result.err()
+        let actual = run_pipeline(markdown);
+        assert_json_eq(
+            &actual,
+            r#"[{"type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left","start":5},"content":[{"type":"text","text":"I2","styles":{}}],"children":[]}]"#,
         );
     }
 }

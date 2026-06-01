@@ -18,14 +18,17 @@ mod tests {
             expected: "A".to_string(),
             found: "B".to_string(),
         };
-        assert!(StdError::source(&err).is_none());
+        assert_eq!(StdError::source(&err).map(ToString::to_string), None);
     }
 
     #[test]
     fn error_source_io() {
         let io_err = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "access denied");
         let err = Error::Io { source: io_err };
-        assert!(StdError::source(&err).is_some());
+        assert_eq!(
+            StdError::source(&err).map(ToString::to_string),
+            Some("access denied".to_string())
+        );
     }
 
     #[test]
@@ -34,7 +37,7 @@ mod tests {
             message: "test".to_string(),
             position: None,
         };
-        assert!(StdError::source(&err).is_none());
+        assert_eq!(StdError::source(&err).map(ToString::to_string), None);
     }
 
     #[test]
@@ -42,7 +45,7 @@ mod tests {
         let err = Error::Other {
             message: "test".to_string(),
         };
-        assert!(StdError::source(&err).is_none());
+        assert_eq!(StdError::source(&err).map(ToString::to_string), None);
     }
 
     #[test]
@@ -51,7 +54,7 @@ mod tests {
             message: "test".to_string(),
             position: None,
         };
-        assert!(StdError::source(&err).is_none());
+        assert_eq!(StdError::source(&err).map(ToString::to_string), None);
     }
 
     #[test]
@@ -71,7 +74,7 @@ mod tests {
     fn io_error() {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
         let err = Error::Io { source: io_err };
-        assert!(err.to_string().starts_with("I/O error:"));
+        assert_eq!(err.to_string(), "I/O error: file not found");
     }
 
     #[test]

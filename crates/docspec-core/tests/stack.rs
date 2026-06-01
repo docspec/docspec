@@ -27,7 +27,21 @@ mod tests {
 
     fn send(sink: &mut StackTrackingSink<MockSink>, event: Event) {
         let result = sink.handle_event(event);
-        assert!(matches!(result, Ok(())));
+        assert!(
+            result.is_ok(),
+            "fixture event should be accepted: {result:?}"
+        );
+    }
+
+    fn assert_invalid_sequence(result: &Result<()>, expected: &str, found: &str, message: &str) {
+        assert!(matches!(
+            result,
+            Err(Error::InvalidSequence {
+                expected: actual_expected,
+                found: actual_found,
+                message: actual_message,
+            }) if actual_expected == expected && actual_found == found && actual_message == message
+        ));
     }
 
     #[test]
@@ -409,9 +423,12 @@ mod tests {
         send(&mut sink, Event::StartTable { id: None });
 
         let result = sink.handle_event(Event::EndBlockQuote);
-        assert!(result.is_err());
-        let err_str = format!("{result:?}");
-        assert!(err_str.contains("Blockquote"));
+        assert_invalid_sequence(
+            &result,
+            "Table",
+            "Blockquote",
+            "End event for Blockquote does not match any open block",
+        );
     }
 
     #[test]
@@ -420,9 +437,12 @@ mod tests {
         let mut sink = StackTrackingSink::new(mock);
 
         let result = sink.handle_event(Event::EndParagraph);
-        assert!(result.is_err());
-        let err_str = format!("{result:?}");
-        assert!(err_str.contains("empty stack"));
+        assert_invalid_sequence(
+            &result,
+            "open block",
+            "Paragraph",
+            "received End event with empty stack",
+        );
     }
 
     #[test]
@@ -431,9 +451,12 @@ mod tests {
         let mut sink = StackTrackingSink::new(mock);
 
         let result = sink.handle_event(Event::EndDocument);
-        assert!(result.is_err());
-        let err_str = format!("{result:?}");
-        assert!(err_str.contains("EndDocument received without StartDocument"));
+        assert_invalid_sequence(
+            &result,
+            "open Document",
+            "EndDocument",
+            "EndDocument received without StartDocument",
+        );
     }
 
     #[test]
@@ -441,23 +464,27 @@ mod tests {
         let mock = MockSink::new();
         let mut sink = StackTrackingSink::new(mock);
 
-        assert!(sink
-            .handle_event(Event::StartDocument {
+        send(
+            &mut sink,
+            Event::StartDocument {
                 id: None,
                 language: None,
                 metadata: None,
-            })
-            .is_ok());
-        assert!(sink.handle_event(Event::EndDocument).is_ok());
+            },
+        );
+        send(&mut sink, Event::EndDocument);
 
         let result = sink.handle_event(Event::StartDocument {
             id: None,
             language: None,
             metadata: None,
         });
-        assert!(result.is_err());
-        let err_str = format!("{result:?}");
-        assert!(err_str.contains("StartDocument received after document already finished"));
+        assert_invalid_sequence(
+            &result,
+            "end of stream",
+            "StartDocument",
+            "StartDocument received after document already finished",
+        );
     }
 
     #[test]
@@ -465,22 +492,26 @@ mod tests {
         let mock = MockSink::new();
         let mut sink = StackTrackingSink::new(mock);
 
-        assert!(sink
-            .handle_event(Event::StartDocument {
+        send(
+            &mut sink,
+            Event::StartDocument {
                 id: None,
                 language: None,
                 metadata: None,
-            })
-            .is_ok());
-        assert!(sink.handle_event(Event::EndDocument).is_ok());
+            },
+        );
+        send(&mut sink, Event::EndDocument);
 
         let result = sink.handle_event(Event::Text {
             content: "orphan".to_string(),
             style: TextStyle::default(),
         });
-        assert!(result.is_err());
-        let err_str = format!("{result:?}");
-        assert!(err_str.contains("event received after document already finished"));
+        assert_invalid_sequence(
+            &result,
+            "end of stream",
+            "Text { content: \"orphan\", style: TextStyle { bold: false, code: false, italic: false, mark: None, strikethrough: false, subscript: false, superscript: false, underline: false } }",
+            "event received after document already finished",
+        );
     }
 
     #[test]
@@ -488,35 +519,41 @@ mod tests {
         let mock = MockSink::new();
         let mut sink = StackTrackingSink::new(mock);
 
-        assert!(sink
-            .handle_event(Event::StartDocument {
+        send(
+            &mut sink,
+            Event::StartDocument {
                 id: None,
                 language: None,
                 metadata: None,
-            })
-            .is_ok());
-        assert!(sink
-            .handle_event(Event::StartParagraph {
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartParagraph {
                 alignment: None,
                 id: None,
-            })
-            .is_ok());
-        assert!(sink
-            .handle_event(Event::StartLink {
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartLink {
                 href: "https://example.com".to_string(),
                 id: None,
                 title: None,
-            })
-            .is_ok());
+            },
+        );
 
         let result = sink.handle_event(Event::StartLink {
             href: "https://nested.com".to_string(),
             id: None,
             title: None,
         });
-        assert!(result.is_err());
-        let err_str = format!("{result:?}");
-        assert!(err_str.contains("StartLink received while another link is already open"));
+        assert_invalid_sequence(
+            &result,
+            "no nested links",
+            "StartLink",
+            "StartLink received while another link is already open",
+        );
     }
 
     #[test]

@@ -4,7 +4,7 @@
 mod helpers {
     #![allow(clippy::single_call_fn)]
 
-    use docspec_core::{Event, ListStyleType};
+    use docspec_core::{Event, ImageSource, ListStyleType, TableHeaderScope, TextStyle};
 
     /// Returns a `StartDocument` event with all optional fields set to `None`.
     /// Use in tests that do not exercise document-level metadata.
@@ -13,6 +13,35 @@ mod helpers {
             id: None,
             language: None,
             metadata: None,
+        }
+    }
+
+    /// Returns a `StartParagraph` event with no alignment or id.
+    pub fn start_paragraph() -> Event {
+        Event::StartParagraph {
+            alignment: None,
+            id: None,
+        }
+    }
+
+    /// Returns a `StartHeading` event with no id.
+    pub fn start_heading(level: u8) -> Event {
+        Event::StartHeading { level, id: None }
+    }
+
+    /// Returns a text event with exact content and style.
+    pub fn text(content: &str, style: TextStyle) -> Event {
+        Event::Text {
+            content: content.to_string(),
+            style,
+        }
+    }
+
+    /// Returns a `StartPreformatted` event with no id.
+    pub fn start_preformatted(syntax: Option<&str>) -> Event {
+        Event::StartPreformatted {
+            syntax: syntax.map(str::to_string),
+            id: None,
         }
     }
 
@@ -26,6 +55,26 @@ mod helpers {
         Event::StartTableRow { id: None }
     }
 
+    /// Returns a `StartTableHeader` event with column scope and no id.
+    pub fn start_table_header() -> Event {
+        Event::StartTableHeader {
+            abbr: None,
+            colspan: None,
+            rowspan: None,
+            scope: Some(TableHeaderScope::Column),
+            id: None,
+        }
+    }
+
+    /// Returns a `StartTableCell` event with default spans and no id.
+    pub fn start_table_cell() -> Event {
+        Event::StartTableCell {
+            colspan: None,
+            rowspan: None,
+            id: None,
+        }
+    }
+
     /// Returns a `StartUnorderedListItem` event with `Disc` style at the given level and no id.
     pub fn start_unordered_list_item(level: u32) -> Event {
         Event::StartUnorderedListItem {
@@ -35,54 +84,26 @@ mod helpers {
         }
     }
 
-    /// Maps a `DocSpec` event to a short type-name string for use in
-    /// document-structure assertions. Returns `"Other"` for any variant not
-    /// explicitly listed (including future variants added to `docspec_core::Event`).
-    pub fn event_type_name(e: &Event) -> &'static str {
-        match e {
-            Event::StartDocument { .. } => "StartDocument",
-            Event::EndDocument => "EndDocument",
-            Event::StartHeading { level: 1, .. } => "StartHeading(1)",
-            Event::StartHeading { level: 2, .. } => "StartHeading(2)",
-            Event::EndHeading => "EndHeading",
-            Event::StartParagraph { .. } => "StartParagraph",
-            Event::EndParagraph => "EndParagraph",
-            Event::Text { .. } => "Text",
-            Event::EndBlockQuote
-            | Event::EndCaption
-            | Event::EndDefinitionDetail
-            | Event::EndDefinitionList
-            | Event::EndDefinitionTerm
-            | Event::EndFootnote
-            | Event::EndLink
-            | Event::EndOrderedListItem
-            | Event::EndUnorderedListItem
-            | Event::EndPreformatted
-            | Event::EndTable
-            | Event::EndTableCell
-            | Event::EndTableHeader
-            | Event::EndTableRow
-            | Event::FootnoteRef { .. }
-            | Event::Image { .. }
-            | Event::LineBreak
-            | Event::SoftBreak
-            | Event::StartBlockQuote { .. }
-            | Event::StartCaption { .. }
-            | Event::StartDefinitionDetail { .. }
-            | Event::StartDefinitionList { .. }
-            | Event::StartDefinitionTerm { .. }
-            | Event::StartFootnote { .. }
-            | Event::StartHeading { .. }
-            | Event::StartLink { .. }
-            | Event::StartOrderedListItem { .. }
-            | Event::StartUnorderedListItem { .. }
-            | Event::StartPreformatted { .. }
-            | Event::StartTable { .. }
-            | Event::StartTableCell { .. }
-            | Event::StartTableHeader { .. }
-            | Event::StartTableRow { .. }
-            | Event::ThematicBreak { .. }
-            | _ => "Other",
+    /// Returns a `StartOrderedListItem` event with `Decimal` style at the given level and no id.
+    pub fn start_ordered_list_item(level: u32, start: Option<u64>) -> Event {
+        Event::StartOrderedListItem {
+            start,
+            style_type: ListStyleType::Decimal,
+            level,
+            id: None,
+        }
+    }
+
+    /// Returns an image event for a URI with no id.
+    pub fn image_uri(uri: &str, alt: Option<&str>, title: Option<&str>, decorative: bool) -> Event {
+        Event::Image {
+            source: ImageSource::Uri {
+                uri: uri.to_string(),
+            },
+            alt: alt.map(str::to_string),
+            title: title.map(str::to_string),
+            decorative,
+            id: None,
         }
     }
 }
@@ -90,9 +111,7 @@ mod helpers {
 #[cfg(test)]
 mod tests {
     use super::helpers;
-    use docspec_core::{
-        Event, EventSource as _, ImageSource, ListStyleType, TableHeaderScope, TextStyle,
-    };
+    use docspec_core::{Event, EventSource as _, ImageSource, ListStyleType, TextStyle};
     use docspec_markdown_reader::MarkdownReader;
 
     fn collect_events(reader: &mut MarkdownReader<'_>) -> Vec<Event> {
@@ -100,9 +119,9 @@ mod tests {
         loop {
             let result = reader.next_event();
             assert!(result.is_ok(), "next_event failed: {:?}", result.err());
-            match result.unwrap_or_default() {
-                Some(event) => events.push(event),
-                None => break,
+            match result {
+                Ok(Some(event)) => events.push(event),
+                Ok(None) | Err(_) => break,
             }
         }
         events
@@ -114,15 +133,24 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(events
-            .iter()
-            .any(|e| matches!(e, Event::StartBlockQuote { .. })));
-        assert!(events.iter().any(|e| matches!(e, Event::EndBlockQuote)));
-
-        let has_quoted = events
-            .iter()
-            .any(|e| matches!(e, Event::Text { content, .. } if content.contains("Quoted")));
-        assert!(has_quoted);
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                Event::StartBlockQuote { id: None },
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::Text {
+                    content: "Quoted text".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::EndParagraph,
+                Event::EndBlockQuote,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -130,23 +158,16 @@ mod tests {
         let mut reader = MarkdownReader::new("***both***");
         let events = collect_events(&mut reader);
 
-        let text_event = events.iter().find(|e| {
-            matches!(
-                e,
-                Event::Text {
-                    style: TextStyle {
-                        bold: true,
-                        italic: true,
-                        ..
-                    },
-                    ..
-                }
-            )
-        });
-        assert!(matches!(
-            text_event,
-            Some(Event::Text { content, style: TextStyle { bold: true, italic: true, .. }, .. }) if content == "both"
-        ));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("both", TextStyle::default().bold().italic()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -154,19 +175,16 @@ mod tests {
         let mut reader = MarkdownReader::new("**bold**");
         let events = collect_events(&mut reader);
 
-        let text_event = events.iter().find(|e| {
-            matches!(
-                e,
-                Event::Text {
-                    style: TextStyle { bold: true, .. },
-                    ..
-                }
-            )
-        });
-        assert!(matches!(
-            text_event,
-            Some(Event::Text { content, style: TextStyle { bold: true, italic: false, .. }, .. }) if content == "bold"
-        ));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("bold", TextStyle::default().bold()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -175,23 +193,21 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        let event_types: Vec<&str> = events.iter().map(helpers::event_type_name).collect();
-
         assert_eq!(
-            event_types,
+            events,
             vec![
-                "StartDocument",
-                "StartHeading(1)",
-                "Text",
-                "EndHeading",
-                "StartParagraph",
-                "Text",
-                "EndParagraph",
-                "Other",
-                "StartHeading(2)",
-                "Text",
-                "EndHeading",
-                "EndDocument"
+                helpers::start_document(),
+                helpers::start_heading(1),
+                helpers::text("Title", TextStyle::default()),
+                Event::EndHeading,
+                helpers::start_paragraph(),
+                helpers::text("Paragraph text.", TextStyle::default()),
+                Event::EndParagraph,
+                Event::ThematicBreak { id: None },
+                helpers::start_heading(2),
+                helpers::text("Subtitle", TextStyle::default()),
+                Event::EndHeading,
+                Event::EndDocument,
             ]
         );
     }
@@ -201,9 +217,7 @@ mod tests {
         let mut reader = MarkdownReader::new("");
         let events = collect_events(&mut reader);
 
-        assert_eq!(events.len(), 2);
-        assert_eq!(events.first(), Some(&helpers::start_document()));
-        assert!(matches!(events.get(1), Some(Event::EndDocument)));
+        assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
     }
 
     #[test]
@@ -211,7 +225,18 @@ mod tests {
         let mut reader = MarkdownReader::new("Line one  \nLine two");
         let events = collect_events(&mut reader);
 
-        assert!(events.iter().any(|e| matches!(e, Event::LineBreak)));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("Line one", TextStyle::default()),
+                Event::LineBreak,
+                helpers::text("Line two", TextStyle::default()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -219,17 +244,16 @@ mod tests {
         let mut reader = MarkdownReader::new("# Hello");
         let events = collect_events(&mut reader);
 
-        assert_eq!(events.first(), Some(&helpers::start_document()));
-        assert!(matches!(
-            events.get(1),
-            Some(Event::StartHeading { level: 1, .. })
-        ));
-        assert!(matches!(
-            events.get(2),
-            Some(Event::Text { content, style: TextStyle { bold: false, italic: false, .. }, .. }) if content == "Hello"
-        ));
-        assert!(matches!(events.get(3), Some(Event::EndHeading)));
-        assert!(matches!(events.get(4), Some(Event::EndDocument)));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_heading(1),
+                helpers::text("Hello", TextStyle::default()),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -240,10 +264,16 @@ mod tests {
             let mut reader = MarkdownReader::new(&markdown);
             let events = collect_events(&mut reader);
 
-            assert!(matches!(
-                events.get(1),
-                Some(Event::StartHeading { level, .. }) if *level == expected
-            ));
+            assert_eq!(
+                events,
+                vec![
+                    helpers::start_document(),
+                    helpers::start_heading(expected),
+                    helpers::text("Heading", TextStyle::default()),
+                    Event::EndHeading,
+                    Event::EndDocument,
+                ]
+            );
         }
     }
 
@@ -253,19 +283,21 @@ mod tests {
             MarkdownReader::new("![Alt text](https://example.com/img.png \"Image Title\")");
         let events = collect_events(&mut reader);
 
-        let image_event = events.iter().find(|e| matches!(e, Event::Image { .. }));
-        assert!(matches!(
-            image_event,
-            Some(Event::Image {
-                source: ImageSource::Uri { uri },
-                alt: Some(alt),
-                title: Some(title),
-                decorative: false,
-                ..
-            }) if uri == "https://example.com/img.png"
-                && alt == "Alt text"
-                && title == "Image Title"
-        ));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::image_uri(
+                    "https://example.com/img.png",
+                    Some("Alt text"),
+                    Some("Image Title"),
+                    false,
+                ),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -273,11 +305,21 @@ mod tests {
         let mut reader = MarkdownReader::new("![Alt text only](https://example.com/img.png)");
         let events = collect_events(&mut reader);
 
-        let image_event = events.iter().find(|e| matches!(e, Event::Image { .. }));
-        assert!(matches!(
-            image_event,
-            Some(Event::Image { alt: Some(alt), title: None, .. }) if alt == "Alt text only"
-        ));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::image_uri(
+                    "https://example.com/img.png",
+                    Some("Alt text only"),
+                    None,
+                    false,
+                ),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -285,15 +327,16 @@ mod tests {
         let mut reader = MarkdownReader::new("![](https://example.com/img.png)");
         let events = collect_events(&mut reader);
 
-        let image_event = events.iter().find(|e| matches!(e, Event::Image { .. }));
-        assert!(matches!(
-            image_event,
-            Some(Event::Image {
-                alt: None,
-                decorative: true,
-                ..
-            })
-        ));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::image_uri("https://example.com/img.png", None, None, true),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -302,29 +345,32 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        let images: Vec<_> = events
-            .iter()
-            .filter(|e| matches!(e, Event::Image { .. }))
-            .collect();
-        assert_eq!(images.len(), 3);
-
-        assert!(matches!(
-            images.first(),
-            Some(Event::Image { alt: Some(alt), title: Some(title), .. })
-            if alt == "Alt text with title" && title == "Image Title"
-        ));
-        assert!(matches!(
-            images.get(1),
-            Some(Event::Image { alt: Some(alt), title: None, .. }) if alt == "Alt text only"
-        ));
-        assert!(matches!(
-            images.get(2),
-            Some(Event::Image {
-                alt: None,
-                decorative: true,
-                ..
-            })
-        ));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::image_uri(
+                    "https://example.com/image1.png",
+                    Some("Alt text with title"),
+                    Some("Image Title"),
+                    false,
+                ),
+                Event::EndParagraph,
+                helpers::start_paragraph(),
+                helpers::image_uri(
+                    "https://example.com/image2.png",
+                    Some("Alt text only"),
+                    None,
+                    false,
+                ),
+                Event::EndParagraph,
+                helpers::start_paragraph(),
+                helpers::image_uri("https://example.com/image3.png", None, None, true),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -332,19 +378,18 @@ mod tests {
         let mut reader = MarkdownReader::new("Use `code` here");
         let events = collect_events(&mut reader);
 
-        let code_event = events.iter().find(|e| {
-            matches!(
-                e,
-                Event::Text {
-                    style: TextStyle { code: true, .. },
-                    ..
-                }
-            )
-        });
-        assert!(matches!(
-            code_event,
-            Some(Event::Text { content, style: TextStyle { code: true, .. }, .. }) if content == "code"
-        ));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("Use ", TextStyle::default()),
+                helpers::text("code", TextStyle::default().code()),
+                helpers::text(" here", TextStyle::default()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -352,25 +397,17 @@ mod tests {
         let mut reader = MarkdownReader::new("**bold `code` bold**");
         let events = collect_events(&mut reader);
 
-        let code_event = events.iter().find(|e| {
-            matches!(
-                e,
-                Event::Text {
-                    style: TextStyle { code: true, .. },
-                    ..
-                }
-            )
-        });
-        assert!(
-            matches!(
-                code_event,
-                Some(Event::Text {
-                    content,
-                    style: TextStyle { code: true, bold: true, .. },
-                    ..
-                }) if content == "code"
-            ),
-            "Code inside bold should inherit bold formatting"
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("bold ", TextStyle::default().bold()),
+                helpers::text("code", TextStyle::default().bold().code()),
+                helpers::text(" bold", TextStyle::default().bold()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
         );
     }
 
@@ -379,25 +416,17 @@ mod tests {
         let mut reader = MarkdownReader::new("*italic `code` italic*");
         let events = collect_events(&mut reader);
 
-        let code_event = events.iter().find(|e| {
-            matches!(
-                e,
-                Event::Text {
-                    style: TextStyle { code: true, .. },
-                    ..
-                }
-            )
-        });
-        assert!(
-            matches!(
-                code_event,
-                Some(Event::Text {
-                    content,
-                    style: TextStyle { code: true, italic: true, .. },
-                    ..
-                }) if content == "code"
-            ),
-            "Code inside italic should inherit italic formatting"
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("italic ", TextStyle::default().italic()),
+                helpers::text("code", TextStyle::default().italic().code()),
+                helpers::text(" italic", TextStyle::default().italic()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
         );
     }
 
@@ -406,25 +435,17 @@ mod tests {
         let mut reader = MarkdownReader::new("~~strikethrough `code` strikethrough~~");
         let events = collect_events(&mut reader);
 
-        let code_event = events.iter().find(|e| {
-            matches!(
-                e,
-                Event::Text {
-                    style: TextStyle { code: true, .. },
-                    ..
-                }
-            )
-        });
-        assert!(
-            matches!(
-                code_event,
-                Some(Event::Text {
-                    content,
-                    style: TextStyle { code: true, strikethrough: true, .. },
-                    ..
-                }) if content == "code"
-            ),
-            "Code inside strikethrough should inherit strikethrough formatting"
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("strikethrough ", TextStyle::default().strikethrough()),
+                helpers::text("code", TextStyle::default().strikethrough().code()),
+                helpers::text(" strikethrough", TextStyle::default().strikethrough()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
         );
     }
 
@@ -433,19 +454,16 @@ mod tests {
         let mut reader = MarkdownReader::new("*italic*");
         let events = collect_events(&mut reader);
 
-        let text_event = events.iter().find(|e| {
-            matches!(
-                e,
-                Event::Text {
-                    style: TextStyle { italic: true, .. },
-                    ..
-                }
-            )
-        });
-        assert!(matches!(
-            text_event,
-            Some(Event::Text { content, style: TextStyle { bold: false, italic: true, .. }, .. }) if content == "italic"
-        ));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("italic", TextStyle::default().italic()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -454,22 +472,25 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(events
-            .iter()
-            .any(|e| matches!(e, Event::StartUnorderedListItem { .. })));
-        assert!(events
-            .iter()
-            .any(|e| matches!(e, Event::EndUnorderedListItem)));
-
-        let has_item_one = events
-            .iter()
-            .any(|e| matches!(e, Event::Text { content, .. } if content.contains("Item one")));
-        let has_item_two = events
-            .iter()
-            .any(|e| matches!(e, Event::Text { content, .. } if content.contains("Item two")));
-
-        assert!(has_item_one);
-        assert!(has_item_two);
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_unordered_list_item(0),
+                Event::Text {
+                    content: "Item one".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::EndUnorderedListItem,
+                helpers::start_unordered_list_item(0),
+                Event::Text {
+                    content: "Item two".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::EndUnorderedListItem,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -478,10 +499,20 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        let has_paragraph_text = events.iter().any(
-                |e| matches!(e, Event::Text { content, .. } if content.contains("paragraph") && content.contains("table")),
-            );
-        assert!(has_paragraph_text);
+        let text_contents: Vec<&str> = events
+            .iter()
+            .filter_map(|event| {
+                if let Event::Text { content, .. } = event {
+                    Some(content.as_str())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(
+            text_contents,
+            vec!["Header", "This paragraph is inside a table cell."]
+        );
     }
 
     #[test]
@@ -491,24 +522,15 @@ mod tests {
         );
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
-            events.get(1),
-            Some(Event::StartUnorderedListItem { level: 0, .. })
-        ));
-        assert!(matches!(events.get(2), Some(Event::StartParagraph { .. })));
-        assert!(matches!(events.get(4), Some(Event::EndParagraph)));
-        assert!(matches!(
-            events.get(5),
-            Some(Event::StartUnorderedListItem { level: 1, .. })
-        ));
-        assert!(matches!(events.get(7), Some(Event::EndUnorderedListItem)));
-        assert!(matches!(events.get(8), Some(Event::StartParagraph { .. })));
-        assert!(matches!(events.get(10), Some(Event::EndParagraph)));
-        assert!(matches!(events.get(11), Some(Event::EndUnorderedListItem)));
-        assert!(matches!(
-            events.get(12),
-            Some(Event::StartUnorderedListItem { level: 0, .. })
-        ));
+        assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
+        assert_eq!(events.get(2), Some(&helpers::start_paragraph()));
+        assert_eq!(events.get(4), Some(&Event::EndParagraph));
+        assert_eq!(events.get(5), Some(&helpers::start_unordered_list_item(1)));
+        assert_eq!(events.get(7), Some(&Event::EndUnorderedListItem));
+        assert_eq!(events.get(8), Some(&helpers::start_paragraph()));
+        assert_eq!(events.get(10), Some(&Event::EndParagraph));
+        assert_eq!(events.get(11), Some(&Event::EndUnorderedListItem));
+        assert_eq!(events.get(12), Some(&helpers::start_unordered_list_item(0)));
         assert_eq!(events.len(), 18);
     }
 
@@ -519,8 +541,18 @@ mod tests {
 
         assert_eq!(events.len(), 2);
 
-        assert!(matches!(reader.next_event(), Ok(None)));
-        assert!(matches!(reader.next_event(), Ok(None)));
+        let first_after_end = reader.next_event();
+        assert!(
+            first_after_end.is_ok(),
+            "next_event failed: {first_after_end:?}"
+        );
+        assert_eq!(first_after_end.unwrap(), None);
+        let second_after_end = reader.next_event();
+        assert!(
+            second_after_end.is_ok(),
+            "next_event failed: {second_after_end:?}"
+        );
+        assert_eq!(second_after_end.unwrap(), None);
     }
 
     #[test]
@@ -528,18 +560,16 @@ mod tests {
         let mut reader = MarkdownReader::new("Hello world");
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
-            events.get(1),
-            Some(Event::StartParagraph {
-                alignment: None,
-                ..
-            })
-        ));
-        assert!(matches!(
-            events.get(2),
-            Some(Event::Text { content, .. }) if content == "Hello world"
-        ));
-        assert!(matches!(events.get(3), Some(Event::EndParagraph)));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("Hello world", TextStyle::default()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -551,19 +581,10 @@ mod tests {
             events,
             vec![
                 helpers::start_document(),
-                Event::StartParagraph {
-                    alignment: None,
-                    id: None
-                },
-                Event::Text {
-                    content: "Line one".to_string(),
-                    style: TextStyle::default(),
-                },
+                helpers::start_paragraph(),
+                helpers::text("Line one", TextStyle::default()),
                 Event::SoftBreak,
-                Event::Text {
-                    content: "Line two".to_string(),
-                    style: TextStyle::default(),
-                },
+                helpers::text("Line two", TextStyle::default()),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -572,34 +593,22 @@ mod tests {
 
     #[test]
     fn soft_break_in_image_alt_appends_space() {
+        // The image alt text flattens the soft break to a single space.
+        // No SoftBreak event is emitted — the soft break is absorbed
+        // into the image's alt buffer.
         let mut reader = MarkdownReader::new("![alt one\nalt two](image.png)");
         let events = collect_events(&mut reader);
 
-        // The image alt text flattens the soft break to a single space.
-        // No SoftBreak event should be emitted — the soft break is absorbed
-        // into the image's alt buffer.
-        let image_count = events
-            .iter()
-            .filter(|e| matches!(e, Event::Image { .. }))
-            .count();
-        assert_eq!(image_count, 1, "exactly one Image event expected");
-
-        let soft_break_count = events
-            .iter()
-            .filter(|e| matches!(e, Event::SoftBreak))
-            .count();
         assert_eq!(
-            soft_break_count, 0,
-            "no SoftBreak event should be emitted inside image alt"
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::image_uri("image.png", Some("alt one alt two"), None, false),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
         );
-
-        let image_alt = events.iter().find_map(|e| {
-            let Event::Image { alt: Some(a), .. } = e else {
-                return None;
-            };
-            Some(a.clone())
-        });
-        assert_eq!(image_alt, Some("alt one alt two".to_string()));
     }
 
     #[test]
@@ -607,9 +616,20 @@ mod tests {
         let mut reader = MarkdownReader::new("Before\n\n---\n\nAfter");
         let events = collect_events(&mut reader);
 
-        assert!(events
-            .iter()
-            .any(|e| matches!(e, Event::ThematicBreak { .. })));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("Before", TextStyle::default()),
+                Event::EndParagraph,
+                Event::ThematicBreak { id: None },
+                helpers::start_paragraph(),
+                helpers::text("After", TextStyle::default()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -617,11 +637,16 @@ mod tests {
         let mut reader = MarkdownReader::new("![`code`](https://example.com/img.png)");
         let events = collect_events(&mut reader);
 
-        let image_event = events.iter().find(|e| matches!(e, Event::Image { .. }));
-        assert!(matches!(
-            image_event,
-            Some(Event::Image { alt: Some(alt), .. }) if alt == "code"
-        ));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::image_uri("https://example.com/img.png", Some("code"), None, false),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -629,8 +654,7 @@ mod tests {
         let mut reader = MarkdownReader::new("<div>hello</div>");
         let events = collect_events(&mut reader);
 
-        assert!(matches!(events.first(), Some(Event::StartDocument { .. })));
-        assert!(matches!(events.last(), Some(Event::EndDocument)));
+        assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
     }
 
     #[test]
@@ -639,10 +663,18 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(events
-            .iter()
-            .any(|e| matches!(e, Event::StartParagraph { .. })));
-        assert!(events.iter().any(|e| matches!(e, Event::EndParagraph)));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                Event::StartBlockQuote { id: None },
+                helpers::start_paragraph(),
+                helpers::text("Quoted", TextStyle::default()),
+                Event::EndParagraph,
+                Event::EndBlockQuote,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -651,15 +683,16 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
-            events.get(1),
-            Some(Event::StartUnorderedListItem { level: 0, .. })
-        ));
-        assert!(matches!(
-            events.get(2),
-            Some(Event::Text { content, .. }) if content == "Item"
-        ));
-        assert!(matches!(events.get(3), Some(Event::EndUnorderedListItem)));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_unordered_list_item(0),
+                helpers::text("Item", TextStyle::default()),
+                Event::EndUnorderedListItem,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -668,19 +701,16 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(events.iter().any(|e| matches!(
-            e,
-            Event::StartPreformatted {
-                syntax: Some(lang),
-                ..
-            } if lang == "rust"
-        )));
-        assert!(events.iter().any(|e| matches!(e, Event::EndPreformatted)));
-
-        let has_content = events
-            .iter()
-            .any(|e| matches!(e, Event::Text { content, .. } if content.contains("fn main")));
-        assert!(has_content);
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_preformatted(Some("rust")),
+                helpers::text("fn main() {}", TextStyle::default().code()),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -689,10 +719,16 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(events
-            .iter()
-            .any(|e| matches!(e, Event::StartPreformatted { syntax: None, .. })));
-        assert!(events.iter().any(|e| matches!(e, Event::EndPreformatted)));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_preformatted(None),
+                helpers::text("some code", TextStyle::default().code()),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -701,15 +737,16 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(events
-            .iter()
-            .any(|e| matches!(e, Event::StartPreformatted { syntax: None, .. })));
-        assert!(events.iter().any(|e| matches!(e, Event::EndPreformatted)));
-
-        let has_content = events
-            .iter()
-            .any(|e| matches!(e, Event::Text { content, .. } if content.contains("indented")));
-        assert!(has_content);
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_preformatted(None),
+                helpers::text("indented code", TextStyle::default().code()),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -721,21 +758,18 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        // Find the text event inside the code block
-        let text_event = events.iter().find(|e| {
-            matches!(
-                e,
-                Event::Text { content, style: TextStyle { code: true, .. }, .. } if content.contains("code")
-            )
-        });
-
-        // The content should preserve the blank lines (two newlines after "code")
-        // Only the parser-added terminator should be removed
-        // Use exact equality to catch regressions
-        assert!(matches!(
-            text_event,
-            Some(Event::Text { content, .. }) if content == "code\n\n"
-        ));
+        // The content should preserve the blank lines (two newlines after "code").
+        // Only the parser-added terminator should be removed.
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_preformatted(None),
+                helpers::text("code\n\n", TextStyle::default().code()),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -743,22 +777,16 @@ mod tests {
         let mut reader = MarkdownReader::new("~~struck~~");
         let events = collect_events(&mut reader);
 
-        let text_event = events.iter().find(|e| {
-            matches!(
-                e,
-                Event::Text {
-                    style: TextStyle {
-                        strikethrough: true,
-                        ..
-                    },
-                    ..
-                }
-            )
-        });
-        assert!(matches!(
-            text_event,
-            Some(Event::Text { content, style: TextStyle { strikethrough: true, .. }, .. }) if content == "struck"
-        ));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("struck", TextStyle::default().strikethrough()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -766,23 +794,16 @@ mod tests {
         let mut reader = MarkdownReader::new("~~**bold struck**~~");
         let events = collect_events(&mut reader);
 
-        let text_event = events.iter().find(|e| {
-            matches!(
-                e,
-                Event::Text {
-                    style: TextStyle {
-                        bold: true,
-                        strikethrough: true,
-                        ..
-                    },
-                    ..
-                }
-            )
-        });
-        assert!(matches!(
-            text_event,
-            Some(Event::Text { content, style: TextStyle { bold: true, strikethrough: true, .. }, .. }) if content == "bold struck"
-        ));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("bold struck", TextStyle::default().bold().strikethrough()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -790,23 +811,19 @@ mod tests {
         let mut reader = MarkdownReader::new("~~*italic struck*~~");
         let events = collect_events(&mut reader);
 
-        let text_event = events.iter().find(|e| {
-            matches!(
-                e,
-                Event::Text {
-                    style: TextStyle {
-                        italic: true,
-                        strikethrough: true,
-                        ..
-                    },
-                    ..
-                }
-            )
-        });
-        assert!(matches!(
-            text_event,
-            Some(Event::Text { content, style: TextStyle { italic: true, strikethrough: true, .. }, .. }) if content == "italic struck"
-        ));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text(
+                    "italic struck",
+                    TextStyle::default().italic().strikethrough()
+                ),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -815,19 +832,17 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(events
-            .iter()
-            .any(|e| matches!(e, Event::StartParagraph { .. })));
-
-        let struck_text = events.iter().find(|e| {
-            matches!(
-                e,
-                Event::Text { content, style: TextStyle { strikethrough: true, .. }, .. } if content == "struck"
-            )
-        });
-        assert!(
-            struck_text.is_some(),
-            "Should find strikethrough text in paragraph"
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("This is ", TextStyle::default()),
+                helpers::text("struck", TextStyle::default().strikethrough()),
+                helpers::text(" text in a paragraph.", TextStyle::default()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
         );
     }
 
@@ -836,24 +851,19 @@ mod tests {
         let mut reader = MarkdownReader::new("~~***bold italic struck***~~");
         let events = collect_events(&mut reader);
 
-        let text_event = events.iter().find(|e| {
-            matches!(
-                e,
-                Event::Text {
-                    style: TextStyle {
-                        bold: true,
-                        italic: true,
-                        strikethrough: true,
-                        ..
-                    },
-                    ..
-                }
-            )
-        });
-        assert!(matches!(
-            text_event,
-            Some(Event::Text { content, style: TextStyle { bold: true, italic: true, strikethrough: true, .. }, .. }) if content == "bold italic struck"
-        ));
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text(
+                    "bold italic struck",
+                    TextStyle::default().bold().italic().strikethrough(),
+                ),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -864,13 +874,10 @@ mod tests {
 
         assert_eq!(events.get(1), Some(&helpers::start_table()));
         assert_eq!(events.get(2), Some(&helpers::start_table_row()));
-        assert!(matches!(
-            events.get(3),
-            Some(Event::StartTableHeader { .. })
-        ));
-        assert!(matches!(events.get(9), Some(Event::EndTableRow)));
+        assert_eq!(events.get(3), Some(&helpers::start_table_header()));
+        assert_eq!(events.get(9), Some(&Event::EndTableRow));
         assert_eq!(events.get(10), Some(&helpers::start_table_row()));
-        assert!(matches!(events.get(18), Some(Event::EndTable)));
+        assert_eq!(events.get(18), Some(&Event::EndTable));
     }
 
     #[test]
@@ -879,20 +886,8 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
-            events.get(3),
-            Some(Event::StartTableHeader {
-                scope: Some(TableHeaderScope::Column),
-                ..
-            })
-        ));
-        assert!(matches!(
-            events.get(6),
-            Some(Event::StartTableHeader {
-                scope: Some(TableHeaderScope::Column),
-                ..
-            })
-        ));
+        assert_eq!(events.get(3), Some(&helpers::start_table_header()));
+        assert_eq!(events.get(6), Some(&helpers::start_table_header()));
     }
 
     #[test]
@@ -901,12 +896,9 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
-            events.get(3),
-            Some(Event::StartTableHeader { .. })
-        ));
+        assert_eq!(events.get(3), Some(&helpers::start_table_header()));
         assert_eq!(events.get(7), Some(&helpers::start_table_row()));
-        assert!(matches!(events.get(8), Some(Event::StartTableCell { .. })));
+        assert_eq!(events.get(8), Some(&helpers::start_table_cell()));
     }
 
     #[test]
@@ -915,9 +907,12 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(matches!(events.get(8), Some(Event::StartTableCell { .. })));
-        assert!(matches!(events.get(9), Some(Event::Text { .. })));
-        assert!(matches!(events.get(10), Some(Event::EndTableCell)));
+        assert_eq!(events.get(8), Some(&helpers::start_table_cell()));
+        assert_eq!(
+            events.get(9),
+            Some(&helpers::text("text", TextStyle::default()))
+        );
+        assert_eq!(events.get(10), Some(&Event::EndTableCell));
     }
 
     #[test]
@@ -926,30 +921,18 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
+        assert_eq!(
             events.get(4),
-            Some(Event::Text {
-                content,
-                style: TextStyle { bold: true, .. },
-                ..
-            }) if content == "bold"
-        ));
-        assert!(matches!(
+            Some(&helpers::text("bold", TextStyle::default().bold()))
+        );
+        assert_eq!(
             events.get(7),
-            Some(Event::Text {
-                content,
-                style: TextStyle { code: true, .. },
-                ..
-            }) if content == "code"
-        ));
-        assert!(matches!(
+            Some(&helpers::text("code", TextStyle::default().code()))
+        );
+        assert_eq!(
             events.get(12),
-            Some(Event::Text {
-                content,
-                style: TextStyle { italic: true, .. },
-                ..
-            }) if content == "italic"
-        ));
+            Some(&helpers::text("italic", TextStyle::default().italic()))
+        );
     }
 
     #[test]
@@ -958,11 +941,11 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(matches!(events.get(1), Some(Event::StartTable { .. })));
-        assert!(matches!(events.get(2), Some(Event::StartTableRow { .. })));
-        assert!(matches!(events.get(9), Some(Event::EndTableRow)));
-        assert!(matches!(events.get(10), Some(Event::EndTable)));
-        assert!(matches!(events.get(11), Some(Event::EndDocument)));
+        assert_eq!(events.get(1), Some(&helpers::start_table()));
+        assert_eq!(events.get(2), Some(&helpers::start_table_row()));
+        assert_eq!(events.get(9), Some(&Event::EndTableRow));
+        assert_eq!(events.get(10), Some(&Event::EndTable));
+        assert_eq!(events.get(11), Some(&Event::EndDocument));
     }
 
     #[test]
@@ -971,13 +954,10 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
-            events.get(6),
-            Some(Event::StartTableHeader { .. })
-        ));
-        assert!(matches!(events.get(7), Some(Event::EndTableHeader)));
-        assert!(matches!(events.get(10), Some(Event::StartTableCell { .. })));
-        assert!(matches!(events.get(11), Some(Event::EndTableCell)));
+        assert_eq!(events.get(6), Some(&helpers::start_table_header()));
+        assert_eq!(events.get(7), Some(&Event::EndTableHeader));
+        assert_eq!(events.get(10), Some(&helpers::start_table_cell()));
+        assert_eq!(events.get(11), Some(&Event::EndTableCell));
     }
 
     #[test]
@@ -986,10 +966,10 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        assert!(matches!(events.get(1), Some(Event::StartTable { .. })));
-        assert!(matches!(events.get(12), Some(Event::EndTable)));
-        assert!(matches!(events.get(13), Some(Event::StartTable { .. })));
-        assert!(matches!(events.get(24), Some(Event::EndTable)));
+        assert_eq!(events.get(1), Some(&helpers::start_table()));
+        assert_eq!(events.get(12), Some(&Event::EndTable));
+        assert_eq!(events.get(13), Some(&helpers::start_table()));
+        assert_eq!(events.get(24), Some(&Event::EndTable));
     }
 
     #[test]
@@ -998,18 +978,15 @@ mod tests {
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
-        assert!(matches!(events.get(2), Some(Event::Text { .. })));
-        assert!(matches!(events.get(3), Some(Event::EndUnorderedListItem)));
-        assert!(matches!(
-            events.get(4),
-            Some(Event::StartUnorderedListItem { level: 0, .. })
-        ));
-        assert!(matches!(events.get(6), Some(Event::EndUnorderedListItem)));
-        assert!(matches!(
-            events.get(7),
-            Some(Event::StartUnorderedListItem { level: 0, .. })
-        ));
-        assert!(matches!(events.get(9), Some(Event::EndUnorderedListItem)));
+        assert_eq!(
+            events.get(2),
+            Some(&helpers::text("a", TextStyle::default()))
+        );
+        assert_eq!(events.get(3), Some(&Event::EndUnorderedListItem));
+        assert_eq!(events.get(4), Some(&helpers::start_unordered_list_item(0)));
+        assert_eq!(events.get(6), Some(&Event::EndUnorderedListItem));
+        assert_eq!(events.get(7), Some(&helpers::start_unordered_list_item(0)));
+        assert_eq!(events.get(9), Some(&Event::EndUnorderedListItem));
     }
 
     #[test]
@@ -1017,31 +994,19 @@ mod tests {
         let mut reader = MarkdownReader::new("1. a\n2. b\n3. c");
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
+        assert_eq!(
             events.get(1),
-            Some(Event::StartOrderedListItem {
-                start: Some(1),
-                level: 0,
-                ..
-            })
-        ));
-        assert!(matches!(events.get(3), Some(Event::EndOrderedListItem)));
-        assert!(matches!(
+            Some(&helpers::start_ordered_list_item(0, Some(1)))
+        );
+        assert_eq!(events.get(3), Some(&Event::EndOrderedListItem));
+        assert_eq!(
             events.get(4),
-            Some(Event::StartOrderedListItem {
-                start: None,
-                level: 0,
-                ..
-            })
-        ));
-        assert!(matches!(
+            Some(&helpers::start_ordered_list_item(0, None))
+        );
+        assert_eq!(
             events.get(7),
-            Some(Event::StartOrderedListItem {
-                start: None,
-                level: 0,
-                ..
-            })
-        ));
+            Some(&helpers::start_ordered_list_item(0, None))
+        );
     }
 
     #[test]
@@ -1049,30 +1014,18 @@ mod tests {
         let mut reader = MarkdownReader::new("5. a\n6. b\n7. c");
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
+        assert_eq!(
             events.get(1),
-            Some(Event::StartOrderedListItem {
-                start: Some(5),
-                level: 0,
-                ..
-            })
-        ));
-        assert!(matches!(
+            Some(&helpers::start_ordered_list_item(0, Some(5)))
+        );
+        assert_eq!(
             events.get(4),
-            Some(Event::StartOrderedListItem {
-                start: None,
-                level: 0,
-                ..
-            })
-        ));
-        assert!(matches!(
+            Some(&helpers::start_ordered_list_item(0, None))
+        );
+        assert_eq!(
             events.get(7),
-            Some(Event::StartOrderedListItem {
-                start: None,
-                level: 0,
-                ..
-            })
-        ));
+            Some(&helpers::start_ordered_list_item(0, None))
+        );
     }
 
     #[test]
@@ -1080,13 +1033,7 @@ mod tests {
         let mut reader = MarkdownReader::new("- a");
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
-            events.get(1),
-            Some(Event::StartUnorderedListItem {
-                style_type: ListStyleType::Disc,
-                ..
-            })
-        ));
+        assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
     }
 
     #[test]
@@ -1094,13 +1041,10 @@ mod tests {
         let mut reader = MarkdownReader::new("1. a");
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
+        assert_eq!(
             events.get(1),
-            Some(Event::StartOrderedListItem {
-                style_type: ListStyleType::Decimal,
-                ..
-            })
-        ));
+            Some(&helpers::start_ordered_list_item(0, Some(1)))
+        );
     }
 
     #[test]
@@ -1108,26 +1052,14 @@ mod tests {
         let mut reader = MarkdownReader::new("- A\n  - B\n  - C\n- D");
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
-            events.get(1),
-            Some(Event::StartUnorderedListItem { level: 0, .. })
-        ));
-        assert!(matches!(
-            events.get(3),
-            Some(Event::StartUnorderedListItem { level: 1, .. })
-        ));
-        assert!(matches!(events.get(5), Some(Event::EndUnorderedListItem)));
-        assert!(matches!(
-            events.get(6),
-            Some(Event::StartUnorderedListItem { level: 1, .. })
-        ));
-        assert!(matches!(events.get(8), Some(Event::EndUnorderedListItem)));
-        assert!(matches!(events.get(9), Some(Event::EndUnorderedListItem)));
-        assert!(matches!(
-            events.get(10),
-            Some(Event::StartUnorderedListItem { level: 0, .. })
-        ));
-        assert!(matches!(events.get(12), Some(Event::EndUnorderedListItem)));
+        assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
+        assert_eq!(events.get(3), Some(&helpers::start_unordered_list_item(1)));
+        assert_eq!(events.get(5), Some(&Event::EndUnorderedListItem));
+        assert_eq!(events.get(6), Some(&helpers::start_unordered_list_item(1)));
+        assert_eq!(events.get(8), Some(&Event::EndUnorderedListItem));
+        assert_eq!(events.get(9), Some(&Event::EndUnorderedListItem));
+        assert_eq!(events.get(10), Some(&helpers::start_unordered_list_item(0)));
+        assert_eq!(events.get(12), Some(&Event::EndUnorderedListItem));
     }
 
     #[test]
@@ -1135,34 +1067,20 @@ mod tests {
         let mut reader = MarkdownReader::new("- A\n  1. B\n  2. C\n- D");
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
-            events.get(1),
-            Some(Event::StartUnorderedListItem { level: 0, .. })
-        ));
-        assert!(matches!(
+        assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
+        assert_eq!(
             events.get(3),
-            Some(Event::StartOrderedListItem {
-                start: Some(1),
-                level: 1,
-                ..
-            })
-        ));
-        assert!(matches!(events.get(5), Some(Event::EndOrderedListItem)));
-        assert!(matches!(
+            Some(&helpers::start_ordered_list_item(1, Some(1)))
+        );
+        assert_eq!(events.get(5), Some(&Event::EndOrderedListItem));
+        assert_eq!(
             events.get(6),
-            Some(Event::StartOrderedListItem {
-                start: None,
-                level: 1,
-                ..
-            })
-        ));
-        assert!(matches!(events.get(8), Some(Event::EndOrderedListItem)));
-        assert!(matches!(events.get(9), Some(Event::EndUnorderedListItem)));
-        assert!(matches!(
-            events.get(10),
-            Some(Event::StartUnorderedListItem { level: 0, .. })
-        ));
-        assert!(matches!(events.get(12), Some(Event::EndUnorderedListItem)));
+            Some(&helpers::start_ordered_list_item(1, None))
+        );
+        assert_eq!(events.get(8), Some(&Event::EndOrderedListItem));
+        assert_eq!(events.get(9), Some(&Event::EndUnorderedListItem));
+        assert_eq!(events.get(10), Some(&helpers::start_unordered_list_item(0)));
+        assert_eq!(events.get(12), Some(&Event::EndUnorderedListItem));
     }
 
     #[test]
@@ -1171,28 +1089,19 @@ mod tests {
         let events = collect_events(&mut reader);
 
         // Outer item opens without any text of its own
-        assert!(matches!(
-            events.get(1),
-            Some(Event::StartUnorderedListItem { level: 0, .. })
-        ));
+        assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
         // Nested item opens immediately inside outer item
-        assert!(matches!(
-            events.get(2),
-            Some(Event::StartUnorderedListItem { level: 1, .. })
-        ));
-        assert!(matches!(
+        assert_eq!(events.get(2), Some(&helpers::start_unordered_list_item(1)));
+        assert_eq!(
             events.get(3),
-            Some(Event::Text { content, .. }) if content == "Nested item"
-        ));
-        assert!(matches!(events.get(4), Some(Event::EndUnorderedListItem)));
+            Some(&helpers::text("Nested item", TextStyle::default()))
+        );
+        assert_eq!(events.get(4), Some(&Event::EndUnorderedListItem));
         // Outer item closes after nested
-        assert!(matches!(events.get(5), Some(Event::EndUnorderedListItem)));
+        assert_eq!(events.get(5), Some(&Event::EndUnorderedListItem));
         // Sibling item
-        assert!(matches!(
-            events.get(6),
-            Some(Event::StartUnorderedListItem { level: 0, .. })
-        ));
-        assert!(matches!(events.get(8), Some(Event::EndUnorderedListItem)));
+        assert_eq!(events.get(6), Some(&helpers::start_unordered_list_item(0)));
+        assert_eq!(events.get(8), Some(&Event::EndUnorderedListItem));
         assert_eq!(events.len(), 10);
     }
 
@@ -1201,30 +1110,18 @@ mod tests {
         let mut reader = MarkdownReader::new("- **bold** item\n- *italic* item");
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
-            events.get(1),
-            Some(Event::StartUnorderedListItem { level: 0, .. })
-        ));
-        assert!(matches!(
+        assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
+        assert_eq!(
             events.get(2),
-            Some(Event::Text {
-                style: TextStyle { bold: true, .. },
-                ..
-            })
-        ));
-        assert!(matches!(events.get(4), Some(Event::EndUnorderedListItem)));
-        assert!(matches!(
-            events.get(5),
-            Some(Event::StartUnorderedListItem { level: 0, .. })
-        ));
-        assert!(matches!(
+            Some(&helpers::text("bold", TextStyle::default().bold()))
+        );
+        assert_eq!(events.get(4), Some(&Event::EndUnorderedListItem));
+        assert_eq!(events.get(5), Some(&helpers::start_unordered_list_item(0)));
+        assert_eq!(
             events.get(6),
-            Some(Event::Text {
-                style: TextStyle { italic: true, .. },
-                ..
-            })
-        ));
-        assert!(matches!(events.get(8), Some(Event::EndUnorderedListItem)));
+            Some(&helpers::text("italic", TextStyle::default().italic()))
+        );
+        assert_eq!(events.get(8), Some(&Event::EndUnorderedListItem));
     }
 
     #[test]
@@ -1233,20 +1130,20 @@ mod tests {
         let events = collect_events(&mut reader);
 
         // Continuation paragraph is inside parent item
-        assert!(matches!(events.get(8), Some(Event::StartParagraph { .. })));
-        assert!(matches!(
+        assert_eq!(events.get(8), Some(&helpers::start_paragraph()));
+        assert_eq!(
             events.get(9),
-            Some(Event::Text { content, .. }) if content == "Line one"
-        ));
+            Some(&helpers::text("Line one", TextStyle::default()))
+        );
         // Hard break is inside the continuation paragraph (not orphaned)
-        assert!(matches!(events.get(10), Some(Event::LineBreak)));
-        assert!(matches!(
+        assert_eq!(events.get(10), Some(&Event::LineBreak));
+        assert_eq!(
             events.get(11),
-            Some(Event::Text { content, .. }) if content == "Line two"
-        ));
-        assert!(matches!(events.get(12), Some(Event::EndParagraph)));
+            Some(&helpers::text("Line two", TextStyle::default()))
+        );
+        assert_eq!(events.get(12), Some(&Event::EndParagraph));
         // Parent closes AFTER continuation
-        assert!(matches!(events.get(13), Some(Event::EndUnorderedListItem)));
+        assert_eq!(events.get(13), Some(&Event::EndUnorderedListItem));
         assert_eq!(events.len(), 15);
     }
 
@@ -1255,26 +1152,17 @@ mod tests {
         let mut reader = MarkdownReader::new("- A\n  - B\n    - C\n");
         let events = collect_events(&mut reader);
 
-        assert!(matches!(
-            events.get(1),
-            Some(Event::StartUnorderedListItem { level: 0, .. })
-        ));
-        assert!(matches!(
-            events.get(3),
-            Some(Event::StartUnorderedListItem { level: 1, .. })
-        ));
-        assert!(matches!(
-            events.get(5),
-            Some(Event::StartUnorderedListItem { level: 2, .. })
-        ));
-        assert!(matches!(
+        assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
+        assert_eq!(events.get(3), Some(&helpers::start_unordered_list_item(1)));
+        assert_eq!(events.get(5), Some(&helpers::start_unordered_list_item(2)));
+        assert_eq!(
             events.get(6),
-            Some(Event::Text { content, .. }) if content == "C"
-        ));
+            Some(&helpers::text("C", TextStyle::default()))
+        );
         // All three levels close in reverse order
-        assert!(matches!(events.get(7), Some(Event::EndUnorderedListItem)));
-        assert!(matches!(events.get(8), Some(Event::EndUnorderedListItem)));
-        assert!(matches!(events.get(9), Some(Event::EndUnorderedListItem)));
+        assert_eq!(events.get(7), Some(&Event::EndUnorderedListItem));
+        assert_eq!(events.get(8), Some(&Event::EndUnorderedListItem));
+        assert_eq!(events.get(9), Some(&Event::EndUnorderedListItem));
         assert_eq!(events.len(), 11);
     }
 
@@ -1287,19 +1175,48 @@ mod tests {
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
 
-        let end_blockquote_idx = events
-            .iter()
-            .position(|e| matches!(e, Event::EndBlockQuote))
-            .expect("EndBlockQuote must be present");
-        let end_outer_item_idx = events
-            .iter()
-            .rposition(|e| matches!(e, Event::EndOrderedListItem))
-            .expect("EndOrderedListItem must be present");
-
-        assert!(
-            end_blockquote_idx < end_outer_item_idx,
-            "EndBlockQuote (at {end_blockquote_idx}) must precede outer EndOrderedListItem \
-             (at {end_outer_item_idx}); events: {events:#?}"
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                Event::StartOrderedListItem {
+                    start: Some(5),
+                    style_type: ListStyleType::Decimal,
+                    level: 0,
+                    id: None,
+                },
+                Event::Text {
+                    content: "I2".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::StartBlockQuote { id: None },
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::Text {
+                    content: "text".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::EndParagraph,
+                helpers::start_unordered_list_item(1),
+                Event::Text {
+                    content: "[".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::Text {
+                    content: "f".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::Text {
+                    content: "]".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::EndUnorderedListItem,
+                Event::EndBlockQuote,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
         );
     }
 
@@ -1308,16 +1225,28 @@ mod tests {
         let markdown = "[text](https://example.com)";
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
-        let start_link_pos = events.iter().position(
-            |e| matches!(e, Event::StartLink { href, .. } if href == "https://example.com"),
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartLink {
+                    href: "https://example.com".to_string(),
+                    title: None,
+                    id: None,
+                },
+                Event::Text {
+                    content: "text".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
         );
-        assert!(start_link_pos.is_some(), "StartLink not found");
-        let pos = start_link_pos.unwrap();
-        assert!(
-            matches!(&events[pos], Event::StartLink { href, title, id } if href == "https://example.com" && title.is_none() && id.is_none())
-        );
-        assert!(matches!(&events[pos + 1], Event::Text { content, .. } if content == "text"));
-        assert!(matches!(&events[pos + 2], Event::EndLink));
     }
 
     #[test]
@@ -1325,10 +1254,27 @@ mod tests {
         let markdown = r#"[text](https://example.com "a title")"#;
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
-        let start_link = events.iter().find(|e| matches!(e, Event::StartLink { .. }));
-        assert!(start_link.is_some(), "StartLink not found");
-        assert!(
-            matches!(start_link.unwrap(), Event::StartLink { href, title, .. } if href == "https://example.com" && title.as_deref() == Some("a title"))
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartLink {
+                    href: "https://example.com".to_string(),
+                    title: Some("a title".to_string()),
+                    id: None,
+                },
+                Event::Text {
+                    content: "text".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
         );
     }
 
@@ -1337,14 +1283,23 @@ mod tests {
         let markdown = "[](https://example.com)";
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
-        let start_link_pos = events
-            .iter()
-            .position(|e| matches!(e, Event::StartLink { .. }));
-        assert!(start_link_pos.is_some(), "StartLink not found");
-        let pos = start_link_pos.unwrap();
-        assert!(
-            matches!(&events[pos + 1], Event::EndLink),
-            "Expected EndLink immediately after StartLink for empty link"
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartLink {
+                    href: "https://example.com".to_string(),
+                    title: None,
+                    id: None,
+                },
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
         );
     }
 
@@ -1353,21 +1308,32 @@ mod tests {
         let markdown = "[**bold** text](https://example.com)";
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
-        let start_link_pos = events
-            .iter()
-            .position(|e| matches!(e, Event::StartLink { .. }));
-        assert!(start_link_pos.is_some(), "StartLink not found");
-        let pos = start_link_pos.unwrap();
-        let end_link_pos = events[pos..]
-            .iter()
-            .position(|e| matches!(e, Event::EndLink))
-            .map(|i| i + pos);
-        assert!(end_link_pos.is_some(), "EndLink not found after StartLink");
-        let end_pos = end_link_pos.unwrap();
-        let has_bold = events[pos + 1..end_pos]
-            .iter()
-            .any(|e| matches!(e, Event::Text { style, .. } if style.bold));
-        assert!(has_bold, "Expected bold Text between StartLink and EndLink");
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartLink {
+                    href: "https://example.com".to_string(),
+                    title: None,
+                    id: None,
+                },
+                Event::Text {
+                    content: "bold".to_string(),
+                    style: TextStyle::default().bold(),
+                },
+                Event::Text {
+                    content: " text".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -1375,23 +1341,27 @@ mod tests {
         let markdown = "[`code`](https://example.com)";
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
-        let start_link_pos = events
-            .iter()
-            .position(|e| matches!(e, Event::StartLink { .. }));
-        assert!(start_link_pos.is_some(), "StartLink not found");
-        let pos = start_link_pos.unwrap();
-        let end_link_pos = events[pos..]
-            .iter()
-            .position(|e| matches!(e, Event::EndLink))
-            .map(|i| i + pos);
-        assert!(end_link_pos.is_some(), "EndLink not found");
-        let end_pos = end_link_pos.unwrap();
-        let has_code = events[pos + 1..end_pos].iter().any(
-            |e| matches!(e, Event::Text { content, style, .. } if content == "code" && style.code),
-        );
-        assert!(
-            has_code,
-            "Expected code-styled Text between StartLink and EndLink"
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartLink {
+                    href: "https://example.com".to_string(),
+                    title: None,
+                    id: None,
+                },
+                Event::Text {
+                    content: "code".to_string(),
+                    style: TextStyle::default().code(),
+                },
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
         );
     }
 
@@ -1400,21 +1370,28 @@ mod tests {
         let markdown = "<https://example.com>";
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
-        let start_link_pos = events.iter().position(
-            |e| matches!(e, Event::StartLink { href, .. } if href == "https://example.com"),
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartLink {
+                    href: "https://example.com".to_string(),
+                    title: None,
+                    id: None,
+                },
+                Event::Text {
+                    content: "https://example.com".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
         );
-        assert!(start_link_pos.is_some(), "StartLink not found for autolink");
-        let pos = start_link_pos.unwrap();
-        let end_link_pos = events[pos..]
-            .iter()
-            .position(|e| matches!(e, Event::EndLink))
-            .map(|i| i + pos);
-        assert!(end_link_pos.is_some(), "EndLink not found");
-        let end_pos = end_link_pos.unwrap();
-        let has_url_text = events[pos + 1..end_pos]
-            .iter()
-            .any(|e| matches!(e, Event::Text { content, .. } if content == "https://example.com"));
-        assert!(has_url_text, "Expected URL as Text content inside autolink");
     }
 
     #[test]
@@ -1422,25 +1399,25 @@ mod tests {
         let markdown = "# [text](https://example.com)";
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
-        let heading_pos = events
-            .iter()
-            .position(|e| matches!(e, Event::StartHeading { level: 1, .. }));
-        assert!(heading_pos.is_some(), "StartHeading not found");
-        let h_pos = heading_pos.unwrap();
-        let end_heading_pos = events[h_pos..]
-            .iter()
-            .position(|e| matches!(e, Event::EndHeading))
-            .map(|i| i + h_pos);
-        assert!(end_heading_pos.is_some(), "EndHeading not found");
-        let eh_pos = end_heading_pos.unwrap();
-        let has_link = events[h_pos..eh_pos]
-            .iter()
-            .any(|e| matches!(e, Event::StartLink { .. }));
-        assert!(has_link, "Expected StartLink inside heading");
-        let has_end_link = events[h_pos..eh_pos]
-            .iter()
-            .any(|e| matches!(e, Event::EndLink));
-        assert!(has_end_link, "Expected EndLink inside heading");
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                Event::StartHeading { level: 1, id: None },
+                Event::StartLink {
+                    href: "https://example.com".to_string(),
+                    title: None,
+                    id: None,
+                },
+                Event::Text {
+                    content: "text".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::EndLink,
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -1448,27 +1425,35 @@ mod tests {
         let markdown = "before [link text](https://example.com) after";
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
-        let start_link_pos = events
-            .iter()
-            .position(|e| matches!(e, Event::StartLink { .. }));
-        assert!(start_link_pos.is_some(), "StartLink not found");
-        let pos = start_link_pos.unwrap();
-        assert!(pos > 0, "Expected text before StartLink");
-        assert!(
-            matches!(&events[pos - 1], Event::Text { content, .. } if content.contains("before")),
-            "Expected 'before' text before StartLink"
-        );
-        assert!(
-            matches!(&events[pos + 1], Event::Text { content, .. } if content == "link text"),
-            "Expected link text inside link"
-        );
-        assert!(
-            matches!(&events[pos + 2], Event::EndLink),
-            "Expected EndLink after link text"
-        );
-        assert!(
-            matches!(&events[pos + 3], Event::Text { content, .. } if content.contains("after")),
-            "Expected 'after' text after EndLink"
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::Text {
+                    content: "before ".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::StartLink {
+                    href: "https://example.com".to_string(),
+                    title: None,
+                    id: None,
+                },
+                Event::Text {
+                    content: "link text".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::EndLink,
+                Event::Text {
+                    content: " after".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
         );
     }
 
@@ -1480,26 +1465,32 @@ mod tests {
         let markdown = "[![alt](img.png)](https://example.com)";
         let mut reader = MarkdownReader::new(markdown);
         let events = collect_events(&mut reader);
-        let para_pos = events
-            .iter()
-            .position(|e| matches!(e, Event::StartParagraph { .. }));
-        assert!(para_pos.is_some(), "StartParagraph not found");
-        let p = para_pos.unwrap();
-        assert!(
-            matches!(&events[p + 1], Event::StartLink { href, .. } if href == "https://example.com"),
-            "Expected StartLink after StartParagraph"
-        );
-        assert!(
-            matches!(&events[p + 2], Event::EndLink),
-            "Expected EndLink immediately after StartLink (image-in-link extraction)"
-        );
-        assert!(
-            matches!(&events[p + 3], Event::Image { .. }),
-            "Expected Image event after EndLink"
-        );
-        assert!(
-            matches!(&events[p + 4], Event::EndParagraph),
-            "Expected EndParagraph after Image"
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartLink {
+                    href: "https://example.com".to_string(),
+                    title: None,
+                    id: None,
+                },
+                Event::EndLink,
+                Event::Image {
+                    source: ImageSource::Uri {
+                        uri: "img.png".to_string(),
+                    },
+                    alt: Some("alt".to_string()),
+                    title: None,
+                    decorative: false,
+                    id: None,
+                },
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
         );
     }
 }
