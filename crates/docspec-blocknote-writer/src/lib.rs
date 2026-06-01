@@ -25,7 +25,7 @@
 //! - `StartTableHeader` / `EndTableHeader` — table cells (header, emitted identically to data cells)
 //! - `Text` — inline text content with bold/italic/code/strikethrough/underline styles
 //! - `Image` — image blocks
-//! - `LineBreak` — line breaks within content blocks
+//! - `LineBreak` / `SoftBreak` — line breaks within content blocks
 //! - `ThematicBreak` — divider blocks
 //! - `StartOrderedListItem` / `EndOrderedListItem` — `numberedListItem` blocks with optional `start` prop
 //! - `StartUnorderedListItem` / `EndUnorderedListItem` — `bulletListItem` blocks
@@ -36,7 +36,7 @@
 //! `EVENTS.md` declares that `DocSpec` cells may contain any block element, so this writer
 //! flattens block-level events that appear inside a cell:
 //!
-//! - **Preserved**: [`Text`](docspec_core::Event::Text) (with all inline styles), [`LineBreak`](docspec_core::Event::LineBreak)
+//! - **Preserved**: [`Text`](docspec_core::Event::Text) (with all inline styles), [`LineBreak`](docspec_core::Event::LineBreak), [`SoftBreak`](docspec_core::Event::SoftBreak)
 //! - **Absorbed silently**: [`StartParagraph`](docspec_core::Event::StartParagraph) / [`EndParagraph`](docspec_core::Event::EndParagraph) (paragraph boundaries are dropped — adjacent paragraphs concatenate without separator)
 //! - **Dropped**: [`Image`](docspec_core::Event::Image), [`StartBlockQuote`](docspec_core::Event::StartBlockQuote), [`StartPreformatted`](docspec_core::Event::StartPreformatted), [`StartHeading`](docspec_core::Event::StartHeading), [`ThematicBreak`](docspec_core::Event::ThematicBreak), nested [`StartTable`](docspec_core::Event::StartTable) and their children — silently discarded
 //!
@@ -1016,7 +1016,7 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             Event::Image {
                 source, alt, id, ..
             } => self.handle_image(source, alt, id.as_ref()),
-            Event::LineBreak => self.handle_line_break(),
+            Event::LineBreak | Event::SoftBreak => self.handle_line_break(),
             Event::StartOrderedListItem {
                 id, level, start, ..
             } => self.handle_start_list_item(ListKind::Ordered, id.as_ref(), level, start),

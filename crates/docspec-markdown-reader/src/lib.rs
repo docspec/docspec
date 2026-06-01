@@ -31,7 +31,7 @@
 //! - Strikethrough → `Text { style: TextStyle { strikethrough: true, .. }, .. }`
 //! - Images → `Image { source: Uri, alt, title, decorative }`
 //! - Hard line breaks → `LineBreak`
-//! - Soft line breaks → space `Text`
+//! - Soft line breaks → `SoftBreak`
 //! - Thematic breaks → `ThematicBreak`
 //! - Tables → `StartTable` / `EndTable`, `StartTableRow` / `EndTableRow`,
 //!   `StartTableHeader` / `EndTableHeader`, `StartTableCell` / `EndTableCell`
@@ -602,10 +602,7 @@ impl<'a> MarkdownReader<'a> {
                     img.alt_buf.push(' ');
                 } else {
                     self.emit_pending_link_start();
-                    self.queue.push_back(Event::Text {
-                        content: " ".to_string(),
-                        style: self.current_text_style(),
-                    });
+                    self.queue.push_back(Event::SoftBreak);
                 }
             }
             pulldown_cmark::Event::Rule => {

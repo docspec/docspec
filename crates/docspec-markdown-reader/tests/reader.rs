@@ -65,6 +65,7 @@ mod helpers {
             | Event::FootnoteRef { .. }
             | Event::Image { .. }
             | Event::LineBreak
+            | Event::SoftBreak
             | Event::StartBlockQuote { .. }
             | Event::StartCaption { .. }
             | Event::StartDefinitionDetail { .. }
@@ -542,16 +543,63 @@ mod tests {
     }
 
     #[test]
-    fn soft_break_becomes_space_text() {
+    fn soft_break_emits_soft_break_event() {
         let mut reader = MarkdownReader::new("Line one\nLine two");
         let events = collect_events(&mut reader);
 
-        assert!(
-            events
-                .iter()
-                .any(|e| matches!(e, Event::Text { content, .. } if content == " ")),
-            "SoftBreak should emit a space Text event"
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None
+                },
+                Event::Text {
+                    content: "Line one".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::SoftBreak,
+                Event::Text {
+                    content: "Line two".to_string(),
+                    style: TextStyle::default(),
+                },
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
         );
+    }
+
+    #[test]
+    fn soft_break_in_image_alt_appends_space() {
+        let mut reader = MarkdownReader::new("![alt one\nalt two](image.png)");
+        let events = collect_events(&mut reader);
+
+        // The image alt text flattens the soft break to a single space.
+        // No SoftBreak event should be emitted — the soft break is absorbed
+        // into the image's alt buffer.
+        let image_count = events
+            .iter()
+            .filter(|e| matches!(e, Event::Image { .. }))
+            .count();
+        assert_eq!(image_count, 1, "exactly one Image event expected");
+
+        let soft_break_count = events
+            .iter()
+            .filter(|e| matches!(e, Event::SoftBreak))
+            .count();
+        assert_eq!(
+            soft_break_count, 0,
+            "no SoftBreak event should be emitted inside image alt"
+        );
+
+        let image_alt = events.iter().find_map(|e| {
+            let Event::Image { alt: Some(a), .. } = e else {
+                return None;
+            };
+            Some(a.clone())
+        });
+        assert_eq!(image_alt, Some("alt one alt two".to_string()));
     }
 
     #[test]
@@ -583,18 +631,6 @@ mod tests {
 
         assert!(matches!(events.first(), Some(Event::StartDocument { .. })));
         assert!(matches!(events.last(), Some(Event::EndDocument)));
-    }
-
-    #[test]
-    fn soft_break_in_image_alt_appends_space() {
-        let mut reader = MarkdownReader::new("![alt\ntext](https://example.com/img.png)");
-        let events = collect_events(&mut reader);
-
-        let image_event = events.iter().find(|e| matches!(e, Event::Image { .. }));
-        assert!(matches!(
-            image_event,
-            Some(Event::Image { alt: Some(alt), .. }) if alt == "alt text"
-        ));
     }
 
     #[test]
