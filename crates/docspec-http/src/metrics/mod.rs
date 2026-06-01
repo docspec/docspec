@@ -35,6 +35,9 @@ pub const METRIC_CONVERSIONS_TOTAL: &str = "docspec_conversions_total";
 /// Histogram: document conversion duration in seconds.
 pub const METRIC_CONVERSION_DURATION_SECONDS: &str = "docspec_conversion_duration_seconds";
 
+/// Histogram: document conversion output size in bytes.
+pub const METRIC_CONVERSION_OUTPUT_BYTES: &str = "docspec_conversion_output_bytes";
+
 // ─── Label key constants ───────────────────────────────────────────────────
 
 /// Label key for the HTTP request method (GET, POST, …).
@@ -52,6 +55,12 @@ pub const LABEL_RESULT: &str = "result";
 /// Label key for the error class when a conversion fails.
 pub const LABEL_ERROR_CLASS: &str = "error_class";
 
+/// Label key for the input MIME type of the conversion request.
+pub const LABEL_INPUT_MIME_TYPE: &str = "input_mime_type";
+
+/// Label key for the output MIME type produced by the conversion.
+pub const LABEL_OUTPUT_MIME_TYPE: &str = "output_mime_type";
+
 // ─── Label value constants ─────────────────────────────────────────────────
 
 /// Value for [`LABEL_PATH`] when no route was matched by the router.
@@ -68,6 +77,21 @@ pub const RESULT_SERVER_ERROR: &str = "server_error";
 
 /// Value for [`LABEL_ERROR_CLASS`] when no error occurred.
 pub const ERROR_CLASS_NONE: &str = "none";
+
+/// Value for [`LABEL_INPUT_MIME_TYPE`] when the request was text/markdown (current sole supported reader).
+pub const INPUT_MIME_MARKDOWN: &str = "text/markdown";
+
+/// Value for [`LABEL_INPUT_MIME_TYPE`] when the Content-Type header was present but not a supported reader format.
+pub const INPUT_MIME_UNSUPPORTED: &str = "unsupported";
+
+/// Value for [`LABEL_INPUT_MIME_TYPE`] when the Content-Type header was absent.
+pub const INPUT_MIME_NONE: &str = "none";
+
+/// Value for [`LABEL_OUTPUT_MIME_TYPE`] when the conversion produced `BlockNote` JSON (current sole supported writer).
+pub const OUTPUT_MIME_BLOCKNOTE: &str = "application/vnd.docspec.blocknote+json";
+
+/// Value for [`LABEL_OUTPUT_MIME_TYPE`] when no output was produced (any error path).
+pub const OUTPUT_MIME_NONE: &str = "none";
 
 // ─── Histogram bucket arrays ───────────────────────────────────────────────
 
@@ -87,6 +111,12 @@ pub const HTTP_BODY_SIZE_BUCKETS: [f64; 12] = [
 /// Shares the same breakpoints as [`HTTP_LATENCY_BUCKETS`].
 pub const CONVERSION_DURATION_BUCKETS: [f64; 11] = HTTP_LATENCY_BUCKETS;
 
+/// Size histogram buckets for conversion output bytes.
+///
+/// Shares the same breakpoints as [`HTTP_BODY_SIZE_BUCKETS`] for symmetry
+/// between request body size and conversion output size in dashboards.
+pub const CONVERSION_OUTPUT_BYTES_BUCKETS: [f64; 12] = HTTP_BODY_SIZE_BUCKETS;
+
 // ─── Recorder builder ──────────────────────────────────────────────────────
 
 fn configure_buckets(builder: PrometheusBuilder) -> Result<PrometheusBuilder, BuildError> {
@@ -102,6 +132,10 @@ fn configure_buckets(builder: PrometheusBuilder) -> Result<PrometheusBuilder, Bu
         .set_buckets_for_metric(
             Matcher::Full(METRIC_CONVERSION_DURATION_SECONDS.to_owned()),
             &CONVERSION_DURATION_BUCKETS,
+        )?
+        .set_buckets_for_metric(
+            Matcher::Full(METRIC_CONVERSION_OUTPUT_BYTES.to_owned()),
+            &CONVERSION_OUTPUT_BYTES_BUCKETS,
         )
 }
 
@@ -142,12 +176,19 @@ pub fn install_global() -> Result<PrometheusHandle, BuildError> {
     );
     describe_histogram!(
         METRIC_HTTP_REQUEST_BODY_BYTES,
-        "HTTP request body size in bytes."
+        "HTTP request body size in bytes, labeled by input MIME type."
     );
-    describe_counter!(METRIC_CONVERSIONS_TOTAL, "Total document conversions.");
+    describe_counter!(
+        METRIC_CONVERSIONS_TOTAL,
+        "Total document conversions, labeled by result, error class, and input/output MIME type."
+    );
     describe_histogram!(
         METRIC_CONVERSION_DURATION_SECONDS,
-        "Document conversion duration in seconds."
+        "Document conversion duration in seconds, labeled by result and input/output MIME type."
+    );
+    describe_histogram!(
+        METRIC_CONVERSION_OUTPUT_BYTES,
+        "Document conversion output size in bytes (recorded only on successful conversions), labeled by input/output MIME type."
     );
 
     Ok(handle)

@@ -29,22 +29,58 @@ pub async fn options_conversion() -> impl IntoResponse {
 /// surface as 422 (parse / sink errors) or 500 (finalize errors) **before**
 /// any response body is sent — no truncated `200 OK` on failure.
 ///
-/// Conversion outcome metrics (`docspec_conversions_total` and
-/// `docspec_conversion_duration_seconds`) are recorded for **every** request
-/// to this endpoint — including early validation failures — so that all
-/// outcomes are visible in dashboards without dead-code paths.
+/// `request_id` is accepted as `Option<Extension<RequestId>>` so the handler
+/// remains usable for downstream consumers that mount it standalone without
+/// the [`tower_http::request_id::SetRequestIdLayer`]. When the extension is
+/// absent, the `request_id` field is **omitted** from the structured
+/// `conversion_completed` event rather than logged as an empty string —
+/// "no correlation id supplied" is a distinct state from "supplied empty".
+/// The same treatment applies to `trace_id`, which is only set when the
+/// upstream `X-Trace-ID` header is present.
+///
+/// Conversion outcome metrics are recorded with intentionally different scopes:
+///
+/// - `docspec_conversions_total` and `docspec_conversion_duration_seconds` are
+///   recorded for **every** request to this endpoint — including early
+///   validation failures — so that all outcomes are visible in dashboards.
+/// - `docspec_http_request_body_bytes` is recorded only after `Content-Type`
+///   and `Accept` validation pass and the body is confirmed non-empty.
+/// - `docspec_conversion_output_bytes` is recorded only on successful
+///   conversions (failed conversions produce no output).
 ///
 /// # Errors
 ///
 /// Returns [`HttpError`] when request headers or body are invalid, the
 /// conversion fails, or the response cannot be constructed.
 #[inline]
-pub async fn post_conversion(headers: HeaderMap, body: Bytes) -> Result<Response<Body>, HttpError> {
-    let conversion_start = std::time::Instant::now();
-    let outcome = do_conversion(headers, body).await;
-    let conversion_duration = conversion_start.elapsed().as_secs_f64();
+pub async fn post_conversion(
+    request_id: Option<axum::extract::Extension<tower_http::request_id::RequestId>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response<Body>, HttpError> {
+    let input_mime_label = crate::mime_parser::bucket_input_mime(headers.get(header::CONTENT_TYPE));
+    let trace_id_owned: Option<String> = headers
+        .get(axum::http::HeaderName::from_static("x-trace-id"))
+        .and_then(|header_value| header_value.to_str().ok())
+        .map(str::to_owned);
+    let body_len_for_logging = body.len();
 
-    let (result_label, error_class_label) = match &outcome {
+    let conversion_start = std::time::Instant::now();
+    let outcome = do_conversion(input_mime_label, headers, body).await;
+    let conversion_duration = conversion_start.elapsed();
+    let conversion_duration_secs = conversion_duration.as_secs_f64();
+    let conversion_duration_ms =
+        u64::try_from(conversion_duration.as_millis().min(u128::from(u64::MAX)))
+            .unwrap_or(u64::MAX);
+
+    let (response_or_error, output_bytes) = match outcome {
+        Ok((response, bytes)) => (Ok(response), bytes),
+        Err(http_error) => (Err(http_error), 0),
+    };
+    let conversion_ok = response_or_error.is_ok();
+    let output_mime_label = crate::mime_parser::bucket_output_mime(conversion_ok);
+
+    let (result_label, error_class_label) = match &response_or_error {
         Ok(_) => (
             crate::metrics::RESULT_SUCCESS,
             crate::metrics::ERROR_CLASS_NONE,
@@ -56,23 +92,59 @@ pub async fn post_conversion(headers: HeaderMap, body: Bytes) -> Result<Response
         crate::metrics::METRIC_CONVERSIONS_TOTAL,
         crate::metrics::LABEL_RESULT => result_label,
         crate::metrics::LABEL_ERROR_CLASS => error_class_label,
+        crate::metrics::LABEL_INPUT_MIME_TYPE => input_mime_label,
+        crate::metrics::LABEL_OUTPUT_MIME_TYPE => output_mime_label,
     )
     .increment(1);
 
     metrics::histogram!(
         crate::metrics::METRIC_CONVERSION_DURATION_SECONDS,
         crate::metrics::LABEL_RESULT => result_label,
+        crate::metrics::LABEL_INPUT_MIME_TYPE => input_mime_label,
+        crate::metrics::LABEL_OUTPUT_MIME_TYPE => output_mime_label,
     )
-    .record(conversion_duration);
+    .record(conversion_duration_secs);
 
-    outcome
+    if conversion_ok {
+        // Reason: u64 → f64 is lossy at extreme values but bounded by realistic output sizes.
+        #[allow(clippy::cast_precision_loss, clippy::as_conversions)]
+        let output_bytes_f64 = output_bytes as f64;
+        metrics::histogram!(
+            crate::metrics::METRIC_CONVERSION_OUTPUT_BYTES,
+            crate::metrics::LABEL_INPUT_MIME_TYPE => input_mime_label,
+            crate::metrics::LABEL_OUTPUT_MIME_TYPE => output_mime_label,
+        )
+        .record(output_bytes_f64);
+    }
+
+    let request_id_opt: Option<&str> = request_id
+        .as_ref()
+        .and_then(|axum::extract::Extension(req_id)| req_id.header_value().to_str().ok());
+    tracing::info!(
+        event = "conversion_completed",
+        result = result_label,
+        error_class = error_class_label,
+        input_mime_type = input_mime_label,
+        output_mime_type = output_mime_label,
+        input_bytes = body_len_for_logging,
+        output_bytes,
+        duration_ms = conversion_duration_ms,
+        request_id = request_id_opt,
+        trace_id = trace_id_owned.as_deref(),
+    );
+
+    response_or_error
 }
 
 /// Perform the actual validation and conversion without recording outcome metrics.
 ///
 /// Body size is recorded here because it is only known after header validation
 /// succeeds and the body is confirmed non-empty.
-async fn do_conversion(headers: HeaderMap, body: Bytes) -> Result<Response<Body>, HttpError> {
+async fn do_conversion(
+    input_mime_label: &'static str,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<(Response<Body>, u64), HttpError> {
     mime_parser::validate_content_type(headers.get(header::CONTENT_TYPE))?;
     mime_parser::negotiate_accept(headers.get(header::ACCEPT))?;
 
@@ -87,14 +159,18 @@ async fn do_conversion(headers: HeaderMap, body: Bytes) -> Result<Response<Body>
     // documented false-positive exception for bounded numeric metric recording.
     #[allow(clippy::cast_precision_loss, clippy::as_conversions)]
     let body_len_bytes = body.len() as f64;
-    metrics::histogram!(crate::metrics::METRIC_HTTP_REQUEST_BODY_BYTES).record(body_len_bytes);
+    metrics::histogram!(
+        crate::metrics::METRIC_HTTP_REQUEST_BODY_BYTES,
+        crate::metrics::LABEL_INPUT_MIME_TYPE => input_mime_label,
+    )
+    .record(body_len_bytes);
 
     let markdown = String::from_utf8(body.into()).map_err(|error| {
         tracing::debug!(error = %error, "request body is not valid UTF-8");
         HttpError::BodyNotUtf8
     })?;
 
-    let join_result = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, HttpError> {
+    let join_result = tokio::task::spawn_blocking(move || -> Result<(Vec<u8>, u64), HttpError> {
         let mut output_buffer = Vec::new();
         let mut reader = MarkdownReader::new(&markdown);
         let mut sink = StackTrackingSink::new(BlockNoteWriter::new(&mut output_buffer));
@@ -122,18 +198,23 @@ async fn do_conversion(headers: HeaderMap, body: Bytes) -> Result<Response<Body>
             HttpError::Internal
         })?;
 
-        Ok(output_buffer)
+        // Capture byte count before output_buffer is consumed by Body::from.
+        // u64::try_from is lossless on 64-bit targets (usize ≤ u64::MAX).
+        let output_bytes =
+            u64::try_from(output_buffer.len()).map_err(|_conversion_error| HttpError::Internal)?;
+        Ok((output_buffer, output_bytes))
     })
     .await;
 
     match join_result {
-        Ok(Ok(output)) => Response::builder()
+        Ok(Ok((output, output_bytes))) => Response::builder()
             .status(StatusCode::OK)
             .header(
                 header::CONTENT_TYPE,
                 HeaderValue::from_static("application/vnd.docspec.blocknote+json; charset=utf-8"),
             )
             .body(Body::from(output))
+            .map(|response| (response, output_bytes))
             .map_err(|error| {
                 tracing::error!(error = %error, "failed to build conversion response");
                 HttpError::Internal
