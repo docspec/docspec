@@ -16,11 +16,7 @@
 
 mod common;
 
-use axum::{
-    body::Body,
-    http::{header, Request, StatusCode},
-    Router,
-};
+use axum::{body::Body, http::StatusCode};
 use docspec_http::{
     metrics::{
         HTTP_LATENCY_BUCKETS, METRIC_HTTP_REQUESTS_TOTAL, METRIC_HTTP_REQUEST_DURATION_SECONDS,
@@ -36,31 +32,11 @@ fn parse_metric_lines<'a>(rendered: &'a str, metric_name: &str) -> Vec<&'a str> 
         .collect()
 }
 
-fn make_rt() -> tokio::runtime::Runtime {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-}
-
-/// Builds a router with a throw-away handle for the `/metrics` route.
-///
-/// Metric values are captured by the thread-local recorder active at request
-/// time — the dummy handle only satisfies `router_with_metrics`'s signature.
-fn make_router() -> Router {
-    let (_, dummy_handle) = docspec_http::metrics::build_recorder().expect("dummy recorder");
-    router_with_metrics(dummy_handle)
-}
-
 #[test]
 fn get_health_increments_requests_total() {
-    let rt = make_rt();
-    let router = make_router();
-    let request = Request::builder()
-        .method("GET")
-        .uri("/health")
-        .body(Body::empty())
-        .unwrap();
+    let rt = common::runtime();
+    let router = common::router();
+    let request = common::empty_request("GET", "/health");
 
     let (handle, _) = common::with_test_recorder(|| {
         rt.block_on(router.oneshot(request))
@@ -77,14 +53,9 @@ fn get_health_increments_requests_total() {
 
 #[test]
 fn post_conversion_increments_requests_total() {
-    let rt = make_rt();
-    let router = make_router();
-    let request = Request::builder()
-        .method("POST")
-        .uri("/conversion")
-        .header(header::CONTENT_TYPE, "text/markdown")
-        .body(Body::from("# Hello"))
-        .unwrap();
+    let rt = common::runtime();
+    let router = common::router();
+    let request = common::markdown_request("# Hello");
 
     let (handle, _) = common::with_test_recorder(|| {
         rt.block_on(router.oneshot(request))
@@ -102,15 +73,10 @@ fn post_conversion_increments_requests_total() {
 
 #[test]
 fn post_conversion_error_status_label() {
-    let rt = make_rt();
-    let router = make_router();
+    let rt = common::runtime();
+    let router = common::router();
     // Empty body → 400 Bad Request from the conversion handler.
-    let request = Request::builder()
-        .method("POST")
-        .uri("/conversion")
-        .header(header::CONTENT_TYPE, "text/markdown")
-        .body(Body::empty())
-        .unwrap();
+    let request = common::markdown_request(Body::empty());
 
     let (handle, response) = common::with_test_recorder(|| {
         rt.block_on(router.oneshot(request))
@@ -134,13 +100,9 @@ fn post_conversion_error_status_label() {
 
 #[test]
 fn request_duration_histogram_records_observation() {
-    let rt = make_rt();
-    let router = make_router();
-    let request = Request::builder()
-        .method("GET")
-        .uri("/health")
-        .body(Body::empty())
-        .unwrap();
+    let rt = common::runtime();
+    let router = common::router();
+    let request = common::empty_request("GET", "/health");
 
     let (handle, _) = common::with_test_recorder(|| {
         rt.block_on(router.oneshot(request))
@@ -157,13 +119,9 @@ fn request_duration_histogram_records_observation() {
 
 #[test]
 fn histogram_buckets_match_spec() {
-    let rt = make_rt();
-    let router = make_router();
-    let request = Request::builder()
-        .method("GET")
-        .uri("/health")
-        .body(Body::empty())
-        .unwrap();
+    let rt = common::runtime();
+    let router = common::router();
+    let request = common::empty_request("GET", "/health");
 
     let (handle, _) = common::with_test_recorder(|| {
         rt.block_on(router.oneshot(request))
@@ -210,27 +168,15 @@ fn histogram_buckets_match_spec() {
 
 #[test]
 fn metrics_route_skipped() {
-    let rt = make_rt();
+    let rt = common::runtime();
     // Use an explicit recorder/handle pair so the router's /metrics route is
     // properly registered (needed for MatchedPath to be "/metrics").
     let (_, dummy_handle) = docspec_http::metrics::build_recorder().expect("dummy recorder");
     let router = router_with_metrics(dummy_handle);
 
-    let health_req = Request::builder()
-        .method("GET")
-        .uri("/health")
-        .body(Body::empty())
-        .unwrap();
-    let metrics_req1 = Request::builder()
-        .method("GET")
-        .uri("/metrics")
-        .body(Body::empty())
-        .unwrap();
-    let metrics_req2 = Request::builder()
-        .method("GET")
-        .uri("/metrics")
-        .body(Body::empty())
-        .unwrap();
+    let health_req = common::empty_request("GET", "/health");
+    let metrics_req1 = common::empty_request("GET", "/metrics");
+    let metrics_req2 = common::empty_request("GET", "/metrics");
 
     let (handle, ()) = common::with_test_recorder(|| {
         let _ = rt
@@ -264,13 +210,9 @@ fn metrics_route_skipped() {
 
 #[test]
 fn fallback_404_uses_unknown_path_label() {
-    let rt = make_rt();
-    let router = make_router();
-    let request = Request::builder()
-        .method("GET")
-        .uri("/does-not-exist")
-        .body(Body::empty())
-        .unwrap();
+    let rt = common::runtime();
+    let router = common::router();
+    let request = common::empty_request("GET", "/does-not-exist");
 
     let (handle, _) = common::with_test_recorder(|| {
         rt.block_on(router.oneshot(request))
