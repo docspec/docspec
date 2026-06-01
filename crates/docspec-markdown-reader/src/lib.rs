@@ -74,6 +74,8 @@ enum BlockState {
     Explicit,
     /// Not inside any block context.
     None,
+    /// Explicit block whose `StartParagraph` is deferred until the first real event.
+    PendingExplicit,
 }
 
 /// Document processing phase.
@@ -195,6 +197,7 @@ impl<'a> MarkdownReader<'a> {
     /// Emits `StartLink` for the buffered link if it hasn't been emitted yet.
     /// Called before any inline event that would belong inside a link.
     fn emit_pending_link_start(&mut self) {
+        self.flush_pending_paragraph_start();
         if let Some(link) = self.link.as_mut() {
             if !link.started {
                 self.queue.push_back(Event::StartLink {
@@ -204,6 +207,18 @@ impl<'a> MarkdownReader<'a> {
                 });
                 link.started = true;
             }
+        }
+    }
+
+    /// Emits `StartParagraph` for the deferred paragraph if it hasn't been emitted yet.
+    /// Called before any committing event that would belong inside a paragraph.
+    fn flush_pending_paragraph_start(&mut self) {
+        if self.block_state == BlockState::PendingExplicit {
+            self.queue.push_back(Event::StartParagraph {
+                alignment: None,
+                id: None,
+            });
+            self.block_state = BlockState::Explicit;
         }
     }
 
@@ -246,6 +261,7 @@ impl<'a> MarkdownReader<'a> {
     /// in-progress image state; does nothing if no image is in progress.
     fn handle_end_image(&mut self) {
         let Some(img) = self.image.take() else { return };
+        self.flush_pending_paragraph_start();
         let trimmed = img.alt_buf.trim();
         let alt = if trimmed.is_empty() {
             None
@@ -278,6 +294,7 @@ impl<'a> MarkdownReader<'a> {
         if link.started {
             self.queue.push_back(Event::EndLink);
         } else {
+            self.flush_pending_paragraph_start();
             self.queue.push_back(Event::StartLink {
                 href: link.href,
                 id: None,
@@ -325,7 +342,13 @@ impl<'a> MarkdownReader<'a> {
             TagEnd::Item => self.handle_end_item(),
             TagEnd::Link => self.handle_end_link(),
             TagEnd::List(_) => self.handle_end_list(),
-            TagEnd::Paragraph => self.push_event_end(Event::EndParagraph),
+            TagEnd::Paragraph => {
+                if self.block_state == BlockState::PendingExplicit {
+                    self.block_state = BlockState::None;
+                } else {
+                    self.push_event_end(Event::EndParagraph);
+                }
+            }
             TagEnd::Strikethrough => self.strikethrough_depth.dec(),
             TagEnd::Strong => self.bold_depth.dec(),
             TagEnd::Table => self.push_event_end(Event::EndTable),
@@ -414,6 +437,7 @@ impl<'a> MarkdownReader<'a> {
         // empty `StartLink`/`EndLink` pair so the URL is preserved. `TagEnd::Image` fires
         // `Event::Image` before `TagEnd::Paragraph`, so downstream writers close the
         // surrounding paragraph before serialising the image as a sibling block.
+        self.flush_pending_paragraph_start();
         if let Some(link) = self.link.take() {
             if link.started {
                 self.queue.push_back(Event::EndLink);
@@ -499,10 +523,7 @@ impl<'a> MarkdownReader<'a> {
                 dest_url, title, ..
             } => self.handle_start_link(dest_url, title),
             Tag::List(start_opt) => self.handle_list_start(start_opt),
-            Tag::Paragraph => self.push_event_start(Event::StartParagraph {
-                alignment: None,
-                id: None,
-            }),
+            Tag::Paragraph => self.block_state = BlockState::PendingExplicit,
             Tag::Strikethrough => self.strikethrough_depth.inc(),
             Tag::Strong => self.bold_depth.inc(),
             Tag::Table(_) => self.push_event_start(Event::StartTable { id: None }),
@@ -592,6 +613,8 @@ impl<'a> MarkdownReader<'a> {
             pulldown_cmark::Event::HardBreak => {
                 if let Some(img) = &mut self.image {
                     img.alt_buf.push(' ');
+                } else if self.block_state == BlockState::PendingExplicit {
+                    // emitting a break before StartParagraph would be malformed — discard
                 } else {
                     self.emit_pending_link_start();
                     self.queue.push_back(Event::LineBreak);
@@ -600,6 +623,8 @@ impl<'a> MarkdownReader<'a> {
             pulldown_cmark::Event::SoftBreak => {
                 if let Some(img) = &mut self.image {
                     img.alt_buf.push(' ');
+                } else if self.block_state == BlockState::PendingExplicit {
+                    // emitting a break before StartParagraph would be malformed — discard
                 } else {
                     self.emit_pending_link_start();
                     self.queue.push_back(Event::SoftBreak);
@@ -677,6 +702,28 @@ mod tests {
             Some(&Event::Text {
                 content: "code".to_string(),
                 style: TextStyle::default().code(),
+            })
+        );
+    }
+
+    #[test]
+    fn handle_text_without_open_block_auto_opens_paragraph() {
+        let mut reader = MarkdownReader::new("");
+        reader.handle_text("hello".to_string());
+
+        assert_eq!(reader.queue.len(), 2);
+        assert_eq!(
+            reader.queue.front(),
+            Some(&Event::StartParagraph {
+                alignment: None,
+                id: None,
+            })
+        );
+        assert_eq!(
+            reader.queue.get(1),
+            Some(&Event::Text {
+                content: "hello".to_string(),
+                style: TextStyle::default(),
             })
         );
     }
