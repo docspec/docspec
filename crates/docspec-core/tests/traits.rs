@@ -241,5 +241,6 @@ mod tests {
         let mut buffer = Vec::new();
         let result = provider.stream_to("unknown", &mut buffer);
         assert!(result.is_none());
+        assert_eq!(buffer, Vec::<u8>::new());
     }
 }
