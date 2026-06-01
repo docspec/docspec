@@ -211,6 +211,229 @@ mod tests {
     }
 
     #[test]
+    fn soft_break_renders_as_newline() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Line one".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::SoftBreak,
+            Event::Text {
+                content: "Line two".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Line two","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn soft_break_inside_heading() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartHeading { level: 2, id: None },
+            Event::Text {
+                content: "Title one".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::SoftBreak,
+            Event::Text {
+                content: "Title two".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndHeading,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"heading","props":{"level":2,"textAlignment":"left"},"content":[{"type":"text","text":"Title one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Title two","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn soft_break_inside_table_cell() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartTable { id: None },
+            Event::StartTableRow { id: None },
+            Event::StartTableCell {
+                colspan: None,
+                rowspan: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Cell line one".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::SoftBreak,
+            Event::Text {
+                content: "Cell line two".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"Cell line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Cell line two","styles":{}}]}]}]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn soft_break_inside_list_item() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            Event::Text {
+                content: "Bullet line one".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::SoftBreak,
+            Event::Text {
+                content: "Bullet line two".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"Bullet line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Bullet line two","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn soft_break_inside_link_display_text() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::StartLink {
+                href: "https://example.com".to_string(),
+                id: None,
+                title: None,
+            },
+            Event::Text {
+                content: "Click line one".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::SoftBreak,
+            Event::Text {
+                content: "click line two".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndLink,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"Click line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"click line two","styles":{}}]}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn soft_break_inside_blockquote() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartBlockQuote { id: None },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Quote line one".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::SoftBreak,
+            Event::Text {
+                content: "Quote line two".to_string(),
+                style: TextStyle::default(),
+            },
+            Event::EndParagraph,
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[{"type":"text","text":"Quote line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Quote line two","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn soft_break_between_styled_spans() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "Bold line one".to_string(),
+                style: TextStyle::default().bold(),
+            },
+            Event::SoftBreak,
+            Event::Text {
+                content: "Bold line two".to_string(),
+                style: TextStyle::default().bold(),
+            },
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        // Three text nodes: bold "Bold line one", default-style "\n", bold "Bold line two"
+        // The "\n" node has empty styles because handle_line_break calls handle_text with TextStyle::default()
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Bold line one","styles":{"bold":true}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Bold line two","styles":{"bold":true}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
     fn italic_text() {
         let json = run_events(&[
             Event::StartDocument {
