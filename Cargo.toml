@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "crates/docspec-core",
   "crates/docspec-markdown-reader",
+  "crates/docspec-docx-reader",
   "crates/docspec-blocknote-writer",
   "crates/docspec-json",
   "crates/docspec-cli",
