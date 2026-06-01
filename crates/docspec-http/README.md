@@ -207,3 +207,79 @@ The container runs as non-root UID/GID `10001` (user `docspec`). No capabilities
 ### Reverse proxy
 
 TLS termination, CORS headers, authentication, and rate limiting are intentionally absent from the binary. Place a reverse proxy (nginx, Caddy, etc.) in front of the container for these concerns. See [Deployment Notes](#deployment-notes) for details.
+
+## Metrics
+
+`docspec-http` exposes a Prometheus metrics endpoint on the same port as the main API.
+
+**Endpoint**: `GET /metrics`
+
+**Format**: Prometheus exposition format 0.0.4 (`text/plain; version=0.0.4; charset=utf-8`)
+
+**Auth**: None. The endpoint is internal-only. See [Security](#security) below.
+
+### Metric Catalog
+
+| Name | Type | Labels | Description | Buckets |
+|------|------|--------|-------------|---------|
+| `docspec_http_requests_total` | counter | `method`, `path`, `status` | Total HTTP requests received | — |
+| `docspec_http_request_duration_seconds` | histogram | `method`, `path`, `status` | HTTP request latency in seconds | 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0 |
+| `docspec_http_request_body_bytes` | histogram | (none) | HTTP request body size in bytes | 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 102400, 204800 |
+| `docspec_conversions_total` | counter | `result`, `error_class` | Total document conversions | — |
+| `docspec_conversion_duration_seconds` | histogram | `result` | Document conversion duration in seconds | 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0 |
+
+### Label Values
+
+**`result`**: `success`, `client_error`, `server_error`
+
+**`error_class`**: `body_not_utf8`, `empty_body`, `internal`, `method_not_allowed`, `not_acceptable`, `not_found`, `unprocessable`, `unsupported_media_type`, `none` (only when `result=success`)
+
+**`path`**: matched route template (`/conversion`, `/health`) or `unknown` for fallback handlers
+
+**`status`**: numeric HTTP status code as a string (e.g., `"200"`, `"422"`)
+
+**`method`**: HTTP method as a string (e.g., `"GET"`, `"POST"`)
+
+### Cardinality Guarantees
+
+`path` is bounded to `{"/conversion", "/health", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels.
+
+### Scrape Model
+
+Each pod maintains its own in-memory metrics. Prometheus scrapes each pod independently. No inter-pod communication is required. Aggregate across pods using PromQL.
+
+Upkeep runs every 5 seconds, keeping histogram internal state bounded.
+
+The `/metrics` route is mounted outside the API middleware stack, so it does not include the global `Cache-Control` header used by API responses.
+
+The body-size histogram (`docspec_http_request_body_bytes`) only records bodies that passed Content-Type and Accept validation. Rejected requests are not counted.
+
+### Example PromQL Queries
+
+Per-pod request rate:
+
+```promql
+rate(docspec_http_requests_total[5m])
+```
+
+Aggregate p99 latency across all pods:
+
+```promql
+histogram_quantile(0.99, sum by (le) (rate(docspec_http_request_duration_seconds_bucket[5m])))
+```
+
+Error rate broken down by error class:
+
+```promql
+rate(docspec_conversions_total{result!="success"}[5m])
+```
+
+Body-size p95:
+
+```promql
+histogram_quantile(0.95, sum by (le) (rate(docspec_http_request_body_bytes_bucket[5m])))
+```
+
+### Security
+
+`/metrics` has no authentication. It's intended for internal scraping only. Deploy behind a private overlay network or a Kubernetes `NetworkPolicy` that restricts access to your Prometheus pods.

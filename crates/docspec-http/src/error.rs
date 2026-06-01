@@ -237,6 +237,42 @@ impl IntoResponse for HttpError {
     }
 }
 
+impl HttpError {
+    /// Returns a stable, low-cardinality string identifying the error class.
+    /// Safe to use as a Prometheus label value — never contains per-request data.
+    #[inline]
+    #[must_use]
+    pub fn error_class(&self) -> &'static str {
+        match self {
+            Self::BodyNotUtf8 => "body_not_utf8",
+            Self::EmptyBody => "empty_body",
+            Self::Internal => "internal",
+            Self::MethodNotAllowed { .. } => "method_not_allowed",
+            Self::NotAcceptable => "not_acceptable",
+            Self::NotFound { .. } => "not_found",
+            Self::Unprocessable { .. } => "unprocessable",
+            Self::UnsupportedMediaType { .. } => "unsupported_media_type",
+        }
+    }
+
+    /// Returns the result class for Prometheus labels: `"client_error"` for 4xx, `"server_error"` for 5xx.
+    #[inline]
+    #[must_use]
+    pub fn result_class(&self) -> &'static str {
+        use crate::metrics::{RESULT_CLIENT_ERROR, RESULT_SERVER_ERROR};
+        match self {
+            Self::BodyNotUtf8
+            | Self::EmptyBody
+            | Self::MethodNotAllowed { .. }
+            | Self::NotAcceptable
+            | Self::NotFound { .. }
+            | Self::Unprocessable { .. }
+            | Self::UnsupportedMediaType { .. } => RESULT_CLIENT_ERROR,
+            Self::Internal => RESULT_SERVER_ERROR,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     // Reason: test code legitimately panics on assertion failures; unwrap, expect,
@@ -474,6 +510,124 @@ mod tests {
         assert_eq!(
             bytes.as_slice(),
             br#"{"type":"about:blank","title":"Unprocessable Entity","status":422,"detail":"bad\u0001input"}"#
+        );
+    }
+
+    #[test]
+    fn body_not_utf8_error_class_returns_body_not_utf8() {
+        assert_eq!(HttpError::BodyNotUtf8.error_class(), "body_not_utf8");
+    }
+
+    #[test]
+    fn empty_body_error_class_returns_empty_body() {
+        assert_eq!(HttpError::EmptyBody.error_class(), "empty_body");
+    }
+
+    #[test]
+    fn internal_error_class_returns_internal() {
+        assert_eq!(HttpError::Internal.error_class(), "internal");
+    }
+
+    #[test]
+    fn method_not_allowed_error_class_returns_method_not_allowed() {
+        assert_eq!(
+            HttpError::MethodNotAllowed { allowed: "GET" }.error_class(),
+            "method_not_allowed"
+        );
+    }
+
+    #[test]
+    fn not_acceptable_error_class_returns_not_acceptable() {
+        assert_eq!(HttpError::NotAcceptable.error_class(), "not_acceptable");
+    }
+
+    #[test]
+    fn not_found_error_class_returns_not_found() {
+        assert_eq!(
+            HttpError::NotFound {
+                method: "GET".to_owned(),
+                path: "/foo".to_owned()
+            }
+            .error_class(),
+            "not_found"
+        );
+    }
+
+    #[test]
+    fn unprocessable_error_class_returns_unprocessable() {
+        assert_eq!(
+            HttpError::Unprocessable {
+                detail: "bad".to_owned()
+            }
+            .error_class(),
+            "unprocessable"
+        );
+    }
+
+    #[test]
+    fn unsupported_media_type_error_class_returns_unsupported_media_type() {
+        assert_eq!(
+            HttpError::UnsupportedMediaType { received: None }.error_class(),
+            "unsupported_media_type"
+        );
+    }
+
+    #[test]
+    fn body_not_utf8_result_class_returns_client_error() {
+        assert_eq!(HttpError::BodyNotUtf8.result_class(), "client_error");
+    }
+
+    #[test]
+    fn empty_body_result_class_returns_client_error() {
+        assert_eq!(HttpError::EmptyBody.result_class(), "client_error");
+    }
+
+    #[test]
+    fn internal_result_class_returns_server_error() {
+        assert_eq!(HttpError::Internal.result_class(), "server_error");
+    }
+
+    #[test]
+    fn method_not_allowed_result_class_returns_client_error() {
+        assert_eq!(
+            HttpError::MethodNotAllowed { allowed: "GET" }.result_class(),
+            "client_error"
+        );
+    }
+
+    #[test]
+    fn not_acceptable_result_class_returns_client_error() {
+        assert_eq!(HttpError::NotAcceptable.result_class(), "client_error");
+    }
+
+    #[test]
+    fn not_found_result_class_returns_client_error() {
+        assert_eq!(
+            HttpError::NotFound {
+                method: "GET".to_owned(),
+                path: "/foo".to_owned()
+            }
+            .result_class(),
+            "client_error"
+        );
+    }
+
+    #[test]
+    fn unprocessable_result_class_returns_client_error() {
+        assert_eq!(
+            HttpError::Unprocessable {
+                detail: "bad".to_owned()
+            }
+            .result_class(),
+            "client_error"
+        );
+    }
+
+    #[test]
+    fn unsupported_media_type_result_class_returns_client_error() {
+        assert_eq!(
+            HttpError::UnsupportedMediaType { received: None }.result_class(),
+            "client_error"
         );
     }
 }

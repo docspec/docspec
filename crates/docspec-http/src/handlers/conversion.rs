@@ -29,12 +29,50 @@ pub async fn options_conversion() -> impl IntoResponse {
 /// surface as 422 (parse / sink errors) or 500 (finalize errors) **before**
 /// any response body is sent — no truncated `200 OK` on failure.
 ///
+/// Conversion outcome metrics (`docspec_conversions_total` and
+/// `docspec_conversion_duration_seconds`) are recorded for **every** request
+/// to this endpoint — including early validation failures — so that all
+/// outcomes are visible in dashboards without dead-code paths.
+///
 /// # Errors
 ///
 /// Returns [`HttpError`] when request headers or body are invalid, the
 /// conversion fails, or the response cannot be constructed.
 #[inline]
 pub async fn post_conversion(headers: HeaderMap, body: Bytes) -> Result<Response<Body>, HttpError> {
+    let conversion_start = std::time::Instant::now();
+    let outcome = do_conversion(headers, body).await;
+    let conversion_duration = conversion_start.elapsed().as_secs_f64();
+
+    let (result_label, error_class_label) = match &outcome {
+        Ok(_) => (
+            crate::metrics::RESULT_SUCCESS,
+            crate::metrics::ERROR_CLASS_NONE,
+        ),
+        Err(http_error) => (http_error.result_class(), http_error.error_class()),
+    };
+
+    metrics::counter!(
+        crate::metrics::METRIC_CONVERSIONS_TOTAL,
+        crate::metrics::LABEL_RESULT => result_label,
+        crate::metrics::LABEL_ERROR_CLASS => error_class_label,
+    )
+    .increment(1);
+
+    metrics::histogram!(
+        crate::metrics::METRIC_CONVERSION_DURATION_SECONDS,
+        crate::metrics::LABEL_RESULT => result_label,
+    )
+    .record(conversion_duration);
+
+    outcome
+}
+
+/// Perform the actual validation and conversion without recording outcome metrics.
+///
+/// Body size is recorded here because it is only known after header validation
+/// succeeds and the body is confirmed non-empty.
+async fn do_conversion(headers: HeaderMap, body: Bytes) -> Result<Response<Body>, HttpError> {
     mime_parser::validate_content_type(headers.get(header::CONTENT_TYPE))?;
     mime_parser::negotiate_accept(headers.get(header::ACCEPT))?;
 
@@ -42,12 +80,21 @@ pub async fn post_conversion(headers: HeaderMap, body: Bytes) -> Result<Response
         return Err(HttpError::EmptyBody);
     }
 
+    // Reason: Body sizes are bounded by request memory and never approach the 2^53
+    // f64 precision limit, so the cast is exact in practice. The Prometheus histogram
+    // API requires f64; usize has no native lossless f64 conversion. Workspace
+    // clippy bans both lints below as a general policy; this is the single
+    // documented false-positive exception for bounded numeric metric recording.
+    #[allow(clippy::cast_precision_loss, clippy::as_conversions)]
+    let body_len_bytes = body.len() as f64;
+    metrics::histogram!(crate::metrics::METRIC_HTTP_REQUEST_BODY_BYTES).record(body_len_bytes);
+
     let markdown = String::from_utf8(body.into()).map_err(|error| {
         tracing::debug!(error = %error, "request body is not valid UTF-8");
         HttpError::BodyNotUtf8
     })?;
 
-    let output = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, HttpError> {
+    let join_result = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, HttpError> {
         let mut output_buffer = Vec::new();
         let mut reader = MarkdownReader::new(&markdown);
         let mut sink = StackTrackingSink::new(BlockNoteWriter::new(&mut output_buffer));
@@ -77,21 +124,24 @@ pub async fn post_conversion(headers: HeaderMap, body: Bytes) -> Result<Response
 
         Ok(output_buffer)
     })
-    .await
-    .map_err(|error| {
-        tracing::error!(error = %error, "spawn_blocking join failed");
-        HttpError::Internal
-    })??;
+    .await;
 
-    Response::builder()
-        .status(StatusCode::OK)
-        .header(
-            header::CONTENT_TYPE,
-            HeaderValue::from_static("application/vnd.docspec.blocknote+json; charset=utf-8"),
-        )
-        .body(Body::from(output))
-        .map_err(|error| {
-            tracing::error!(error = %error, "failed to build conversion response");
-            HttpError::Internal
-        })
+    match join_result {
+        Ok(Ok(output)) => Response::builder()
+            .status(StatusCode::OK)
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/vnd.docspec.blocknote+json; charset=utf-8"),
+            )
+            .body(Body::from(output))
+            .map_err(|error| {
+                tracing::error!(error = %error, "failed to build conversion response");
+                HttpError::Internal
+            }),
+        Ok(Err(http_error)) => Err(http_error),
+        Err(join_error) => {
+            tracing::error!(error = %join_error, "spawn_blocking join failed");
+            Err(HttpError::Internal)
+        }
+    }
 }

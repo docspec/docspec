@@ -259,3 +259,71 @@ fn smoke_error_response_has_cache_control() {
         })
     );
 }
+
+#[test]
+fn smoke_metrics_endpoint_returns_prometheus_format() {
+    let (_guard, port) = start_server();
+    let base = format!("http://127.0.0.1:{port}");
+    let client = smoke_client();
+
+    let health = client
+        .get(format!("{base}/health"))
+        .send()
+        .expect("health request");
+    assert_eq!(health.status(), reqwest::StatusCode::OK);
+
+    let conversion = client
+        .post(format!("{base}/conversion"))
+        .header("content-type", "text/markdown")
+        .header("accept", "application/vnd.docspec.blocknote+json")
+        .body("# Hello World")
+        .send()
+        .expect("conversion request");
+    assert_eq!(conversion.status(), reqwest::StatusCode::OK);
+
+    let response = client
+        .get(format!("{base}/metrics"))
+        .send()
+        .expect("metrics request");
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get("content-type")
+            .expect("content-type header")
+            .to_str()
+            .expect("content-type header value"),
+        "text/plain; version=0.0.4; charset=utf-8"
+    );
+
+    let body = response.text().expect("metrics body");
+    for metric_name in [
+        "docspec_http_requests_total",
+        "docspec_http_request_duration_seconds",
+        "docspec_http_request_body_bytes",
+        "docspec_conversions_total",
+        "docspec_conversion_duration_seconds",
+    ] {
+        let help_prefix = format!("# HELP {metric_name} ");
+        assert!(
+            body.lines().any(|line| line.starts_with(&help_prefix)),
+            "missing HELP line for {metric_name} in:\n{body}"
+        );
+    }
+    let body_after_second_scrape = client
+        .get(format!("{base}/metrics"))
+        .send()
+        .expect("second metrics request")
+        .text()
+        .expect("second metrics body");
+
+    let metrics_in_counter = body_after_second_scrape
+        .lines()
+        .filter(|line| line.starts_with("docspec_http_requests_total{"))
+        .any(|line| line.contains(r#"path="/metrics""#));
+
+    assert!(
+        !metrics_in_counter,
+        "/metrics appeared in docspec_http_requests_total:\n{body_after_second_scrape}"
+    );
+}

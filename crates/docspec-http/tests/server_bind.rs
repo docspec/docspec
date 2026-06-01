@@ -4,7 +4,10 @@
 
 use tokio::net::TcpListener;
 
-use docspec_http::server::{bind, serve, ServerConfig};
+use docspec_http::{
+    metrics::install_global,
+    server::{bind, serve, ServerConfig, ServerError},
+};
 
 #[tokio::test]
 async fn bind_succeeds_on_port_zero() {
@@ -18,7 +21,7 @@ async fn bind_succeeds_on_port_zero() {
 }
 
 #[tokio::test]
-async fn unresolvable_host_returns_error() {
+async fn unresolvable_host_returns_listen_error_before_global_metrics_install() {
     let result = serve(ServerConfig::new(
         "definitely-not-a-real-host.invalid",
         9999,
@@ -26,8 +29,21 @@ async fn unresolvable_host_returns_error() {
     .await;
 
     match result {
-        Err(_) => {}
+        Err(ServerError::Listen(_)) => {}
+        Err(error) => panic!("expected listen error, got {error:?}"),
         Ok(()) => panic!("unresolvable host should return an error"),
+    }
+
+    install_global().expect("bind failure should not install global metrics recorder");
+
+    let metrics_result = serve(ServerConfig::new("127.0.0.1", 0)).await;
+    match metrics_result {
+        Err(error @ ServerError::MetricsInit(_)) => assert!(
+            core::error::Error::source(&error).is_some(),
+            "metrics init error should preserve the BuildError source"
+        ),
+        Err(error) => panic!("expected metrics init error, got {error:?}"),
+        Ok(()) => panic!("global recorder conflict should return an error"),
     }
 }
 
