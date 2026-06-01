@@ -706,7 +706,7 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_preformatted(Some("rust")),
-                helpers::text("fn main() {}", TextStyle::default().code()),
+                helpers::text("fn main() {}", TextStyle::default()),
                 Event::EndPreformatted,
                 Event::EndDocument,
             ]
@@ -724,7 +724,7 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_preformatted(None),
-                helpers::text("some code", TextStyle::default().code()),
+                helpers::text("some code", TextStyle::default()),
                 Event::EndPreformatted,
                 Event::EndDocument,
             ]
@@ -742,7 +742,7 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_preformatted(None),
-                helpers::text("indented code", TextStyle::default().code()),
+                helpers::text("indented code", TextStyle::default()),
                 Event::EndPreformatted,
                 Event::EndDocument,
             ]
@@ -765,8 +765,76 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_preformatted(None),
-                helpers::text("code\n\n", TextStyle::default().code()),
+                helpers::text("code\n\n", TextStyle::default()),
                 Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn code_block_special_chars_pass_through_literally() {
+        // Markdown special characters inside a fenced code block must arrive
+        // as literal text with no inline styling. pulldown-cmark does not parse
+        // inline markdown inside code blocks, and the reader's code_block_buffer
+        // branch never consults bold/italic depth.
+        let markdown = "```\n*test* **bold** `code` _italic_ ~strike~\n```";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_preformatted(None),
+                helpers::text(
+                    "*test* **bold** `code` _italic_ ~strike~",
+                    TextStyle::default(),
+                ),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn fenced_code_block_empty() {
+        // An empty fenced code block emits StartPreformatted immediately
+        // followed by EndPreformatted with NO Text event in between
+        // (the `if !content.is_empty()` guard at src/lib.rs:234 suppresses it).
+        let markdown = "```\n```";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_preformatted(None),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn code_block_inside_list_item() {
+        let markdown = "- item\n\n  ```\n  code\n  ```";
+        let mut reader = MarkdownReader::new(markdown);
+        let events = collect_events(&mut reader);
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_unordered_list_item(0),
+                helpers::start_paragraph(),
+                helpers::text("item", TextStyle::default()),
+                Event::EndParagraph,
+                helpers::start_preformatted(None),
+                helpers::text("code", TextStyle::default()),
+                Event::EndPreformatted,
+                Event::EndUnorderedListItem,
                 Event::EndDocument,
             ]
         );

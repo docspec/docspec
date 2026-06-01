@@ -234,7 +234,7 @@ impl<'a> MarkdownReader<'a> {
             if !content.is_empty() {
                 self.queue.push_back(Event::Text {
                     content,
-                    style: TextStyle::default().code(),
+                    style: TextStyle::default(),
                 });
             }
         }
