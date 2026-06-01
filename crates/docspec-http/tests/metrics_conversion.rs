@@ -16,27 +16,10 @@
     clippy::expect_used
 )]
 
-use axum::{body::Body, http::Request};
+mod common;
+
+use axum::body::Body;
 use tower::ServiceExt as _;
-
-// ─── Test helpers ─────────────────────────────────────────────────────────────
-
-fn make_runtime() -> tokio::runtime::Runtime {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("runtime builds")
-}
-
-fn valid_markdown_request(body: impl Into<Body>) -> Request<Body> {
-    Request::builder()
-        .method("POST")
-        .uri("/conversion")
-        .header("content-type", "text/markdown")
-        .header("accept", "application/vnd.docspec.blocknote+json")
-        .body(body.into())
-        .unwrap()
-}
 
 /// Asserts that the Prometheus exposition text `rendered` contains a line that
 /// is an exact string match of `expected_line`.
@@ -54,12 +37,12 @@ fn assert_metric_line(rendered: &str, expected_line: &str) {
 /// `result="success"` and `error_class="none"`.
 #[test]
 fn success_increments_with_none_error_class() {
-    let rt = make_runtime();
+    let rt = common::runtime();
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
     let router = docspec_http::router::router_with_metrics(handle.clone());
 
     metrics::with_local_recorder(&recorder, || {
-        rt.block_on(router.oneshot(valid_markdown_request("# Hello World")))
+        rt.block_on(router.oneshot(common::accepted_markdown_request("# Hello World")))
     })
     .expect("oneshot succeeds");
 
@@ -76,12 +59,12 @@ fn success_increments_with_none_error_class() {
 /// `result="client_error"` and `error_class="empty_body"`.
 #[test]
 fn empty_body_records_client_error() {
-    let rt = make_runtime();
+    let rt = common::runtime();
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
     let router = docspec_http::router::router_with_metrics(handle.clone());
 
     metrics::with_local_recorder(&recorder, || {
-        rt.block_on(router.oneshot(valid_markdown_request("")))
+        rt.block_on(router.oneshot(common::accepted_markdown_request("")))
     })
     .expect("oneshot succeeds");
 
@@ -98,17 +81,11 @@ fn empty_body_records_client_error() {
 /// with `result="client_error"` and `error_class="body_not_utf8"`.
 #[test]
 fn invalid_utf8_records_client_error() {
-    let rt = make_runtime();
+    let rt = common::runtime();
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
     let router = docspec_http::router::router_with_metrics(handle.clone());
 
-    let request = Request::builder()
-        .method("POST")
-        .uri("/conversion")
-        .header("content-type", "text/markdown")
-        .header("accept", "application/vnd.docspec.blocknote+json")
-        .body(Body::from(b"\xFF\xFE\x00".to_vec()))
-        .unwrap();
+    let request = common::accepted_markdown_request(Body::from(b"\xFF\xFE\x00".to_vec()));
 
     metrics::with_local_recorder(&recorder, || rt.block_on(router.oneshot(request)))
         .expect("oneshot succeeds");
@@ -127,17 +104,19 @@ fn invalid_utf8_records_client_error() {
 /// `error_class="unsupported_media_type"`.
 #[test]
 fn unsupported_media_type_records_client_error() {
-    let rt = make_runtime();
+    let rt = common::runtime();
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
     let router = docspec_http::router::router_with_metrics(handle.clone());
 
-    let request = Request::builder()
-        .method("POST")
-        .uri("/conversion")
-        .header("content-type", "application/json")
-        .header("accept", "application/vnd.docspec.blocknote+json")
-        .body(Body::from(r#"{"hello": "world"}"#))
-        .unwrap();
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[
+            ("content-type", "application/json"),
+            ("accept", "application/vnd.docspec.blocknote+json"),
+        ],
+        Body::from(r#"{"hello": "world"}"#),
+    );
 
     metrics::with_local_recorder(&recorder, || rt.block_on(router.oneshot(request)))
         .expect("oneshot succeeds");
@@ -156,17 +135,19 @@ fn unsupported_media_type_records_client_error() {
 /// `error_class="not_acceptable"`.
 #[test]
 fn not_acceptable_records_client_error() {
-    let rt = make_runtime();
+    let rt = common::runtime();
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
     let router = docspec_http::router::router_with_metrics(handle.clone());
 
-    let request = Request::builder()
-        .method("POST")
-        .uri("/conversion")
-        .header("content-type", "text/markdown")
-        .header("accept", "application/json")
-        .body(Body::from("# Hello"))
-        .unwrap();
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[
+            ("content-type", "text/markdown"),
+            ("accept", "application/json"),
+        ],
+        Body::from("# Hello"),
+    );
 
     metrics::with_local_recorder(&recorder, || rt.block_on(router.oneshot(request)))
         .expect("oneshot succeeds");
@@ -184,12 +165,12 @@ fn not_acceptable_records_client_error() {
 /// `docspec_conversion_duration_seconds` with `result="success"`.
 #[test]
 fn conversion_duration_recorded_on_success() {
-    let rt = make_runtime();
+    let rt = common::runtime();
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
     let router = docspec_http::router::router_with_metrics(handle.clone());
 
     metrics::with_local_recorder(&recorder, || {
-        rt.block_on(router.oneshot(valid_markdown_request("# Hello")))
+        rt.block_on(router.oneshot(common::accepted_markdown_request("# Hello")))
     })
     .expect("oneshot succeeds");
 
@@ -206,12 +187,12 @@ fn conversion_duration_recorded_on_success() {
 /// `docspec_conversion_duration_seconds` with `result="client_error"`.
 #[test]
 fn conversion_duration_recorded_on_error() {
-    let rt = make_runtime();
+    let rt = common::runtime();
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
     let router = docspec_http::router::router_with_metrics(handle.clone());
 
     metrics::with_local_recorder(&recorder, || {
-        rt.block_on(router.oneshot(valid_markdown_request("")))
+        rt.block_on(router.oneshot(common::accepted_markdown_request("")))
     })
     .expect("oneshot succeeds");
 
@@ -229,13 +210,13 @@ fn conversion_duration_recorded_on_error() {
 /// `docspec_http_request_body_bytes_sum` line must equal `7`.
 #[test]
 fn body_size_histogram_records_correct_byte_count() {
-    let rt = make_runtime();
+    let rt = common::runtime();
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
     let router = docspec_http::router::router_with_metrics(handle.clone());
 
     // "# Hello" = '#' + ' ' + 'H' + 'e' + 'l' + 'l' + 'o' = 7 bytes
     metrics::with_local_recorder(&recorder, || {
-        rt.block_on(router.oneshot(valid_markdown_request("# Hello")))
+        rt.block_on(router.oneshot(common::accepted_markdown_request("# Hello")))
     })
     .expect("oneshot succeeds");
 

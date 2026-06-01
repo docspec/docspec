@@ -138,35 +138,71 @@ mod tests {
         String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8")
     }
 
+    fn start_document() -> Event {
+        Event::StartDocument {
+            id: None,
+            language: None,
+            metadata: None,
+        }
+    }
+
+    fn start_paragraph() -> Event {
+        Event::StartParagraph {
+            alignment: None,
+            id: None,
+        }
+    }
+
+    fn text(content: &str) -> Event {
+        Event::Text {
+            content: content.to_string(),
+            style: TextStyle::default(),
+        }
+    }
+
+    fn start_heading(level: u8) -> Event {
+        Event::StartHeading { level, id: None }
+    }
+
+    fn start_blockquote() -> Event {
+        Event::StartBlockQuote { id: None }
+    }
+
+    fn start_preformatted(syntax: Option<&str>) -> Event {
+        Event::StartPreformatted {
+            syntax: syntax.map(str::to_string),
+            id: None,
+        }
+    }
+
+    fn start_table() -> Event {
+        Event::StartTable { id: None }
+    }
+
+    fn start_table_row() -> Event {
+        Event::StartTableRow { id: None }
+    }
+
+    fn start_table_cell() -> Event {
+        Event::StartTableCell {
+            colspan: None,
+            id: None,
+            rowspan: None,
+        }
+    }
+
     #[test]
     fn empty_document() {
-        let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::EndDocument,
-        ]);
+        let json = run_events(&[start_document(), Event::EndDocument]);
         assert_eq!(json, "[]");
     }
 
     #[test]
     fn single_paragraph() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Hello".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("Hello"),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -179,15 +215,8 @@ mod tests {
     #[test]
     fn bold_text() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::Text {
                 content: "Bold".to_string(),
                 style: TextStyle::default().bold(),
@@ -204,24 +233,11 @@ mod tests {
     #[test]
     fn soft_break_renders_as_newline() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Line one".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("Line one"),
             Event::SoftBreak,
-            Event::Text {
-                content: "Line two".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Line two"),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -234,21 +250,11 @@ mod tests {
     #[test]
     fn soft_break_inside_heading() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartHeading { level: 2, id: None },
-            Event::Text {
-                content: "Title one".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_heading(2),
+            text("Title one"),
             Event::SoftBreak,
-            Event::Text {
-                content: "Title two".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Title two"),
             Event::EndHeading,
             Event::EndDocument,
         ]);
@@ -261,27 +267,13 @@ mod tests {
     #[test]
     fn soft_break_inside_table_cell() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartTable { id: None },
-            Event::StartTableRow { id: None },
-            Event::StartTableCell {
-                colspan: None,
-                rowspan: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Cell line one".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("Cell line one"),
             Event::SoftBreak,
-            Event::Text {
-                content: "Cell line two".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Cell line two"),
             Event::EndTableCell,
             Event::EndTableRow,
             Event::EndTable,
@@ -296,25 +288,15 @@ mod tests {
     #[test]
     fn soft_break_inside_list_item() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "Bullet line one".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Bullet line one"),
             Event::SoftBreak,
-            Event::Text {
-                content: "Bullet line two".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Bullet line two"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -327,29 +309,16 @@ mod tests {
     #[test]
     fn soft_break_inside_link_display_text() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::StartLink {
                 href: "https://example.com".to_string(),
                 id: None,
                 title: None,
             },
-            Event::Text {
-                content: "Click line one".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Click line one"),
             Event::SoftBreak,
-            Event::Text {
-                content: "click line two".to_string(),
-                style: TextStyle::default(),
-            },
+            text("click line two"),
             Event::EndLink,
             Event::EndParagraph,
             Event::EndDocument,
@@ -363,25 +332,12 @@ mod tests {
     #[test]
     fn soft_break_inside_blockquote() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartBlockQuote { id: None },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Quote line one".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_blockquote(),
+            start_paragraph(),
+            text("Quote line one"),
             Event::SoftBreak,
-            Event::Text {
-                content: "Quote line two".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Quote line two"),
             Event::EndParagraph,
             Event::EndBlockQuote,
             Event::EndDocument,
@@ -395,15 +351,8 @@ mod tests {
     #[test]
     fn soft_break_between_styled_spans() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::Text {
                 content: "Bold line one".to_string(),
                 style: TextStyle::default().bold(),
@@ -427,15 +376,8 @@ mod tests {
     #[test]
     fn italic_text() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::Text {
                 content: "Italic".to_string(),
                 style: TextStyle::default().italic(),
@@ -452,15 +394,8 @@ mod tests {
     #[test]
     fn bold_and_italic_text() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::Text {
                 content: "Both".to_string(),
                 style: TextStyle::default().bold().italic(),
@@ -477,16 +412,9 @@ mod tests {
     #[test]
     fn heading_level_1() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartHeading { level: 1, id: None },
-            Event::Text {
-                content: "Title".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_heading(1),
+            text("Title"),
             Event::EndHeading,
             Event::EndDocument,
         ]);
@@ -499,16 +427,9 @@ mod tests {
     #[test]
     fn heading_level_2() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartHeading { level: 2, id: None },
-            Event::Text {
-                content: "Subtitle".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_heading(2),
+            text("Subtitle"),
             Event::EndHeading,
             Event::EndDocument,
         ]);
@@ -521,28 +442,12 @@ mod tests {
     #[test]
     fn multiple_paragraphs() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "First".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("First"),
             Event::EndParagraph,
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Second".to_string(),
-                style: TextStyle::default(),
-            },
+            start_paragraph(),
+            text("Second"),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -555,11 +460,7 @@ mod tests {
     #[test]
     fn image_block() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::Image {
                 source: ImageSource::Uri {
                     uri: "https://example.com/img.png".to_string(),
@@ -580,11 +481,7 @@ mod tests {
     #[test]
     fn image_without_alt() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::Image {
                 source: ImageSource::Uri {
                     uri: "https://example.com/img.png".to_string(),
@@ -628,25 +525,12 @@ mod tests {
     #[test]
     fn mixed_content() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartHeading { level: 1, id: None },
-            Event::Text {
-                content: "Title".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_heading(1),
+            text("Title"),
             Event::EndHeading,
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Body".to_string(),
-                style: TextStyle::default(),
-            },
+            start_paragraph(),
+            text("Body"),
             Event::EndParagraph,
             Event::Image {
                 source: ImageSource::Uri {
@@ -668,12 +552,8 @@ mod tests {
     #[test]
     fn ignored_events() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartBlockQuote { id: None },
+            start_document(),
+            start_blockquote(),
             Event::EndBlockQuote,
             Event::LineBreak,
             Event::ThematicBreak { id: None },
@@ -688,20 +568,10 @@ mod tests {
     #[test]
     fn blockquote_with_text() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartBlockQuote { id: None },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "test".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_blockquote(),
+            start_paragraph(),
+            text("test"),
             Event::EndParagraph,
             Event::EndBlockQuote,
             Event::EndDocument,
@@ -715,16 +585,9 @@ mod tests {
     #[test]
     fn blockquote_with_styled_text() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartBlockQuote { id: None },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_blockquote(),
+            start_paragraph(),
             Event::Text {
                 content: "bold quote".to_string(),
                 style: TextStyle::default().bold(),
@@ -742,30 +605,14 @@ mod tests {
     #[test]
     fn blockquote_followed_by_paragraph() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartBlockQuote { id: None },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "quoted".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_blockquote(),
+            start_paragraph(),
+            text("quoted"),
             Event::EndParagraph,
             Event::EndBlockQuote,
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "normal".to_string(),
-                style: TextStyle::default(),
-            },
+            start_paragraph(),
+            text("normal"),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -778,30 +625,14 @@ mod tests {
     #[test]
     fn blockquote_multiline() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartBlockQuote { id: None },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "line1".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_blockquote(),
+            start_paragraph(),
+            text("line1"),
             Event::LineBreak,
-            Event::Text {
-                content: "line2".to_string(),
-                style: TextStyle::default(),
-            },
+            text("line2"),
             Event::LineBreak,
-            Event::Text {
-                content: "line3".to_string(),
-                style: TextStyle::default(),
-            },
+            text("line3"),
             Event::EndParagraph,
             Event::EndBlockQuote,
             Event::EndDocument,
@@ -815,31 +646,15 @@ mod tests {
     #[test]
     fn stack_empty_after_document() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartHeading { level: 1, id: None },
-            Event::Text {
-                content: "Title".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_heading(1),
+            text("Title"),
             Event::EndHeading,
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Body".to_string(),
-                style: TextStyle::default(),
-            },
+            start_paragraph(),
+            text("Body"),
             Event::EndParagraph,
-            Event::StartBlockQuote { id: None },
-            Event::Text {
-                content: "Quote".to_string(),
-                style: TextStyle::default(),
-            },
+            start_blockquote(),
+            text("Quote"),
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
@@ -852,20 +667,10 @@ mod tests {
     #[test]
     fn end_blockquote_auto_closes_open_content() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartBlockQuote { id: None },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Quoted text".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_blockquote(),
+            start_paragraph(),
+            text("Quoted text"),
             Event::EndParagraph,
             Event::EndBlockQuote,
             Event::EndDocument,
@@ -879,31 +684,15 @@ mod tests {
     #[test]
     fn multiple_block_types_in_sequence() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Para".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("Para"),
             Event::EndParagraph,
-            Event::StartBlockQuote { id: None },
-            Event::Text {
-                content: "Quote".to_string(),
-                style: TextStyle::default(),
-            },
+            start_blockquote(),
+            text("Quote"),
             Event::EndBlockQuote,
-            Event::StartHeading { level: 2, id: None },
-            Event::Text {
-                content: "Head".to_string(),
-                style: TextStyle::default(),
-            },
+            start_heading(2),
+            text("Head"),
             Event::EndHeading,
             Event::EndDocument,
         ]);
@@ -916,20 +705,13 @@ mod tests {
     #[test]
     fn list_item_tracked_on_stack() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "Item".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Item"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -942,20 +724,13 @@ mod tests {
     #[test]
     fn single_bullet_item_emits_bullet_list_item_block() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "First bullet".to_string(),
-                style: TextStyle::default(),
-            },
+            text("First bullet"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -968,21 +743,14 @@ mod tests {
     #[test]
     fn single_numbered_item_emits_numbered_list_item_block_with_start_1() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartOrderedListItem {
                 id: None,
                 level: 0,
                 start: Some(1),
                 style_type: docspec_core::ListStyleType::Decimal,
             },
-            Event::Text {
-                content: "First item".to_string(),
-                style: TextStyle::default(),
-            },
+            text("First item"),
             Event::EndOrderedListItem,
             Event::EndDocument,
         ]);
@@ -995,30 +763,20 @@ mod tests {
     #[test]
     fn two_top_level_bullets_emit_two_sibling_blocks() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "First".to_string(),
-                style: TextStyle::default(),
-            },
+            text("First"),
             Event::EndUnorderedListItem,
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "Second".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Second"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -1031,20 +789,13 @@ mod tests {
     #[test]
     fn end_document_closes_single_open_list_item() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "x".to_string(),
-                style: TextStyle::default(),
-            },
+            text("x"),
             Event::EndDocument,
         ]);
         assert_eq!(
@@ -1056,20 +807,13 @@ mod tests {
     #[test]
     fn end_document_with_clean_state_unchanged() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "x".to_string(),
-                style: TextStyle::default(),
-            },
+            text("x"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -1082,29 +826,19 @@ mod tests {
     #[test]
     fn end_document_with_two_consecutive_open_level_0_items_drains_both() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "a".to_string(),
-                style: TextStyle::default(),
-            },
+            text("a"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "b".to_string(),
-                style: TextStyle::default(),
-            },
+            text("b"),
             Event::EndDocument,
         ]);
         assert_eq!(
@@ -1116,20 +850,13 @@ mod tests {
     #[test]
     fn bullet_then_numbered_then_bullet_at_level_0() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "Bullet one".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Bullet one"),
             Event::EndUnorderedListItem,
             Event::StartOrderedListItem {
                 id: None,
@@ -1137,20 +864,14 @@ mod tests {
                 start: Some(1),
                 style_type: docspec_core::ListStyleType::Decimal,
             },
-            Event::Text {
-                content: "Number one".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Number one"),
             Event::EndOrderedListItem,
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "Bullet two".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Bullet two"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -1163,11 +884,7 @@ mod tests {
     #[test]
     fn bold_text_inside_bullet_list_item() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
@@ -1189,29 +906,19 @@ mod tests {
     #[test]
     fn nested_bullet_lists_emit_children_array() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "a".to_string(),
-                style: TextStyle::default(),
-            },
+            text("a"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 1,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "b".to_string(),
-                style: TextStyle::default(),
-            },
+            text("b"),
             Event::EndUnorderedListItem,
             Event::EndUnorderedListItem,
             Event::EndDocument,
@@ -1225,38 +932,25 @@ mod tests {
     #[test]
     fn three_level_nesting_emits_correct_structure() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "a".to_string(),
-                style: TextStyle::default(),
-            },
+            text("a"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 1,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "b".to_string(),
-                style: TextStyle::default(),
-            },
+            text("b"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 2,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "c".to_string(),
-                style: TextStyle::default(),
-            },
+            text("c"),
             Event::EndUnorderedListItem,
             Event::EndUnorderedListItem,
             Event::EndUnorderedListItem,
@@ -1271,30 +965,20 @@ mod tests {
     #[test]
     fn nested_numbered_inside_bullet() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "bullet".to_string(),
-                style: TextStyle::default(),
-            },
+            text("bullet"),
             Event::StartOrderedListItem {
                 id: None,
                 level: 1,
                 start: Some(1),
                 style_type: docspec_core::ListStyleType::Decimal,
             },
-            Event::Text {
-                content: "one".to_string(),
-                style: TextStyle::default(),
-            },
+            text("one"),
             Event::EndOrderedListItem,
             Event::EndUnorderedListItem,
             Event::EndDocument,
@@ -1308,39 +992,26 @@ mod tests {
     #[test]
     fn multiple_children_at_same_nested_level() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "a".to_string(),
-                style: TextStyle::default(),
-            },
+            text("a"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 1,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "b".to_string(),
-                style: TextStyle::default(),
-            },
+            text("b"),
             Event::EndUnorderedListItem,
             Event::StartUnorderedListItem {
                 id: None,
                 level: 1,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "c".to_string(),
-                style: TextStyle::default(),
-            },
+            text("c"),
             Event::EndUnorderedListItem,
             Event::EndUnorderedListItem,
             Event::EndDocument,
@@ -1355,13 +1026,7 @@ mod tests {
     fn orphan_end_unordered_list_item_is_silent_ok() {
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         let result = writer.handle_event(Event::EndUnorderedListItem);
         assert!(
             result.is_ok(),
@@ -1375,18 +1040,7 @@ mod tests {
 
     #[test]
     fn text_outside_block_auto_opens_paragraph() {
-        let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::Text {
-                content: "Orphan".to_string(),
-                style: TextStyle::default(),
-            },
-            Event::EndDocument,
-        ]);
+        let json = run_events(&[start_document(), text("Orphan"), Event::EndDocument]);
         assert_eq!(
             json,
             "[{\"type\":\"paragraph\",\"props\":{\"textAlignment\":\"left\"},\"content\":[{\"type\":\"text\",\"text\":\"Orphan\",\"styles\":{}}],\"children\":[]}]"
@@ -1396,19 +1050,9 @@ mod tests {
     #[test]
     fn multiple_text_in_paragraph() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Hello ".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("Hello "),
             Event::Text {
                 content: "World".to_string(),
                 style: TextStyle::default().bold(),
@@ -1425,28 +1069,12 @@ mod tests {
     #[test]
     fn two_paragraphs_without_ids() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "First".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("First"),
             Event::EndParagraph,
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Second".to_string(),
-                style: TextStyle::default(),
-            },
+            start_paragraph(),
+            text("Second"),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -1459,19 +1087,9 @@ mod tests {
     #[test]
     fn json_escaping_quotes() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "He said \"hello\"".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("He said \"hello\""),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -1484,19 +1102,9 @@ mod tests {
     #[test]
     fn json_escaping_backslash() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "path\\to\\file".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("path\\to\\file"),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -1509,19 +1117,9 @@ mod tests {
     #[test]
     fn json_escaping_newline() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "line1\nline2".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("line1\nline2"),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -1534,19 +1132,9 @@ mod tests {
     #[test]
     fn json_escaping_tab() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "col1\tcol2".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("col1\tcol2"),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -1559,15 +1147,8 @@ mod tests {
     #[test]
     fn empty_paragraph() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -1580,12 +1161,8 @@ mod tests {
     #[test]
     fn empty_heading() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartHeading { level: 1, id: None },
+            start_document(),
+            start_heading(1),
             Event::EndHeading,
             Event::EndDocument,
         ]);
@@ -1598,19 +1175,9 @@ mod tests {
     #[test]
     fn image_in_paragraph() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Before".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("Before"),
             Event::EndParagraph,
             Event::Image {
                 source: ImageSource::Uri {
@@ -1632,25 +1199,12 @@ mod tests {
     #[test]
     fn heading_then_paragraph() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartHeading { level: 1, id: None },
-            Event::Text {
-                content: "Title".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_heading(1),
+            text("Title"),
             Event::EndHeading,
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Body".to_string(),
-                style: TextStyle::default(),
-            },
+            start_paragraph(),
+            text("Body"),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -1663,19 +1217,9 @@ mod tests {
     #[test]
     fn json_escaping_carriage_return() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "line1\rline2".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("line1\rline2"),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -1688,11 +1232,7 @@ mod tests {
     #[test]
     fn image_url_escaping() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::Image {
                 source: ImageSource::Uri {
                     uri: "https://example.com/img?a=1&b=\"test\"".to_string(),
@@ -1713,15 +1253,8 @@ mod tests {
     #[test]
     fn end_paragraph_after_image_is_noop() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::EndParagraph,
             Event::Image {
                 source: ImageSource::Uri {
@@ -1776,7 +1309,7 @@ mod tests {
             metadata: None,
         });
         assert!(start_result.is_ok(), "start should succeed");
-        let heading_result = writer.handle_event(Event::StartHeading { level: 1, id: None });
+        let heading_result = writer.handle_event(start_heading(1));
         let err =
             heading_result.expect_err("StartHeading must fail when writer fails after first write");
         assert_eq!(err.to_string(), "I/O error: simulated write failure");
@@ -1889,11 +1422,7 @@ mod tests {
             MockAssetProvider::new().with_asset("photo", "image/jpeg", &[0xFF, 0xD8, 0xFF]);
         let json = run_events_with_assets(
             &[
-                Event::StartDocument {
-                    id: None,
-                    language: None,
-                    metadata: None,
-                },
+                start_document(),
                 Event::Image {
                     source: ImageSource::Asset {
                         asset_id: "photo".to_string(),
@@ -1918,11 +1447,7 @@ mod tests {
         let provider = MockAssetProvider::new().with_asset("empty", "image/png", &[]);
         let json = run_events_with_assets(
             &[
-                Event::StartDocument {
-                    id: None,
-                    language: None,
-                    metadata: None,
-                },
+                start_document(),
                 Event::Image {
                     source: ImageSource::Asset {
                         asset_id: "empty".to_string(),
@@ -1948,11 +1473,7 @@ mod tests {
             MockAssetProvider::new().with_asset("img1", "image/png", &[0x89, 0x50, 0x4E, 0x47]);
         let json = run_events_with_assets(
             &[
-                Event::StartDocument {
-                    id: None,
-                    language: None,
-                    metadata: None,
-                },
+                start_document(),
                 Event::Image {
                     source: ImageSource::Asset {
                         asset_id: "img1".to_string(),
@@ -1987,11 +1508,7 @@ mod tests {
             MockAssetProvider::new().with_asset("img1", "image/png", &[0x89, 0x50, 0x4E, 0x47]);
         let json = run_events_with_assets(
             &[
-                Event::StartDocument {
-                    id: None,
-                    language: None,
-                    metadata: None,
-                },
+                start_document(),
                 Event::Image {
                     source: ImageSource::Asset {
                         asset_id: "img1".to_string(),
@@ -2026,19 +1543,9 @@ mod tests {
             MockAssetProvider::new().with_asset("img1", "image/png", &[0x89, 0x50, 0x4E, 0x47]);
         let json = run_events_with_assets(
             &[
-                Event::StartDocument {
-                    id: None,
-                    language: None,
-                    metadata: None,
-                },
-                Event::StartParagraph {
-                    alignment: None,
-                    id: None,
-                },
-                Event::Text {
-                    content: "Before".to_string(),
-                    style: TextStyle::default(),
-                },
+                start_document(),
+                start_paragraph(),
+                text("Before"),
                 Event::EndParagraph,
                 Event::Image {
                     source: ImageSource::Asset {
@@ -2093,19 +1600,12 @@ mod tests {
     #[test]
     fn heading_with_explicit_id() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartHeading {
                 level: 1,
                 id: Some("custom-id".to_string()),
             },
-            Event::Text {
-                content: "Title".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Title"),
             Event::EndHeading,
             Event::EndDocument,
         ]);
@@ -2118,19 +1618,9 @@ mod tests {
     #[test]
     fn paragraph_without_id_omits_id_key() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Body".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("Body"),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -2143,19 +1633,9 @@ mod tests {
     #[test]
     fn code_block_with_language() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartPreformatted {
-                id: None,
-                syntax: Some("rust".to_string()),
-            },
-            Event::Text {
-                content: "fn main() {}".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_preformatted(Some("rust")),
+            text("fn main() {}"),
             Event::EndPreformatted,
             Event::EndDocument,
         ]);
@@ -2168,19 +1648,9 @@ mod tests {
     #[test]
     fn code_block_without_language() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartPreformatted {
-                id: None,
-                syntax: None,
-            },
-            Event::Text {
-                content: "plain code".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_preformatted(None),
+            text("plain code"),
             Event::EndPreformatted,
             Event::EndDocument,
         ]);
@@ -2193,15 +1663,8 @@ mod tests {
     #[test]
     fn empty_code_block() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartPreformatted {
-                id: None,
-                syntax: Some("python".to_string()),
-            },
+            start_document(),
+            start_preformatted(Some("python")),
             Event::EndPreformatted,
             Event::EndDocument,
         ]);
@@ -2214,11 +1677,7 @@ mod tests {
     #[test]
     fn code_block_with_id() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartPreformatted {
                 id: Some("cb-1".to_string()),
                 syntax: None,
@@ -2238,16 +1697,8 @@ mod tests {
         let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 
         // > ![logo](https://example.com/logo.png)
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartBlockQuote { id: None })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_blockquote()).is_ok());
         assert!(writer
             .handle_event(Event::Image {
                 source: ImageSource::Uri {
@@ -2277,45 +1728,15 @@ mod tests {
 
         // Test actual nesting: send StartBlockQuote while another is open
         // Sibling emission should close outer quote and emit inner as sibling
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartBlockQuote { id: None })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartParagraph {
-                alignment: None,
-                id: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "outer".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_blockquote()).is_ok());
+        assert!(writer.handle_event(start_paragraph()).is_ok());
+        assert!(writer.handle_event(text("outer")).is_ok());
         assert!(writer.handle_event(Event::EndParagraph).is_ok());
         // DO NOT close outer quote - send nested StartBlockQuote directly
-        assert!(writer
-            .handle_event(Event::StartBlockQuote { id: None })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartParagraph {
-                alignment: None,
-                id: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "inner".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_blockquote()).is_ok());
+        assert!(writer.handle_event(start_paragraph()).is_ok());
+        assert!(writer.handle_event(text("inner")).is_ok());
         assert!(writer.handle_event(Event::EndParagraph).is_ok());
         assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
         // Outer was force-closed by sibling emission, so only close inner
@@ -2335,25 +1756,10 @@ mod tests {
         let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 
         // > # Title
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartBlockQuote { id: None })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartHeading { level: 1, id: None })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "Title".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_blockquote()).is_ok());
+        assert!(writer.handle_event(start_heading(1)).is_ok());
+        assert!(writer.handle_event(text("Title")).is_ok());
         assert!(writer.handle_event(Event::EndHeading).is_ok());
         assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
@@ -2372,28 +1778,12 @@ mod tests {
         let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 
         // > ```code```
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_blockquote()).is_ok());
         assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
+            .handle_event(start_preformatted(Some("rust")))
             .is_ok());
-        assert!(writer
-            .handle_event(Event::StartBlockQuote { id: None })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartPreformatted {
-                syntax: Some("rust".to_string()),
-                id: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "fn main() {}".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(text("fn main() {}")).is_ok());
         assert!(writer.handle_event(Event::EndPreformatted).is_ok());
         assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
@@ -2412,16 +1802,8 @@ mod tests {
         let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 
         // # ![logo](https://example.com/logo.png)
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartHeading { level: 1, id: None })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_heading(1)).is_ok());
         assert!(writer
             .handle_event(Event::Image {
                 source: ImageSource::Uri {
@@ -2449,16 +1831,8 @@ mod tests {
         let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 
         // > ---
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartBlockQuote { id: None })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_blockquote()).is_ok());
         assert!(writer
             .handle_event(Event::ThematicBreak { id: None })
             .is_ok());
@@ -2480,15 +1854,8 @@ mod tests {
     #[test]
     fn code_text() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::Text {
                 content: "code".to_string(),
                 style: TextStyle::default().code(),
@@ -2505,15 +1872,8 @@ mod tests {
     #[test]
     fn strikethrough_text() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::Text {
                 content: "struck".to_string(),
                 style: TextStyle::default().strikethrough(),
@@ -2530,15 +1890,8 @@ mod tests {
     #[test]
     fn underline_text() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::Text {
                 content: "underlined".to_string(),
                 style: TextStyle::default().underline(),
@@ -2555,15 +1908,8 @@ mod tests {
     #[test]
     fn combined_styles_bold_code_strikethrough() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::Text {
                 content: "combined".to_string(),
                 style: TextStyle::default().bold().code().strikethrough(),
@@ -2580,12 +1926,8 @@ mod tests {
     #[test]
     fn empty_table_emits_table_block_with_no_rows() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartTable { id: None },
+            start_document(),
+            start_table(),
             Event::EndTable,
             Event::EndDocument,
         ]);
@@ -2598,32 +1940,14 @@ mod tests {
     #[test]
     fn simple_table_with_one_data_row_and_two_cells() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartTable { id: None },
-            Event::StartTableRow { id: None },
-            Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            },
-            Event::Text {
-                content: "Cell1".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("Cell1"),
             Event::EndTableCell,
-            Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            },
-            Event::Text {
-                content: "Cell2".to_string(),
-                style: TextStyle::default(),
-            },
+            start_table_cell(),
+            text("Cell2"),
             Event::EndTableCell,
             Event::EndTableRow,
             Event::EndTable,
@@ -2638,13 +1962,9 @@ mod tests {
     #[test]
     fn header_only_table() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartTable { id: None },
-            Event::StartTableRow { id: None },
+            start_document(),
+            start_table(),
+            start_table_row(),
             Event::StartTableHeader {
                 id: None,
                 scope: None,
@@ -2652,10 +1972,7 @@ mod tests {
                 colspan: None,
                 rowspan: None,
             },
-            Event::Text {
-                content: "H1".to_string(),
-                style: TextStyle::default(),
-            },
+            text("H1"),
             Event::EndTableHeader,
             Event::StartTableHeader {
                 id: None,
@@ -2664,10 +1981,7 @@ mod tests {
                 colspan: None,
                 rowspan: None,
             },
-            Event::Text {
-                content: "H2".to_string(),
-                style: TextStyle::default(),
-            },
+            text("H2"),
             Event::EndTableHeader,
             Event::EndTableRow,
             Event::EndTable,
@@ -2682,18 +1996,10 @@ mod tests {
     #[test]
     fn table_cell_with_bold_text() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartTable { id: None },
-            Event::StartTableRow { id: None },
-            Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            },
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
             Event::Text {
                 content: "bold".to_string(),
                 style: TextStyle::default().bold(),
@@ -2712,21 +2018,11 @@ mod tests {
     #[test]
     fn table_preceded_by_paragraph_closes_paragraph() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "before".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("before"),
             Event::EndParagraph,
-            Event::StartTable { id: None },
+            start_table(),
             Event::EndTable,
             Event::EndDocument,
         ]);
@@ -2739,21 +2035,11 @@ mod tests {
     #[test]
     fn table_followed_by_paragraph_opens_new_block() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartTable { id: None },
+            start_document(),
+            start_table(),
             Event::EndTable,
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "after".to_string(),
-                style: TextStyle::default(),
-            },
+            start_paragraph(),
+            text("after"),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -2771,13 +2057,7 @@ mod tests {
         // sequence the stack tracker would otherwise reject.
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         let result = writer.handle_event(Event::EndTable);
         assert!(result.is_ok(), "orphan EndTable must be silently absorbed");
         assert!(writer.handle_event(Event::EndDocument).is_ok());
@@ -2796,48 +2076,16 @@ mod tests {
         // readers may produce in the future.
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::StartTable { id: None }).is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableRow { id: None })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "outer".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_table()).is_ok());
+        assert!(writer.handle_event(start_table_row()).is_ok());
+        assert!(writer.handle_event(start_table_cell()).is_ok());
+        assert!(writer.handle_event(text("outer")).is_ok());
         // Nested inner table — every event below is silently absorbed by guards
-        assert!(writer.handle_event(Event::StartTable { id: None }).is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableRow { id: None })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "inner".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_table()).is_ok());
+        assert!(writer.handle_event(start_table_row()).is_ok());
+        assert!(writer.handle_event(start_table_cell()).is_ok());
+        assert!(writer.handle_event(text("inner")).is_ok());
         assert!(writer.handle_event(Event::EndTableCell).is_ok());
         assert!(writer.handle_event(Event::EndTableRow).is_ok());
         assert!(writer.handle_event(Event::EndTable).is_ok());
@@ -2856,11 +2104,7 @@ mod tests {
     #[test]
     fn thematic_break_with_id_emits_id_field() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::ThematicBreak {
                 id: Some("hr-1".to_string()),
             },
@@ -2872,11 +2116,7 @@ mod tests {
     #[test]
     fn image_with_id_emits_id_field() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::Image {
                 source: ImageSource::Uri {
                     uri: "https://example.com/img.png".to_string(),
@@ -2902,13 +2142,7 @@ mod tests {
         // rejects orphan close events.
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         let result = writer.handle_event(Event::EndPreformatted);
         assert!(
             result.is_ok(),
@@ -2926,18 +2160,10 @@ mod tests {
         // cell content is InlineContent[] — block-level events (including images)
         // are silently dropped per the documented cell-content semantics.
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartTable { id: None },
-            Event::StartTableRow { id: None },
-            Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            },
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
             Event::Image {
                 source: ImageSource::Uri {
                     uri: "https://example.com/img.png".to_string(),
@@ -2961,21 +2187,14 @@ mod tests {
     #[test]
     fn numbered_list_item_with_start_5_emits_start_prop() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartOrderedListItem {
                 id: None,
                 level: 0,
                 start: Some(5),
                 style_type: docspec_core::ListStyleType::Decimal,
             },
-            Event::Text {
-                content: "Item".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Item"),
             Event::EndOrderedListItem,
             Event::EndDocument,
         ]);
@@ -2988,21 +2207,14 @@ mod tests {
     #[test]
     fn numbered_list_item_with_no_start_omits_start_prop() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartOrderedListItem {
                 id: None,
                 level: 0,
                 start: None,
                 style_type: docspec_core::ListStyleType::Decimal,
             },
-            Event::Text {
-                content: "Item".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Item"),
             Event::EndOrderedListItem,
             Event::EndDocument,
         ]);
@@ -3015,20 +2227,13 @@ mod tests {
     #[test]
     fn unordered_list_item_never_emits_start_prop() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "Item".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Item"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -3041,20 +2246,13 @@ mod tests {
     #[test]
     fn list_item_with_id_emits_id_field() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: Some("item-1".to_string()),
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "Item".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Item"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -3067,20 +2265,13 @@ mod tests {
     #[test]
     fn list_item_without_id_omits_id_key() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "Item".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Item"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -3094,24 +2285,10 @@ mod tests {
     fn list_inside_table_cell_is_dropped() {
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::StartTable { id: None }).is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableRow { id: None })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_table()).is_ok());
+        assert!(writer.handle_event(start_table_row()).is_ok());
+        assert!(writer.handle_event(start_table_cell()).is_ok());
         assert!(writer
             .handle_event(Event::StartUnorderedListItem {
                 id: None,
@@ -3119,12 +2296,7 @@ mod tests {
                 style_type: docspec_core::ListStyleType::Disc,
             })
             .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "dropped".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(text("dropped")).is_ok());
         assert!(writer.handle_event(Event::EndUnorderedListItem).is_ok());
         assert!(writer.handle_event(Event::EndTableCell).is_ok());
         assert!(writer.handle_event(Event::EndTableRow).is_ok());
@@ -3141,21 +2313,14 @@ mod tests {
     #[test]
     fn list_inside_blockquote_emits_sibling() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartBlockQuote { id: None },
+            start_document(),
+            start_blockquote(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "quoted bullet".to_string(),
-                style: TextStyle::default(),
-            },
+            text("quoted bullet"),
             Event::EndUnorderedListItem,
             Event::EndBlockQuote,
             Event::EndDocument,
@@ -3169,38 +2334,20 @@ mod tests {
     #[test]
     fn nested_table_with_list_in_cell_drops_list() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartTable { id: None },
-            Event::StartTableRow { id: None },
-            Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            },
-            Event::Text {
-                content: "outer".to_string(),
-                style: TextStyle::default(),
-            },
-            Event::StartTable { id: None },
-            Event::StartTableRow { id: None },
-            Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            },
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("outer"),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "inner dropped".to_string(),
-                style: TextStyle::default(),
-            },
+            text("inner dropped"),
             Event::EndUnorderedListItem,
             Event::EndTableCell,
             Event::EndTableRow,
@@ -3223,47 +2370,31 @@ mod tests {
     #[test]
     fn level_two_to_zero_drops_three_levels_correctly() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "a".to_string(),
-                style: TextStyle::default(),
-            },
+            text("a"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 1,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "b".to_string(),
-                style: TextStyle::default(),
-            },
+            text("b"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 2,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "c".to_string(),
-                style: TextStyle::default(),
-            },
+            text("c"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "d".to_string(),
-                style: TextStyle::default(),
-            },
+            text("d"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -3276,47 +2407,31 @@ mod tests {
     #[test]
     fn level_two_to_one_drops_one_level() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "a".to_string(),
-                style: TextStyle::default(),
-            },
+            text("a"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 1,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "b".to_string(),
-                style: TextStyle::default(),
-            },
+            text("b"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 2,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "c".to_string(),
-                style: TextStyle::default(),
-            },
+            text("c"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 1,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "d".to_string(),
-                style: TextStyle::default(),
-            },
+            text("d"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -3329,29 +2444,19 @@ mod tests {
     #[test]
     fn programmatic_level_jump_0_to_2_clamps_to_1() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "a".to_string(),
-                style: TextStyle::default(),
-            },
+            text("a"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 2,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "b".to_string(),
-                style: TextStyle::default(),
-            },
+            text("b"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -3364,39 +2469,26 @@ mod tests {
     #[test]
     fn explicit_end_then_level_down_works() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "a".to_string(),
-                style: TextStyle::default(),
-            },
+            text("a"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 1,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "b".to_string(),
-                style: TextStyle::default(),
-            },
+            text("b"),
             Event::EndUnorderedListItem,
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "c".to_string(),
-                style: TextStyle::default(),
-            },
+            text("c"),
             Event::EndDocument,
         ]);
         assert_eq!(
@@ -3408,38 +2500,25 @@ mod tests {
     #[test]
     fn end_document_with_nested_open_items_drains_in_reverse_order() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "a".to_string(),
-                style: TextStyle::default(),
-            },
+            text("a"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 1,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "b".to_string(),
-                style: TextStyle::default(),
-            },
+            text("b"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 2,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "c".to_string(),
-                style: TextStyle::default(),
-            },
+            text("c"),
             Event::EndDocument,
         ]);
         assert_eq!(
@@ -3455,20 +2534,13 @@ mod tests {
     #[test]
     fn single_paragraph_item_inline_content_only() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "Hello".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Hello"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -3481,28 +2553,15 @@ mod tests {
     #[test]
     fn multi_paragraph_item_first_inline_rest_as_children() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "Para one".to_string(),
-                style: TextStyle::default(),
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Para two".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Para one"),
+            start_paragraph(),
+            text("Para two"),
             Event::EndParagraph,
             Event::EndUnorderedListItem,
             Event::EndDocument,
@@ -3516,37 +2575,21 @@ mod tests {
     #[test]
     fn nested_item_inherits_paragraph_dispatch() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "a".to_string(),
-                style: TextStyle::default(),
-            },
+            text("a"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 1,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "b1".to_string(),
-                style: TextStyle::default(),
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "b2".to_string(),
-                style: TextStyle::default(),
-            },
+            text("b1"),
+            start_paragraph(),
+            text("b2"),
             Event::EndParagraph,
             Event::EndUnorderedListItem,
             Event::EndUnorderedListItem,
@@ -3561,37 +2604,18 @@ mod tests {
     #[test]
     fn three_paragraphs_in_item() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "Para one".to_string(),
-                style: TextStyle::default(),
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Para two".to_string(),
-                style: TextStyle::default(),
-            },
+            text("Para one"),
+            start_paragraph(),
+            text("Para two"),
             Event::EndParagraph,
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "Para three".to_string(),
-                style: TextStyle::default(),
-            },
+            start_paragraph(),
+            text("Para three"),
             Event::EndParagraph,
             Event::EndUnorderedListItem,
             Event::EndDocument,
@@ -3605,26 +2629,16 @@ mod tests {
     #[test]
     fn list_immediately_after_blockquote_with_no_intervening_text_emits_at_top_level() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartBlockQuote { id: None },
-            Event::Text {
-                content: "Quote".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_blockquote(),
+            text("Quote"),
             Event::EndBlockQuote,
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "after quote".to_string(),
-                style: TextStyle::default(),
-            },
+            text("after quote"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -3637,26 +2651,16 @@ mod tests {
     #[test]
     fn heading_inside_list_item_is_dropped() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::StartHeading { level: 1, id: None },
-            Event::Text {
-                content: "h".to_string(),
-                style: TextStyle::default(),
-            },
+            start_heading(1),
+            text("h"),
             Event::EndHeading,
-            Event::Text {
-                content: "item".to_string(),
-                style: TextStyle::default(),
-            },
+            text("item"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -3669,11 +2673,7 @@ mod tests {
     #[test]
     fn image_inside_list_item_is_dropped() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
@@ -3700,24 +2700,14 @@ mod tests {
     #[test]
     fn code_block_inside_list_item_is_dropped() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::StartPreformatted {
-                id: None,
-                syntax: None,
-            },
-            Event::Text {
-                content: "code".to_string(),
-                style: TextStyle::default(),
-            },
+            start_preformatted(None),
+            text("code"),
             Event::EndPreformatted,
             Event::EndUnorderedListItem,
             Event::EndDocument,
@@ -3731,21 +2721,14 @@ mod tests {
     #[test]
     fn nested_blockquote_inside_list_item_is_dropped() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::StartBlockQuote { id: None },
-            Event::Text {
-                content: "q".to_string(),
-                style: TextStyle::default(),
-            },
+            start_blockquote(),
+            text("q"),
             Event::EndBlockQuote,
             Event::EndUnorderedListItem,
             Event::EndDocument,
@@ -3759,11 +2742,7 @@ mod tests {
     #[test]
     fn divider_inside_list_item_is_dropped() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
@@ -3782,27 +2761,16 @@ mod tests {
     #[test]
     fn table_inside_list_item_is_dropped() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::StartTable { id: None },
-            Event::StartTableRow { id: None },
-            Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            },
-            Event::Text {
-                content: "cell".to_string(),
-                style: TextStyle::default(),
-            },
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("cell"),
             Event::EndTableCell,
             Event::EndTableRow,
             Event::EndTable,
@@ -3818,30 +2786,17 @@ mod tests {
     #[test]
     fn text_after_dropped_block_in_list_item_is_preserved() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "before".to_string(),
-                style: TextStyle::default(),
-            },
-            Event::StartHeading { level: 1, id: None },
-            Event::Text {
-                content: "dropped".to_string(),
-                style: TextStyle::default(),
-            },
+            text("before"),
+            start_heading(1),
+            text("dropped"),
             Event::EndHeading,
-            Event::Text {
-                content: "after".to_string(),
-                style: TextStyle::default(),
-            },
+            text("after"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -3854,21 +2809,14 @@ mod tests {
     #[test]
     fn drop_counter_returns_to_zero_after_end() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::StartHeading { level: 1, id: None },
-            Event::Text {
-                content: "dropped".to_string(),
-                style: TextStyle::default(),
-            },
+            start_heading(1),
+            text("dropped"),
             Event::EndHeading,
             Event::EndUnorderedListItem,
             Event::StartUnorderedListItem {
@@ -3876,10 +2824,7 @@ mod tests {
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "second".to_string(),
-                style: TextStyle::default(),
-            },
+            text("second"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -3966,23 +2911,12 @@ mod tests {
         // driven (the !in_text_block guard fires). Heading text is flattened into the
         // cell's inline content — only the heading *structure* is dropped.
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartTable { id: None },
-            Event::StartTableRow { id: None },
-            Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            },
-            Event::StartHeading { level: 1, id: None },
-            Event::Text {
-                content: "h".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            start_heading(1),
+            text("h"),
             Event::EndHeading,
             Event::EndTableCell,
             Event::EndTableRow,
@@ -4002,23 +2936,12 @@ mod tests {
         // EndBlockQuote match arms. blockquote_depth is never incremented; text is
         // flattened into the cell's inline content.
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartTable { id: None },
-            Event::StartTableRow { id: None },
-            Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            },
-            Event::StartBlockQuote { id: None },
-            Event::Text {
-                content: "q".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            start_blockquote(),
+            text("q"),
             Event::EndBlockQuote,
             Event::EndTableCell,
             Event::EndTableRow,
@@ -4037,26 +2960,12 @@ mod tests {
         // EndPreformatted match arms. Code-block structure is never emitted; text is
         // flattened into the cell's inline content.
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartTable { id: None },
-            Event::StartTableRow { id: None },
-            Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            },
-            Event::StartPreformatted {
-                id: None,
-                syntax: None,
-            },
-            Event::Text {
-                content: "code".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            start_preformatted(None),
+            text("code"),
             Event::EndPreformatted,
             Event::EndTableCell,
             Event::EndTableRow,
@@ -4076,31 +2985,18 @@ mod tests {
         // discarded — neither the line break nor any surrounding text from the dropped
         // block appears in the output.
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::StartHeading { level: 1, id: None },
-            Event::Text {
-                content: "head".to_string(),
-                style: TextStyle::default(),
-            },
+            start_heading(1),
+            text("head"),
             Event::LineBreak,
-            Event::Text {
-                content: "more".to_string(),
-                style: TextStyle::default(),
-            },
+            text("more"),
             Event::EndHeading,
-            Event::Text {
-                content: "item".to_string(),
-                style: TextStyle::default(),
-            },
+            text("item"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -4117,13 +3013,7 @@ mod tests {
         // Uses BlockNoteWriter directly to bypass StackTrackingSink validation.
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         let result = writer.handle_event(Event::StartOrderedListItem {
             id: None,
             level: 0,
@@ -4145,25 +3035,15 @@ mod tests {
         // Verifies that the closed list item is properly finalised and the following
         // paragraph is emitted at the top level.
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
             Event::EndUnorderedListItem,
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "after".to_string(),
-                style: TextStyle::default(),
-            },
+            start_paragraph(),
+            text("after"),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -4179,24 +3059,11 @@ mod tests {
         // is true. The separator path emits a "\n\n" text node between the two
         // paragraphs' content so block-quote paragraphs are visually separated.
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartBlockQuote { id: None },
-            Event::Text {
-                content: "first".to_string(),
-                style: TextStyle::default(),
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "second".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_blockquote(),
+            text("first"),
+            start_paragraph(),
+            text("second"),
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
@@ -4214,13 +3081,7 @@ mod tests {
         // End events.
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         let result = writer.handle_event(Event::EndHeading);
         assert!(
             result.is_ok(),
@@ -4240,19 +3101,9 @@ mod tests {
         // already closed the paragraph — the next Text call triggers a new implicit
         // paragraph open.
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "before".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("before"),
             Event::Image {
                 source: ImageSource::Uri {
                     uri: "https://example.com/img.png".to_string(),
@@ -4262,10 +3113,7 @@ mod tests {
                 decorative: false,
                 id: None,
             },
-            Event::Text {
-                content: "after".to_string(),
-                style: TextStyle::default(),
-            },
+            text("after"),
             Event::EndDocument,
         ]);
         assert_eq!(
@@ -4283,13 +3131,7 @@ mod tests {
         // stack-order constraints on orphan End events.
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         for event in [
             Event::EndCaption,
             Event::EndDefinitionDetail,
@@ -4319,27 +3161,11 @@ mod tests {
         // Drives return_if_table_cell! return branch in the StartHeading arm (line 843).
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::StartTable { id: None }).is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableRow { id: None })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartHeading { level: 1, id: None })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_table()).is_ok());
+        assert!(writer.handle_event(start_table_row()).is_ok());
+        assert!(writer.handle_event(start_table_cell()).is_ok());
+        assert!(writer.handle_event(start_heading(1)).is_ok());
         assert!(writer.handle_event(Event::EndTableCell).is_ok());
         assert!(writer.handle_event(Event::EndTableRow).is_ok());
         assert!(writer.handle_event(Event::EndTable).is_ok());
@@ -4358,13 +3184,7 @@ mod tests {
         // and drop_block_in_list_end! return branch in EndHeading arm (line 849).
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         assert!(writer
             .handle_event(Event::StartUnorderedListItem {
                 id: None,
@@ -4372,9 +3192,7 @@ mod tests {
                 style_type: docspec_core::ListStyleType::Disc,
             })
             .is_ok());
-        assert!(writer
-            .handle_event(Event::StartHeading { level: 1, id: None })
-            .is_ok());
+        assert!(writer.handle_event(start_heading(1)).is_ok());
         assert!(writer.handle_event(Event::EndHeading).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
@@ -4390,22 +3208,9 @@ mod tests {
         // Drives close_text_block! in the EndHeading arm (line 853) via raw BlockNoteWriter.
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartHeading { level: 2, id: None })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "Heading text".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_heading(2)).is_ok());
+        assert!(writer.handle_event(text("Heading text")).is_ok());
         assert!(writer.handle_event(Event::EndHeading).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
@@ -4422,13 +3227,7 @@ mod tests {
         // drop_block_in_list_end! in EndPreformatted arm (line 856).
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         assert!(writer
             .handle_event(Event::StartUnorderedListItem {
                 id: None,
@@ -4436,12 +3235,7 @@ mod tests {
                 style_type: docspec_core::ListStyleType::Disc,
             })
             .is_ok());
-        assert!(writer
-            .handle_event(Event::StartPreformatted {
-                id: None,
-                syntax: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_preformatted(None)).is_ok());
         assert!(writer.handle_event(Event::EndPreformatted).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
@@ -4457,24 +3251,10 @@ mod tests {
         // Drives return_if_table_cell! return branch in EndPreformatted arm (line 857).
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::StartTable { id: None }).is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableRow { id: None })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_table()).is_ok());
+        assert!(writer.handle_event(start_table_row()).is_ok());
+        assert!(writer.handle_event(start_table_cell()).is_ok());
         assert!(writer.handle_event(Event::EndPreformatted).is_ok());
         assert!(writer.handle_event(Event::EndTableCell).is_ok());
         assert!(writer.handle_event(Event::EndTableRow).is_ok());
@@ -4493,25 +3273,11 @@ mod tests {
         // Drives close_text_block! in EndPreformatted arm (line 861) via raw BlockNoteWriter.
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
+        assert!(writer.handle_event(start_document()).is_ok());
         assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
+            .handle_event(start_preformatted(Some("rust")))
             .is_ok());
-        assert!(writer
-            .handle_event(Event::StartPreformatted {
-                id: None,
-                syntax: Some("rust".to_string()),
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "let x = 1;".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(text("let x = 1;")).is_ok());
         assert!(writer.handle_event(Event::EndPreformatted).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
@@ -4527,27 +3293,11 @@ mod tests {
         // Drives return_if_table_cell! return branch in StartBlockQuote arm (line 866).
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::StartTable { id: None }).is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableRow { id: None })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartBlockQuote { id: None })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_table()).is_ok());
+        assert!(writer.handle_event(start_table_row()).is_ok());
+        assert!(writer.handle_event(start_table_cell()).is_ok());
+        assert!(writer.handle_event(start_blockquote()).is_ok());
         assert!(writer.handle_event(Event::EndTableCell).is_ok());
         assert!(writer.handle_event(Event::EndTableRow).is_ok());
         assert!(writer.handle_event(Event::EndTable).is_ok());
@@ -4566,13 +3316,7 @@ mod tests {
         // drop_block_in_list_end! in EndBlockQuote arm (line 872).
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         assert!(writer
             .handle_event(Event::StartUnorderedListItem {
                 id: None,
@@ -4580,9 +3324,7 @@ mod tests {
                 style_type: docspec_core::ListStyleType::Disc,
             })
             .is_ok());
-        assert!(writer
-            .handle_event(Event::StartBlockQuote { id: None })
-            .is_ok());
+        assert!(writer.handle_event(start_blockquote()).is_ok());
         assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
@@ -4598,24 +3340,10 @@ mod tests {
         // Drives return_if_table_cell! return branch in EndBlockQuote arm (line 873).
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::StartTable { id: None }).is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableRow { id: None })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_table()).is_ok());
+        assert!(writer.handle_event(start_table_row()).is_ok());
+        assert!(writer.handle_event(start_table_cell()).is_ok());
         assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
         assert!(writer.handle_event(Event::EndTableCell).is_ok());
         assert!(writer.handle_event(Event::EndTableRow).is_ok());
@@ -4634,30 +3362,11 @@ mod tests {
         // Drives return_if_table_cell! return branch in StartPreformatted arm (line 885).
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::StartTable { id: None }).is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableRow { id: None })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartPreformatted {
-                id: None,
-                syntax: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_table()).is_ok());
+        assert!(writer.handle_event(start_table_row()).is_ok());
+        assert!(writer.handle_event(start_table_cell()).is_ok());
+        assert!(writer.handle_event(start_preformatted(None)).is_ok());
         assert!(writer.handle_event(Event::EndTableCell).is_ok());
         assert!(writer.handle_event(Event::EndTableRow).is_ok());
         assert!(writer.handle_event(Event::EndTable).is_ok());
@@ -4675,24 +3384,10 @@ mod tests {
         // Drives return_if_table_cell! return branch in ThematicBreak arm (line 891).
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::StartTable { id: None }).is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableRow { id: None })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_table()).is_ok());
+        assert!(writer.handle_event(start_table_row()).is_ok());
+        assert!(writer.handle_event(start_table_cell()).is_ok());
         assert!(writer
             .handle_event(Event::ThematicBreak { id: None })
             .is_ok());
@@ -4714,13 +3409,7 @@ mod tests {
         // drop_block_in_list_end! in EndTable arm (line 348).
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         assert!(writer
             .handle_event(Event::StartUnorderedListItem {
                 id: None,
@@ -4728,7 +3417,7 @@ mod tests {
                 style_type: docspec_core::ListStyleType::Disc,
             })
             .is_ok());
-        assert!(writer.handle_event(Event::StartTable { id: None }).is_ok());
+        assert!(writer.handle_event(start_table()).is_ok());
         assert!(writer.handle_event(Event::EndTable).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
@@ -4745,25 +3434,9 @@ mod tests {
         // via raw BlockNoteWriter.
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartParagraph {
-                alignment: None,
-                id: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "plain text".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_paragraph()).is_ok());
+        assert!(writer.handle_event(text("plain text")).is_ok());
         assert!(writer.handle_event(Event::EndParagraph).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
@@ -4780,25 +3453,9 @@ mod tests {
         let provider = MockAssetProvider::new();
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::with_assets(&mut buf, &provider);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartParagraph {
-                alignment: None,
-                id: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "hello".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_paragraph()).is_ok());
+        assert!(writer.handle_event(text("hello")).is_ok());
         assert!(writer.handle_event(Event::EndParagraph).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
@@ -4814,47 +3471,31 @@ mod tests {
         // Drives the break statement (line 592) in the level-down while-loop of
         // handle_start_list_item: level-0 → level-1 → level-2 → back to level-1.
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "a".to_string(),
-                style: TextStyle::default(),
-            },
+            text("a"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 1,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "b".to_string(),
-                style: TextStyle::default(),
-            },
+            text("b"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 2,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "c".to_string(),
-                style: TextStyle::default(),
-            },
+            text("c"),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 1,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "d".to_string(),
-                style: TextStyle::default(),
-            },
+            text("d"),
             Event::EndDocument,
         ]);
         assert_eq!(
@@ -4869,13 +3510,7 @@ mod tests {
         // handle_end_paragraph second-para-close path (line 324) via raw BlockNoteWriter.
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         assert!(writer
             .handle_event(Event::StartUnorderedListItem {
                 id: None,
@@ -4883,31 +3518,11 @@ mod tests {
                 style_type: docspec_core::ListStyleType::Disc,
             })
             .is_ok());
-        assert!(writer
-            .handle_event(Event::StartParagraph {
-                alignment: None,
-                id: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "first".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_paragraph()).is_ok());
+        assert!(writer.handle_event(text("first")).is_ok());
         assert!(writer.handle_event(Event::EndParagraph).is_ok());
-        assert!(writer
-            .handle_event(Event::StartParagraph {
-                alignment: None,
-                id: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "second".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_paragraph()).is_ok());
+        assert!(writer.handle_event(text("second")).is_ok());
         assert!(writer.handle_event(Event::EndParagraph).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
@@ -4924,13 +3539,7 @@ mod tests {
         // and children_array_open=false (line 737) via raw BlockNoteWriter.
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         assert!(writer
             .handle_event(Event::StartUnorderedListItem {
                 id: None,
@@ -4938,12 +3547,7 @@ mod tests {
                 style_type: docspec_core::ListStyleType::Disc,
             })
             .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "parent".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(text("parent")).is_ok());
         assert!(writer
             .handle_event(Event::StartUnorderedListItem {
                 id: None,
@@ -4951,12 +3555,7 @@ mod tests {
                 style_type: docspec_core::ListStyleType::Disc,
             })
             .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "child".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(text("child")).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
@@ -4972,13 +3571,7 @@ mod tests {
         // and ListStackEntry push fields in open_list_item_object.
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         assert!(writer
             .handle_event(Event::StartOrderedListItem {
                 id: None,
@@ -4987,12 +3580,7 @@ mod tests {
                 style_type: docspec_core::ListStyleType::Decimal,
             })
             .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "item 42".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(text("item 42")).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
@@ -5007,13 +3595,7 @@ mod tests {
         // Drives Image match arm pattern bindings (lines 900-901) via raw BlockNoteWriter.
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         assert!(writer
             .handle_event(Event::Image {
                 source: ImageSource::Uri {
@@ -5040,13 +3622,7 @@ mod tests {
         // raw BlockNoteWriter.
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         assert!(writer
             .handle_event(Event::StartOrderedListItem {
                 id: Some("li-1".to_string()),
@@ -5055,12 +3631,7 @@ mod tests {
                 style_type: docspec_core::ListStyleType::Decimal,
             })
             .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "five".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(text("five")).is_ok());
         assert!(writer.handle_event(Event::EndOrderedListItem).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
@@ -5091,13 +3662,7 @@ mod tests {
         ] {
             let mut buf = Vec::<u8>::new();
             let mut writer = BlockNoteWriter::new(&mut buf);
-            assert!(writer
-                .handle_event(Event::StartDocument {
-                    id: None,
-                    language: None,
-                    metadata: None,
-                })
-                .is_ok());
+            assert!(writer.handle_event(start_document()).is_ok());
             assert!(
                 writer.handle_event(event).is_ok(),
                 "catch-all event must return Ok(())"
@@ -5114,50 +3679,28 @@ mod tests {
         // Exercises drop_block_in_list_start! and drop_block_in_list_end! for all block types
         // inside a list item: heading, preformatted, blockquote, table, thematic break
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "before".to_string(),
-                style: TextStyle::default(),
-            },
+            text("before"),
             // Heading inside list item → dropped
-            Event::StartHeading { id: None, level: 1 },
-            Event::Text {
-                content: "heading".to_string(),
-                style: TextStyle::default(),
-            },
+            start_heading(1),
+            text("heading"),
             Event::EndHeading,
             // Preformatted inside list item → dropped
-            Event::StartPreformatted {
-                id: None,
-                syntax: None,
-            },
-            Event::Text {
-                content: "code".to_string(),
-                style: TextStyle::default(),
-            },
+            start_preformatted(None),
+            text("code"),
             Event::EndPreformatted,
             // BlockQuote inside list item → dropped
-            Event::StartBlockQuote { id: None },
-            Event::Text {
-                content: "quote".to_string(),
-                style: TextStyle::default(),
-            },
+            start_blockquote(),
+            text("quote"),
             Event::EndBlockQuote,
             // ThematicBreak inside list item → dropped
             Event::ThematicBreak { id: None },
-            Event::Text {
-                content: "after".to_string(),
-                style: TextStyle::default(),
-            },
+            text("after"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -5170,33 +3713,17 @@ mod tests {
 
     fn list_item_with_children_transition_then(block_events: Vec<Event>) -> String {
         let mut events = vec![
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "first".to_string(),
-                style: TextStyle::default(),
-            },
+            start_paragraph(),
+            text("first"),
             Event::EndParagraph,
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "second".to_string(),
-                style: TextStyle::default(),
-            },
+            start_paragraph(),
+            text("second"),
             Event::EndParagraph,
         ];
         events.extend(block_events);
@@ -5234,11 +3761,8 @@ mod tests {
     #[test]
     fn heading_after_children_transition_inside_list_item_is_dropped() {
         let json = list_item_with_children_transition_then(vec![
-            Event::StartHeading { id: None, level: 2 },
-            Event::Text {
-                content: "leaked-heading".to_string(),
-                style: TextStyle::default(),
-            },
+            start_heading(2),
+            text("leaked-heading"),
             Event::EndHeading,
         ]);
         assert_eq!(
@@ -5250,11 +3774,8 @@ mod tests {
     #[test]
     fn blockquote_after_children_transition_inside_list_item_is_dropped() {
         let json = list_item_with_children_transition_then(vec![
-            Event::StartBlockQuote { id: None },
-            Event::Text {
-                content: "leaked-quote".to_string(),
-                style: TextStyle::default(),
-            },
+            start_blockquote(),
+            text("leaked-quote"),
             Event::EndBlockQuote,
         ]);
         assert_eq!(
@@ -5266,14 +3787,8 @@ mod tests {
     #[test]
     fn preformatted_after_children_transition_inside_list_item_is_dropped() {
         let json = list_item_with_children_transition_then(vec![
-            Event::StartPreformatted {
-                id: None,
-                syntax: None,
-            },
-            Event::Text {
-                content: "leaked-code".to_string(),
-                style: TextStyle::default(),
-            },
+            start_preformatted(None),
+            text("leaked-code"),
             Event::EndPreformatted,
         ]);
         assert_eq!(
@@ -5285,17 +3800,10 @@ mod tests {
     #[test]
     fn table_after_children_transition_inside_list_item_is_dropped() {
         let json = list_item_with_children_transition_then(vec![
-            Event::StartTable { id: None },
-            Event::StartTableRow { id: None },
-            Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            },
-            Event::Text {
-                content: "leaked-cell".to_string(),
-                style: TextStyle::default(),
-            },
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("leaked-cell"),
             Event::EndTableCell,
             Event::EndTableRow,
             Event::EndTable,
@@ -5310,21 +3818,14 @@ mod tests {
     fn ordered_list_item_with_explicit_start_emits_start_prop() {
         // Exercises line 771: start prop write for ordered list items
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartOrderedListItem {
                 id: None,
                 level: 0,
                 start: Some(3),
                 style_type: docspec_core::ListStyleType::Decimal,
             },
-            Event::Text {
-                content: "item".to_string(),
-                style: TextStyle::default(),
-            },
+            text("item"),
             Event::EndOrderedListItem,
             Event::EndDocument,
         ]);
@@ -5341,13 +3842,7 @@ mod tests {
         // StackTrackingSink to isolate the dispatch logic.
         let mut buf = Vec::<u8>::new();
         let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_document()).is_ok());
         assert!(writer
             .handle_event(Event::StartUnorderedListItem {
                 id: None,
@@ -5355,31 +3850,11 @@ mod tests {
                 style_type: docspec_core::ListStyleType::Disc,
             })
             .is_ok());
-        assert!(writer
-            .handle_event(Event::StartParagraph {
-                alignment: None,
-                id: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "first".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_paragraph()).is_ok());
+        assert!(writer.handle_event(text("first")).is_ok());
         assert!(writer.handle_event(Event::EndParagraph).is_ok());
-        assert!(writer
-            .handle_event(Event::StartParagraph {
-                alignment: None,
-                id: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "second".to_string(),
-                style: TextStyle::default(),
-            })
-            .is_ok());
+        assert!(writer.handle_event(start_paragraph()).is_ok());
+        assert!(writer.handle_event(text("second")).is_ok());
         assert!(writer.handle_event(Event::EndParagraph).is_ok());
         assert!(writer.handle_event(Event::EndUnorderedListItem).is_ok());
         assert!(writer.handle_event(Event::EndDocument).is_ok());
@@ -5394,20 +3869,13 @@ mod tests {
     #[test]
     fn image_after_end_list_item_appears_as_top_level_sibling() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "item".to_string(),
-                style: TextStyle::default(),
-            },
+            text("item"),
             Event::EndUnorderedListItem,
             Event::Image {
                 source: ImageSource::Uri {
@@ -5430,26 +3898,16 @@ mod tests {
     #[test]
     fn heading_after_end_list_item_appears_as_top_level_sibling() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "item".to_string(),
-                style: TextStyle::default(),
-            },
+            text("item"),
             Event::EndUnorderedListItem,
-            Event::StartHeading { level: 2, id: None },
-            Event::Text {
-                content: "After list".to_string(),
-                style: TextStyle::default(),
-            },
+            start_heading(2),
+            text("After list"),
             Event::EndHeading,
             Event::EndDocument,
         ]);
@@ -5462,30 +3920,20 @@ mod tests {
     #[test]
     fn start_list_item_inside_dropped_block_in_list_item_is_silently_dropped() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "outer".to_string(),
-                style: TextStyle::default(),
-            },
-            Event::StartBlockQuote { id: None },
+            text("outer"),
+            start_blockquote(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "inner".to_string(),
-                style: TextStyle::default(),
-            },
+            text("inner"),
             Event::EndUnorderedListItem,
             Event::EndBlockQuote,
             Event::EndUnorderedListItem,
@@ -5500,35 +3948,19 @@ mod tests {
     #[test]
     fn paragraph_events_inside_dropped_block_in_list_item_are_fully_absorbed() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::StartBlockQuote { id: None },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "dropped".to_string(),
-                style: TextStyle::default(),
-            },
+            start_blockquote(),
+            start_paragraph(),
+            text("dropped"),
             Event::EndParagraph,
             Event::EndBlockQuote,
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "real".to_string(),
-                style: TextStyle::default(),
-            },
+            start_paragraph(),
+            text("real"),
             Event::EndParagraph,
             Event::EndUnorderedListItem,
             Event::EndDocument,
@@ -5542,48 +3974,26 @@ mod tests {
     #[test]
     fn continuation_paragraph_after_nested_list_attaches_to_parent_item() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "outer".to_string(),
-                style: TextStyle::default(),
-            },
+            start_paragraph(),
+            text("outer"),
             Event::EndParagraph,
             Event::StartUnorderedListItem {
                 id: None,
                 level: 1,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "nested".to_string(),
-                style: TextStyle::default(),
-            },
+            start_paragraph(),
+            text("nested"),
             Event::EndParagraph,
             Event::EndUnorderedListItem,
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "continuation".to_string(),
-                style: TextStyle::default(),
-            },
+            start_paragraph(),
+            text("continuation"),
             Event::EndParagraph,
             Event::EndUnorderedListItem,
             Event::EndDocument,
@@ -5601,24 +4011,14 @@ mod tests {
     #[test]
     fn link_simple() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::StartLink {
                 href: "https://example.com".to_string(),
                 title: None,
                 id: None,
             },
-            Event::Text {
-                content: "text".to_string(),
-                style: TextStyle::default(),
-            },
+            text("text"),
             Event::EndLink,
             Event::EndParagraph,
             Event::EndDocument,
@@ -5632,15 +4032,8 @@ mod tests {
     #[test]
     fn nested_start_link_is_silently_ignored() {
         let json = run_direct_writer_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::StartLink {
                 href: "https://a.example".to_string(),
                 title: None,
@@ -5651,10 +4044,7 @@ mod tests {
                 title: None,
                 id: None,
             },
-            Event::Text {
-                content: "inner".to_string(),
-                style: TextStyle::default(),
-            },
+            text("inner"),
             Event::EndLink,
             Event::EndParagraph,
             Event::EndDocument,
@@ -5668,24 +4058,14 @@ mod tests {
     #[test]
     fn link_left_open_at_paragraph_end_is_defensively_closed() {
         let json = run_direct_writer_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::StartLink {
                 href: "https://x.example".to_string(),
                 title: None,
                 id: None,
             },
-            Event::Text {
-                content: "label".to_string(),
-                style: TextStyle::default(),
-            },
+            text("label"),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -5698,27 +4078,16 @@ mod tests {
     #[test]
     fn link_left_open_at_table_cell_end_is_defensively_closed() {
         let json = run_direct_writer_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartTable { id: None },
-            Event::StartTableRow { id: None },
-            Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            },
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
             Event::StartLink {
                 href: "https://cell.example".to_string(),
                 title: None,
                 id: None,
             },
-            Event::Text {
-                content: "cell".to_string(),
-                style: TextStyle::default(),
-            },
+            text("cell"),
             Event::EndTableCell,
             Event::EndTableRow,
             Event::EndTable,
@@ -5733,15 +4102,8 @@ mod tests {
     #[test]
     fn link_empty_content_emits_empty_styled_text() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::StartLink {
                 href: "https://example.com".to_string(),
                 title: None,
@@ -5760,24 +4122,14 @@ mod tests {
     #[test]
     fn link_drops_title_field() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::StartLink {
                 href: "https://example.com".to_string(),
                 title: Some("a title".to_string()),
                 id: None,
             },
-            Event::Text {
-                content: "text".to_string(),
-                style: TextStyle::default(),
-            },
+            text("text"),
             Event::EndLink,
             Event::EndParagraph,
             Event::EndDocument,
@@ -5791,15 +4143,8 @@ mod tests {
     #[test]
     fn link_with_styled_content_array() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_paragraph(),
             Event::StartLink {
                 href: "https://example.com".to_string(),
                 title: None,
@@ -5813,10 +4158,7 @@ mod tests {
                 content: "italic".to_string(),
                 style: TextStyle::default().italic(),
             },
-            Event::Text {
-                content: "plain".to_string(),
-                style: TextStyle::default(),
-            },
+            text("plain"),
             Event::EndLink,
             Event::EndParagraph,
             Event::EndDocument,
@@ -5830,33 +4172,17 @@ mod tests {
     #[test]
     fn link_in_paragraph_alongside_other_text() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
-            Event::Text {
-                content: "before ".to_string(),
-                style: TextStyle::default(),
-            },
+            start_document(),
+            start_paragraph(),
+            text("before "),
             Event::StartLink {
                 href: "https://example.com".to_string(),
                 title: None,
                 id: None,
             },
-            Event::Text {
-                content: "link".to_string(),
-                style: TextStyle::default(),
-            },
+            text("link"),
             Event::EndLink,
-            Event::Text {
-                content: " after".to_string(),
-                style: TextStyle::default(),
-            },
+            text(" after"),
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -5869,21 +4195,14 @@ mod tests {
     #[test]
     fn link_in_heading() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartHeading { level: 1, id: None },
+            start_document(),
+            start_heading(1),
             Event::StartLink {
                 href: "https://example.com".to_string(),
                 title: None,
                 id: None,
             },
-            Event::Text {
-                content: "title link".to_string(),
-                style: TextStyle::default(),
-            },
+            text("title link"),
             Event::EndLink,
             Event::EndHeading,
             Event::EndDocument,
@@ -5897,11 +4216,7 @@ mod tests {
     #[test]
     fn link_in_list_item() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
@@ -5912,10 +4227,7 @@ mod tests {
                 title: None,
                 id: None,
             },
-            Event::Text {
-                content: "link".to_string(),
-                style: TextStyle::default(),
-            },
+            text("link"),
             Event::EndLink,
             Event::EndUnorderedListItem,
             Event::EndDocument,
@@ -5929,25 +4241,15 @@ mod tests {
     #[test]
     fn link_in_blockquote() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartBlockQuote { id: None },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_blockquote(),
+            start_paragraph(),
             Event::StartLink {
                 href: "https://example.com".to_string(),
                 title: None,
                 id: None,
             },
-            Event::Text {
-                content: "link".to_string(),
-                style: TextStyle::default(),
-            },
+            text("link"),
             Event::EndLink,
             Event::EndParagraph,
             Event::EndBlockQuote,
@@ -5962,16 +4264,9 @@ mod tests {
     #[test]
     fn empty_link_in_blockquote() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartBlockQuote { id: None },
-            Event::StartParagraph {
-                alignment: None,
-                id: None,
-            },
+            start_document(),
+            start_blockquote(),
+            start_paragraph(),
             Event::StartLink {
                 href: "https://example.com".to_string(),
                 title: None,
@@ -5991,27 +4286,16 @@ mod tests {
     #[test]
     fn link_in_table_cell() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartTable { id: None },
-            Event::StartTableRow { id: None },
-            Event::StartTableCell {
-                id: None,
-                colspan: None,
-                rowspan: None,
-            },
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
             Event::StartLink {
                 href: "https://example.com".to_string(),
                 title: None,
                 id: None,
             },
-            Event::Text {
-                content: "link".to_string(),
-                style: TextStyle::default(),
-            },
+            text("link"),
             Event::EndLink,
             Event::EndTableCell,
             Event::EndTableRow,
@@ -6027,26 +4311,19 @@ mod tests {
     #[test]
     fn link_in_dropped_heading_inside_list_emits_no_link() {
         let json = run_events(&[
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
+            start_document(),
             Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::StartHeading { level: 1, id: None },
+            start_heading(1),
             Event::StartLink {
                 href: "https://x".to_string(),
                 title: None,
                 id: None,
             },
-            Event::Text {
-                content: "hidden".to_string(),
-                style: TextStyle::default(),
-            },
+            text("hidden"),
             Event::EndLink,
             Event::EndHeading,
             Event::EndUnorderedListItem,

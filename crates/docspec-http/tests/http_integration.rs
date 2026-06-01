@@ -7,9 +7,11 @@
     clippy::expect_used
 )]
 
+mod common;
+
 use axum::{
     body::{Body, Bytes},
-    http::{header, Method, Request, StatusCode},
+    http::{header, StatusCode},
     Router,
 };
 use serde_json::Value;
@@ -24,13 +26,8 @@ fn app() -> Router {
     docspec_http::router::router()
 }
 
-fn post_markdown(body: impl Into<Body>) -> Request<Body> {
-    Request::builder()
-        .method(Method::POST)
-        .uri("/conversion")
-        .header(header::CONTENT_TYPE, "text/markdown")
-        .body(body.into())
-        .unwrap()
+fn post_markdown(body: impl Into<Body>) -> axum::http::Request<Body> {
+    common::markdown_request(body)
 }
 
 async fn response_body_text(body: axum::body::Body) -> String {
@@ -91,13 +88,12 @@ async fn post_conversion_happy_path() {
 
 #[tokio::test]
 async fn post_conversion_echoes_request_id() {
-    let request = Request::builder()
-        .method(Method::POST)
-        .uri("/conversion")
-        .header(header::CONTENT_TYPE, "text/markdown")
-        .header("x-request-id", "my-id")
-        .body(Body::from("# Hello"))
-        .unwrap();
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", "text/markdown"), ("x-request-id", "my-id")],
+        Body::from("# Hello"),
+    );
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -112,13 +108,12 @@ async fn post_conversion_echoes_request_id() {
 
 #[tokio::test]
 async fn post_conversion_echoes_trace_id() {
-    let request = Request::builder()
-        .method(Method::POST)
-        .uri("/conversion")
-        .header(header::CONTENT_TYPE, "text/markdown")
-        .header("x-trace-id", "trace-1")
-        .body(Body::from("# Hello"))
-        .unwrap();
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", "text/markdown"), ("x-trace-id", "trace-1")],
+        Body::from("# Hello"),
+    );
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -174,11 +169,7 @@ async fn post_conversion_empty_body() {
 
 #[tokio::test]
 async fn post_conversion_missing_content_type() {
-    let request = Request::builder()
-        .method(Method::POST)
-        .uri("/conversion")
-        .body(Body::from("# Hello"))
-        .unwrap();
+    let request = common::request("POST", "/conversion", &[], Body::from("# Hello"));
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -212,12 +203,12 @@ async fn post_conversion_missing_content_type() {
 
 #[tokio::test]
 async fn post_conversion_wrong_content_type() {
-    let request = Request::builder()
-        .method(Method::POST)
-        .uri("/conversion")
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(Body::from("{}"))
-        .unwrap();
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", "application/json")],
+        Body::from("{}"),
+    );
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -237,12 +228,12 @@ async fn post_conversion_wrong_content_type() {
 
 #[tokio::test]
 async fn post_conversion_multipart_content_type() {
-    let request = Request::builder()
-        .method(Method::POST)
-        .uri("/conversion")
-        .header(header::CONTENT_TYPE, "multipart/form-data; boundary=x")
-        .body(Body::from("data"))
-        .unwrap();
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", "multipart/form-data; boundary=x")],
+        Body::from("data"),
+    );
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -262,13 +253,15 @@ async fn post_conversion_multipart_content_type() {
 
 #[tokio::test]
 async fn post_conversion_wrong_accept() {
-    let request = Request::builder()
-        .method(Method::POST)
-        .uri("/conversion")
-        .header(header::CONTENT_TYPE, "text/markdown")
-        .header(header::ACCEPT, "application/json")
-        .body(Body::from("# Hello"))
-        .unwrap();
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[
+            ("content-type", "text/markdown"),
+            ("accept", "application/json"),
+        ],
+        Body::from("# Hello"),
+    );
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -301,13 +294,12 @@ async fn post_conversion_missing_accept() {
 
 #[tokio::test]
 async fn post_conversion_wildcard_accept() {
-    let request = Request::builder()
-        .method(Method::POST)
-        .uri("/conversion")
-        .header(header::CONTENT_TYPE, "text/markdown")
-        .header(header::ACCEPT, "*/*")
-        .body(Body::from("# Hello"))
-        .unwrap();
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", "text/markdown"), ("accept", "*/*")],
+        Body::from("# Hello"),
+    );
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -319,13 +311,15 @@ async fn post_conversion_wildcard_accept() {
 
 #[tokio::test]
 async fn post_conversion_alias_accept() {
-    let request = Request::builder()
-        .method(Method::POST)
-        .uri("/conversion")
-        .header(header::CONTENT_TYPE, "text/markdown")
-        .header(header::ACCEPT, "application/vnd.blocknote+json")
-        .body(Body::from("# Hello"))
-        .unwrap();
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[
+            ("content-type", "text/markdown"),
+            ("accept", "application/vnd.blocknote+json"),
+        ],
+        Body::from("# Hello"),
+    );
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -337,12 +331,7 @@ async fn post_conversion_alias_accept() {
 
 #[tokio::test]
 async fn post_conversion_invalid_utf8() {
-    let request = Request::builder()
-        .method(Method::POST)
-        .uri("/conversion")
-        .header(header::CONTENT_TYPE, "text/markdown")
-        .body(Body::from(Bytes::from_static(&[0xFF, 0xFE])))
-        .unwrap();
+    let request = common::markdown_request(Body::from(Bytes::from_static(&[0xFF, 0xFE])));
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -362,11 +351,7 @@ async fn post_conversion_invalid_utf8() {
 
 #[tokio::test]
 async fn options_conversion_returns_204() {
-    let request = Request::builder()
-        .method(Method::OPTIONS)
-        .uri("/conversion")
-        .body(Body::empty())
-        .unwrap();
+    let request = common::empty_request("OPTIONS", "/conversion");
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -389,11 +374,7 @@ async fn options_conversion_returns_204() {
 
 #[tokio::test]
 async fn put_conversion_returns_405() {
-    let request = Request::builder()
-        .method(Method::PUT)
-        .uri("/conversion")
-        .body(Body::empty())
-        .unwrap();
+    let request = common::empty_request("PUT", "/conversion");
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -434,11 +415,7 @@ async fn put_conversion_returns_405() {
 
 #[tokio::test]
 async fn delete_conversion_returns_405() {
-    let request = Request::builder()
-        .method(Method::DELETE)
-        .uri("/conversion")
-        .body(Body::empty())
-        .unwrap();
+    let request = common::empty_request("DELETE", "/conversion");
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -465,11 +442,7 @@ async fn delete_conversion_returns_405() {
 
 #[tokio::test]
 async fn get_health_returns_200() {
-    let request = Request::builder()
-        .method(Method::GET)
-        .uri("/health")
-        .body(Body::empty())
-        .unwrap();
+    let request = common::empty_request("GET", "/health");
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -495,11 +468,7 @@ async fn get_health_returns_200() {
 
 #[tokio::test]
 async fn head_health_returns_204() {
-    let request = Request::builder()
-        .method(Method::HEAD)
-        .uri("/health")
-        .body(Body::empty())
-        .unwrap();
+    let request = common::empty_request("HEAD", "/health");
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -520,11 +489,7 @@ async fn head_health_returns_204() {
 
 #[tokio::test]
 async fn options_health_returns_204() {
-    let request = Request::builder()
-        .method(Method::OPTIONS)
-        .uri("/health")
-        .body(Body::empty())
-        .unwrap();
+    let request = common::empty_request("OPTIONS", "/health");
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -552,11 +517,7 @@ async fn options_health_returns_204() {
 
 #[tokio::test]
 async fn put_health_returns_405() {
-    let request = Request::builder()
-        .method(Method::PUT)
-        .uri("/health")
-        .body(Body::empty())
-        .unwrap();
+    let request = common::empty_request("PUT", "/health");
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -583,11 +544,7 @@ async fn put_health_returns_405() {
 
 #[tokio::test]
 async fn unknown_path_returns_404() {
-    let request = Request::builder()
-        .method(Method::GET)
-        .uri("/unknown")
-        .body(Body::empty())
-        .unwrap();
+    let request = common::empty_request("GET", "/unknown");
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
@@ -621,11 +578,7 @@ async fn unknown_path_returns_404() {
 
 #[tokio::test]
 async fn query_string_not_in_404_detail() {
-    let request = Request::builder()
-        .method(Method::GET)
-        .uri("/unknown?secret=password")
-        .body(Body::empty())
-        .unwrap();
+    let request = common::empty_request("GET", "/unknown?secret=password");
 
     let response = app().oneshot(request).await.expect("request succeeds");
 
