@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/docspec/docspec/compare/v0.2.0...v0.3.0) (2026-06-01)
+
+
+### Features
+
+* **markdown-reader:** defer StartParagraph emission to elide empty wrappers ([ec1b157](https://github.com/docspec/docspec/commit/ec1b1576465dc4267416eb194dde1ad90370a014)), closes [#37](https://github.com/docspec/docspec/issues/37)
+
+
+### Bug Fixes
+
+* **markdown-reader:** remove redundant code style from preformatted text events ([a37b70f](https://github.com/docspec/docspec/commit/a37b70fff7aedddf0c5aca3c650033b4bbf896d7)), closes [#37](https://github.com/docspec/docspec/issues/37)
+
 ## [0.2.0](https://github.com/docspec/docspec/compare/v0.1.0...v0.2.0) (2026-06-01)
 
 

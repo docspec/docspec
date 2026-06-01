@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/docspec/docspec/compare/v0.2.0...v0.3.0) (2026-06-01)
+
+
+### Features
+
+* **http:** add mime-type labels and output-bytes tracking to metrics ([f7249c2](https://github.com/docspec/docspec/commit/f7249c242602faee837f427ab9b679d2f6867604)), closes [#15](https://github.com/docspec/docspec/issues/15)
+
 ## [0.2.0](https://github.com/docspec/docspec/compare/v0.1.0...v0.2.0) (2026-06-01)
 
 
