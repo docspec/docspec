@@ -6,7 +6,9 @@
     "crates/docspec-core": { "component": "docspec-core" },
     "crates/docspec-markdown-reader": { "component": "docspec-markdown-reader" },
     "crates/docspec-blocknote-writer": { "component": "docspec-blocknote-writer" },
+    "crates/docspec-json": { "component": "docspec-json" },
     "crates/docspec-cli": { "component": "docspec-cli" },
+    "crates/docspec-http": { "component": "docspec-http" },
     "crates/docspec-wasm": { "component": "docspec-wasm" }
   },
   "plugins": [
@@ -14,7 +16,7 @@
     {
       "type": "linked-versions",
       "groupName": "docspec",
-      "components": ["docspec-core", "docspec-markdown-reader", "docspec-blocknote-writer", "docspec-cli", "docspec-wasm"]
+      "components": ["docspec-core", "docspec-markdown-reader", "docspec-blocknote-writer", "docspec-json", "docspec-cli", "docspec-http", "docspec-wasm"]
     }
   ]
 }
