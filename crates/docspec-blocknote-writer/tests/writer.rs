@@ -227,7 +227,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Line two","styles":{}}],"children":[]}]"#
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Line one\nLine two","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -254,7 +254,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"heading","props":{"level":2,"textAlignment":"left"},"content":[{"type":"text","text":"Title one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Title two","styles":{}}],"children":[]}]"#
+            r#"[{"type":"heading","props":{"level":2,"textAlignment":"left"},"content":[{"type":"text","text":"Title one\nTitle two","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -289,7 +289,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"Cell line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Cell line two","styles":{}}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"Cell line one\nCell line two","styles":{}}]}]}]},"children":[]}]"#
         );
     }
 
@@ -320,7 +320,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"Bullet line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Bullet line two","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"Bullet line one\nBullet line two","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -356,7 +356,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"Click line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"click line two","styles":{}}]}],"children":[]}]"#
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"Click line one\nclick line two","styles":{}}]}],"children":[]}]"#
         );
     }
 
@@ -388,7 +388,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"Quote line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Quote line two","styles":{}}],"children":[]}]"#
+            r#"[{"type":"quote","content":[{"type":"text","text":"Quote line one\nQuote line two","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -416,11 +416,74 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        // Three text nodes: bold "Bold line one", default-style "\n", bold "Bold line two"
-        // The "\n" node has empty styles because handle_line_break calls handle_text with TextStyle::default()
+        // Single coalesced bold text node: "Bold line one\nBold line two" with bold style
+        // Soft breaks are coalesced into the text content when styles match
         assert_eq!(
             json,
-            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Bold line one","styles":{"bold":true}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Bold line two","styles":{"bold":true}}],"children":[]}]"#
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Bold line one\nBold line two","styles":{"bold":true}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn soft_break_between_different_styled_spans() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "A".to_string(),
+                style: TextStyle::default().bold(),
+            },
+            Event::SoftBreak,
+            Event::Text {
+                content: "B".to_string(),
+                style: TextStyle::default().italic(),
+            },
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        // Mismatched styles: break attaches to the bold run; italic "B" starts a new node
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"A\n","styles":{"bold":true}},{"type":"text","text":"B","styles":{"italic":true}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn consecutive_soft_breaks_same_style() {
+        let json = run_events(&[
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::Text {
+                content: "A".to_string(),
+                style: TextStyle::default().bold(),
+            },
+            Event::SoftBreak,
+            Event::SoftBreak,
+            Event::Text {
+                content: "B".to_string(),
+                style: TextStyle::default().bold(),
+            },
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        // Two consecutive breaks with same style: all coalesced into one node
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"A\n\nB","styles":{"bold":true}}],"children":[]}]"#
         );
     }
 
@@ -808,7 +871,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"line1","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"line2","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"line3","styles":{}}],"children":[]}]"#
+            r#"[{"type":"quote","content":[{"type":"text","text":"line1\nline2\nline3","styles":{}}],"children":[]}]"#
         );
     }
 

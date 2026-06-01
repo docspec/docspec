@@ -150,6 +150,14 @@ mod tests {
     }
 
     #[test]
+    fn pipeline_bold_soft_break() {
+        let markdown = include_str!("../../../tests/fixtures/markdown/bold_soft_break.md");
+        let expected = include_str!("../../../tests/fixtures/blocknote/bold_soft_break.json");
+        let actual = run_pipeline(markdown);
+        assert_json_eq(&actual, expected);
+    }
+
+    #[test]
     fn pipeline_list_inside_blockquote_inside_list_item_is_well_formed() {
         // Regression for cmark-gfm/test.md edge case.
         // A list nested inside a blockquote that is itself inside a list item

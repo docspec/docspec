@@ -217,6 +217,17 @@ struct BlockContext {
     in_text_block: bool,
 }
 
+/// Holds a pending inline run (text with style) awaiting flush.
+///
+/// Used to defer emission of styled text until a later point in the event stream,
+/// enabling coalescing of adjacent runs with the same style.
+struct PendingRun {
+    /// The text content of the run.
+    content: String,
+    /// The text style (bold, italic, code, etc.) applied to this run.
+    style: TextStyle,
+}
+
 /// A streaming `BlockNote` JSON writer.
 ///
 /// Writes JSON tokens directly to the underlying `Write` as events arrive using `docspec-json`.
@@ -241,6 +252,8 @@ pub struct BlockNoteWriter<'a, W: Write> {
     /// Whether at least one `StyledText` has been emitted into the current link's content array.
     link_emitted_styled_text: bool,
     list_stack: Vec<ListStackEntry>,
+    /// A pending inline run awaiting flush (used for soft-break coalescing).
+    pending_inline_run: Option<PendingRun>,
     table_depth: Depth,
 }
 
@@ -344,6 +357,13 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         })
     }
 
+    fn flush_pending_inline_run(&mut self) -> Result<()> {
+        if let Some(run) = self.pending_inline_run.take() {
+            self.handle_text(&run.content, &run.style)?;
+        }
+        Ok(())
+    }
+
     fn handle_blockquote(&mut self, id: Option<&String>) -> Result<()> {
         self.json.open_object()?;
         self.json.key("type").value("quote")?;
@@ -371,6 +391,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     /// `StyledText` (`{"type":"text","text":"","styles":{}}`) to satisfy the `BlockNote`
     /// schema (links must have at least one content item).
     fn handle_end_link(&mut self) -> Result<()> {
+        self.flush_pending_inline_run()?;
         if !self.in_link {
             return Ok(());
         }
@@ -397,6 +418,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if self.list_stack.is_empty() {
             return Ok(());
         }
+        self.flush_pending_inline_run()?;
         self.close_current_list_item_object()
     }
 
@@ -404,6 +426,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if self.drop_inside_list_depth.is_positive() || self.dropped_list_depth.is_positive() {
             return Ok(());
         }
+        self.flush_pending_inline_run()?;
         if !self.list_stack.is_empty()
             && self
                 .list_stack
@@ -454,6 +477,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if self.drop_inside_list_depth.is_positive() || self.table_depth.get() > 1 {
             return Ok(());
         }
+        self.flush_pending_inline_run()?;
         self.close_open_link_if_any()?;
         self.json.close_array()?;
         self.json.close_object()?;
@@ -494,6 +518,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if self.in_any_list_item() {
             return Ok(());
         }
+        self.flush_pending_inline_run()?;
         self.close_for_block_sibling()?;
         let url = match source {
             ImageSource::Uri { uri } => uri,
@@ -522,7 +547,18 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if (self.context.in_text_block || self.context.in_table_cell || self.in_list_item_content())
             && self.table_depth.get() <= 1
         {
-            self.handle_text("\n", &TextStyle::default())
+            match &mut self.pending_inline_run {
+                Some(run) => {
+                    run.content.push('\n');
+                }
+                None => {
+                    self.pending_inline_run = Some(PendingRun {
+                        content: "\n".to_string(),
+                        style: TextStyle::default(),
+                    });
+                }
+            }
+            Ok(())
         } else {
             Ok(())
         }
@@ -625,6 +661,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if self.in_link {
             return Ok(());
         }
+        self.flush_pending_inline_run()?;
         if self.blockquote_depth.is_positive() {
             self.context.blockquote_has_content = true;
         }
@@ -671,6 +708,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         };
 
         if effective_level > stack_top_level {
+            self.flush_pending_inline_run()?;
             self.open_current_list_item_children()?;
             self.open_list_item_object(kind, id, effective_level, start)?;
             return Ok(());
@@ -787,6 +825,13 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_text_event(&mut self, content: &str, style: &TextStyle) -> Result<()> {
+        // Drop text inside dropped blocks or nested tables
+        if self.drop_inside_list_depth.is_positive()
+            || self.dropped_list_depth.is_positive()
+            || self.table_depth.get() > 1
+        {
+            return Ok(());
+        }
         // Auto-open paragraph for orphan text (e.g., text after image closed paragraph)
         if !self.context.in_text_block
             && self.blockquote_depth.is_zero()
@@ -795,7 +840,25 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         {
             self.handle_paragraph(None)?;
         }
-        self.handle_text(content, style)
+        match &mut self.pending_inline_run {
+            None => {
+                self.pending_inline_run = Some(PendingRun {
+                    content: content.to_string(),
+                    style: style.clone(),
+                });
+            }
+            Some(run) if run.style == *style => {
+                run.content.push_str(content);
+            }
+            Some(_) => {
+                self.flush_pending_inline_run()?;
+                self.pending_inline_run = Some(PendingRun {
+                    content: content.to_string(),
+                    style: style.clone(),
+                });
+            }
+        }
+        Ok(())
     }
 
     /// Returns true when any list item is currently open on the stack, regardless of whether
@@ -834,6 +897,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             json: JsonEmitter::new(StrusonBackend::new(writer)),
             link_emitted_styled_text: false,
             list_stack: Vec::new(),
+            pending_inline_run: None,
             table_depth: Depth::default(),
         }
     }
@@ -928,6 +992,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             json: JsonEmitter::new(StrusonBackend::new(writer)),
             link_emitted_styled_text: false,
             list_stack: Vec::new(),
+            pending_inline_run: None,
             table_depth: Depth::default(),
         }
     }
@@ -947,10 +1012,12 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
     }
 
     #[inline]
+    #[allow(clippy::too_many_lines)]
     fn handle_event(&mut self, event: Event) -> Result<()> {
         match event {
             Event::StartDocument { .. } => self.json.open_array(),
             Event::EndDocument => {
+                self.flush_pending_inline_run()?;
                 while !self.list_stack.is_empty() {
                     self.close_current_list_item_object()?;
                 }
@@ -964,6 +1031,7 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             }
             Event::EndHeading => {
                 drop_block_in_list_end!(self);
+                self.flush_pending_inline_run()?;
                 if !self.context.in_text_block {
                     return Ok(());
                 }
@@ -972,6 +1040,7 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             Event::EndPreformatted => {
                 drop_block_in_list_end!(self);
                 return_if_table_cell!(self);
+                self.flush_pending_inline_run()?;
                 if !self.context.in_text_block {
                     return Ok(());
                 }
@@ -992,6 +1061,7 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                     self.blockquote_force_closed_count.dec();
                     return Ok(());
                 }
+                self.flush_pending_inline_run()?;
                 self.close_open_link_if_any()?;
                 self.close_content_block()?;
                 self.blockquote_depth.dec();
