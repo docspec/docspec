@@ -32,6 +32,9 @@ tower-http = { version = "0.6", features = [
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt"] }
 mime = "0.3"
+metrics = "0.24"
+metrics-exporter-prometheus = { version = "0.18", default-features = false }
+thiserror = "2"
 sentry = { version = "0.48", default-features = false, features = [
   "backtrace",
   "contexts",
