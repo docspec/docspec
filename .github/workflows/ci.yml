@@ -8,6 +8,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -33,3 +36,45 @@ jobs:
         with:
           components: rustfmt
       - run: cargo fmt --all -- --check
+
+  docker-build:
+    name: Docker Build
+    uses: ./.github/workflows/docker.yml
+    permissions:
+      contents: read
+      actions: write
+    with:
+      push: false
+
+  release-please:
+    needs: [test, clippy, fmt, docker-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      tag_name: ${{ steps.release.outputs['crates/docspec-core--tag_name'] }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  docker-release:
+    name: Docker Release
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      actions: write
+    uses: ./.github/workflows/docker.yml
+    with:
+      push: true
+      sign: true
+      ref: ${{ needs.release-please.outputs.tag_name }}
+      tag_name: ${{ needs.release-please.outputs.tag_name }}
