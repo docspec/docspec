@@ -143,12 +143,13 @@ All events in the `Event` enum, grouped by category.
 
 **Inline (self-contained):**
 
-| Event         | Fields                                                                                                                                                                 |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Text`        | `content: String`, `bold: bool`, `italic: bool`, `code: bool`, `strikethrough: bool`, `underline: bool`, `subscript: bool`, `superscript: bool`, `mark: Option<Color>` |
-| `Image`       | `source: ImageSource`, `alt: Option<String>`, `title: Option<String>`, `decorative: bool`                                                                              |
-| `FootnoteRef` | `id: u32`                                                                                                                                                              |
-| `LineBreak`   | —                                                                                                                                                                      |
+| Event         | Fields                                                                           |
+| ------------- | -------------------------------------------------------------------------------- |
+| `Text`        | `content: String`, `style: TextStyle`                                            |
+| `Image`       | `source: ImageSource`, `alt: Option<String>`, `title: Option<String>`, `decorative: bool` |
+| `FootnoteRef` | `id: u32`                                                                        |
+| `LineBreak`   | —                                                                                |
+| `SoftBreak`   | —                                                                                |
 
 ---
 
@@ -174,13 +175,15 @@ Every `Start*` has a matching `End*`. They nest but never overlap.
 
 **Link.** An inline container (uses Start/End because it carries `href`). Valid inside paragraphs, headings, list items, cells, definition details. Cannot nest.
 
-**Text.** Formatting changes produce new events. Default: all bools `false`, mark `None`. Empty content is valid but meaningless. `subscript` and `superscript` may both be true; writers that can't represent both prefer `superscript`. Whitespace is significant. Outside preformatted blocks, newlines in content are collapsed to whitespace; readers emit `LineBreak` for semantically meaningful line breaks.
+**Text.** Formatting changes produce new events. Default: `TextStyle::default()` — all formatting flags disabled and `mark` is `None`. Empty content is valid but meaningless. `subscript` and `superscript` may both be true; writers that can't represent both prefer `superscript`. Whitespace is significant. Outside preformatted blocks, newlines in content are collapsed to whitespace; readers emit `LineBreak` for explicit hard breaks (e.g., markdown two-space-newline, HTML `<br>`) and `SoftBreak` for soft breaks (e.g., source line wraps within a paragraph).
 
 **Image.** Asset bytes resolve lazily via `AssetProvider`. `decorative` means purely visual. May appear inline or directly in block containers.
 
 **FootnoteRef.** Inline marker; corresponding `StartFootnote` appears elsewhere.
 
-**LineBreak.** Soft break within a block.
+**LineBreak.** Explicit hard break within a paragraph (e.g., markdown two-space-newline, HTML `<br>`).
+
+**SoftBreak.** Soft line break in source markup, such as a markdown line wrap. Writers choose rendering policy (space, newline, `<br>`, etc.).
 
 **ThematicBreak.** Horizontal rule / section separator.
 

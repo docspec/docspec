@@ -146,6 +146,13 @@ pub enum Event {
     /// A hard line break within a paragraph.
     LineBreak,
 
+    /// A soft line break in source markup, such as a markdown line wrap.
+    ///
+    /// Soft breaks correspond to source line wraps that do not enforce a
+    /// visible break. Writers choose rendering policy: space, newline,
+    /// `<br>`, etc.
+    SoftBreak,
+
     /// Begin a block quote.
     StartBlockQuote {
         /// Optional block identifier.

@@ -182,6 +182,12 @@ mod tests {
     }
 
     #[test]
+    fn soft_break() {
+        let event = Event::SoftBreak;
+        assert_eq!(event, Event::SoftBreak);
+    }
+
+    #[test]
     fn partial_eq_different_fields() {
         let event1 = Event::StartHeading { level: 1, id: None };
         let event2 = Event::StartHeading { level: 2, id: None };
