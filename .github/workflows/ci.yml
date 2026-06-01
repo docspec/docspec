@@ -42,6 +42,8 @@ jobs:
     uses: ./.github/workflows/docker.yml
     permissions:
       contents: read
+      packages: write
+      id-token: write
       actions: write
     with:
       push: false
