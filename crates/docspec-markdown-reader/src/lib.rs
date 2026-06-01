@@ -47,13 +47,14 @@
 //!   as a sibling block: content preceding the image stays inside the link, content
 //!   following the image is outside the link, and the link is empty only when the
 //!   image is the sole link label, e.g. `[![alt](img)](url)`)
+//! - HTML blocks (`<p>` only, others dropped)
 //!
 //! # Unsupported Elements
 //!
 //! The following elements are not emitted as structured events. Text content is
 //! recursively extracted where applicable; structure is silently dropped:
 //! - Definition lists and footnotes
-//! - HTML blocks and inline HTML
+//! - Inline HTML
 //! - Math blocks and inline math
 //! - Subscript and superscript formatting
 
@@ -63,6 +64,7 @@ use alloc::collections::VecDeque;
 
 pub use docspec_core::EventSource;
 use docspec_core::{Depth, Event, ImageSource, ListStyleType, Result, TableHeaderScope, TextStyle};
+use docspec_html_reader::parse_html_fragment;
 use pulldown_cmark::{CodeBlockKind, CowStr, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 /// Whether content is inside a block-level element.
@@ -144,6 +146,8 @@ pub struct MarkdownReader<'a> {
     bold_depth: Depth,
     /// Buffered code block text (accumulated until `EndCodeBlock` to strip trailing newline).
     code_block_buffer: Option<String>,
+    /// Buffered HTML block text (accumulated until `EndHtmlBlock` to parse as fragment).
+    html_block_buffer: Option<String>,
     /// Buffered image being processed (alt text accumulation).
     image: Option<ImageBuffer>,
     /// Whether the parser is currently inside a table header row.
@@ -355,12 +359,16 @@ impl<'a> MarkdownReader<'a> {
             TagEnd::TableCell => self.handle_end_table_cell(),
             TagEnd::TableHead => self.handle_end_table_head(),
             TagEnd::TableRow => self.push_event_end(Event::EndTableRow),
+            TagEnd::HtmlBlock => {
+                if let Some(buf) = self.html_block_buffer.take() {
+                    parse_html_fragment(&buf, &mut self.queue);
+                }
+            }
             // Tags intentionally ignored (structure dropped, text extracted elsewhere):
             TagEnd::DefinitionList
             | TagEnd::DefinitionListDefinition
             | TagEnd::DefinitionListTitle
             | TagEnd::FootnoteDefinition
-            | TagEnd::HtmlBlock
             | TagEnd::MetadataBlock(_)
             | TagEnd::Subscript
             | TagEnd::Superscript => {}
@@ -530,12 +538,14 @@ impl<'a> MarkdownReader<'a> {
             Tag::TableCell => self.handle_start_table_cell(),
             Tag::TableHead => self.handle_start_table_head(),
             Tag::TableRow => self.push_event_start(Event::StartTableRow { id: None }),
+            Tag::HtmlBlock => {
+                self.html_block_buffer = Some(String::new());
+            }
             // Tags intentionally ignored (structure dropped, text extracted elsewhere):
             Tag::DefinitionList
             | Tag::DefinitionListDefinition
             | Tag::DefinitionListTitle
             | Tag::FootnoteDefinition(_)
-            | Tag::HtmlBlock
             | Tag::MetadataBlock(_)
             | Tag::Subscript
             | Tag::Superscript => {}
@@ -584,6 +594,7 @@ impl<'a> MarkdownReader<'a> {
             block_state: BlockState::None,
             bold_depth: Depth::default(),
             code_block_buffer: None,
+            html_block_buffer: None,
             image: None,
             in_table_head: false,
             italic_depth: Depth::default(),
@@ -633,9 +644,13 @@ impl<'a> MarkdownReader<'a> {
             pulldown_cmark::Event::Rule => {
                 self.queue.push_back(Event::ThematicBreak { id: None });
             }
+            pulldown_cmark::Event::Html(html) => {
+                if let Some(buf) = &mut self.html_block_buffer {
+                    buf.push_str(html.as_ref());
+                }
+            }
             pulldown_cmark::Event::DisplayMath(_)
             | pulldown_cmark::Event::FootnoteReference(_)
-            | pulldown_cmark::Event::Html(_)
             | pulldown_cmark::Event::InlineHtml(_)
             | pulldown_cmark::Event::InlineMath(_)
             | pulldown_cmark::Event::TaskListMarker(_) => {}

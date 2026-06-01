@@ -11,6 +11,7 @@ categories = ["parsing"]
 
 [dependencies]
 docspec-core = { path = "../docspec-core" }
+docspec-html-reader = { path = "../docspec-html-reader" }
 pulldown-cmark = "0.13"
 
 [lints]

@@ -1688,4 +1688,85 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn html_block_with_p_emits_paragraph() {
+        let mut reader = MarkdownReader::new("\n<p>Hello from HTML</p>\n");
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("Hello from HTML", TextStyle::default()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn markdown_then_html_then_markdown_paragraphs() {
+        let mut reader = MarkdownReader::new("Before\n\n<p>HTML</p>\n\nAfter");
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("Before", TextStyle::default()),
+                Event::EndParagraph,
+                helpers::start_paragraph(),
+                helpers::text("HTML", TextStyle::default()),
+                Event::EndParagraph,
+                helpers::start_paragraph(),
+                helpers::text("After", TextStyle::default()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn html_block_with_multiple_p_tags() {
+        let mut reader = MarkdownReader::new("\n<p>One</p>\n<p>Two</p>\n");
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("One", TextStyle::default()),
+                Event::EndParagraph,
+                helpers::start_paragraph(),
+                helpers::text("Two", TextStyle::default()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn html_block_with_div_still_silently_ignored() {
+        let mut reader = MarkdownReader::new("\n<div>x</div>\n");
+        let events = collect_events(&mut reader);
+        assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
+    }
+
+    #[test]
+    fn inline_html_still_silently_ignored() {
+        let mut reader = MarkdownReader::new("Hello <span>world</span>");
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("Hello ", TextStyle::default()),
+                helpers::text("world", TextStyle::default()),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
 }
