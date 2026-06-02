@@ -10,4 +10,5 @@ git_release_latest = true
 
 [[package]]
 name = "docspec-wasm"
+publish = false
 release = false
