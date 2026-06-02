@@ -44,7 +44,7 @@ LABEL org.opencontainers.image.title="docspec-http" \
   org.opencontainers.image.source="https://github.com/docspec/docspec" \
   org.opencontainers.image.version="${IMAGE_VERSION}" \
   org.opencontainers.image.revision="${IMAGE_REVISION}" \
-  org.opencontainers.image.licenses="MIT OR Apache-2.0"
+  org.opencontainers.image.licenses="MIT"
 
 ENTRYPOINT ["/usr/local/bin/docspec-http"]
 CMD ["--host", "0.0.0.0", "--port", "3000"]

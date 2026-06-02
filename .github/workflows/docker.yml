@@ -58,7 +58,7 @@ jobs:
             org.opencontainers.image.title=docspec-http
             org.opencontainers.image.description=HTTP API server for DocSpec markdown to BlockNote JSON conversion
             org.opencontainers.image.source=https://github.com/docspec/docspec
-            org.opencontainers.image.licenses=MIT OR Apache-2.0
+            org.opencontainers.image.licenses=MIT
 
       - name: Verify resolved version is non-empty
         if: inputs.push
