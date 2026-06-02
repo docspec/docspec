@@ -1,6 +1,6 @@
 [package]
 name = "docspec-cli"
-version = "0.3.0"
+version = "0.5.0"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -15,9 +15,9 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive", "color"] }
-docspec-core = { path = "../docspec-core" }
-docspec-markdown-reader = { path = "../docspec-markdown-reader" }
-docspec-blocknote-writer = { path = "../docspec-blocknote-writer" }
+docspec-core = { path = "../docspec-core", version = "0.5.0" }
+docspec-markdown-reader = { path = "../docspec-markdown-reader", version = "0.5.0" }
+docspec-blocknote-writer = { path = "../docspec-blocknote-writer", version = "0.5.0" }
 thiserror = "2"
 
 [dev-dependencies]

@@ -1,0 +1,61 @@
+name: Publish crates
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to publish from"
+        required: true
+        type: string
+      dry_run:
+        description: "Run cargo publish --dry-run instead of uploading"
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      CARGO_REGISTRY_TOKEN:
+        required: true
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Manual runs are dry-run only"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+
+env:
+  CARGO_TERM_COLOR: always
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish crates.io packages
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_call' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Install stable Rust toolchain
+        run: rustup toolchain install stable --profile minimal --component clippy
+
+      - name: Verify workspace before publishing
+        run: |
+          cargo +stable test --workspace
+          cargo +stable clippy --workspace --all-targets -- -D warnings
+          cargo +stable package --workspace --exclude docspec-wasm
+
+      - name: Dry-run publish crates
+        if: github.event_name == 'workflow_dispatch' || inputs.dry_run
+        run: cargo +stable publish --workspace --exclude docspec-wasm --dry-run
+
+      - name: Publish crates
+        if: github.event_name == 'workflow_call' && !inputs.dry_run
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo +stable publish --workspace --exclude docspec-wasm
