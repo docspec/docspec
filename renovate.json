@@ -5,13 +5,6 @@
   "semanticCommits": "enabled",
   "packageRules": [
     {
-      "description": "Automerge patch/minor updates with sufficient confidence and age",
-      "matchUpdateTypes": ["patch", "minor"],
-      "matchConfidence": ["neutral", "high", "very high"],
-      "minimumReleaseAge": "7 days",
-      "automerge": true
-    },
-    {
       "description": "Require manual review for major updates",
       "matchUpdateTypes": ["major"],
       "automerge": false
