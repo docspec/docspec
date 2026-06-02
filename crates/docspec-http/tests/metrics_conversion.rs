@@ -20,7 +20,7 @@
 
 mod common;
 
-use axum::body::Body;
+use axum::{body::Body, http::Request};
 use tower::ServiceExt as _;
 
 /// Asserts that the Prometheus exposition text `rendered` contains a line that
@@ -346,7 +346,7 @@ fn assert_metric_value_gt(rendered: &str, prefix: &str, threshold: f64) {
 /// `input_mime_type="unsupported"` on `docspec_conversions_total`.
 #[test]
 fn input_mime_unsupported_when_other_content_type() {
-    let rt = make_runtime();
+    let rt = common::runtime();
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
     let router = docspec_http::router::router_with_metrics(handle.clone());
 
@@ -374,7 +374,7 @@ fn input_mime_unsupported_when_other_content_type() {
 /// `input_mime_type="none"` on `docspec_conversions_total`.
 #[test]
 fn input_mime_none_when_no_content_type() {
-    let rt = make_runtime();
+    let rt = common::runtime();
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
     let router = docspec_http::router::router_with_metrics(handle.clone());
 
@@ -401,12 +401,12 @@ fn input_mime_none_when_no_content_type() {
 /// `docspec_conversion_output_bytes` with a positive sum.
 #[test]
 fn output_bytes_recorded_on_success() {
-    let rt = make_runtime();
+    let rt = common::runtime();
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
     let router = docspec_http::router::router_with_metrics(handle.clone());
 
     metrics::with_local_recorder(&recorder, || {
-        rt.block_on(router.oneshot(valid_markdown_request("# Hello")))
+        rt.block_on(router.oneshot(common::accepted_markdown_request("# Hello")))
     })
     .expect("oneshot succeeds");
 
@@ -428,12 +428,12 @@ fn output_bytes_recorded_on_success() {
 /// `docspec_conversion_output_bytes`.
 #[test]
 fn output_bytes_not_recorded_on_error() {
-    let rt = make_runtime();
+    let rt = common::runtime();
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
     let router = docspec_http::router::router_with_metrics(handle.clone());
 
     metrics::with_local_recorder(&recorder, || {
-        rt.block_on(router.oneshot(valid_markdown_request("")))
+        rt.block_on(router.oneshot(common::accepted_markdown_request("")))
     })
     .expect("oneshot succeeds");
 
@@ -452,7 +452,7 @@ fn output_bytes_not_recorded_on_error() {
 /// in `docspec_conversion_output_bytes`.
 #[test]
 fn output_bytes_not_recorded_on_unsupported_media() {
-    let rt = make_runtime();
+    let rt = common::runtime();
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
     let router = docspec_http::router::router_with_metrics(handle.clone());
 
@@ -485,7 +485,7 @@ fn tracing_event_emitted_on_success() {
     use std::sync::{Arc, Mutex};
     use tracing_test_helpers::{CapturedEvent, CapturingSubscriber};
 
-    let rt = make_runtime();
+    let rt = common::runtime();
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
     let router = docspec_http::router::router_with_metrics(handle.clone());
 
@@ -494,7 +494,7 @@ fn tracing_event_emitted_on_success() {
 
     tracing::subscriber::with_default(subscriber, || {
         metrics::with_local_recorder(&recorder, || {
-            rt.block_on(router.oneshot(valid_markdown_request("# Hello")))
+            rt.block_on(router.oneshot(common::accepted_markdown_request("# Hello")))
         })
         .expect("oneshot succeeds");
     });
@@ -553,7 +553,7 @@ fn tracing_event_emitted_on_error() {
     use std::sync::{Arc, Mutex};
     use tracing_test_helpers::{CapturedEvent, CapturingSubscriber};
 
-    let rt = make_runtime();
+    let rt = common::runtime();
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
     let router = docspec_http::router::router_with_metrics(handle.clone());
 
@@ -562,7 +562,7 @@ fn tracing_event_emitted_on_error() {
 
     tracing::subscriber::with_default(subscriber, || {
         metrics::with_local_recorder(&recorder, || {
-            rt.block_on(router.oneshot(valid_markdown_request("")))
+            rt.block_on(router.oneshot(common::accepted_markdown_request("")))
         })
         .expect("oneshot succeeds");
     });
