@@ -1,0 +1,51 @@
+name: Publish crates
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to publish from (e.g. a release tag). Empty = caller commit."
+        required: false
+        type: string
+        default: ""
+    secrets:
+      CARGO_REGISTRY_TOKEN:
+        required: true
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to publish from. Empty = default branch."
+        required: false
+        type: string
+        default: ""
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish workspace crates
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          cargo publish \
+            -p docspec-core \
+            -p docspec-json \
+            -p docspec-markdown-reader \
+            -p docspec-blocknote-writer \
+            -p docspec-cli \
+            -p docspec-http \
+            -p docspec
