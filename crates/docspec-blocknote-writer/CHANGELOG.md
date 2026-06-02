@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.3.0](https://github.com/docspec/docspec/compare/v0.2.2...v0.3.0) (2026-06-02)
+
+
+### Features
+
+* **blocknote-writer:** emit native BlockNote table blocks ([f3b3d31](https://github.com/docspec/docspec/commit/f3b3d3112834fa276e05a4d820647cd0938a1714)), closes [#12](https://github.com/docspec/docspec/issues/12)
+* **blocknote-writer:** list support with nesting ([6f7c1a9](https://github.com/docspec/docspec/commit/6f7c1a9283058f27f87f8c7481e34597e3ac5733)), closes [#12](https://github.com/docspec/docspec/issues/12)
+* **blocknote-writer:** preformatted blocks / codeBlocks ([e1a95fd](https://github.com/docspec/docspec/commit/e1a95fd17ec702a305d6265f80b401f22893b61e)), closes [#12](https://github.com/docspec/docspec/issues/12)
+* **cli:** scaffold CLI, improve I/O handling ([0108fe8](https://github.com/docspec/docspec/commit/0108fe87409662e3c5e127bcd4b7a5790e8cd8e3)), closes [#16](https://github.com/docspec/docspec/issues/16)
+* **core:** add code, strikethrough, underline text formatting support ([d0a768d](https://github.com/docspec/docspec/commit/d0a768d9edafb944043b471ce78721d4c90bb164))
+* **core:** add Event::SoftBreak variant ([be8b485](https://github.com/docspec/docspec/commit/be8b48527368440986934b28df7a4d1e414bc322)), closes [#12](https://github.com/docspec/docspec/issues/12)
+* **core:** add StackTrackingSink for event stream normalization ([0555b0a](https://github.com/docspec/docspec/commit/0555b0aab7d278be5152b542fe2bef5905bb8c3a))
+* **json:** extract JSON writing primitives to docspec-json crate ([8b51f24](https://github.com/docspec/docspec/commit/8b51f24fda81605db46335b49b823ac871f55d92))
+* **markdown-reader,blocknote-writer:** emit and serialize inline links ([9592073](https://github.com/docspec/docspec/commit/9592073313c627257cfc7fd91ad978b3267e24a6))
+* **markdown-reader,blocknote-writer:** Markdown reader and BlockNote writer ([8e56b1b](https://github.com/docspec/docspec/commit/8e56b1b2d70633ddc29732d48228f2cb22f24db6))
+* **markdown-reader,blocknote-writer:** support block quotes and thematic break dividers ([91f7246](https://github.com/docspec/docspec/commit/91f7246a4e7fbfa97519317d9a4891f679965c9c))
+* **markdown-reader:** emit ordered and unordered list events ([7ffec48](https://github.com/docspec/docspec/commit/7ffec480eca1a54cecc5ef20e2ec2abcc0b88664))
+
+
+### Bug Fixes
+
+* **blocknote-writer:** blockquote text no longer lost to separate paragraph ([5bde87f](https://github.com/docspec/docspec/commit/5bde87fb6bbfaaef5f68813612f7fc4bcb90cc0a)), closes [#12](https://github.com/docspec/docspec/issues/12)
+* **blocknote-writer:** handle image inside heading without panic ([7c9d11c](https://github.com/docspec/docspec/commit/7c9d11c6a501d184930853d6804829aa9a602260)), closes [#12](https://github.com/docspec/docspec/issues/12)
+* **blocknote-writer:** use double newline for paragraph separation in quotes ([b6ceae0](https://github.com/docspec/docspec/commit/b6ceae086e2411462c09c5f0d3b508a74d39a001)), closes [#12](https://github.com/docspec/docspec/issues/12)
+* **core:** add id's to every event type ([d14a5a6](https://github.com/docspec/docspec/commit/d14a5a6f84a88445e18acd0bfdccfb71991df2d4)), closes [#10](https://github.com/docspec/docspec/issues/10)
+* **core:** validate EndDocument and remove Blockquote from content-bearing ([e1377ff](https://github.com/docspec/docspec/commit/e1377ff810a6b67d471add2bae8a3d58d609da9d)), closes [#10](https://github.com/docspec/docspec/issues/10)
+* **core:** validate single StartDocument in StackTrackingSink ([ab26465](https://github.com/docspec/docspec/commit/ab2646530ea0593be1f3ff67d5528fa866269443))
+* dependency cycle ([7315fd0](https://github.com/docspec/docspec/commit/7315fd0f8912941c7a69a7d5e8065ba258d1f584))
+* **markdown-reader:** buffer code block text for proper newline stripping ([718b4c3](https://github.com/docspec/docspec/commit/718b4c3c37c634835a2b2a1826a02814c12f32ec))
+
 ## [0.2.2](https://github.com/docspec/docspec/compare/v0.2.1...v0.2.2) (2026-06-01)
 
 ## [0.2.1](https://github.com/docspec/docspec/compare/v0.2.0...v0.2.1) (2026-06-01)
