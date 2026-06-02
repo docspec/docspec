@@ -15,9 +15,9 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive", "color"] }
-docspec-core = { path = "../docspec-core", version = "0.5.0" }
-docspec-markdown-reader = { path = "../docspec-markdown-reader", version = "0.5.0" }
-docspec-blocknote-writer = { path = "../docspec-blocknote-writer", version = "0.5.0" }
+docspec-core = "0.5.0"
+docspec-markdown-reader = "0.5.0"
+docspec-blocknote-writer = "0.5.0"
 thiserror = "2"
 
 [dev-dependencies]

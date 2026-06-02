@@ -11,11 +11,11 @@ categories = ["encoding"]
 
 [dependencies]
 base64 = "0.22"
-docspec-core = { path = "../docspec-core", version = "0.5.0" }
-docspec-json = { path = "../docspec-json", version = "0.5.0" }
+docspec-core = "0.5.0"
+docspec-json = "0.5.0"
 
 [dev-dependencies]
-docspec-markdown-reader = { path = "../docspec-markdown-reader", version = "0.5.0" }
+docspec-markdown-reader = "0.5.0"
 serde_json = "1"
 
 [lints]

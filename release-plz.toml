@@ -1,0 +1,13 @@
+[workspace]
+pr_labels = ["release"]
+release_commits = "^(feat|fix|perf|refactor|chore|docs|build)[(:!]"
+git_tag_name = "{{ package }}-v{{ version }}"
+git_release_latest = false
+
+[[package]]
+name = "docspec"
+git_release_latest = true
+
+[[package]]
+name = "docspec-wasm"
+release = false
