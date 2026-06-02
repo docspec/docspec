@@ -1,4 +1,4 @@
-# docspec
+# `docspec`
 
 Streaming document conversion. Convenience facade re-exporting the DocSpec readers,
 writers, and core event types.
@@ -34,29 +34,29 @@ writer.finish()?;
 
 ### Readers
 
-| Feature    | Format                                              | Crate                      |
-|------------|-----------------------------------------------------|----------------------------|
-| `markdown` | Markdown (CommonMark + GFM tables/strikethrough)    | `docspec-markdown-reader`  |
+| Feature    | Format                                           | Crate                     |
+| ---------- | ------------------------------------------------ | ------------------------- |
+| `markdown` | Markdown (CommonMark + GFM tables/strikethrough) | `docspec-markdown-reader` |
 
 ### Writers
 
-| Feature     | Format         | Crate                        |
-|-------------|----------------|------------------------------|
-| `blocknote` | BlockNote JSON | `docspec-blocknote-writer`   |
+| Feature     | Format         | Crate                      |
+| ----------- | -------------- | -------------------------- |
+| `blocknote` | BlockNote JSON | `docspec-blocknote-writer` |
 
 ### Primitives
 
-| Feature | Crate          | Use case                                              |
-|---------|----------------|-------------------------------------------------------|
-| `json`  | `docspec-json` | Building custom JSON-based writers                    |
+| Feature | Crate          | Use case                           |
+| ------- | -------------- | ---------------------------------- |
+| `json`  | `docspec-json` | Building custom JSON-based writers |
 
 ### Convenience
 
-| Feature       | Enables                                                 |
-|---------------|---------------------------------------------------------|
-| `all-readers` | All reader features                                     |
-| `all-writers` | All writer features                                     |
-| `full`        | Everything (`all-readers` + `all-writers` + `json`)     |
+| Feature       | Enables                                             |
+| ------------- | --------------------------------------------------- |
+| `all-readers` | All reader features                                 |
+| `all-writers` | All writer features                                 |
+| `full`        | Everything (`all-readers` + `all-writers` + `json`) |
 
 No features are enabled by default — opt into what you need.
 

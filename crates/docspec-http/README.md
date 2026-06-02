@@ -1,4 +1,4 @@
-# docspec-http
+# `docspec-http`
 
 HTTP API server for DocSpec markdown to BlockNote JSON conversion.
 
@@ -19,13 +19,13 @@ Default host is `127.0.0.1`. Default port is `3000`.
 
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | /conversion | Convert markdown to BlockNote JSON |
-| OPTIONS | /conversion | Preflight / allowed methods |
-| GET | /health | Liveness check |
-| HEAD | /health | Liveness check (no body) |
-| OPTIONS | /health | Allowed methods |
+| Method  | Path        | Description                        |
+| ------- | ----------- | ---------------------------------- |
+| POST    | /conversion | Convert markdown to BlockNote JSON |
+| OPTIONS | /conversion | Preflight / allowed methods        |
+| GET     | /health     | Liveness check                     |
+| HEAD    | /health     | Liveness check (no body)           |
+| OPTIONS | /health     | Allowed methods                    |
 
 ## curl Examples
 
@@ -58,15 +58,15 @@ curl -X OPTIONS -i http://localhost:3000/conversion
 
 All errors use RFC 7807 Problem Details JSON (`application/problem+json; charset=utf-8`).
 
-| Code | Meaning |
-|------|---------|
-| 400 | Empty body or invalid UTF-8 |
-| 404 | Unknown path |
-| 405 | Wrong method (response includes `Allow` header) |
-| 406 | `Accept` header excludes all supported output types |
-| 415 | `Content-Type` must be `text/markdown` |
-| 422 | Markdown parse error |
-| 500 | Internal conversion error |
+| Code | Meaning                                             |
+| ---- | --------------------------------------------------- |
+| 400  | Empty body or invalid UTF-8                         |
+| 404  | Unknown path                                        |
+| 405  | Wrong method (response includes `Allow` header)     |
+| 406  | `Accept` header excludes all supported output types |
+| 415  | `Content-Type` must be `text/markdown`              |
+| 422  | Markdown parse error                                |
+| 500  | Internal conversion error                           |
 
 Accepted `Accept` values for `/conversion`: `*/*`, `application/*`, `application/vnd.docspec.blocknote+json`, `application/vnd.blocknote+json`. Anything else returns 406.
 
@@ -113,16 +113,16 @@ These follow Sentry's standard conventions:
 
 ### What is captured
 
-| Signal | Captured? |
-|---|---|
-| `500 Internal Server Error` (`HttpError::Internal`) | yes (event) |
-| `422 Unprocessable Entity` (`HttpError::Unprocessable`) | yes (event) |
-| Other 4xx responses | no |
-| Panics | yes (event) |
-| `tracing::error!` calls | yes (event) |
-| `tracing::warn!` calls | yes (breadcrumb) |
-| `tracing::info!`/`debug!` calls | yes (breadcrumb) |
-| Performance transactions | only if `SENTRY_TRACES_SAMPLE_RATE > 0` |
+| Signal                                                  | Captured?                               |
+| ------------------------------------------------------- | --------------------------------------- |
+| `500 Internal Server Error` (`HttpError::Internal`)     | yes (event)                             |
+| `422 Unprocessable Entity` (`HttpError::Unprocessable`) | yes (event)                             |
+| Other 4xx responses                                     | no                                      |
+| Panics                                                  | yes (event)                             |
+| `tracing::error!` calls                                 | yes (event)                             |
+| `tracing::warn!` calls                                  | yes (breadcrumb)                        |
+| `tracing::info!`/`debug!` calls                         | yes (breadcrumb)                        |
+| Performance transactions                                | only if `SENTRY_TRACES_SAMPLE_RATE > 0` |
 
 ### Privacy
 
@@ -187,11 +187,11 @@ Kubernetes users should configure a Pod-level `httpGet` liveness probe on `/heal
 
 Images are published to `ghcr.io/docspec/api` by the release workflow (managed by release-please). The following tags are maintained:
 
-| Tag | Meaning |
-|-----|---------|
-| `0.1.0` | Exact version |
-| `0.1` | Latest patch of 0.1 |
-| `0` | Latest minor of 0 |
+| Tag      | Meaning                      |
+| -------- | ---------------------------- |
+| `0.1.0`  | Exact version                |
+| `0.1`    | Latest patch of 0.1          |
+| `0`      | Latest minor of 0            |
 | `latest` | Most recent released version |
 
 `latest` follows the most recent GitHub release, not the `main` branch. The publish workflow is documented contract; it is not implemented in this repository.
@@ -220,14 +220,14 @@ TLS termination, CORS headers, authentication, and rate limiting are intentional
 
 ### Metric Catalog
 
-| Name | Type | Labels | Description | Buckets |
-|------|------|--------|-------------|---------|
-| `docspec_http_requests_total` | counter | `method`, `path`, `status` | Total HTTP requests received | — |
-| `docspec_http_request_duration_seconds` | histogram | `method`, `path`, `status` | HTTP request latency in seconds | 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0 |
-| `docspec_http_request_body_bytes` | histogram | `input_mime_type` | HTTP request body size in bytes, labeled by input MIME type | 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 102400, 204800 |
-| `docspec_conversions_total` | counter | `result`, `error_class`, `input_mime_type`, `output_mime_type` | Total document conversions, labeled by result, error class, and input/output MIME type | — |
-| `docspec_conversion_duration_seconds` | histogram | `result`, `input_mime_type`, `output_mime_type` | Document conversion duration in seconds, labeled by result and input/output MIME type | 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0 |
-| **`docspec_conversion_output_bytes`** (NEW) | histogram | `input_mime_type`, `output_mime_type` | Document conversion output size in bytes (success only) | 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 102400, 204800 |
+| Name                                        | Type      | Labels                                                         | Description                                                                            | Buckets                                                                   |
+| ------------------------------------------- | --------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `docspec_http_requests_total`               | counter   | `method`, `path`, `status`                                     | Total HTTP requests received                                                           | —                                                                         |
+| `docspec_http_request_duration_seconds`     | histogram | `method`, `path`, `status`                                     | HTTP request latency in seconds                                                        | 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0             |
+| `docspec_http_request_body_bytes`           | histogram | `input_mime_type`                                              | HTTP request body size in bytes, labeled by input MIME type                            | 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 102400, 204800 |
+| `docspec_conversions_total`                 | counter   | `result`, `error_class`, `input_mime_type`, `output_mime_type` | Total document conversions, labeled by result, error class, and input/output MIME type | —                                                                         |
+| `docspec_conversion_duration_seconds`       | histogram | `result`, `input_mime_type`, `output_mime_type`                | Document conversion duration in seconds, labeled by result and input/output MIME type  | 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0             |
+| **`docspec_conversion_output_bytes`** (NEW) | histogram | `input_mime_type`, `output_mime_type`                          | Document conversion output size in bytes (success only)                                | 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 102400, 204800 |
 
 ### Label Values
 

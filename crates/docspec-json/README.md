@@ -1,4 +1,4 @@
-# docspec-json
+# `docspec-json`
 
 JSON writing primitives for docspec writers.
 

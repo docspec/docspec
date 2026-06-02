@@ -1,4 +1,4 @@
-# docspec-cli
+# `docspec-cli`
 
 Command-line interface for DocSpec document conversion.
 

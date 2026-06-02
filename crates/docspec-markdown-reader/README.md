@@ -1,4 +1,4 @@
-# docspec-markdown-reader
+# `docspec-markdown-reader`
 
 Markdown to DocSpec event stream reader.
 

@@ -1,4 +1,4 @@
-# docspec-wasm
+# `docspec-wasm`
 
 WebAssembly bindings for the DocSpec document conversion library.
 

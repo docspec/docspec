@@ -1,21 +1,21 @@
-# docspec-blocknote-writer
+# `docspec-blocknote-writer`
 
 Converts a DocSpec event stream into [BlockNote](https://www.blocknotejs.org/) JSON. Implements the `EventSink` trait and emits JSON tokens directly to any `Write` target as events arrive — no intermediate document representation, constant memory regardless of file size.
 
 ## Supported Features
 
-| Block type | BlockNote type |
-|---|---|
-| Paragraph | `paragraph` |
-| Heading (levels 1–6) | `heading` |
-| Block quote | `quote` |
-| Preformatted / code block | `codeBlock` |
-| Image | `image` |
-| Table (with header and data cells) | `table` |
-| Thematic break | `divider` |
-| Unordered list item | `bulletListItem` |
-| Ordered list item | `numberedListItem` |
-| Inline link | `link` inline type with `href` (title is dropped) |
+| Block type                         | BlockNote type                                    |
+| ---------------------------------- | ------------------------------------------------- |
+| Paragraph                          | `paragraph`                                       |
+| Heading (levels 1–6)               | `heading`                                         |
+| Block quote                        | `quote`                                           |
+| Preformatted / code block          | `codeBlock`                                       |
+| Image                              | `image`                                           |
+| Table (with header and data cells) | `table`                                           |
+| Thematic break                     | `divider`                                         |
+| Unordered list item                | `bulletListItem`                                  |
+| Ordered list item                  | `numberedListItem`                                |
+| Inline link                        | `link` inline type with `href` (title is dropped) |
 
 Inline styles supported within text content: bold, italic, code, strikethrough, underline.
 Inline links (`StartLink`/`EndLink`) emit a `link` inline type with the `href`. The optional `title` field is dropped (BlockNote's default link schema has no title).
