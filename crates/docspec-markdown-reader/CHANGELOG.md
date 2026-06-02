@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.6.0](https://github.com/docspec/docspec/compare/v0.5.0...v0.6.0) (2026-06-02)
+
+
+### Features
+
+* **core:** add code, strikethrough, underline text formatting support ([d0a768d](https://github.com/docspec/docspec/commit/d0a768d9edafb944043b471ce78721d4c90bb164))
+* **core:** add Event::SoftBreak variant ([be8b485](https://github.com/docspec/docspec/commit/be8b48527368440986934b28df7a4d1e414bc322)), closes [#12](https://github.com/docspec/docspec/issues/12)
+* **core:** add StackTrackingSink for event stream normalization ([0555b0a](https://github.com/docspec/docspec/commit/0555b0aab7d278be5152b542fe2bef5905bb8c3a))
+* **json:** extract JSON writing primitives to docspec-json crate ([8b51f24](https://github.com/docspec/docspec/commit/8b51f24fda81605db46335b49b823ac871f55d92))
+* **markdown-reader,blocknote-writer:** emit and serialize inline links ([9592073](https://github.com/docspec/docspec/commit/9592073313c627257cfc7fd91ad978b3267e24a6))
+* **markdown-reader,blocknote-writer:** Markdown reader and BlockNote writer ([8e56b1b](https://github.com/docspec/docspec/commit/8e56b1b2d70633ddc29732d48228f2cb22f24db6))
+* **markdown-reader,blocknote-writer:** support block quotes and thematic break dividers ([91f7246](https://github.com/docspec/docspec/commit/91f7246a4e7fbfa97519317d9a4891f679965c9c))
+* **markdown-reader:** defer StartParagraph emission to elide empty wrappers ([1606839](https://github.com/docspec/docspec/commit/1606839898e032e654730e8aa1a2cb325465def2)), closes [#37](https://github.com/docspec/docspec/issues/37)
+* **markdown-reader:** emit ordered and unordered list events ([7ffec48](https://github.com/docspec/docspec/commit/7ffec480eca1a54cecc5ef20e2ec2abcc0b88664))
+* **markdown-reader:** emit table structure events ([4dbef52](https://github.com/docspec/docspec/commit/4dbef52252c25c3e0b1ef683ad5ca5f65fdf0200)), closes [#37](https://github.com/docspec/docspec/issues/37)
+* **markdown-reader:** preformatted/code block ([0881081](https://github.com/docspec/docspec/commit/08810818ad9f4c0a7570ba5cdf7dbd02b7d3d7d0)), closes [#37](https://github.com/docspec/docspec/issues/37)
+
+
+### Bug Fixes
+
+* **blocknote-writer:** blockquote text no longer lost to separate paragraph ([5bde87f](https://github.com/docspec/docspec/commit/5bde87fb6bbfaaef5f68813612f7fc4bcb90cc0a)), closes [#12](https://github.com/docspec/docspec/issues/12)
+* **core:** add id's to every event type ([d14a5a6](https://github.com/docspec/docspec/commit/d14a5a6f84a88445e18acd0bfdccfb71991df2d4)), closes [#10](https://github.com/docspec/docspec/issues/10)
+* **core:** validate EndDocument and remove Blockquote from content-bearing ([e1377ff](https://github.com/docspec/docspec/commit/e1377ff810a6b67d471add2bae8a3d58d609da9d)), closes [#10](https://github.com/docspec/docspec/issues/10)
+* dependency cycle ([7315fd0](https://github.com/docspec/docspec/commit/7315fd0f8912941c7a69a7d5e8065ba258d1f584))
+* **markdown-reader:** buffer code block text for proper newline stripping ([718b4c3](https://github.com/docspec/docspec/commit/718b4c3c37c634835a2b2a1826a02814c12f32ec))
+* **markdown-reader:** keep parent item open during nested list ([d68e0a2](https://github.com/docspec/docspec/commit/d68e0a2c696e3c6efa9d937e641dbc1b220f06af)), closes [#37](https://github.com/docspec/docspec/issues/37)
+* **markdown-reader:** remove redundant code style from preformatted text events ([a749578](https://github.com/docspec/docspec/commit/a749578039a61f0553b5408ef045e2fbc74fb0d1)), closes [#37](https://github.com/docspec/docspec/issues/37)
+
 ## [0.5.0](https://github.com/docspec/docspec/compare/v0.4.0...v0.5.0) (2026-06-02)
 
 

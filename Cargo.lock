@@ -448,7 +448,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-blocknote-writer"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "base64",
  "docspec-core",
@@ -459,7 +459,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-cli"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -483,7 +483,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-http"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "axum",
  "clap",
@@ -516,7 +516,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-markdown-reader"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "docspec-core",
  "pulldown-cmark",
@@ -524,7 +524,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-wasm"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "docspec-blocknote-writer",
  "docspec-core",

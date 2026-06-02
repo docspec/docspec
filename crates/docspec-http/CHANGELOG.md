@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.6.0](https://github.com/docspec/docspec/compare/v0.5.0...v0.6.0) (2026-06-02)
+
+
+### Features
+
+* **docker:** create a Dockerfile ([937fc9c](https://github.com/docspec/docspec/commit/937fc9cab3d7fb576cda8c021285cac002dd1a53))
+* **http:** add mime-type labels and output-bytes tracking to metrics ([ff24f48](https://github.com/docspec/docspec/commit/ff24f48ddfb74ae9551fb05e54b8f0e1eb022186)), closes [#15](https://github.com/docspec/docspec/issues/15)
+* **http:** add sentry telemetry to http server ([0c9cbf5](https://github.com/docspec/docspec/commit/0c9cbf55e4787b236aaba54df26a1508ef896af6)), closes [#15](https://github.com/docspec/docspec/issues/15)
+* **http:** HTTP API server for conversion ([2c16050](https://github.com/docspec/docspec/commit/2c1605007d5b3638f19ed5a662b4cd524e2b94c7)), closes [#15](https://github.com/docspec/docspec/issues/15)
+* **http:** Prometheus metrics endpoint ([a216b3f](https://github.com/docspec/docspec/commit/a216b3f870f7bff8151b99897a5b4d82508dd9b2)), closes [#15](https://github.com/docspec/docspec/issues/15)
+
 ## [0.5.0](https://github.com/docspec/docspec/compare/v0.4.0...v0.5.0) (2026-06-02)
 
 
