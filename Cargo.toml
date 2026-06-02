@@ -134,3 +134,24 @@ multiple_crate_versions = "allow"
 fn_params_excessive_bools = "allow"
 # Reason: Callback trait contracts may require Option return even when current implementation always keeps values.
 unnecessary_wraps = "allow"
+
+# =============================================================================
+# [patch.crates-io] — TEMPORARY bootstrap for the pre-first-publish window.
+# Without this block, `cargo build -p docspec-X` fails because docspec crates
+# are not yet published to crates.io and Cargo does NOT auto-resolve
+# workspace members through bare `version = "X.Y.Z"` declarations (verified
+# empirically — see plan Context).
+#
+# REMOVAL: This block MUST be removed once all 7 publishable docspec crates
+# (everything except docspec-wasm) have shipped 0.5.0 (or first release) to
+# crates.io. Tracked as a follow-up plan.
+# =============================================================================
+[patch.crates-io]
+docspec                  = { path = "crates/docspec" }
+docspec-core             = { path = "crates/docspec-core" }
+docspec-json             = { path = "crates/docspec-json" }
+docspec-cli              = { path = "crates/docspec-cli" }
+docspec-http             = { path = "crates/docspec-http" }
+docspec-blocknote-writer = { path = "crates/docspec-blocknote-writer" }
+docspec-markdown-reader  = { path = "crates/docspec-markdown-reader" }
+docspec-wasm             = { path = "crates/docspec-wasm" }

@@ -28,10 +28,10 @@ all-writers = ["blocknote"]
 full = ["all-readers", "all-writers", "json"]
 
 [dependencies]
-docspec-core = { path = "../docspec-core", version = "0.5.0" }
-docspec-json = { path = "../docspec-json", version = "0.5.0", optional = true }
-docspec-markdown-reader = { path = "../docspec-markdown-reader", version = "0.5.0", optional = true }
-docspec-blocknote-writer = { path = "../docspec-blocknote-writer", version = "0.5.0", optional = true }
+docspec-core = "0.5.0"
+docspec-json = { version = "0.5.0", optional = true }
+docspec-markdown-reader = { version = "0.5.0", optional = true }
+docspec-blocknote-writer = { version = "0.5.0", optional = true }
 
 [package.metadata.docs.rs]
 all-features = true

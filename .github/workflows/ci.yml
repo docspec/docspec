@@ -8,12 +8,11 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-permissions:
-  contents: read
-
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -21,6 +20,8 @@ jobs:
 
   clippy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -30,6 +31,8 @@ jobs:
 
   fmt:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -48,27 +51,58 @@ jobs:
     with:
       push: false
 
-  release-please:
-    needs: [test, clippy, fmt, docker-build]
+  release-plz:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, clippy, fmt, docker-build]
     runs-on: ubuntu-latest
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
       contents: write
       pull-requests: write
     outputs:
-      release_created: ${{ steps.release.outputs['crates/docspec-core--release_created'] }}
-      tag_name: ${{ steps.release.outputs['crates/docspec-core--tag_name'] }}
+      docspec_http_version: ${{ steps.extract.outputs.version }}
+      docspec_http_tag: ${{ steps.extract.outputs.tag }}
     steps:
-      - id: release
-        uses: googleapis/release-please-action@8b8fd2cc23b2e18957157a9d923d75aa0c6f6ad5
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run release-plz release-pr
+        uses: release-plz/action@v0.5
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: Run release-plz release
+        id: release
+        uses: release-plz/action@v0.5
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: Extract docspec-http release info
+        id: extract
+        if: steps.release.outputs.releases_created == 'true'
+        env:
+          RELEASES: ${{ steps.release.outputs.releases }}
+        run: |
+          version=$(echo "$RELEASES" | jq -r '[.[] | select(.package_name == "docspec-http")] | .[0].version // ""')
+          tag=$(echo "$RELEASES" | jq -r '[.[] | select(.package_name == "docspec-http")] | .[0].tag // ""')
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "Extracted docspec-http version: '${version}', tag: '${tag}'"
 
   docker-release:
     name: Docker Release
-    needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
+    needs: release-plz
+    if: needs.release-plz.outputs.docspec_http_version != ''
     permissions:
       contents: read
       packages: write
@@ -78,16 +112,5 @@ jobs:
     with:
       push: true
       sign: true
-      ref: ${{ needs.release-please.outputs.tag_name }}
-      tag_name: ${{ needs.release-please.outputs.tag_name }}
-
-  crates-release:
-    name: Crates.io Release
-    needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
-    uses: ./.github/workflows/publish-crates.yml
-    secrets:
-      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-    with:
-      ref: ${{ needs.release-please.outputs.tag_name }}
-      dry_run: false
+      ref: ${{ needs.release-plz.outputs.docspec_http_tag }}
+      tag_name: ${{ needs.release-plz.outputs.docspec_http_version }}
