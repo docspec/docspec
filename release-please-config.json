@@ -3,20 +3,45 @@
   "release-type": "rust",
   "include-component-in-tag": false,
   "packages": {
-    "crates/docspec-core": { "component": "docspec-core" },
-    "crates/docspec-markdown-reader": { "component": "docspec-markdown-reader" },
-    "crates/docspec-blocknote-writer": { "component": "docspec-blocknote-writer" },
-    "crates/docspec-json": { "component": "docspec-json" },
-    "crates/docspec-cli": { "component": "docspec-cli" },
-    "crates/docspec-http": { "component": "docspec-http" },
-    "crates/docspec-wasm": { "component": "docspec-wasm" }
+    "crates/docspec": {
+      "component": "docspec",
+      "changelog-path": "../../CHANGELOG.md"
+    },
+    "crates/docspec-core": {
+      "component": "docspec-core",
+      "changelog-path": "../../CHANGELOG.md"
+    },
+    "crates/docspec-markdown-reader": {
+      "component": "docspec-markdown-reader",
+      "changelog-path": "../../CHANGELOG.md"
+    },
+    "crates/docspec-blocknote-writer": {
+      "component": "docspec-blocknote-writer",
+      "changelog-path": "../../CHANGELOG.md"
+    },
+    "crates/docspec-json": {
+      "component": "docspec-json",
+      "changelog-path": "../../CHANGELOG.md"
+    },
+    "crates/docspec-cli": {
+      "component": "docspec-cli",
+      "changelog-path": "../../CHANGELOG.md"
+    },
+    "crates/docspec-http": {
+      "component": "docspec-http",
+      "changelog-path": "../../CHANGELOG.md"
+    },
+    "crates/docspec-wasm": {
+      "component": "docspec-wasm",
+      "changelog-path": "../../CHANGELOG.md"
+    }
   },
   "plugins": [
     { "type": "cargo-workspace", "merge": false },
     {
       "type": "linked-versions",
       "groupName": "docspec",
-      "components": ["docspec-core", "docspec-markdown-reader", "docspec-blocknote-writer", "docspec-json", "docspec-cli", "docspec-http", "docspec-wasm"]
+      "components": ["docspec", "docspec-core", "docspec-markdown-reader", "docspec-blocknote-writer", "docspec-json", "docspec-cli", "docspec-http", "docspec-wasm"]
     }
   ]
 }

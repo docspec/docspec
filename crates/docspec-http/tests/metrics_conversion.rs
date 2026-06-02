@@ -233,7 +233,9 @@ mod tracing_test_helpers {
     use core::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
     use tracing::field::{Field, Visit};
+    use tracing::level_filters::LevelFilter;
     use tracing::span::{Attributes, Record};
+    use tracing::subscriber::Interest;
     use tracing::{Event, Id, Metadata, Subscriber};
 
     /// A captured tracing event with its fields as key-value string pairs.
@@ -292,8 +294,31 @@ mod tracing_test_helpers {
     }
 
     impl Subscriber for CapturingSubscriber {
+        // Override the per-callsite interest so the tracing crate's global
+        // callsite cache cannot leave us at `Interest::never` from a prior
+        // subscriber that was active for this same callsite. Without this,
+        // tests that run after another test which registered a different
+        // subscriber on the same callsite can silently lose events on
+        // multi-threaded test runners.
+        fn register_callsite(&self, metadata: &Metadata<'_>) -> Interest {
+            if metadata.is_event() && *metadata.level() <= tracing::Level::INFO {
+                Interest::always()
+            } else {
+                Interest::never()
+            }
+        }
+
         fn enabled(&self, metadata: &Metadata<'_>) -> bool {
             metadata.is_event() && *metadata.level() <= tracing::Level::INFO
+        }
+
+        // Publish a concrete max level so the tracing crate's per-thread
+        // `LevelFilter::current()` short-circuit does not filter our INFO
+        // events out before they reach `event()`. Combined with
+        // `register_callsite`, this makes the subscriber's interest in INFO
+        // events explicit and stable across parallel tests.
+        fn max_level_hint(&self) -> Option<LevelFilter> {
+            Some(LevelFilter::INFO)
         }
 
         fn enter(&self, _span: &Id) {}

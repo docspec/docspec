@@ -56,11 +56,11 @@ jobs:
       contents: write
       pull-requests: write
     outputs:
-      releases_created: ${{ steps.release.outputs.releases_created }}
+      release_created: ${{ steps.release.outputs['crates/docspec-core--release_created'] }}
       tag_name: ${{ steps.release.outputs['crates/docspec-core--tag_name'] }}
     steps:
       - id: release
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@8b8fd2cc23b2e18957157a9d923d75aa0c6f6ad5
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
@@ -68,7 +68,7 @@ jobs:
   docker-release:
     name: Docker Release
     needs: release-please
-    if: needs.release-please.outputs.releases_created == 'true'
+    if: needs.release-please.outputs.release_created == 'true'
     permissions:
       contents: read
       packages: write
@@ -80,3 +80,14 @@ jobs:
       sign: true
       ref: ${{ needs.release-please.outputs.tag_name }}
       tag_name: ${{ needs.release-please.outputs.tag_name }}
+
+  crates-release:
+    name: Crates.io Release
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    uses: ./.github/workflows/publish-crates.yml
+    secrets:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    with:
+      ref: ${{ needs.release-please.outputs.tag_name }}
+      dry_run: false

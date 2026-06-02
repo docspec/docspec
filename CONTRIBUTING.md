@@ -186,6 +186,19 @@ DocSpec uses [release-please](https://github.com/googleapis/release-please) to g
 3. The release PR contains the proposed version bump and generated changelog
 4. A maintainer merges the release PR
 5. A new release is tagged and published automatically
+6. The crates.io publish workflow publishes all publishable workspace crates in dependency order
+
+### Crates.io Publishing
+
+Crates are published from the `Publish crates` GitHub Actions workflow when release-please creates a non-prerelease GitHub release. The workflow requires a repository secret named `CARGO_REGISTRY_TOKEN` containing a crates.io API token with publish access for all publishable DocSpec crates. `docspec-wasm` remains `publish = false`; WebAssembly package publishing is handled separately from crates.io.
+
+For local development, first-party dependencies use both `path` and `version`. Cargo uses the path inside the workspace, then strips the path and keeps the version requirement when packaging crates for crates.io.
+
+Before publishing manually, run:
+
+```bash
+cargo publish --workspace --dry-run
+```
 
 ### Release Types
 
