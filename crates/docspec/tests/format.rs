@@ -97,6 +97,9 @@ mod tests {
     #[cfg(feature = "markdown")]
     #[test]
     fn input_format_eq() {
-        assert_eq!(docspec::InputFormat::Markdown, docspec::InputFormat::Markdown);
+        assert_eq!(
+            docspec::InputFormat::Markdown,
+            docspec::InputFormat::Markdown
+        );
     }
 }
