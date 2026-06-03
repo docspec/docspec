@@ -121,7 +121,7 @@ pub mod writers {
 /// from file paths based on extension.
 pub mod format;
 
-/// Enum-dispatch factories for document readers and writers.
+/// Enum-dispatch factories for document readers.
 pub mod factory;
 
 pub use docspec_core::*;
