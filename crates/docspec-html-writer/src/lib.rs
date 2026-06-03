@@ -86,10 +86,8 @@ impl<W: Write> EventSink for HtmlWriter<W> {
                     self.in_paragraph = false;
                 }
             }
-            Event::Text { content, .. } => {
-                if self.in_paragraph {
-                    self.serializer.write_text(&content)?;
-                }
+            Event::Text { content, .. } if self.in_paragraph => {
+                self.serializer.write_text(&content)?;
             }
             _ => {}
         }
