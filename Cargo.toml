@@ -10,6 +10,7 @@ members = [
   "crates/docspec-json",
   "crates/docspec-cli",
   "crates/docspec-http",
+  "crates/docspec-oxa-writer",
   "crates/docspec-wasm",
 ]
 

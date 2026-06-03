@@ -548,6 +548,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "docspec-oxa-writer"
+version = "0.1.0"
+dependencies = [
+ "docspec-core",
+ "docspec-json",
+ "serde_json",
+]
+
+[[package]]
 name = "docspec-wasm"
 version = "1.0.2"
 dependencies = [

@@ -34,6 +34,9 @@
     "crates/docspec-html-writer": {
       "component": "docspec-html-writer"
     },
+    "crates/docspec-oxa-writer": {
+      "component": "docspec-oxa-writer"
+    },
     "crates/docspec-html-reader": {
       "component": "docspec-html-reader"
     }
