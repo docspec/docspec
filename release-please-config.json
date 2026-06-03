@@ -29,6 +29,9 @@
     },
     "crates/docspec-wasm": {
       "component": "docspec-wasm"
+    },
+    "crates/docspec-html-reader": {
+      "component": "docspec-html-reader"
     }
   }
 }
