@@ -51,7 +51,7 @@ No buffering. No intermediate representations. No loading the entire document in
 - **Streaming First**: Data flows event by event. Nothing accumulates. Everything moves.
 - **Fail Fast**: On corruption or error, surface it immediately. No partial output. No silent truncation.
 - **No Unsafe Code**: The workspace forbids unsafe entirely. Safety is not a limitation; it is a foundation.
-- **Strict Quality**: 98% test coverage from day one. No unwrap. No expect. No warning suppressions.
+- **Strict Quality**: 98% coverage for new and changed executable Rust lines in covered crates. No unwrap. No expect. No warning suppressions.
 
 ## Why Rust
 

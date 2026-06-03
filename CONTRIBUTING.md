@@ -117,7 +117,7 @@ Security advisory GHSA-xxxx-xxxx-xxxx affects zip < 2.2.0.
 
 Every pull request requires at least one reviewer approval before merging. Reviewers verify:
 - All CI checks pass (tests, lint, format)
-- Test coverage remains at or above 98%
+- New and changed executable Rust lines in covered crates meet the 98% coverage floor
 - New code has tests covering the changes
 - Public APIs are documented
 - Error handling is thorough (no unwrap, no expect)
@@ -136,7 +136,7 @@ Review is collaboration, not gatekeeping. Ask questions. Push back when needed.
 
 ## Code Standards
 
-See [CODING_STANDARDS.md](CODING_STANDARDS.md) for complete rules. The essentials: no unsafe, no unwrap/expect, no #[allow], all public items documented, 98% test coverage, `cargo fmt` before every commit.
+See [CODING_STANDARDS.md](CODING_STANDARDS.md) for complete rules. The essentials: no unsafe, no unwrap/expect, no #[allow], all public items documented, 98% coverage for new and changed executable Rust lines in covered crates, `cargo fmt` before every commit.
 
 ## Adding Dependencies
 
