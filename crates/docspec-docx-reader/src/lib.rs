@@ -53,7 +53,8 @@ use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 
 pub use docspec_core::EventSource;
-use docspec_core::{Error, Event, Result};
+use docspec_core::{Error, Event, Result, TextStyle};
+use quick_xml::events::{BytesCData, BytesRef, BytesText};
 
 /// Document processing phase.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -92,6 +93,8 @@ pub struct DocxReader {
     in_paragraph: bool,
     /// Whether the reader is currently inside a `<w:t>` element.
     in_text: bool,
+    /// Text collected for the current `<w:t>` element.
+    pending_text: String,
     /// Document processing phase.
     phase: Phase,
     /// Queue of `DocSpec` events to emit.
@@ -108,6 +111,7 @@ impl fmt::Debug for DocxReader {
             .field("in_ignored_subtree", &self.in_ignored_subtree)
             .field("in_paragraph", &self.in_paragraph)
             .field("in_text", &self.in_text)
+            .field("pending_text", &self.pending_text)
             .field("phase", &"<phase>")
             .field("queue", &self.queue)
             .field("xml", &"<quick_xml::Reader>")
@@ -196,6 +200,7 @@ impl DocxReader {
             in_ignored_subtree: 0,
             in_paragraph: false,
             in_text: false,
+            pending_text: String::new(),
             phase: Phase::NotStarted,
             queue: VecDeque::new(),
             xml,
@@ -203,11 +208,284 @@ impl DocxReader {
     }
 }
 
+impl DocxReader {
+    fn can_collect_text(&self) -> bool {
+        self.in_ignored_subtree == 0 && self.in_paragraph && self.in_text
+    }
+
+    fn end_paragraph(&mut self) {
+        self.queue.push_back(Event::EndParagraph);
+        self.in_paragraph = false;
+        self.in_text = false;
+        self.pending_text.clear();
+    }
+
+    fn flush_pending_text(&mut self) {
+        if !self.pending_text.is_empty() {
+            self.queue.push_back(Event::Text {
+                content: core::mem::take(&mut self.pending_text),
+                style: TextStyle::default(),
+            });
+        }
+    }
+
+    fn handle_cdata(&mut self, cdata: BytesCData<'_>) -> Result<()> {
+        if self.can_collect_text() {
+            let bytes = cdata.into_inner();
+            let content = core::str::from_utf8(&bytes).map_err(|err| Error::Parse {
+                message: format!("malformed document.xml: {err}"),
+                position: None,
+            })?;
+            self.pending_text.push_str(content);
+        }
+        Ok(())
+    }
+
+    fn handle_empty(&mut self, local: &[u8]) {
+        match local {
+            value if self.in_ignored_subtree > 0 || is_ignored_container(value) => {}
+            b"p" if !self.in_paragraph => {
+                self.queue.push_back(Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                });
+                self.queue.push_back(Event::EndParagraph);
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_end(&mut self, local: &[u8]) {
+        if self.in_ignored_subtree > 0 {
+            self.in_ignored_subtree = self.in_ignored_subtree.saturating_sub(1);
+            return;
+        }
+
+        match local {
+            b"p" if self.in_paragraph => self.end_paragraph(),
+            b"t" if self.in_text => {
+                self.flush_pending_text();
+                self.in_text = false;
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_eof(&mut self) {
+        if self.in_text {
+            self.flush_pending_text();
+        }
+        if self.in_paragraph {
+            self.end_paragraph();
+        }
+        self.queue.push_back(Event::EndDocument);
+        self.phase = Phase::Finished;
+    }
+
+    fn handle_general_ref(&mut self, reference: &BytesRef<'_>) -> Result<()> {
+        if self.can_collect_text() {
+            let decoded = reference.decode().map_err(|err| Error::Parse {
+                message: format!("malformed document.xml: {err}"),
+                position: None,
+            })?;
+            let escaped = format!("&{decoded};");
+            let unescaped = quick_xml::escape::unescape(&escaped).map_err(|err| Error::Parse {
+                message: format!("malformed document.xml: {err}"),
+                position: None,
+            })?;
+            self.pending_text.push_str(&unescaped);
+        }
+        Ok(())
+    }
+
+    fn handle_start(&mut self, local: &[u8]) {
+        if self.in_ignored_subtree > 0 {
+            self.in_ignored_subtree = self.in_ignored_subtree.saturating_add(1);
+            return;
+        }
+
+        match local {
+            value if is_ignored_container(value) => self.in_ignored_subtree = 1,
+            b"p" if !self.in_paragraph => self.start_paragraph(),
+            b"t" if self.in_paragraph => {
+                self.in_text = true;
+                self.pending_text.clear();
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_text(&mut self, text: &BytesText<'_>) -> Result<()> {
+        if self.can_collect_text() {
+            let decoded = text.decode().map_err(|err| Error::Parse {
+                message: format!("malformed document.xml: {err}"),
+                position: None,
+            })?;
+            let unescaped = quick_xml::escape::unescape(&decoded).map_err(|err| Error::Parse {
+                message: format!("malformed document.xml: {err}"),
+                position: None,
+            })?;
+            self.pending_text.push_str(&unescaped);
+        }
+        Ok(())
+    }
+
+    fn read_until_event(&mut self) -> Result<()> {
+        let event = self
+            .xml
+            .read_event_into(&mut self.buf)
+            .map_err(|err| Error::Parse {
+                message: format!("malformed document.xml: {err}"),
+                position: None,
+            })?
+            .into_owned();
+
+        match event {
+            quick_xml::events::Event::Start(tag) => self.handle_start(tag.local_name().as_ref()),
+            quick_xml::events::Event::End(tag) => self.handle_end(tag.local_name().as_ref()),
+            quick_xml::events::Event::Empty(tag) => self.handle_empty(tag.local_name().as_ref()),
+            quick_xml::events::Event::Text(text) => {
+                self.handle_text(&text)?;
+            }
+            quick_xml::events::Event::GeneralRef(reference) => {
+                self.handle_general_ref(&reference)?;
+            }
+            quick_xml::events::Event::CData(cdata) => self.handle_cdata(cdata)?,
+            quick_xml::events::Event::Eof => self.handle_eof(),
+            quick_xml::events::Event::Comment(_)
+            | quick_xml::events::Event::Decl(_)
+            | quick_xml::events::Event::PI(_)
+            | quick_xml::events::Event::DocType(_) => {}
+        }
+
+        self.buf.clear();
+        Ok(())
+    }
+
+    fn start_paragraph(&mut self) {
+        self.queue.push_back(Event::StartParagraph {
+            alignment: None,
+            id: None,
+        });
+        self.in_paragraph = true;
+        self.in_text = false;
+        self.pending_text.clear();
+    }
+}
+
 impl EventSource for DocxReader {
     #[inline]
     fn next_event(&mut self) -> Result<Option<Event>> {
-        Err(Error::Other {
-            message: "docx reader not yet implemented".to_string(),
-        })
+        loop {
+            if let Some(event) = self.queue.pop_front() {
+                return Ok(Some(event));
+            }
+
+            match self.phase {
+                Phase::NotStarted => {
+                    self.phase = Phase::Running;
+                    self.queue.push_back(Event::StartDocument {
+                        id: None,
+                        language: None,
+                        metadata: None,
+                    });
+                }
+                Phase::Finished => return Ok(None),
+                Phase::Running => self.read_until_event()?,
+            }
+        }
+    }
+}
+
+fn is_ignored_container(local: &[u8]) -> bool {
+    matches!(
+        local,
+        b"tbl"
+            | b"tr"
+            | b"tc"
+            | b"sdt"
+            | b"hyperlink"
+            | b"drawing"
+            | b"pict"
+            | b"object"
+            | b"ins"
+            | b"del"
+            | b"moveFrom"
+            | b"moveTo"
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::{Cursor, Write as _};
+
+    use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
+
+    use super::*;
+
+    const SIMPLE_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+
+    fn synth_docx_for_unit_test(
+        rels_xml: &str,
+        document_xml: &str,
+    ) -> core::result::Result<Vec<u8>, Box<dyn core::error::Error>> {
+        let buf = Cursor::new(Vec::new());
+        let mut writer = ZipWriter::new(buf);
+        let rels_options =
+            SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+        writer.start_file("_rels/.rels", rels_options)?;
+        writer.write_all(rels_xml.as_bytes())?;
+        let document_options =
+            SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+        writer.start_file("word/document.xml", document_options)?;
+        writer.write_all(document_xml.as_bytes())?;
+        Ok(writer.finish()?.into_inner())
+    }
+
+    fn make_reader(
+        document_xml: &str,
+    ) -> core::result::Result<DocxReader, Box<dyn core::error::Error>> {
+        let bytes = synth_docx_for_unit_test(SIMPLE_RELS, document_xml)?;
+        Ok(DocxReader::from_reader(Cursor::new(bytes))?)
+    }
+
+    #[test]
+    fn queue_length_never_exceeds_three() -> core::result::Result<(), Box<dyn core::error::Error>> {
+        let doc = {
+            let mut content = String::from(
+                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>"#,
+            );
+            for _ in 0..1000 {
+                content.push_str("<w:p><w:r><w:t>hello</w:t></w:r></w:p>");
+            }
+            content.push_str("</w:body></w:document>");
+            content
+        };
+        let mut reader = make_reader(&doc)?;
+        loop {
+            if reader.queue.len() > 3 {
+                return Err(Box::new(Error::Other {
+                    message: format!("queue grew to {}", reader.queue.len()),
+                }));
+            }
+            if reader.next_event()?.is_none() {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn buf_is_cleared_per_iteration() -> core::result::Result<(), Box<dyn core::error::Error>> {
+        let doc = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>hello</w:t></w:r></w:p></w:body></w:document>"#;
+        let mut reader = make_reader(doc)?;
+        while reader.next_event()?.is_some() {
+            if !reader.buf.is_empty() {
+                return Err(Box::new(Error::Other {
+                    message: "buf not cleared after event".to_string(),
+                }));
+            }
+        }
+        Ok(())
     }
 }

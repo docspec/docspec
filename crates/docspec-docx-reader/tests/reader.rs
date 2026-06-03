@@ -214,3 +214,358 @@ mod constructor {
         assert!(result.is_ok(), "expected Ok, got: {result:?}");
     }
 }
+
+mod events {
+    use std::io::Cursor;
+
+    use docspec_core::{Event, TextStyle};
+    use docspec_docx_reader::{DocxReader, EventSource as _};
+
+    use crate::fixture;
+
+    const SIMPLE_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+
+    fn make_reader(document_xml: &str) -> DocxReader {
+        let bytes = fixture::synth_docx(SIMPLE_RELS, document_xml);
+        DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader")
+    }
+
+    fn drive(reader: &mut DocxReader) -> Vec<Event> {
+        let mut events = Vec::new();
+        while let Some(event) = reader.next_event().expect("next_event") {
+            events.push(event);
+        }
+        events
+    }
+
+    fn start_doc() -> Event {
+        Event::StartDocument {
+            id: None,
+            language: None,
+            metadata: None,
+        }
+    }
+
+    fn start_para() -> Event {
+        Event::StartParagraph {
+            alignment: None,
+            id: None,
+        }
+    }
+
+    fn text(content: &str) -> Event {
+        Event::Text {
+            content: content.to_string(),
+            style: TextStyle::default(),
+        }
+    }
+
+    #[test]
+    fn single_paragraph_emits_text() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>hello</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("hello"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn multiple_paragraphs() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>foo</w:t></w:r></w:p><w:p><w:r><w:t>bar</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("foo"),
+                Event::EndParagraph,
+                start_para(),
+                text("bar"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn empty_paragraph_emits_paragraph_pair_only() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]
+        );
+    }
+
+    #[test]
+    fn empty_document_body() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(events, vec![start_doc(), Event::EndDocument]);
+    }
+
+    #[test]
+    fn multiple_runs_in_one_paragraph_emit_separate_text_events() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>foo</w:t></w:r><w:r><w:t>bar</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("foo"),
+                text("bar"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn wt_outside_wp_is_silently_dropped() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:t>orphan</w:t></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(events, vec![start_doc(), Event::EndDocument]);
+    }
+
+    #[test]
+    fn table_cells_do_not_emit_paragraphs() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(events, vec![start_doc(), Event::EndDocument]);
+    }
+
+    #[test]
+    fn wins_subtree_suppressed_inside_paragraph() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>before</w:t></w:r><w:ins><w:r><w:t>inserted</w:t></w:r></w:ins><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("before"),
+                text("after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn wdel_subtree_suppressed() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>before</w:t></w:r><w:del><w:r><w:t>deleted</w:t></w:r></w:del><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("before"),
+                text("after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn paragraph_containing_only_ins_emits_empty_paragraph() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:ins><w:r><w:t>x</w:t></w:r></w:ins></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]
+        );
+    }
+
+    #[test]
+    fn xml_space_preserve_whitespace_is_preserved() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t xml:space="preserve"> hello  world </w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text(" hello  world "),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn xml_entities_unescaped_once() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>a &amp; b</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("a & b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn namespace_prefix_variation_handled() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><ns0:document xmlns:ns0="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><ns0:body><ns0:p><ns0:r><ns0:t>x</ns0:t></ns0:r></ns0:p></ns0:body></ns0:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn next_event_idempotent_after_end_document() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
+        );
+        loop {
+            if reader.next_event().expect("next_event").is_none() {
+                break;
+            }
+        }
+        assert_eq!(reader.next_event().expect("1st extra"), None);
+        assert_eq!(reader.next_event().expect("2nd extra"), None);
+        assert_eq!(reader.next_event().expect("3rd extra"), None);
+    }
+
+    #[test]
+    fn malformed_document_xml_returns_error_parse() {
+        let bytes = fixture::synth_docx(SIMPLE_RELS, "<w:p");
+        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+        let first = reader.next_event().expect("first call");
+        assert_eq!(
+            first,
+            Some(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+        );
+        let second = reader.next_event();
+        match second {
+            Err(docspec_core::Error::Parse { message, position }) => {
+                assert!(
+                    message.starts_with("malformed document.xml"),
+                    "message was: {message}"
+                );
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Error::Parse, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn eof_mid_paragraph_auto_closes() {
+        let bytes = fixture::synth_docx(
+            SIMPLE_RELS,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>"#,
+        );
+        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]
+        );
+    }
+
+    #[test]
+    fn w_br_and_w_tab_silently_ignored() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>a</w:t><w:br/><w:t>b</w:t><w:tab/><w:t>c</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("a"),
+                text("b"),
+                text("c"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn unknown_container_passes_children_through() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:customXml><w:p><w:r><w:t>x</w:t></w:r></w:p></w:customXml></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+}
