@@ -15,7 +15,7 @@
 //! | Feature    | Format                                              | Re-exports                  |
 //! |------------|-----------------------------------------------------|-----------------------------|
 //! | `markdown` | Markdown (`CommonMark` + GFM tables/strikethrough)  | [`readers::MarkdownReader`] |
-//! | `html`     | HTML (paragraphs only)                              | [`readers::HtmlReader`]     |
+//! | `html`     | HTML (paragraphs only)                              | `readers::HtmlReader`       |
 //!
 //! ## Writers
 //!
@@ -27,7 +27,7 @@
 //!
 //! | Feature | Re-exports                                                            |
 //! |---------|-----------------------------------------------------------------------|
-//! | `json`  | [`json`] — streaming JSON emission primitives for custom writers      |
+//! | `json`  | `json` — streaming JSON emission primitives for custom writers        |
 //!
 //! ## Convenience
 //!
