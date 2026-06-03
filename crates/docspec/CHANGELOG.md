@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.0](https://github.com/docspec/docspec/compare/docspec-v1.0.1...docspec-v1.1.0) (2026-06-03)
+
+
+### Features
+
+* **docspec:** add AnyReader enum-dispatch factory in factory::reader ([22917ec](https://github.com/docspec/docspec/commit/22917ec4870f79e9762ed7a8e91be257d78d11fd))
+* **docspec:** add AnyWriter enum-dispatch factory wrapping StackTrackingSink ([c165137](https://github.com/docspec/docspec/commit/c165137cbaec3064ab6efa802a37256c6b82e5cf)), closes [#16](https://github.com/docspec/docspec/issues/16)
+* **docspec:** add format module with InputFormat, OutputFormat, and detection helpers ([0e01800](https://github.com/docspec/docspec/commit/0e018005559bb83e35db37ba6ac47134f8e7e842))
+
+
+### Bug Fixes
+
+* **docspec:** replace broken intra-doc links with code formatting ([0f8d733](https://github.com/docspec/docspec/commit/0f8d7335a10501ac3c87400a186a36aa736d905f)), closes [#16](https://github.com/docspec/docspec/issues/16)
+
 ## [1.0.1](https://github.com/docspec/docspec/compare/docspec-v1.0.0...docspec-v1.0.1) (2026-06-03)
 
 

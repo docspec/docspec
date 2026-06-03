@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/docspec/docspec/compare/docspec-cli-v1.0.2...docspec-cli-v1.1.0) (2026-06-03)
+
+
+### Features
+
+* **cli:** add ReaderNotImplemented and WriterNotImplemented variants to CliError ([5cc7cc5](https://github.com/docspec/docspec/commit/5cc7cc58f8c88961c0f1e6e30c41dfb0f6786982)), closes [#16](https://github.com/docspec/docspec/issues/16)
+* **cli:** default --to blocknote when no output format detectable ([bff13f3](https://github.com/docspec/docspec/commit/bff13f3c2af0036412304bd624a11e8be149de1c))
+
+
+### Bug Fixes
+
+* **cli:** deprecate FormatNotSupported instead of #![allow(dead_code)] ([5350d6b](https://github.com/docspec/docspec/commit/5350d6b66121d6df75ec6f87ad1534503e1585b3)), closes [#16](https://github.com/docspec/docspec/issues/16)
+
 ## [1.0.2](https://github.com/docspec/docspec/compare/docspec-cli-v1.0.1...docspec-cli-v1.0.2) (2026-06-03)
 
 
