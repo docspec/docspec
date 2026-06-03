@@ -3,7 +3,7 @@
   "release-type": "rust",
   "include-component-in-tag": true,
   "tag-separator": "-",
-  "separate-pull-requests": true,
+  "separate-pull-requests": false,
   "always-update": true,
   "bootstrap-sha": "1e64a99423960a65ff2488e6467aa2a1af72339a",
   "packages": {
