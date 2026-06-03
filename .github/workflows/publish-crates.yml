@@ -1,10 +1,14 @@
-name: Publish crates
+name: Publish crate
 
 on:
   workflow_call:
     inputs:
+      crate:
+        description: "Path to the crate to publish (e.g. 'crates/docspec-core')."
+        required: true
+        type: string
       ref:
-        description: "Git ref to publish from (e.g. a release tag). Empty = caller commit."
+        description: "Git ref to publish from. Empty = caller commit."
         required: false
         type: string
         default: ""
@@ -13,6 +17,10 @@ on:
         required: true
   workflow_dispatch:
     inputs:
+      crate:
+        description: "Path to the crate to publish (e.g. 'crates/docspec-core')."
+        required: true
+        type: string
       ref:
         description: "Git ref to publish from. Empty = default branch."
         required: false
@@ -27,7 +35,7 @@ permissions:
 
 jobs:
   publish:
-    name: Publish to crates.io
+    name: cargo publish -p ${{ inputs.crate }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -37,15 +45,20 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Publish workspace crates
+      - name: Publish to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CRATE_PATH: ${{ inputs.crate }}
         run: |
-          cargo publish \
-            -p docspec-core \
-            -p docspec-json \
-            -p docspec-markdown-reader \
-            -p docspec-blocknote-writer \
-            -p docspec-cli \
-            -p docspec-http \
-            -p docspec
+          set -euo pipefail
+          crate_toml="${CRATE_PATH}/Cargo.toml"
+          if [ ! -f "${crate_toml}" ]; then
+            echo "ERROR: ${crate_toml} not found" >&2
+            exit 1
+          fi
+          name=$(basename "${CRATE_PATH}")
+          if grep -Eq '^[[:space:]]*publish[[:space:]]*=[[:space:]]*false' "${crate_toml}"; then
+            echo "Skipping ${name} (publish = false)"
+            exit 0
+          fi
+          cargo publish -p "${name}"
