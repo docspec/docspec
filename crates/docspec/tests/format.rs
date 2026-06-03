@@ -62,6 +62,13 @@ mod tests {
         assert_eq!(result, Some(docspec::OutputFormat::Blocknote));
     }
 
+    #[cfg(all(feature = "oxa", not(feature = "blocknote")))]
+    #[test]
+    fn oxa_is_not_auto_detected_from_json() {
+        let result = docspec::detect_output_format(Path::new("file.json"));
+        assert_eq!(result, None);
+    }
+
     #[test]
     fn unknown_extension_returns_none() {
         let result = docspec::detect_input_format(Path::new("file.txt"));
@@ -92,6 +99,25 @@ mod tests {
     fn output_format_debug() {
         let debug_str = format!("{:?}", docspec::OutputFormat::Blocknote);
         assert_eq!(debug_str, "Blocknote");
+    }
+
+    #[cfg(feature = "oxa")]
+    #[test]
+    fn output_format_debug_oxa() {
+        let debug_str = format!("{:?}", docspec::OutputFormat::Oxa);
+        assert_eq!(debug_str, "Oxa");
+    }
+
+    #[cfg(feature = "oxa")]
+    #[test]
+    fn output_format_eq_oxa() {
+        assert_eq!(docspec::OutputFormat::Oxa, docspec::OutputFormat::Oxa);
+    }
+
+    #[cfg(all(feature = "blocknote", feature = "oxa"))]
+    #[test]
+    fn output_format_ne_oxa_blocknote() {
+        assert_ne!(docspec::OutputFormat::Oxa, docspec::OutputFormat::Blocknote);
     }
 
     #[cfg(feature = "markdown")]

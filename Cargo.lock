@@ -455,6 +455,7 @@ dependencies = [
  "docspec-html-reader",
  "docspec-json",
  "docspec-markdown-reader",
+ "docspec-oxa-writer",
 ]
 
 [[package]]
@@ -501,7 +502,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-html-writer"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "docspec-core",
  "html5ever",
@@ -549,7 +550,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-oxa-writer"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "docspec-core",
  "docspec-json",

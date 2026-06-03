@@ -18,6 +18,9 @@ pub enum OutputFormat {
     /// `BlockNote` JSON. Available when the `blocknote` feature is enabled.
     #[cfg(feature = "blocknote")]
     Blocknote,
+    /// `oxa.dev` JSON. Available when the `oxa` feature is enabled.
+    #[cfg(feature = "oxa")]
+    Oxa,
 }
 
 /// Detect the input format from a file path's extension.
@@ -41,6 +44,10 @@ pub fn detect_input_format(path: &Path) -> Option<InputFormat> {
 ///
 /// Returns `None` if the extension is unknown or not recognized.
 /// Extension matching is case-insensitive.
+///
+/// Note: `OutputFormat::Oxa` is not currently auto-detected. Both `BlockNote`
+/// and `oxa.dev` emit JSON, so the `.json` extension is ambiguous; callers must
+/// select `OutputFormat::Oxa` explicitly.
 #[inline]
 #[must_use]
 pub fn detect_output_format(path: &Path) -> Option<OutputFormat> {
