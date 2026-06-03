@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/docspec/docspec/compare/docspec-html-writer-v1.0.0...docspec-html-writer-v1.0.1) (2026-06-03)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate html5ever to 0.39 ([31bae0d](https://github.com/docspec/docspec/commit/31bae0dc680206d761e6fede8e9b4c3f8bf15c74))
+
 ## 1.0.0 (2026-06-03)
 
 
