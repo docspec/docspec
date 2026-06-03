@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/docspec/docspec/compare/docspec-cli-v1.1.0...docspec-cli-v1.1.1) (2026-06-03)
+
+
+### Bug Fixes
+
+* **deps:** ping version ([6f1db5b](https://github.com/docspec/docspec/commit/6f1db5b095f67710a8b8f0d377e33caf4f1fbd74))
+
 ## [1.1.0](https://github.com/docspec/docspec/compare/docspec-cli-v1.0.2...docspec-cli-v1.1.0) (2026-06-03)
 
 
