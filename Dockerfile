@@ -15,7 +15,7 @@ RUN cargo build -p docspec-http --bin docspec-http --release && \
   cp target/release/docspec-http /out/docspec-http
 
 # ─ Runtime ─
-FROM alpine:3.20
+FROM alpine:3.23
 
 # Binary is dynamically linked against musl. Runtime base MUST remain
 # Alpine-compatible (any image shipping `/lib/ld-musl-x86_64.so.1`).
