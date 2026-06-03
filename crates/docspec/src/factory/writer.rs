@@ -86,3 +86,49 @@ impl<W: Write> EventSink for AnyWriter<'_, W> {
         self.inner.handle_event(event)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::borrow::Cow;
+    use std::io::Write;
+
+    use docspec_core::{AssetProvider, Event, EventSink as _};
+
+    use super::{AnyWriter, OutputFormat};
+
+    struct NullAssets;
+
+    impl AssetProvider for NullAssets {
+        fn content_type(&self, _asset_id: &str) -> Option<Cow<'_, str>> {
+            None
+        }
+
+        fn stream_to(
+            &self,
+            _asset_id: &str,
+            _writer: &mut dyn Write,
+        ) -> Option<std::io::Result<u64>> {
+            None
+        }
+    }
+
+    #[cfg(feature = "blocknote")]
+    #[test]
+    fn with_assets_constructs_writer_for_blocknote() {
+        let assets = NullAssets;
+        assert!(assets.content_type("any-id").is_none());
+        assert!(assets.stream_to("any-id", &mut std::io::sink()).is_none());
+        let mut buf = Vec::new();
+        let mut writer = AnyWriter::with_assets(OutputFormat::Blocknote, &mut buf, &assets);
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+        assert!(!buf.is_empty());
+    }
+}
