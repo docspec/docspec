@@ -326,6 +326,28 @@ mod tests {
     }
 
     #[test]
+    fn html_to_stdout_defaults_to_blocknote_output() {
+        let fixture = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/html/paragraphs.html"
+        );
+        let expected = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/blocknote/paragraphs_from_html.json"
+        ));
+        let expected_value: serde_json::Value =
+            serde_json::from_str(expected).unwrap_or_else(|_| std::process::abort());
+
+        let assert = docspec_cmd().arg(fixture).assert().success();
+
+        let stdout = String::from_utf8(assert.get_output().stdout.clone())
+            .unwrap_or_else(|_| std::process::abort());
+        let actual_value: serde_json::Value =
+            serde_json::from_str(&stdout).unwrap_or_else(|_| std::process::abort());
+        assert_eq!(actual_value, expected_value);
+    }
+
+    #[test]
     fn html_explicit_from_flag_via_stdin() {
         docspec_cmd()
             .args(["--from", "html", "--to", "blocknote", "-"])
