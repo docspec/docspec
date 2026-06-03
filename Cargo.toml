@@ -4,6 +4,7 @@ members = [
   "crates/docspec",
   "crates/docspec-core",
   "crates/docspec-html-reader",
+  "crates/docspec-html-writer",
   "crates/docspec-markdown-reader",
   "crates/docspec-blocknote-writer",
   "crates/docspec-json",
@@ -77,6 +78,10 @@ multiple_inherent_impl = "allow"
 allow_attributes_without_reason = "allow"
 
 # --- Selective allows: restriction group (practicality) ---
+# Reason: Non-exhaustive enums require wildcard catch-all arms from downstream crates;
+# listing every known variant explicitly creates maintenance burden and defeats the
+# purpose of #[non_exhaustive].
+wildcard_enum_match_arm = "allow"
 # Reason: let x = x.trim() is idiomatic Rust transformation via shadowing
 shadow_same = "allow"
 # Reason: Too noisy; numeric types clear from context
