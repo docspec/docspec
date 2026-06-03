@@ -20,6 +20,8 @@ repository = "https://github.com/docspec/docspec"
 [workspace.lints.rust]
 unsafe_code = "forbid"
 missing_docs = "deny"
+# Reason: Public functions in docspec-cli format module are intentionally exposed for use by future tasks (e.g., T9 uses resolve_input_format and resolve_output_format)
+dead_code = "allow"
 
 [workspace.lints.clippy]
 # Verified against clippy 0.1.92 (2025-12-08)
@@ -134,3 +136,9 @@ multiple_crate_versions = "allow"
 fn_params_excessive_bools = "allow"
 # Reason: Callback trait contracts may require Option return even when current implementation always keeps values.
 unnecessary_wraps = "allow"
+
+# --- Selective allows: perf group (continued) ---
+# Reason: AnyReader enum variants (HtmlReader, MarkdownReader) are large but must be stack-allocated for zero heap allocation and zero virtual-dispatch overhead per MANIFESTO.md. Boxing would violate the design constraint.
+large_enum_variant = "allow"
+
+

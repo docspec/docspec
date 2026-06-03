@@ -60,12 +60,12 @@ pub enum ColorChoice {
 /// Input format for document conversion.
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum CliInputFormat {
-    /// Markdown format.
-    #[value(name = "markdown")]
-    Markdown,
     /// HTML format (paragraph-only; `<p>` elements and text within them only).
     #[value(name = "html")]
     Html,
+    /// Markdown format.
+    #[value(name = "markdown")]
+    Markdown,
 }
 
 /// Output format for document conversion.

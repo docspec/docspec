@@ -1,5 +1,7 @@
 //! Error types for the CLI.
 
+#![allow(dead_code)]
+
 use thiserror::Error;
 
 /// Result type alias for CLI operations.
@@ -28,6 +30,10 @@ pub enum CliError {
         format: String,
     },
 
+    /// I/O error from file operations.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
     /// Reader for the requested input format is not yet implemented.
     #[error("{format} reader not yet implemented")]
     ReaderNotImplemented {
@@ -35,20 +41,16 @@ pub enum CliError {
         format: String,
     },
 
+    /// Input and output paths are the same file.
+    #[error("input and output paths refer to the same file")]
+    SameInputOutput,
+
     /// Writer for the requested output format is not yet implemented.
     #[error("{format} writer not yet implemented")]
     WriterNotImplemented {
         /// The output format that has no registered writer.
         format: String,
     },
-
-    /// I/O error from file operations.
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-
-    /// Input and output paths are the same file.
-    #[error("input and output paths refer to the same file")]
-    SameInputOutput,
 }
 
 #[cfg(test)]
