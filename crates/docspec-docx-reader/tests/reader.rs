@@ -35,9 +35,12 @@ fn synth_docx_roundtrips_through_zip_archive() {
 }
 
 mod constructor {
+    use core::cell::Cell;
     use std::io::Cursor;
+    use std::io::{Read, Seek};
+    use std::rc::Rc;
 
-    use docspec_core::Error;
+    use docspec_core::{Error, Event, EventSource as _};
     use docspec_docx_reader::DocxReader;
 
     use crate::fixture;
@@ -60,6 +63,18 @@ mod constructor {
                 assert_eq!(message, "not a valid ZIP archive");
             }
             other => panic!("expected Error::Parse, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_reader_passes_through_zip_open_io_error() {
+        let result = DocxReader::from_reader(ErrorReader);
+        match result {
+            Err(Error::Io { source }) => {
+                assert_eq!(source.kind(), std::io::ErrorKind::PermissionDenied);
+                assert_eq!(source.to_string(), "zip open denied");
+            }
+            other => panic!("expected Error::Io, got: {other:?}"),
         }
     }
 
@@ -121,13 +136,108 @@ mod constructor {
         let result = DocxReader::from_reader(Cursor::new(bytes));
         match result {
             Err(Error::Parse { message, .. }) => {
-                assert!(
-                    message.starts_with("unsupported compression"),
-                    "message was: {message}"
-                );
-                assert!(message.contains("Bzip2"), "message was: {message}");
+                assert_eq!(message, "unsupported compression: Bzip2");
             }
             other => panic!("expected Error::Parse, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn next_event_passes_through_mid_parse_io_error() {
+        let bytes = fixture::synth_docx_with_entries(&[
+            (
+                "_rels/.rels",
+                zip::CompressionMethod::Deflated,
+                r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#.as_bytes(),
+            ),
+            (
+                "word/document.xml",
+                zip::CompressionMethod::Stored,
+                b"<?xml version=\"1.0\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body></w:body></w:document>",
+            ),
+        ]);
+        let fail_at = document_data_start(&bytes);
+        let fail_enabled = Rc::new(Cell::new(false));
+        let failing_reader = FailingReader::new(bytes, fail_at, Rc::clone(&fail_enabled));
+        let mut reader = DocxReader::from_reader(failing_reader).expect("from_reader");
+        fail_enabled.set(true);
+
+        assert_eq!(
+            reader.next_event().expect("start document"),
+            Some(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+        );
+        match reader.next_event() {
+            Err(Error::Io { source }) => {
+                assert_eq!(source.kind(), std::io::ErrorKind::Other);
+                assert_eq!(source.to_string(), "forced read failure");
+            }
+            other => panic!("expected Error::Io, got: {other:?}"),
+        }
+    }
+
+    fn document_data_start(bytes: &[u8]) -> u64 {
+        let cursor = Cursor::new(bytes.to_vec());
+        let mut archive = zip::ZipArchive::new(cursor).expect("valid ZIP");
+        let data_start = archive
+            .by_name("word/document.xml")
+            .expect("document entry")
+            .data_start()
+            .expect("data start");
+        data_start
+    }
+
+    struct FailingReader {
+        cursor: Cursor<Vec<u8>>,
+        fail_enabled: Rc<Cell<bool>>,
+        fail_at: u64,
+    }
+
+    impl FailingReader {
+        fn new(bytes: Vec<u8>, fail_at: u64, fail_enabled: Rc<Cell<bool>>) -> Self {
+            Self {
+                cursor: Cursor::new(bytes),
+                fail_enabled,
+                fail_at,
+            }
+        }
+    }
+
+    impl Read for FailingReader {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            if self.fail_enabled.get() && self.cursor.position() >= self.fail_at {
+                return Err(std::io::Error::other("forced read failure"));
+            }
+            self.cursor.read(buf)
+        }
+    }
+
+    impl Seek for FailingReader {
+        fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+            self.cursor.seek(pos)
+        }
+    }
+
+    struct ErrorReader;
+
+    impl Read for ErrorReader {
+        fn read(&mut self, _buf: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "zip open denied",
+            ))
+        }
+    }
+
+    impl Seek for ErrorReader {
+        fn seek(&mut self, _pos: std::io::SeekFrom) -> std::io::Result<u64> {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "zip open denied",
+            ))
         }
     }
 
@@ -167,6 +277,73 @@ mod constructor {
         );
         let result = DocxReader::from_reader(Cursor::new(bytes));
         assert!(result.is_ok(), "expected Ok, got: {result:?}");
+    }
+
+    #[test]
+    fn from_reader_handles_non_empty_relationship_element() {
+        let bytes = fixture::synth_docx(
+            r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"></Relationship></Relationships>"#,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
+        );
+        let result = DocxReader::from_reader(Cursor::new(bytes));
+        assert!(result.is_ok(), "expected Ok, got: {result:?}");
+    }
+
+    #[test]
+    fn from_reader_errors_on_rels_parent_reference() {
+        let bytes = fixture::synth_docx(
+            r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="../foo/document.xml"/></Relationships>"#,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
+        );
+        let result = DocxReader::from_reader(Cursor::new(bytes));
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "rels target contains parent reference: ../foo/document.xml"
+                );
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Error::Parse, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_reader_errors_on_malformed_rels_attribute() {
+        let bytes = fixture::synth_docx(
+            r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target=word/document.xml/></Relationships>"#,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
+        );
+        let result = DocxReader::from_reader(Cursor::new(bytes));
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "malformed _rels/.rels: position 120: attribute value must be enclosed in `\"` or `'`"
+                );
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Error::Parse, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_reader_errors_on_rels_attribute_entity() {
+        let bytes = fixture::synth_docx(
+            r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/&bogus;.xml"/></Relationships>"#,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
+        );
+        let result = DocxReader::from_reader(Cursor::new(bytes));
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "malformed _rels/.rels: at 6..11: unrecognized entity `bogus`"
+                );
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Error::Parse, got: {other:?}"),
+        }
     }
 
     #[test]
@@ -279,6 +456,18 @@ mod events {
     }
 
     #[test]
+    fn debug_redacts_xml_reader() {
+        let reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
+        );
+
+        assert_eq!(
+            format!("{reader:?}"),
+            "DocxReader { buf: [], in_ignored_subtree: 0, in_paragraph: false, in_text: false, pending_text: \"\", phase: \"<phase>\", queue: [], xml: \"<quick_xml::Reader>\" }"
+        );
+    }
+
+    #[test]
     fn multiple_paragraphs() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>foo</w:t></w:r></w:p><w:p><w:r><w:t>bar</w:t></w:r></w:p></w:body></w:document>"#,
@@ -314,6 +503,32 @@ mod events {
                 Event::EndDocument
             ]
         );
+    }
+
+    #[test]
+    fn empty_paragraph_element_emits_paragraph_pair() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]
+        );
+    }
+
+    #[test]
+    fn ignored_empty_container_does_not_emit_paragraph() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl/></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(events, vec![start_doc(), Event::EndDocument]);
     }
 
     #[test]
@@ -454,6 +669,51 @@ mod events {
     }
 
     #[test]
+    fn xml_general_ref_unescaped_once() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>a &lt; b</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("a < b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn unknown_xml_entity_returns_parse_error() {
+        let bytes = fixture::synth_docx(
+            SIMPLE_RELS,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>a &bogus; b</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+        assert_eq!(
+            reader.next_event().expect("start document"),
+            Some(start_doc())
+        );
+        assert_eq!(
+            reader.next_event().expect("start paragraph"),
+            Some(start_para())
+        );
+        match reader.next_event() {
+            Err(docspec_core::Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "malformed document.xml: at 1..6: unrecognized entity `bogus`"
+                );
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Error::Parse, got: {other:?}"),
+        }
+    }
+
+    #[test]
     fn namespace_prefix_variation_handled() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><ns0:document xmlns:ns0="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><ns0:body><ns0:p><ns0:r><ns0:t>x</ns0:t></ns0:r></ns0:p></ns0:body></ns0:document>"#,
@@ -502,14 +762,52 @@ mod events {
         let second = reader.next_event();
         match second {
             Err(docspec_core::Error::Parse { message, position }) => {
-                assert!(
-                    message.starts_with("malformed document.xml"),
-                    "message was: {message}"
+                assert_eq!(
+                    message,
+                    "malformed document.xml: syntax error: tag not closed: `>` not found before end of input"
                 );
                 assert_eq!(position, None);
             }
             other => panic!("expected Error::Parse, got: {other:?}"),
         }
+    }
+
+    #[test]
+    fn cdata_inside_text_emits_text() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t><![CDATA[hello <world>]]></w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("hello <world>"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn eof_mid_text_flushes_text_and_closes_paragraph() {
+        let bytes = fixture::synth_docx(
+            SIMPLE_RELS,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>partial"#,
+        );
+        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("partial"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]

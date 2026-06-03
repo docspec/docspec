@@ -49,7 +49,7 @@ pub fn find_document_path<R: Read + Seek>(
             Ok(Event::End(_)) => {
                 let Some(next_depth) = element_depth.checked_sub(1) else {
                     return Err(Error::Parse {
-                        message: "malformed _rels/.rels: unexpected closing element".to_string(),
+                        message: "malformed _rels/.rels".to_string(),
                         position: None,
                     });
                 };
@@ -58,7 +58,7 @@ pub fn find_document_path<R: Read + Seek>(
             Ok(Event::Eof) => {
                 if element_depth != 0 {
                     return Err(Error::Parse {
-                        message: "malformed _rels/.rels: unclosed element".to_string(),
+                        message: "malformed _rels/.rels".to_string(),
                         position: None,
                     });
                 }
@@ -67,9 +67,9 @@ pub fn find_document_path<R: Read + Seek>(
                     position: None,
                 });
             }
-            Err(err) => {
+            Err(_err) => {
                 return Err(Error::Parse {
-                    message: format!("malformed _rels/.rels: {err}"),
+                    message: "malformed _rels/.rels".to_string(),
                     position: None,
                 });
             }
@@ -266,6 +266,66 @@ mod tests {
     }
 
     #[test]
+    fn find_document_path_accepts_non_empty_relationship_element() {
+        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"></Relationship>
+</Relationships>"#;
+        let Some(mut archive) = assert_zip_result(archive_from_rels(rels_xml)) else {
+            return;
+        };
+
+        let result = find_document_path(&mut archive);
+
+        assert_document_path(result, "word/document.xml");
+    }
+
+    #[test]
+    fn find_document_path_errors_on_malformed_relationship_attribute() {
+        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target=word/document.xml/>
+</Relationships>"#;
+        let Some(mut archive) = assert_zip_result(archive_from_rels(rels_xml)) else {
+            return;
+        };
+
+        let result = find_document_path(&mut archive);
+
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "malformed _rels/.rels: position 120: attribute value must be enclosed in `\"` or `'`"
+                );
+                assert_eq!(position, None);
+            }
+            other => assert_eq!(format!("{other:?}"), "expected attribute parse error"),
+        }
+    }
+
+    #[test]
+    fn find_document_path_errors_on_bad_attribute_entity() {
+        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/&bogus;.xml"/>
+</Relationships>"#;
+        let Some(mut archive) = assert_zip_result(archive_from_rels(rels_xml)) else {
+            return;
+        };
+
+        let result = find_document_path(&mut archive);
+
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "malformed _rels/.rels: at 6..11: unrecognized entity `bogus`"
+                );
+                assert_eq!(position, None);
+            }
+            other => assert_eq!(format!("{other:?}"), "expected entity parse error"),
+        }
+    }
+
+    #[test]
     fn find_document_path_tolerates_namespaced_relationship_element() {
         let rels_xml = r#"<r:Relationships xmlns:r="http://schemas.openxmlformats.org/package/2006/relationships">
   <r:Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
@@ -289,8 +349,7 @@ mod tests {
 
         match result {
             Err(Error::Parse { message, position }) => {
-                let prefix = "malformed _rels/.rels";
-                assert_eq!(message.get(..prefix.len()), Some(prefix));
+                assert_eq!(message, "malformed _rels/.rels");
                 assert_eq!(position, None);
             }
             other => assert_eq!(format!("{other:?}"), "expected malformed rels parse error"),
@@ -309,8 +368,10 @@ mod tests {
 
         match result {
             Err(Error::Parse { message, position }) => {
-                let prefix = "rels target contains parent reference";
-                assert_eq!(message.get(..prefix.len()), Some(prefix));
+                assert_eq!(
+                    message,
+                    "rels target contains parent reference: ../foo/document.xml"
+                );
                 assert_eq!(position, None);
             }
             other => assert_eq!(format!("{other:?}"), "expected dotdot parse error"),

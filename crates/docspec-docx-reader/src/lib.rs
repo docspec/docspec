@@ -334,9 +334,14 @@ impl DocxReader {
         let event = self
             .xml
             .read_event_into(&mut self.buf)
-            .map_err(|err| Error::Parse {
-                message: format!("malformed document.xml: {err}"),
-                position: None,
+            .map_err(|err| match err {
+                quick_xml::Error::Io(source) => Error::Io {
+                    source: std::io::Error::new(source.kind(), source.to_string()),
+                },
+                other => Error::Parse {
+                    message: format!("malformed document.xml: {other}"),
+                    position: None,
+                },
             })?
             .into_owned();
 
