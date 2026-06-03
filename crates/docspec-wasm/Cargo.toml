@@ -15,9 +15,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = "0.2"
-docspec-core = "0.5.0"
-docspec-markdown-reader = "0.5.0"
-docspec-blocknote-writer = "0.5.0"
+docspec-core = "1.0.0"
+docspec-markdown-reader = "1.0.0"
+docspec-blocknote-writer = "1.0.0"
 
 [lints.rust]
 unsafe_code = "forbid"

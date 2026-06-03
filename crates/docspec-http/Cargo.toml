@@ -45,10 +45,10 @@ sentry = { version = "0.48", default-features = false, features = [
   "reqwest",
   "rustls",
 ] }
-docspec-core = "0.5.0"
-docspec-json = "0.5.0"
-docspec-markdown-reader = "0.5.0"
-docspec-blocknote-writer = "0.5.0"
+docspec-core = "1.0.0"
+docspec-json = "1.0.0"
+docspec-markdown-reader = "1.0.0"
+docspec-blocknote-writer = "1.0.0"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
