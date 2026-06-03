@@ -1,0 +1,30 @@
+[
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "first paragraph",
+        "styles": {}
+      }
+    ],
+    "children": []
+  },
+  {
+    "type": "paragraph",
+    "props": {
+      "textAlignment": "left"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "second paragraph with multiple words",
+        "styles": {}
+      }
+    ],
+    "children": []
+  }
+]
