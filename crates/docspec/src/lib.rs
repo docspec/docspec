@@ -115,7 +115,14 @@ pub mod writers {
     pub use docspec_blocknote_writer::BlockNoteWriter;
 }
 
+/// Format detection and conversion helpers.
+///
+/// Provides enums for input and output formats, plus functions to detect formats
+/// from file paths based on extension.
+pub mod format;
+
 pub use docspec_core::*;
+pub use format::{detect_input_format, detect_output_format, InputFormat, OutputFormat};
 
 /// Streaming JSON emission primitives.
 ///
