@@ -5,9 +5,7 @@ use axum::{
     http::{header, HeaderMap, HeaderValue, Response, StatusCode},
     response::IntoResponse,
 };
-use docspec_blocknote_writer::BlockNoteWriter;
-use docspec_core::{EventSink as _, EventSource as _, StackTrackingSink};
-use docspec_markdown_reader::MarkdownReader;
+use docspec_core::{EventSink as _, EventSource as _};
 
 use crate::{error::HttpError, mime_parser};
 
@@ -172,8 +170,8 @@ async fn do_conversion(
 
     let join_result = tokio::task::spawn_blocking(move || -> Result<(Vec<u8>, u64), HttpError> {
         let mut output_buffer = Vec::new();
-        let mut reader = MarkdownReader::new(&markdown);
-        let mut sink = StackTrackingSink::new(BlockNoteWriter::new(&mut output_buffer));
+        let mut reader = docspec::AnyReader::new(docspec::InputFormat::Markdown, &markdown);
+        let mut sink = docspec::AnyWriter::new(docspec::OutputFormat::Blocknote, &mut output_buffer);
 
         loop {
             match reader.next_event() {

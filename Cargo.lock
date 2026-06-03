@@ -507,10 +507,9 @@ version = "1.0.2"
 dependencies = [
  "axum",
  "clap",
- "docspec-blocknote-writer",
+ "docspec",
  "docspec-core",
  "docspec-json",
- "docspec-markdown-reader",
  "metrics",
  "metrics-exporter-prometheus",
  "mime",
@@ -546,9 +545,8 @@ dependencies = [
 name = "docspec-wasm"
 version = "1.0.2"
 dependencies = [
- "docspec-blocknote-writer",
+ "docspec",
  "docspec-core",
- "docspec-markdown-reader",
  "wasm-bindgen",
 ]
 
