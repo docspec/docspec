@@ -15,6 +15,7 @@
 //! | Feature    | Format                                              | Re-exports                  |
 //! |------------|-----------------------------------------------------|-----------------------------|
 //! | `markdown` | Markdown (`CommonMark` + GFM tables/strikethrough)  | [`readers::MarkdownReader`] |
+//! | `html`     | HTML (paragraphs only)                              | [`readers::HtmlReader`]     |
 //!
 //! ## Writers
 //!
@@ -95,6 +96,12 @@ pub mod readers {
     #[cfg(feature = "markdown")]
     #[cfg_attr(docsrs, doc(cfg(feature = "markdown")))]
     pub use docspec_markdown_reader::MarkdownReader;
+
+    /// Streaming HTML reader. Available when the `html` feature is enabled.
+    /// Note: currently parses only `<p>` elements and text within them.
+    #[cfg(feature = "html")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "html")))]
+    pub use docspec_html_reader::HtmlReader;
 }
 
 /// Document writers (event sinks).
