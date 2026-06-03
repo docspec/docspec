@@ -11,7 +11,7 @@ categories = ["encoding"]
 
 [dependencies]
 docspec-core = { path = "../docspec-core", version = "1.0.0" }
-html5ever = "0.27"
+html5ever = "0.39"
 
 [lints]
 workspace = true
