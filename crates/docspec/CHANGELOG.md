@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/docspec/docspec/compare/docspec-v1.1.0...docspec-v1.2.0) (2026-06-03)
+
+
+### Features
+
+* **docspec:** hookup oxa writer behind oxa feature flag ([e0c81c1](https://github.com/docspec/docspec/commit/e0c81c182d46ddc1682eeba396ecae85a2931e9c)), closes [#180](https://github.com/docspec/docspec/issues/180)
+
 ## [1.1.0](https://github.com/docspec/docspec/compare/docspec-v1.0.1...docspec-v1.1.0) (2026-06-03)
 
 
