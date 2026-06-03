@@ -416,6 +416,7 @@ fn parse_error(message: String) -> Error {
 }
 
 #[cfg(test)]
+#[cfg(not(coverage))]
 mod tests {
     use std::io::{Cursor, Write as _};
 

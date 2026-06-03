@@ -121,6 +121,7 @@ fn office_document_target(
 }
 
 #[cfg(test)]
+#[cfg(not(coverage))]
 mod tests {
     use super::*;
     use std::io::Cursor;
