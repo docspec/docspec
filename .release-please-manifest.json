@@ -3,9 +3,9 @@
   "crates/docspec-http": "1.0.2",
   "crates/docspec-core": "1.0.0",
   "crates/docspec-markdown-reader": "1.0.2",
-  "crates/docspec-json": "1.0.1",
+  "crates/docspec-json": "1.0.2",
   "crates/docspec-blocknote-writer": "1.0.2",
   "crates/docspec-cli": "1.0.2",
-  "crates/docspec": "1.0.0",
+  "crates/docspec": "1.0.1",
   "crates/docspec-html-reader": "1.0.1"
 }
