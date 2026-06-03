@@ -81,11 +81,8 @@ mod tests {
     #[test]
     fn explicit_format_overrides_path_input() {
         use crate::args::CliInputFormat;
-        let result = resolve_input_format(
-            Some(CliInputFormat::Html),
-            Some(Path::new("doc.md")),
-            "err",
-        );
+        let result =
+            resolve_input_format(Some(CliInputFormat::Html), Some(Path::new("doc.md")), "err");
         assert!(matches!(result, Ok(docspec::InputFormat::Html)));
     }
 

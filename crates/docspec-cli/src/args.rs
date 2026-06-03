@@ -6,7 +6,10 @@ use clap::{Parser, ValueEnum};
 #[derive(Parser, Debug)]
 #[command(name = "docspec")]
 #[command(version = "0.1.0")]
-#[command(about = "Convert documents between formats using streaming event pipeline", long_about = None)]
+#[command(
+    about = "Convert documents between formats using streaming event pipeline",
+    long_about = "Convert documents between formats using streaming event pipeline.\n\nSupports converting Markdown or HTML input to BlockNote JSON output.\n\nNote: the HTML reader currently parses only <p> paragraph elements and\nthe text within them. All other HTML elements (headings, lists, tables,\nformatting, etc.) are silently dropped. Use Markdown input for full\nfeature coverage."
+)]
 pub struct Cli {
     /// When to use colors.
     #[arg(long, value_name = "WHEN", default_value = "auto")]
@@ -71,12 +74,18 @@ mod tests {
     #[test]
     fn clap_rejects_blocknote_as_input() {
         let result = Cli::try_parse_from(["docspec", "--from", "blocknote", "x.md"]);
-        assert!(result.is_err(), "blocknote should not be a valid input format");
+        assert!(
+            result.is_err(),
+            "blocknote should not be a valid input format"
+        );
     }
 
     #[test]
     fn clap_rejects_markdown_as_output() {
         let result = Cli::try_parse_from(["docspec", "--to", "markdown", "x.md"]);
-        assert!(result.is_err(), "markdown should not be a valid output format");
+        assert!(
+            result.is_err(),
+            "markdown should not be a valid output format"
+        );
     }
 }

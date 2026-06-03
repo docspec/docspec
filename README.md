@@ -13,9 +13,11 @@ See our [Manifesto](MANIFESTO.md) for what we stand for: memory extremism, strea
 | DOCX | ✓ | — |
 | ODT | ✓ | — |
 | RTF | ✓ | ✓ |
-| HTML | ✓ | ✓ |
+| HTML | ✓† | — |
 | Markdown | ✓ | ✓ |
 | BlockNote JSON | ✓ | ✓ |
+
+† HTML reader currently supports only `<p>` paragraph elements; other elements are silently dropped.
 
 ## Quick Start
 

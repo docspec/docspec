@@ -318,8 +318,8 @@ mod tests {
             .assert()
             .success();
 
-        let stdout =
-            String::from_utf8(assert.get_output().stdout.clone()).unwrap_or_else(|_| std::process::abort());
+        let stdout = String::from_utf8(assert.get_output().stdout.clone())
+            .unwrap_or_else(|_| std::process::abort());
         let actual_value: serde_json::Value =
             serde_json::from_str(&stdout).unwrap_or_else(|_| std::process::abort());
         assert_eq!(actual_value, expected_value);

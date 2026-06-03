@@ -70,7 +70,14 @@ fn main() {
             .to_string();
 
         cli.output.as_ref().map_or_else(
-            || run_pipeline(input_format, &content, output_format, std::io::stdout().lock()),
+            || {
+                run_pipeline(
+                    input_format,
+                    &content,
+                    output_format,
+                    std::io::stdout().lock(),
+                )
+            },
             |path| {
                 let mut writer = BufWriter::new(File::create(path)?);
                 run_pipeline(input_format, &content, output_format, &mut writer)?;

@@ -171,7 +171,8 @@ async fn do_conversion(
     let join_result = tokio::task::spawn_blocking(move || -> Result<(Vec<u8>, u64), HttpError> {
         let mut output_buffer = Vec::new();
         let mut reader = docspec::AnyReader::new(docspec::InputFormat::Markdown, &markdown);
-        let mut sink = docspec::AnyWriter::new(docspec::OutputFormat::Blocknote, &mut output_buffer);
+        let mut sink =
+            docspec::AnyWriter::new(docspec::OutputFormat::Blocknote, &mut output_buffer);
 
         loop {
             match reader.next_event() {
