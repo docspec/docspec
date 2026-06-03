@@ -45,6 +45,8 @@
 
 extern crate alloc;
 
+mod rels;
+
 use alloc::collections::VecDeque;
 use std::io::{BufReader, Read, Seek};
 use std::path::Path;
