@@ -30,6 +30,5 @@
     "crates/docspec-wasm": {
       "component": "docspec-wasm"
     }
-  },
-  "plugins": [{ "type": "cargo-workspace", "merge": false }]
+  }
 }
