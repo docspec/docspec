@@ -15,6 +15,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive", "color"] }
+docspec = { path = "../docspec", features = ["markdown", "html", "blocknote"] }
 docspec-core = { path = "../docspec-core", version = "1.0.0" }
 docspec-markdown-reader = { path = "../docspec-markdown-reader", version = "1.0.0" }
 docspec-blocknote-writer = { path = "../docspec-blocknote-writer", version = "1.0.0" }

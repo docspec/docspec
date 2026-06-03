@@ -2,6 +2,7 @@
 //! Command-line interface for `DocSpec` document conversion.
 
 mod args;
+mod conversions;
 mod error;
 mod format;
 
