@@ -29,7 +29,8 @@ pub fn resolve_input_format(
 /// Resolves output format from explicit flag or path detection.
 ///
 /// Uses explicit format if provided, otherwise detects from path extension via the facade.
-/// Returns an error with the provided message if format cannot be determined.
+/// Defaults to `BlockNote` when no output format can be detected, because it is the only
+/// currently supported output format.
 pub fn resolve_output_format(
     explicit: Option<crate::args::CliOutputFormat>,
     path: Option<&Path>,
@@ -43,9 +44,8 @@ pub fn resolve_output_format(
             return Ok(format);
         }
     }
-    Err(CliError::FormatDetection {
-        message: error_message.to_string(),
-    })
+    let _ = error_message;
+    Ok(docspec::OutputFormat::Blocknote)
 }
 
 #[cfg(test)]
@@ -128,14 +128,14 @@ mod tests {
     }
 
     #[test]
-    fn unknown_extension_returns_error_output() {
+    fn unknown_extension_defaults_to_blocknote_output() {
         let result = resolve_output_format(None, Some(Path::new("doc.xyz")), "my error");
-        assert!(result.is_err());
+        assert!(matches!(result, Ok(docspec::OutputFormat::Blocknote)));
     }
 
     #[test]
-    fn none_path_returns_error_output() {
+    fn none_path_defaults_to_blocknote_output() {
         let result = resolve_output_format(None, None, "no path err");
-        assert!(result.is_err());
+        assert!(matches!(result, Ok(docspec::OutputFormat::Blocknote)));
     }
 }
