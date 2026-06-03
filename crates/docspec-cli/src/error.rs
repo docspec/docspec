@@ -28,6 +28,20 @@ pub enum CliError {
         format: String,
     },
 
+    /// Reader for the requested input format is not yet implemented.
+    #[error("{format} reader not yet implemented")]
+    ReaderNotImplemented {
+        /// The input format that has no registered reader.
+        format: String,
+    },
+
+    /// Writer for the requested output format is not yet implemented.
+    #[error("{format} writer not yet implemented")]
+    WriterNotImplemented {
+        /// The output format that has no registered writer.
+        format: String,
+    },
+
     /// I/O error from file operations.
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -64,6 +78,22 @@ mod tests {
             format: "blocknote".to_string(),
         };
         assert_eq!(err.to_string(), "blocknote reader not yet implemented");
+    }
+
+    #[test]
+    fn display_reader_not_implemented_error() {
+        let err = CliError::ReaderNotImplemented {
+            format: "blocknote".to_string(),
+        };
+        assert_eq!(err.to_string(), "blocknote reader not yet implemented");
+    }
+
+    #[test]
+    fn display_writer_not_implemented_error() {
+        let err = CliError::WriterNotImplemented {
+            format: "markdown".to_string(),
+        };
+        assert_eq!(err.to_string(), "markdown writer not yet implemented");
     }
 
     #[test]
