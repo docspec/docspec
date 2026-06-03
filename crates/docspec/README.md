@@ -36,6 +36,7 @@ writer.finish()?;
 
 | Feature    | Format                                           | Crate                     |
 | ---------- | ------------------------------------------------ | ------------------------- |
+| `docx`     | DOCX (paragraphs + text only)                    | `docspec-docx-reader`     |
 | `markdown` | Markdown (CommonMark + GFM tables/strikethrough) | `docspec-markdown-reader` |
 
 ### Writers
