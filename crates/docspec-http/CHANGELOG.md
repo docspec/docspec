@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/docspec/docspec/compare/docspec-http-v1.0.0...docspec-http-v1.0.1) (2026-06-03)
+
+
+### Bug Fixes
+
+* **deps:** update internal dependencies ([ddef8e2](https://github.com/docspec/docspec/commit/ddef8e24eba8798d7a73fe28b892a4504faa1d3c))
+
 ## 1.0.0 (2026-06-03)
 
 
