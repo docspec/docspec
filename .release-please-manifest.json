@@ -1,1 +1,4 @@
-{"crates/docspec-cli":"1.0.0"}
+{
+  "crates/docspec-cli":"1.0.0",
+  "crates/docspec-wasm":"1.0.0"
+}
