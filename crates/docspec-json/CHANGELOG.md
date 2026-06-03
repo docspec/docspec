@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/docspec/docspec/compare/docspec-json-v1.0.1...docspec-json-v1.0.2) (2026-06-03)
+
+
+### Bug Fixes
+
+* **deps:** local path deps for internals ([5f916d0](https://github.com/docspec/docspec/commit/5f916d06fb1e0ff99bb1aa9da8cfe3fc58f04142))
+
 ## [1.0.1](https://github.com/docspec/docspec/compare/docspec-json-v1.0.0...docspec-json-v1.0.1) (2026-06-03)
 
 
