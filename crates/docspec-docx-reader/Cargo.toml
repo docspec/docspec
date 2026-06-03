@@ -16,7 +16,8 @@ zip = "8"
 flate2 = "1"
 
 [dev-dependencies]
-zip = { version = "8", features = ["deflate"] }
+zip = { version = "8", features = ["deflate", "bzip2"] }
+tempfile = "3"
 
 [lints]
 workspace = true
