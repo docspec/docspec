@@ -3,13 +3,13 @@ use std::path::Path;
 /// Input format for document conversion.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum InputFormat {
-    /// Markdown (`CommonMark` + GFM). Available when the `markdown` feature is enabled.
-    #[cfg(feature = "markdown")]
-    Markdown,
     /// HTML (paragraph-only; `<p>` elements and text within them only).
     /// Available when the `html` feature is enabled.
     #[cfg(feature = "html")]
     Html,
+    /// Markdown (`CommonMark` + GFM). Available when the `markdown` feature is enabled.
+    #[cfg(feature = "markdown")]
+    Markdown,
 }
 
 /// Output format for document conversion.
