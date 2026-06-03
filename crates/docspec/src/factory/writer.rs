@@ -27,6 +27,7 @@ enum AnyWriterInner<'a, W: Write> {
 
 impl<'a, W: Write> AnyWriter<'a, W> {
     /// Construct a writer for the given format.
+    #[inline]
     #[must_use]
     pub fn new(format: OutputFormat, writer: W) -> Self {
         let inner = match format {
@@ -39,6 +40,7 @@ impl<'a, W: Write> AnyWriter<'a, W> {
     }
 
     /// Construct a writer with an asset provider, where supported.
+    #[inline]
     #[must_use]
     pub fn with_assets(format: OutputFormat, writer: W, assets: &'a dyn AssetProvider) -> Self {
         let inner = match format {
@@ -53,16 +55,7 @@ impl<'a, W: Write> AnyWriter<'a, W> {
     }
 }
 
-impl<'a, W: Write> EventSink for AnyWriterInner<'a, W> {
-    fn handle_event(&mut self, event: Event) -> Result<()> {
-        match self {
-            #[cfg(feature = "blocknote")]
-            Self::BlockNote(w) => w.handle_event(event),
-            #[cfg(not(feature = "blocknote"))]
-            Self::_Phantom(_) => Ok(()),
-        }
-    }
-
+impl<W: Write> EventSink for AnyWriterInner<'_, W> {
     fn finish(self) -> Result<()> {
         match self {
             #[cfg(feature = "blocknote")]
@@ -71,14 +64,25 @@ impl<'a, W: Write> EventSink for AnyWriterInner<'a, W> {
             Self::_Phantom(_) => Ok(()),
         }
     }
+
+    fn handle_event(&mut self, event: Event) -> Result<()> {
+        match self {
+            #[cfg(feature = "blocknote")]
+            Self::BlockNote(w) => w.handle_event(event),
+            #[cfg(not(feature = "blocknote"))]
+            Self::_Phantom(_) => Ok(()),
+        }
+    }
 }
 
-impl<'a, W: Write> EventSink for AnyWriter<'a, W> {
-    fn handle_event(&mut self, event: Event) -> Result<()> {
-        self.inner.handle_event(event)
-    }
-
+impl<W: Write> EventSink for AnyWriter<'_, W> {
+    #[inline]
     fn finish(self) -> Result<()> {
         self.inner.finish()
+    }
+
+    #[inline]
+    fn handle_event(&mut self, event: Event) -> Result<()> {
+        self.inner.handle_event(event)
     }
 }
