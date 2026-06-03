@@ -4,7 +4,7 @@
 
 use docspec_core::{Event, EventSink, Result};
 use html5ever::serialize::{HtmlSerializer, SerializeOpts, Serializer as _};
-use html5ever::{local_name, namespace_url, ns, QualName};
+use html5ever::{local_name, namespace_url, ns, LocalName, QualName};
 use std::io::Write;
 
 /// A streaming HTML5 writer for `DocSpec` events.
@@ -23,6 +23,12 @@ pub struct HtmlWriter<W: Write> {
 }
 
 impl<W: Write> HtmlWriter<W> {
+    fn close(&mut self, local: LocalName) -> Result<()> {
+        let name = QualName::new(None, ns!(html), local);
+        self.serializer.end_elem(name)?;
+        Ok(())
+    }
+
     /// Creates a new `HtmlWriter` that writes to the given writer.
     #[inline]
     #[must_use]
@@ -33,6 +39,13 @@ impl<W: Write> HtmlWriter<W> {
             finished: false,
             in_paragraph: false,
         }
+    }
+
+    fn open(&mut self, local: LocalName) -> Result<()> {
+        let name = QualName::new(None, ns!(html), local);
+        self.serializer
+            .start_elem(name, core::iter::empty::<(&QualName, &str)>())?;
+        Ok(())
     }
 }
 
@@ -48,41 +61,31 @@ impl<W: Write> EventSink for HtmlWriter<W> {
         match event {
             Event::StartDocument { .. } => {
                 if !self.started && !self.finished {
-                    let html = QualName::new(None, ns!(html), local_name!("html"));
-                    let body = QualName::new(None, ns!(html), local_name!("body"));
-                    self.serializer
-                        .start_elem(html, core::iter::empty::<(&QualName, &str)>())?;
-                    self.serializer
-                        .start_elem(body, core::iter::empty::<(&QualName, &str)>())?;
+                    self.open(local_name!("html"))?;
+                    self.open(local_name!("body"))?;
                     self.started = true;
                 }
             }
             Event::EndDocument => {
                 if self.started && !self.finished {
                     if self.in_paragraph {
-                        let p = QualName::new(None, ns!(html), local_name!("p"));
-                        self.serializer.end_elem(p)?;
+                        self.close(local_name!("p"))?;
                         self.in_paragraph = false;
                     }
-                    let body = QualName::new(None, ns!(html), local_name!("body"));
-                    let html = QualName::new(None, ns!(html), local_name!("html"));
-                    self.serializer.end_elem(body)?;
-                    self.serializer.end_elem(html)?;
+                    self.close(local_name!("body"))?;
+                    self.close(local_name!("html"))?;
                     self.finished = true;
                 }
             }
             Event::StartParagraph { .. } => {
                 if self.started && !self.finished && !self.in_paragraph {
-                    let p = QualName::new(None, ns!(html), local_name!("p"));
-                    self.serializer
-                        .start_elem(p, core::iter::empty::<(&QualName, &str)>())?;
+                    self.open(local_name!("p"))?;
                     self.in_paragraph = true;
                 }
             }
             Event::EndParagraph => {
                 if self.in_paragraph {
-                    let p = QualName::new(None, ns!(html), local_name!("p"));
-                    self.serializer.end_elem(p)?;
+                    self.close(local_name!("p"))?;
                     self.in_paragraph = false;
                 }
             }
