@@ -5,7 +5,7 @@ use quick_xml::events::Event;
 use quick_xml::XmlVersion;
 use zip::result::ZipError;
 
-pub(in crate::rels) fn find_document_path<R: Read + Seek>(
+pub fn find_document_path<R: Read + Seek>(
     archive: &mut zip::ZipArchive<R>,
 ) -> docspec_core::Result<String> {
     let mut rels = archive.by_name("_rels/.rels").map_err(|err| {
