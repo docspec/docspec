@@ -39,11 +39,21 @@ mod tests {
     fn blocknote_dispatch_writes_expected_bytes_simple() {
         let mut output = Vec::new();
         let mut writer = AnyWriter::new(OutputFormat::Blocknote, &mut output);
-        writer.handle_event(start_document()).expect("handle_event failed");
-        writer.handle_event(start_paragraph()).expect("handle_event failed");
-        writer.handle_event(text("hello")).expect("handle_event failed");
-        writer.handle_event(Event::EndParagraph).expect("handle_event failed");
-        writer.handle_event(Event::EndDocument).expect("handle_event failed");
+        writer
+            .handle_event(start_document())
+            .expect("handle_event failed");
+        writer
+            .handle_event(start_paragraph())
+            .expect("handle_event failed");
+        writer
+            .handle_event(text("hello"))
+            .expect("handle_event failed");
+        writer
+            .handle_event(Event::EndParagraph)
+            .expect("handle_event failed");
+        writer
+            .handle_event(Event::EndDocument)
+            .expect("handle_event failed");
         writer.finish().expect("finish failed");
         let json = String::from_utf8(output).expect("not utf8");
         assert_eq!(
@@ -57,9 +67,15 @@ mod tests {
     fn stack_tracking_is_active() {
         let mut output = Vec::new();
         let mut writer = AnyWriter::new(OutputFormat::Blocknote, &mut output);
-        writer.handle_event(start_document()).expect("handle_event failed");
-        writer.handle_event(text("bare text")).expect("handle_event failed");
-        writer.handle_event(Event::EndDocument).expect("handle_event failed");
+        writer
+            .handle_event(start_document())
+            .expect("handle_event failed");
+        writer
+            .handle_event(text("bare text"))
+            .expect("handle_event failed");
+        writer
+            .handle_event(Event::EndDocument)
+            .expect("handle_event failed");
         writer.finish().expect("finish failed");
         let json = String::from_utf8(output).expect("not utf8");
         assert_eq!(
