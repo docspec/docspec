@@ -4,7 +4,7 @@
 
 use docspec_core::{Event, EventSink, Result};
 use html5ever::serialize::{HtmlSerializer, SerializeOpts, Serializer as _};
-use html5ever::{local_name, namespace_url, ns, LocalName, QualName};
+use html5ever::{local_name, ns, LocalName, QualName};
 use std::io::Write;
 
 /// A streaming HTML5 writer for `DocSpec` events.
