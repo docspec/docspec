@@ -2,7 +2,7 @@
 
 Testing is not a step that happens after development. It is development. Every feature, every bug fix, every refactor comes with tests that prove it works. Untested code is incomplete code.
 
-We target 98% test coverage from day one. Not as an aspirational goal. As a floor. The 2% tolerance exists for genuinely untestable code: platform-specific initialization, embedded hardware interaction, code that interfaces with external systems beyond our control, and WASM/CLI entry points that require integration testing. If your code does not have tests, it is not done.
+We target 98% test coverage for new and changed executable Rust lines in crates covered by the standard coverage job. Not as an aspirational goal. As a floor. The 2% tolerance exists for genuinely untestable code: platform-specific initialization, embedded hardware interaction, code that interfaces with external systems beyond our control, and WASM/CLI entry points that require integration testing. If your code does not have tests, it is not done.
 
 ## Why 98%
 
@@ -14,7 +14,7 @@ Going from 80% to 98% coverage catches the subtle bugs, the edge cases, the erro
 
 The 2% gap is a recognition that some code lives at the boundary between our system and the outside world. Code that talks to hardware. Code that interfaces with the operating system. Code that handles signals we cannot simulate. Everything else gets tested.
 
-We track coverage religiously. We run coverage reports on every build. We review coverage in pull requests. We question any drop in coverage. Coverage is a team metric, not an individual one.
+We track coverage religiously. Pull requests enforce 98% coverage on executable Rust lines added or changed by the branch in crates covered by the standard coverage job. The full covered-crate report remains visible in local and CI logs as baseline information. We question any drop in coverage and ratchet the baseline upward over time. Coverage is a team metric, not an individual one.
 
 High coverage is not achieved by writing bad tests that cover lines without asserting anything. Coverage is meaningful only when tests are meaningful. Write assertions. Check the output. Verify the error. Test the edge case. Coverage is a side effect of thoroughness, not the goal itself. A line that is covered but not asserted is not really tested.
 
