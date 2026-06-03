@@ -10,7 +10,7 @@ keywords = ["document", "conversion", "streaming", "markdown"]
 categories = ["parsing"]
 
 [dependencies]
-docspec-core = "1.0.0"
+docspec-core = { path = "../docspec-core", version = "1.0.0" }
 pulldown-cmark = "0.13"
 
 [lints]

@@ -10,7 +10,7 @@ keywords = ["document", "conversion", "streaming", "html"]
 categories = ["parsing"]
 
 [dependencies]
-docspec-core = "1.0.0"
+docspec-core = { path = "../docspec-core", version = "1.0.0" }
 html5gum = "0.8"
 
 [lints]
