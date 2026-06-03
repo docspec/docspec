@@ -15,10 +15,7 @@ pub fn find_document_path<R: Read + Seek>(
                 position: None,
             }
         } else {
-            Error::Parse {
-                message: format!("malformed ZIP: {err}"),
-                position: None,
-            }
+            parse_error(format!("malformed ZIP: {err}"))
         }
     })?;
 
@@ -48,19 +45,13 @@ pub fn find_document_path<R: Read + Seek>(
             }
             Ok(Event::End(_)) => {
                 let Some(next_depth) = element_depth.checked_sub(1) else {
-                    return Err(Error::Parse {
-                        message: "malformed _rels/.rels".to_string(),
-                        position: None,
-                    });
+                    return Err(parse_error("malformed _rels/.rels".to_string()));
                 };
                 element_depth = next_depth;
             }
             Ok(Event::Eof) => {
                 if element_depth != 0 {
-                    return Err(Error::Parse {
-                        message: "malformed _rels/.rels".to_string(),
-                        position: None,
-                    });
+                    return Err(parse_error("malformed _rels/.rels".to_string()));
                 }
                 return Err(Error::Parse {
                     message: "no officeDocument relationship".to_string(),
@@ -68,14 +59,18 @@ pub fn find_document_path<R: Read + Seek>(
                 });
             }
             Err(_err) => {
-                return Err(Error::Parse {
-                    message: "malformed _rels/.rels".to_string(),
-                    position: None,
-                });
+                return Err(parse_error("malformed _rels/.rels".to_string()));
             }
             Ok(_) => {}
         }
         buf.clear();
+    }
+}
+
+fn parse_error(message: String) -> Error {
+    Error::Parse {
+        message,
+        position: None,
     }
 }
 
@@ -233,6 +228,66 @@ mod tests {
                 format!("{other:?}"),
                 "expected no officeDocument parse error"
             ),
+        }
+    }
+
+    #[test]
+    fn find_document_path_errors_after_balanced_nested_non_matching_rels() {
+        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Group><Relationship Id="rId1" Type="http://example.com/not-office" Target="word/document.xml"></Relationship></Group>
+</Relationships>"#;
+        let Some(mut archive) = assert_zip_result(archive_from_rels(rels_xml)) else {
+            return;
+        };
+
+        let result = find_document_path(&mut archive);
+
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(message, "no officeDocument relationship");
+                assert_eq!(position, None);
+            }
+            other => assert_eq!(
+                format!("{other:?}"),
+                "expected balanced traversal parse error"
+            ),
+        }
+    }
+
+    #[test]
+    fn find_document_path_errors_on_unexpected_closing_element() {
+        let Some(mut archive) = assert_zip_result(archive_from_rels("</Relationships>")) else {
+            return;
+        };
+
+        let result = find_document_path(&mut archive);
+
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(message, "malformed _rels/.rels");
+                assert_eq!(position, None);
+            }
+            other => assert_eq!(
+                format!("{other:?}"),
+                "expected unexpected closing element parse error"
+            ),
+        }
+    }
+
+    #[test]
+    fn find_document_path_errors_on_rels_xml_parser_error() {
+        let Some(mut archive) = assert_zip_result(archive_from_rels("<Relationships><")) else {
+            return;
+        };
+
+        let result = find_document_path(&mut archive);
+
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(message, "malformed _rels/.rels");
+                assert_eq!(position, None);
+            }
+            other => assert_eq!(format!("{other:?}"), "expected rels parser error"),
         }
     }
 

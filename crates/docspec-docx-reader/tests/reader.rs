@@ -101,6 +101,108 @@ mod constructor {
     }
 
     #[test]
+    fn from_reader_errors_when_rels_entry_header_is_malformed() {
+        let mut bytes = fixture::synth_docx(
+            r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
+        );
+        bytes[0] = b'X';
+
+        let result = DocxReader::from_reader(Cursor::new(bytes));
+
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "malformed ZIP: invalid Zip archive: Invalid local file header"
+                );
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Error::Parse, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_reader_errors_after_empty_non_matching_rels() {
+        let bytes = fixture::synth_docx(
+            r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://example.com/not-office" Target="word/document.xml"/></Relationships>"#,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
+        );
+        let result = DocxReader::from_reader(Cursor::new(bytes));
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(message, "no officeDocument relationship");
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Error::Parse, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_reader_errors_after_balanced_nested_non_matching_rels() {
+        let bytes = fixture::synth_docx(
+            r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Group><Relationship Id="rId1" Type="http://example.com/not-office" Target="word/document.xml"></Relationship></Group></Relationships>"#,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
+        );
+        let result = DocxReader::from_reader(Cursor::new(bytes));
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(message, "no officeDocument relationship");
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Error::Parse, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_reader_errors_on_unexpected_closing_rels_element() {
+        let bytes = fixture::synth_docx(
+            "</Relationships>",
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
+        );
+        let result = DocxReader::from_reader(Cursor::new(bytes));
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(message, "malformed _rels/.rels");
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Error::Parse, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_reader_errors_on_rels_xml_parser_error() {
+        let bytes = fixture::synth_docx(
+            "<Relationships><",
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
+        );
+        let result = DocxReader::from_reader(Cursor::new(bytes));
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(message, "malformed _rels/.rels");
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Error::Parse, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_reader_errors_on_unclosed_rels_xml() {
+        let bytes = fixture::synth_docx(
+            "<Relationships>",
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
+        );
+        let result = DocxReader::from_reader(Cursor::new(bytes));
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(message, "malformed _rels/.rels");
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Error::Parse, got: {other:?}"),
+        }
+    }
+
+    #[test]
     fn from_reader_errors_on_missing_target_entry() {
         use std::io::Write as _;
         use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
@@ -687,6 +789,24 @@ mod events {
     }
 
     #[test]
+    fn xml_general_ref_outside_text_is_ignored() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>&amp;<w:p><w:r><w:t>x</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
     fn unknown_xml_entity_returns_parse_error() {
         let bytes = fixture::synth_docx(
             SIMPLE_RELS,
@@ -773,6 +893,64 @@ mod events {
     }
 
     #[test]
+    fn xml_decl_doctype_processing_instruction_and_comment_are_ignored() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?>
+<!DOCTYPE w:document>
+<?docspec before-root?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><!-- body comment --><?docspec inside-body?><w:p><w:r><w:t>visible</w:t></w:r></w:p></w:body>
+</w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("visible"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn malformed_utf8_text_returns_parse_error() {
+        let bytes = fixture::synth_docx_with_entries(&[
+            (
+                "_rels/.rels",
+                zip::CompressionMethod::Deflated,
+                SIMPLE_RELS.as_bytes(),
+            ),
+            (
+                "word/document.xml",
+                zip::CompressionMethod::Deflated,
+                b"<?xml version=\"1.0\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p><w:r><w:t>\xFF</w:t></w:r></w:p></w:body></w:document>",
+            ),
+        ]);
+        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+        assert_eq!(
+            reader.next_event().expect("start document"),
+            Some(start_doc())
+        );
+        assert_eq!(
+            reader.next_event().expect("start paragraph"),
+            Some(start_para())
+        );
+        match reader.next_event() {
+            Err(docspec_core::Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "malformed document.xml: cannot decode input using UTF-8: invalid utf-8 sequence of 1 bytes from index 0"
+                );
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Error::Parse, got: {other:?}"),
+        }
+    }
+
+    #[test]
     fn cdata_inside_text_emits_text() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t><![CDATA[hello <world>]]></w:t></w:r></w:p></w:body></w:document>"#,
@@ -788,6 +966,59 @@ mod events {
                 Event::EndDocument,
             ]
         );
+    }
+
+    #[test]
+    fn cdata_outside_text_is_ignored() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><![CDATA[ignored]]><w:p><w:r><w:t>kept</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("kept"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn malformed_utf8_cdata_returns_parse_error() {
+        let bytes = fixture::synth_docx_with_entries(&[
+            (
+                "_rels/.rels",
+                zip::CompressionMethod::Deflated,
+                SIMPLE_RELS.as_bytes(),
+            ),
+            (
+                "word/document.xml",
+                zip::CompressionMethod::Deflated,
+                b"<?xml version=\"1.0\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p><w:r><w:t><![CDATA[\xFF]]></w:t></w:r></w:p></w:body></w:document>",
+            ),
+        ]);
+        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+        assert_eq!(
+            reader.next_event().expect("start document"),
+            Some(start_doc())
+        );
+        assert_eq!(
+            reader.next_event().expect("start paragraph"),
+            Some(start_para())
+        );
+        match reader.next_event() {
+            Err(docspec_core::Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "malformed document.xml: invalid utf-8 sequence of 1 bytes from index 0"
+                );
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Error::Parse, got: {other:?}"),
+        }
     }
 
     #[test]

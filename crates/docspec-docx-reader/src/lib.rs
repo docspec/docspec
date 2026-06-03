@@ -153,10 +153,7 @@ impl DocxReader {
             zip::result::ZipError::FileNotFound
             | zip::result::ZipError::InvalidPassword
             | zip::result::ZipError::CompressionMethodNotSupported(_)
-            | _ => Error::Parse {
-                message: format!("not a valid ZIP archive: {err}"),
-                position: None,
-            },
+            | _ => parse_error(format!("not a valid ZIP archive: {err}")),
         })?;
 
         let document_path = rels::find_document_path(&mut archive)?;
@@ -168,10 +165,9 @@ impl DocxReader {
                     message: format!("document target not found: {document_path}"),
                     position: None,
                 })?;
-            let data_start = entry.data_start().ok_or_else(|| Error::Parse {
-                message: "document.xml has no data offset".to_string(),
-                position: None,
-            })?;
+            let data_start = entry
+                .data_start()
+                .ok_or_else(|| parse_error("document.xml has no data offset".to_string()))?;
             (data_start, entry.compressed_size(), entry.compression())
         };
         drop(archive);
@@ -232,10 +228,8 @@ impl DocxReader {
     fn handle_cdata(&mut self, cdata: BytesCData<'_>) -> Result<()> {
         if self.can_collect_text() {
             let bytes = cdata.into_inner();
-            let content = core::str::from_utf8(&bytes).map_err(|err| Error::Parse {
-                message: format!("malformed document.xml: {err}"),
-                position: None,
-            })?;
+            let content = core::str::from_utf8(&bytes)
+                .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
             self.pending_text.push_str(content);
         }
         Ok(())
@@ -284,15 +278,12 @@ impl DocxReader {
 
     fn handle_general_ref(&mut self, reference: &BytesRef<'_>) -> Result<()> {
         if self.can_collect_text() {
-            let decoded = reference.decode().map_err(|err| Error::Parse {
-                message: format!("malformed document.xml: {err}"),
-                position: None,
-            })?;
+            let decoded = reference
+                .decode()
+                .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
             let escaped = format!("&{decoded};");
-            let unescaped = quick_xml::escape::unescape(&escaped).map_err(|err| Error::Parse {
-                message: format!("malformed document.xml: {err}"),
-                position: None,
-            })?;
+            let unescaped = quick_xml::escape::unescape(&escaped)
+                .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
             self.pending_text.push_str(&unescaped);
         }
         Ok(())
@@ -317,14 +308,11 @@ impl DocxReader {
 
     fn handle_text(&mut self, text: &BytesText<'_>) -> Result<()> {
         if self.can_collect_text() {
-            let decoded = text.decode().map_err(|err| Error::Parse {
-                message: format!("malformed document.xml: {err}"),
-                position: None,
-            })?;
-            let unescaped = quick_xml::escape::unescape(&decoded).map_err(|err| Error::Parse {
-                message: format!("malformed document.xml: {err}"),
-                position: None,
-            })?;
+            let decoded = text
+                .decode()
+                .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
+            let unescaped = quick_xml::escape::unescape(&decoded)
+                .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
             self.pending_text.push_str(&unescaped);
         }
         Ok(())
@@ -418,6 +406,13 @@ fn is_ignored_container(local: &[u8]) -> bool {
             | b"moveFrom"
             | b"moveTo"
     )
+}
+
+fn parse_error(message: String) -> Error {
+    Error::Parse {
+        message,
+        position: None,
+    }
 }
 
 #[cfg(test)]
