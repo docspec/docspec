@@ -24,6 +24,10 @@ pub enum CliError {
     },
 
     /// Format reader or writer is not yet implemented.
+    #[deprecated(
+        since = "1.0.3",
+        note = "use `ReaderNotImplemented` or `WriterNotImplemented` for direction-correct error messages"
+    )]
     #[error("{format} reader not yet implemented")]
     FormatNotSupported {
         /// The format that is not supported.
@@ -74,6 +78,7 @@ mod tests {
         assert_eq!(err.to_string(), "cannot detect format");
     }
 
+    #[allow(deprecated)]
     #[test]
     fn display_format_not_supported_error() {
         let err = CliError::FormatNotSupported {

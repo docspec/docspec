@@ -14,7 +14,7 @@ pub struct Cli {
 
     /// Input format (auto-detected from extension if omitted).
     #[arg(short, long)]
-    pub from: Option<Format>,
+    pub from: Option<CliInputFormat>,
 
     /// Input file (use `-` or omit for stdin).
     #[arg(value_name = "FILE")]
@@ -26,19 +26,7 @@ pub struct Cli {
 
     /// Output format (auto-detected from extension if omitted).
     #[arg(short, long)]
-    pub to: Option<Format>,
-}
-
-/// Document format.
-#[derive(Clone, Copy, Debug, ValueEnum)]
-pub enum Format {
-    /// `BlockNote` JSON format.
-    #[value(name = "blocknote")]
-    Blocknote,
-
-    /// Markdown format.
-    #[value(name = "markdown")]
-    Markdown,
+    pub to: Option<CliOutputFormat>,
 }
 
 /// Color output choice.
@@ -74,4 +62,21 @@ pub enum CliOutputFormat {
     /// `BlockNote` JSON format.
     #[value(name = "blocknote")]
     Blocknote,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clap_rejects_blocknote_as_input() {
+        let result = Cli::try_parse_from(["docspec", "--from", "blocknote", "x.md"]);
+        assert!(result.is_err(), "blocknote should not be a valid input format");
+    }
+
+    #[test]
+    fn clap_rejects_markdown_as_output() {
+        let result = Cli::try_parse_from(["docspec", "--to", "markdown", "x.md"]);
+        assert!(result.is_err(), "markdown should not be a valid output format");
+    }
 }
