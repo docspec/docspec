@@ -12,11 +12,11 @@ categories = ["parsing"]
 [dependencies]
 docspec-core = { path = "../docspec-core", version = "1.0.0" }
 quick-xml = "0.40"
-zip = "8"
+zip = { version = "8", default-features = false, features = ["deflate"] }
 flate2 = "1"
 
 [dev-dependencies]
-zip = { version = "8", features = ["deflate", "bzip2"] }
+zip = { version = "8", default-features = false, features = ["deflate", "bzip2"] }
 tempfile = "3"
 
 [lints]
