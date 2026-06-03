@@ -1,7 +1,5 @@
 //! Error types for the CLI.
 
-#![allow(dead_code)]
-
 use thiserror::Error;
 
 /// Result type alias for CLI operations.
