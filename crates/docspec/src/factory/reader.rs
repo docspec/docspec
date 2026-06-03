@@ -14,10 +14,6 @@ use crate::format::InputFormat;
 /// Constructed via [`AnyReader::new`]. Implements [`EventSource`] by delegating
 /// `next_event` to the inner concrete reader. Zero heap allocation, zero
 /// virtual-dispatch overhead.
-#[expect(
-    clippy::large_enum_variant,
-    reason = "enum dispatch intentionally avoids heap allocation and virtual dispatch"
-)]
 pub enum AnyReader<'a> {
     /// HTML reader from [`docspec_html_reader`] (paragraph-only; see crate docs).
     #[cfg(feature = "html")]

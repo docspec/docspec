@@ -121,11 +121,12 @@ pub mod writers {
 /// from file paths based on extension.
 pub mod format;
 
-/// Enum-dispatch factories for document readers.
+/// Enum-dispatch factories for document readers and writers.
 pub mod factory;
 
 pub use docspec_core::*;
 pub use factory::reader::AnyReader;
+pub use factory::writer::AnyWriter;
 pub use format::{detect_input_format, detect_output_format, InputFormat, OutputFormat};
 
 /// Streaming JSON emission primitives.
