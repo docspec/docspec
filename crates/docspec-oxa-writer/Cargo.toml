@@ -1,0 +1,20 @@
+[package]
+name = "docspec-oxa-writer"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+description = "DocSpec event stream to oxa.dev JSON writer"
+keywords = ["document", "conversion", "streaming"]
+categories = ["encoding"]
+
+[dependencies]
+docspec-core = { path = "../docspec-core", version = "1.0.0" }
+docspec-json = { path = "../docspec-json", version = "1.0.2" }
+
+[dev-dependencies]
+serde_json = "1"
+
+[lints]
+workspace = true
