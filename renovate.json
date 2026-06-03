@@ -5,6 +5,12 @@
   "semanticCommits": "enabled",
   "packageRules": [
     {
+      "description": "Use fix(deps) for production Cargo dependencies so version bumps trigger releases",
+      "matchManagers": ["cargo"],
+      "matchDepTypes": ["dependencies", "workspace.dependencies"],
+      "semanticCommitType": "fix"
+    },
+    {
       "description": "Require manual review for major updates",
       "matchUpdateTypes": ["major"],
       "automerge": false
