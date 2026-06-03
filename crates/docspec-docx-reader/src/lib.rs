@@ -105,8 +105,7 @@ impl DocxReader {
     /// Returns [`Error::Io`] if the file cannot be opened. See [`from_reader`](Self::from_reader)
     /// for additional error conditions.
     #[inline]
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let _ = path;
+    pub fn from_path<P: AsRef<Path>>(_path: P) -> Result<Self> {
         Err(Error::Other {
             message: "docx reader not yet implemented".to_string(),
         })
@@ -122,8 +121,7 @@ impl DocxReader {
     /// `_rels/.rels` is missing or malformed, or if the document target entry
     /// cannot be opened. Returns [`Error::Io`] for I/O failures.
     #[inline]
-    pub fn from_reader<R: Read + Seek + 'static>(reader: &R) -> Result<Self> {
-        let _ = reader;
+    pub fn from_reader<R: Read + Seek + 'static>(_reader: R) -> Result<Self> {
         Err(Error::Other {
             message: "docx reader not yet implemented".to_string(),
         })
