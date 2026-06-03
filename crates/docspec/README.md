@@ -43,6 +43,7 @@ writer.finish()?;
 | Feature     | Format         | Crate                      |
 | ----------- | -------------- | -------------------------- |
 | `blocknote` | BlockNote JSON | `docspec-blocknote-writer` |
+| `oxa`       | oxa.dev JSON   | `docspec-oxa-writer`       |
 
 ### Primitives
 

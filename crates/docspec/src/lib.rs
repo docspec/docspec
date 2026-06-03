@@ -22,6 +22,7 @@
 //! | Feature     | Format           | Re-exports                    |
 //! |-------------|------------------|-------------------------------|
 //! | `blocknote` | `BlockNote` JSON | [`writers::BlockNoteWriter`]  |
+//! | `oxa`       | `oxa.dev` JSON   | `writers::OxaWriter`          |
 //!
 //! ## Primitives
 //!
@@ -113,6 +114,11 @@ pub mod writers {
     #[cfg(feature = "blocknote")]
     #[cfg_attr(docsrs, doc(cfg(feature = "blocknote")))]
     pub use docspec_blocknote_writer::BlockNoteWriter;
+
+    /// Streaming `oxa.dev` JSON writer. Available when the `oxa` feature is enabled.
+    #[cfg(feature = "oxa")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "oxa")))]
+    pub use docspec_oxa_writer::OxaWriter;
 }
 
 /// Format detection and conversion helpers.
