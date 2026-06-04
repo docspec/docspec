@@ -136,6 +136,10 @@ impl<S: EventSink> StackTrackingSink<S> {
     /// Handles any intermediate End event (not `EndDocument`): validates the stack,
     /// auto-closes intervening blocks, pops the target frame, and forwards the event.
     fn handle_end_event(&mut self, event: Event) -> Result<()> {
+        while self.style_stack.pop().is_some() {
+            self.sink.handle_event(Event::EndTextStyle)?;
+        }
+
         let Some(target_kind) = block_kind_for_end(&event) else {
             return Err(Error::InvalidSequence {
                 expected: "valid End event".to_string(),

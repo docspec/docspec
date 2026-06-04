@@ -838,4 +838,114 @@ mod tests {
         assert!(!sink.is_inside_text_style(TextStyleKind::Italic));
         assert!(sink.is_inside_text_style(TextStyleKind::Bold));
     }
+
+    #[test]
+    fn styles_drain_before_end_paragraph() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
+        );
+        send(&mut sink, Event::EndParagraph);
+
+        assert!(!sink.is_inside_text_style(TextStyleKind::Bold));
+        let events = sink.into_inner().events;
+        assert_eq!(
+            events,
+            vec![
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                },
+                Event::EndTextStyle,
+                Event::EndParagraph,
+            ]
+        );
+    }
+
+    #[test]
+    fn styles_drain_lifo_before_block_end() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Italic,
+            },
+        );
+        send(&mut sink, Event::EndParagraph);
+
+        assert!(!sink.is_inside_text_style(TextStyleKind::Bold));
+        assert!(!sink.is_inside_text_style(TextStyleKind::Italic));
+        let events = sink.into_inner().events;
+        assert_eq!(
+            events,
+            vec![
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Italic,
+                },
+                Event::EndTextStyle,
+                Event::EndTextStyle,
+                Event::EndParagraph,
+            ]
+        );
+    }
+
+    #[test]
+    fn styles_drain_before_end_heading() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+        let mark = TextStyleKind::Mark(Color::Rgb { r: 255, g: 0, b: 0 });
+
+        send(&mut sink, Event::StartHeading { id: None, level: 1 });
+        send(&mut sink, Event::StartTextStyle { kind: mark });
+        send(&mut sink, Event::EndHeading);
+
+        assert!(!sink.is_inside_text_style(mark));
+        let events = sink.into_inner().events;
+        assert_eq!(
+            events,
+            vec![
+                Event::StartHeading { id: None, level: 1 },
+                Event::StartTextStyle { kind: mark },
+                Event::EndTextStyle,
+                Event::EndHeading,
+            ]
+        );
+    }
 }
