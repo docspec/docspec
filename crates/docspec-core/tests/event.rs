@@ -133,6 +133,7 @@ mod tests {
     fn end_text_style() {
         let event = Event::EndTextStyle;
         assert_eq!(format!("{event:?}"), "EndTextStyle");
+        assert_eq!(event, Event::EndTextStyle);
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
@@ -536,29 +537,116 @@ mod tests {
 
     #[test]
     fn start_text_style_bold() {
-        let event = Event::StartTextStyle {
-            kind: TextStyleKind::Bold,
-        };
+        let kind = TextStyleKind::Bold;
+        let event = Event::StartTextStyle { kind };
         assert_eq!(format!("{event:?}"), "StartTextStyle { kind: Bold }");
+        assert_eq!(event, Event::StartTextStyle { kind });
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_text_style_italic() {
+        let kind = TextStyleKind::Italic;
+        let event = Event::StartTextStyle { kind };
+        assert_eq!(format!("{event:?}"), "StartTextStyle { kind: Italic }");
+        assert_eq!(event, Event::StartTextStyle { kind });
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_text_style_code() {
+        let kind = TextStyleKind::Code;
+        let event = Event::StartTextStyle { kind };
+        assert_eq!(format!("{event:?}"), "StartTextStyle { kind: Code }");
+        assert_eq!(event, Event::StartTextStyle { kind });
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_text_style_strikethrough() {
+        let kind = TextStyleKind::Strikethrough;
+        let event = Event::StartTextStyle { kind };
+        assert_eq!(
+            format!("{event:?}"),
+            "StartTextStyle { kind: Strikethrough }"
+        );
+        assert_eq!(event, Event::StartTextStyle { kind });
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_text_style_underline() {
+        let kind = TextStyleKind::Underline;
+        let event = Event::StartTextStyle { kind };
+        assert_eq!(format!("{event:?}"), "StartTextStyle { kind: Underline }");
+        assert_eq!(event, Event::StartTextStyle { kind });
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_text_style_subscript() {
+        let kind = TextStyleKind::Subscript;
+        let event = Event::StartTextStyle { kind };
+        assert_eq!(format!("{event:?}"), "StartTextStyle { kind: Subscript }");
+        assert_eq!(event, Event::StartTextStyle { kind });
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_text_style_superscript() {
+        let kind = TextStyleKind::Superscript;
+        let event = Event::StartTextStyle { kind };
+        assert_eq!(format!("{event:?}"), "StartTextStyle { kind: Superscript }");
+        assert_eq!(event, Event::StartTextStyle { kind });
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
 
     #[test]
     fn start_text_style_mark() {
-        let event = Event::StartTextStyle {
-            kind: TextStyleKind::Mark(Color::Rgb {
-                r: 10,
-                g: 20,
-                b: 30,
-            }),
-        };
+        let kind = TextStyleKind::Mark(Color::Rgb {
+            r: 200,
+            g: 100,
+            b: 50,
+        });
+        let event = Event::StartTextStyle { kind };
         assert_eq!(
             format!("{event:?}"),
-            "StartTextStyle { kind: Mark(Rgb { b: 30, g: 20, r: 10 }) }"
+            "StartTextStyle { kind: Mark(Rgb { b: 50, g: 100, r: 200 }) }"
         );
+        assert_eq!(event, Event::StartTextStyle { kind });
         let cloned = event.clone();
         assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_text_style_mark_zero() {
+        let kind = TextStyleKind::Mark(Color::Rgb { r: 0, g: 0, b: 0 });
+        let event = Event::StartTextStyle { kind };
+        assert_eq!(
+            format!("{event:?}"),
+            "StartTextStyle { kind: Mark(Rgb { b: 0, g: 0, r: 0 }) }"
+        );
+        assert_eq!(event, Event::StartTextStyle { kind });
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_text_style_bold_ne_italic() {
+        let bold = Event::StartTextStyle {
+            kind: TextStyleKind::Bold,
+        };
+        let italic = Event::StartTextStyle {
+            kind: TextStyleKind::Italic,
+        };
+        assert_ne!(bold, italic);
     }
 
     #[test]
