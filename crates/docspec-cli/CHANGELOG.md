@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1](https://github.com/docspec/docspec/compare/docspec-cli-v1.3.0...docspec-cli-v1.3.1) (2026-06-04)
+
+
+### Bug Fixes
+
+* **cli:** show help when running docspec ([7e2c831](https://github.com/docspec/docspec/commit/7e2c83187950626f06add9955d10768c61e51754)), closes [#16](https://github.com/docspec/docspec/issues/16)
+* **cli:** stdout end with new line char ([c57d4f5](https://github.com/docspec/docspec/commit/c57d4f5e0dbd112506ce74029fbf4f230197419d)), closes [#16](https://github.com/docspec/docspec/issues/16)
+
 ## [1.3.0](https://github.com/docspec/docspec/compare/docspec-cli-v1.2.0...docspec-cli-v1.3.0) (2026-06-04)
 
 
