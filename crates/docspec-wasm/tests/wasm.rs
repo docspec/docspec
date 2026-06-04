@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 //! Tests.
 
 #[cfg(test)]
