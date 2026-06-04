@@ -589,6 +589,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "docspec-test-fixtures"
+version = "0.1.0"
+dependencies = [
+ "zip",
+]
+
+[[package]]
 name = "docspec-wasm"
 version = "1.0.2"
 dependencies = [
