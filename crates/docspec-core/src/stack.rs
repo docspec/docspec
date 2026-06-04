@@ -285,6 +285,12 @@ impl<S: EventSink> StackTrackingSink<S> {
         &self.sink
     }
 
+    /// Consumes the wrapper and returns the inner sink.
+    #[inline]
+    pub fn into_inner(self) -> S {
+        self.sink
+    }
+
     /// Returns a slice of the current nesting stack.
     ///
     /// The first element is the outermost container (typically [`BlockKind::Document`]),
@@ -329,6 +335,19 @@ impl<S: EventSink> EventSink for StackTrackingSink<S> {
 
         if block_kind_for_end(&event).is_some() {
             return self.handle_end_event(event);
+        }
+
+        if let Event::StartTextStyle { kind } = event {
+            if !self.has_open_content() {
+                let para = Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                };
+                self.stack.push(BlockKind::Paragraph);
+                self.sink.handle_event(para)?;
+            }
+            self.style_stack.push(kind);
+            return self.sink.handle_event(Event::StartTextStyle { kind });
         }
 
         self.handle_other_event(event)

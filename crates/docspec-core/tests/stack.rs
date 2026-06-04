@@ -584,4 +584,153 @@ mod tests {
         let sink = StackTrackingSink::new(mock);
         assert!(!sink.is_inside_text_style(TextStyleKind::Bold));
     }
+
+    #[test]
+    fn start_text_style_inside_paragraph() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
+        );
+
+        let events = sink.into_inner().events;
+        assert_eq!(
+            events,
+            vec![
+                Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn start_text_style_inside_heading() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(&mut sink, Event::StartHeading { id: None, level: 1 });
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
+        );
+
+        let events = sink.into_inner().events;
+        assert_eq!(
+            events,
+            vec![
+                Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                Event::StartHeading { id: None, level: 1 },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn start_text_style_at_root_auto_paragraph() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
+        );
+
+        let events = sink.into_inner().events;
+        assert_eq!(
+            events,
+            vec![
+                Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn start_text_style_auto_paragraph_style_on_stack() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
+        );
+
+        assert!(sink.is_inside_text_style(TextStyleKind::Bold));
+        assert!(sink.is_inside(BlockKind::Paragraph));
+    }
 }
