@@ -177,4 +177,39 @@ mod tests {
             docspec::InputFormat::Markdown
         );
     }
+
+    #[cfg(feature = "docx")]
+    #[test]
+    fn detect_docx_from_docx_extension() {
+        let result = docspec::detect_input_format(Path::new("file.docx"));
+        assert_eq!(result, Some(docspec::InputFormat::Docx));
+    }
+
+    #[cfg(feature = "docx")]
+    #[test]
+    fn detect_docx_case_insensitive() {
+        let result_upper = docspec::detect_input_format(Path::new("file.DOCX"));
+        assert_eq!(result_upper, Some(docspec::InputFormat::Docx));
+        let result_mixed = docspec::detect_input_format(Path::new("file.Docx"));
+        assert_eq!(result_mixed, Some(docspec::InputFormat::Docx));
+    }
+
+    #[cfg(feature = "docx")]
+    #[test]
+    fn docx_input_format_debug() {
+        let debug_str = format!("{:?}", docspec::InputFormat::Docx);
+        assert_eq!(debug_str, "Docx");
+    }
+
+    #[cfg(feature = "docx")]
+    #[test]
+    fn docx_input_format_eq() {
+        assert_eq!(docspec::InputFormat::Docx, docspec::InputFormat::Docx);
+    }
+
+    #[cfg(all(feature = "docx", feature = "markdown"))]
+    #[test]
+    fn input_format_ne_docx_markdown() {
+        assert_ne!(docspec::InputFormat::Docx, docspec::InputFormat::Markdown);
+    }
 }

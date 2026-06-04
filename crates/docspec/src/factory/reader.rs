@@ -31,17 +31,35 @@ impl<'a> AnyReader<'a> {
     #[inline]
     #[must_use]
     pub fn new(format: InputFormat, input: &'a str) -> Self {
-        #[cfg(not(any(feature = "markdown", feature = "html")))]
+        #[cfg(not(any(feature = "markdown", feature = "html", feature = "docx")))]
         {
             let _ = input;
             match format {}
         }
-        #[cfg(any(feature = "markdown", feature = "html"))]
+        #[cfg(any(feature = "markdown", feature = "html", feature = "docx"))]
         match format {
             #[cfg(feature = "html")]
             InputFormat::Html => Self::Html(HtmlReader::new(input)),
             #[cfg(feature = "markdown")]
             InputFormat::Markdown => Self::Markdown(MarkdownReader::new(input)),
+            #[cfg(feature = "docx")]
+            InputFormat::Docx => {
+                // Docx reader requires a file path or binary reader, not a string.
+                // This arm is unreachable in correct usage; T7 will remove AnyReader::new entirely.
+                // Return a dummy value that will never be used in practice.
+                #[cfg(feature = "html")]
+                {
+                    Self::Html(HtmlReader::new(""))
+                }
+                #[cfg(all(not(feature = "html"), feature = "markdown"))]
+                {
+                    Self::Markdown(MarkdownReader::new(""))
+                }
+                #[cfg(all(not(feature = "html"), not(feature = "markdown")))]
+                {
+                    Self::_Phantom(std::marker::PhantomData)
+                }
+            }
         }
     }
 }

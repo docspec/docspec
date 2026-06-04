@@ -3,6 +3,9 @@ use std::path::Path;
 /// Input format for document conversion.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum InputFormat {
+    /// DOCX (paragraphs and text only). Available when the `docx` feature is enabled.
+    #[cfg(feature = "docx")]
+    Docx,
     /// HTML (paragraph-only; `<p>` elements and text within them only).
     /// Available when the `html` feature is enabled.
     #[cfg(feature = "html")]
@@ -36,10 +39,12 @@ pub enum OutputFormat {
 pub fn detect_input_format(path: &Path) -> Option<InputFormat> {
     let ext = path.extension()?.to_str()?.to_ascii_lowercase();
     match ext.as_str() {
-        #[cfg(feature = "markdown")]
-        "md" | "markdown" => Some(InputFormat::Markdown),
+        #[cfg(feature = "docx")]
+        "docx" => Some(InputFormat::Docx),
         #[cfg(feature = "html")]
         "html" | "htm" => Some(InputFormat::Html),
+        #[cfg(feature = "markdown")]
+        "md" | "markdown" => Some(InputFormat::Markdown),
         _ => None,
     }
 }
