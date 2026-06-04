@@ -1,8 +1,8 @@
 # `docspec-http`
 
-HTTP API server for DocSpec markdown to BlockNote JSON conversion.
+HTTP API server for DocSpec markdown to BlockNote JSON conversion (oxa.dev JSON opt-in via `Accept`).
 
-Send markdown, receive BlockNote JSON. The underlying DocSpec pipeline is streaming, but this v1 HTTP wrapper **buffers the request body and the conversion output in memory** before responding. End-to-end streaming over HTTP is planned for a future version. For now, request size scales with available memory.
+Send markdown, receive BlockNote JSON (default) or oxa.dev JSON (`Accept: application/vnd.oxa+json`). The underlying DocSpec pipeline is streaming, but this v1 HTTP wrapper **buffers the request body and the conversion output in memory** before responding. End-to-end streaming over HTTP is planned for a future version. For now, request size scales with available memory.
 
 ## Quick Start
 
@@ -19,21 +19,28 @@ Default host is `127.0.0.1`. Default port is `3000`.
 
 ## Endpoints
 
-| Method  | Path        | Description                        |
-| ------- | ----------- | ---------------------------------- |
-| POST    | /conversion | Convert markdown to BlockNote JSON |
-| OPTIONS | /conversion | Preflight / allowed methods        |
-| GET     | /health     | Liveness check                     |
-| HEAD    | /health     | Liveness check (no body)           |
-| OPTIONS | /health     | Allowed methods                    |
+| Method  | Path        | Description                                              |
+| ------- | ----------- | -------------------------------------------------------- |
+| POST    | /conversion | Convert markdown to BlockNote (default) or oxa.dev JSON  |
+| OPTIONS | /conversion | Preflight / allowed methods                              |
+| GET     | /health     | Liveness check                                           |
+| HEAD    | /health     | Liveness check (no body)                                 |
+| OPTIONS | /health     | Allowed methods                                          |
 
 ## curl Examples
 
 ```bash
-# Convert markdown to BlockNote JSON
+# Convert markdown to BlockNote JSON (default)
 curl -X POST \
      -H 'Content-Type: text/markdown' \
      --data '# Hello World' \
+     http://localhost:3000/conversion
+
+# Convert markdown to oxa.dev JSON (opt-in via Accept)
+curl -X POST \
+     -H 'Content-Type: text/markdown' \
+     -H 'Accept: application/vnd.oxa+json' \
+     --data 'Hello World' \
      http://localhost:3000/conversion
 
 # Check server health
@@ -68,7 +75,7 @@ All errors use RFC 7807 Problem Details JSON (`application/problem+json; charset
 | 422  | Markdown parse error                                |
 | 500  | Internal conversion error                           |
 
-Accepted `Accept` values for `/conversion`: `*/*`, `application/*`, `application/vnd.docspec.blocknote+json`, `application/vnd.blocknote+json`. Anything else returns 406.
+Accepted `Accept` values for `/conversion`: `application/vnd.oxa+json` (oxa.dev), `application/vnd.docspec.blocknote+json`, `application/vnd.blocknote+json` (BlockNote alias), `application/*`, or `*/*`. Wildcards and missing `Accept` default to BlockNote for back-compat. Anything else returns 406.
 
 ## Deployment Notes
 
@@ -237,7 +244,7 @@ TLS termination, CORS headers, authentication, and rate limiting are intentional
 
 **`input_mime_type`**: `text/markdown` (the request's Content-Type matched the markdown reader), `unsupported` (Content-Type header present but not a supported input format), `none` (Content-Type header absent).
 
-**`output_mime_type`**: `application/vnd.docspec.blocknote+json` (conversion succeeded; output produced by the BlockNote writer), `none` (no output produced — any error path).
+**`output_mime_type`**: `application/vnd.docspec.blocknote+json` (conversion succeeded; output produced by the BlockNote writer), `application/vnd.oxa+json` (conversion succeeded; output produced by the oxa.dev writer), `none` (no output produced — any error path).
 
 **`path`**: matched route template (`/conversion`, `/health`) or `unknown` for fallback handlers
 
@@ -247,7 +254,7 @@ TLS termination, CORS headers, authentication, and rate limiting are intentional
 
 ### Cardinality Guarantees
 
-`path` is bounded to `{"/conversion", "/health", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 3 values. `output_mime_type` is bounded to 2 values. Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
+`path` is bounded to `{"/conversion", "/health", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 3 values. `output_mime_type` is bounded to 3 values. Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
 
 ### Scrape Model
 
