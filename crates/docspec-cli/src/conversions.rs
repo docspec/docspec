@@ -19,6 +19,7 @@ impl From<CliOutputFormat> for OutputFormat {
     fn from(f: CliOutputFormat) -> Self {
         match f {
             CliOutputFormat::Blocknote => Self::Blocknote,
+            CliOutputFormat::Html => Self::Html,
             CliOutputFormat::Oxa => Self::Oxa,
         }
     }
@@ -46,6 +47,14 @@ mod tests {
         assert_eq!(
             OutputFormat::from(CliOutputFormat::Blocknote),
             OutputFormat::Blocknote
+        );
+    }
+
+    #[test]
+    fn from_html_output_converts_to_facade_html() {
+        assert_eq!(
+            OutputFormat::from(CliOutputFormat::Html),
+            OutputFormat::Html
         );
     }
 

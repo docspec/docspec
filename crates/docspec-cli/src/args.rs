@@ -8,7 +8,7 @@ use clap::{Parser, ValueEnum};
 #[command(version = "0.1.0")]
 #[command(
     about = "Convert documents between formats using streaming event pipeline",
-    long_about = "Convert documents between formats using streaming event pipeline.\n\nSupports converting Markdown or HTML input to BlockNote JSON output.\n\nNote: the HTML reader currently parses only <p> paragraph elements and\nthe text within them. All other HTML elements (headings, lists, tables,\nformatting, etc.) are silently dropped. Use Markdown input for full\nfeature coverage."
+    long_about = "Convert documents between formats using streaming event pipeline.\n\nSupports converting Markdown or HTML input to BlockNote JSON, HTML, or oxa.dev JSON output.\n\nNote: HTML input and output currently preserve only paragraph text. Other HTML input\nelements and non-paragraph output events (headings, lists, tables, formatting, etc.)\nare silently dropped. Use BlockNote JSON output for fuller feature coverage."
 )]
 pub struct Cli {
     /// When to use colors.
@@ -65,6 +65,9 @@ pub enum CliOutputFormat {
     /// `BlockNote` JSON format.
     #[value(name = "blocknote")]
     Blocknote,
+    /// HTML5 format.
+    #[value(name = "html")]
+    Html,
     /// `oxa.dev` JSON format.
     #[value(name = "oxa")]
     Oxa,
@@ -89,6 +92,22 @@ mod tests {
         assert!(
             result.is_err(),
             "markdown should not be a valid output format"
+        );
+    }
+
+    #[test]
+    fn clap_accepts_html_as_output_format() {
+        let result = Cli::try_parse_from(["docspec", "--to", "html", "x.md"]);
+        assert!(
+            result.is_ok(),
+            "html should be a valid output format, got error: {:?}",
+            result.as_ref().err()
+        );
+        let cli = result.unwrap_or_else(|_| std::process::abort());
+        assert!(
+            matches!(cli.to, Some(CliOutputFormat::Html)),
+            "expected CliOutputFormat::Html, got {:?}",
+            cli.to
         );
     }
 

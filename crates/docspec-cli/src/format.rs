@@ -111,6 +111,18 @@ mod tests {
     }
 
     #[test]
+    fn detect_html_from_html_output() {
+        let result = resolve_output_format(None, Some(Path::new("doc.html")), "err");
+        assert!(matches!(result, Ok(docspec::OutputFormat::Html)));
+    }
+
+    #[test]
+    fn detect_html_from_htm_output() {
+        let result = resolve_output_format(None, Some(Path::new("doc.htm")), "err");
+        assert!(matches!(result, Ok(docspec::OutputFormat::Html)));
+    }
+
+    #[test]
     fn case_insensitive_extension_output() {
         let result = resolve_output_format(None, Some(Path::new("doc.JSON")), "err");
         assert!(matches!(result, Ok(docspec::OutputFormat::Blocknote)));

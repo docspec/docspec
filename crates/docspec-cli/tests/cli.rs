@@ -400,6 +400,44 @@ mod tests {
     }
 
     #[test]
+    fn convert_markdown_stdin_to_html_stdout() {
+        docspec_cmd()
+            .args(["--from", "markdown", "--to", "html"])
+            .write_stdin("Hello world")
+            .assert()
+            .success()
+            .stdout("<html><body><p>Hello world</p></body></html>");
+    }
+
+    #[test]
+    fn markdown_heading_is_dropped_by_paragraph_only_html_writer() {
+        docspec_cmd()
+            .args(["--from", "markdown", "--to", "html"])
+            .write_stdin("# Dropped\n\nKept paragraph")
+            .assert()
+            .success()
+            .stdout("<html><body><p>Kept paragraph</p></body></html>");
+    }
+
+    #[test]
+    fn convert_markdown_to_html_file_via_extension_autodetect() {
+        let input = markdown_tempfile(b"Hello world\n", ".md");
+        let output = empty_tempfile(".html");
+        let output_path = output.path().to_path_buf();
+
+        docspec_cmd()
+            .arg(input.path())
+            .args(["-o", output_path.to_str().unwrap_or("")])
+            .assert()
+            .success();
+
+        assert_eq!(
+            read_output(&output_path),
+            "<html><body><p>Hello world</p></body></html>"
+        );
+    }
+
+    #[test]
     fn convert_markdown_stdin_to_oxa_stdout() {
         docspec_cmd()
             .args(["--from", "markdown", "--to", "oxa"])

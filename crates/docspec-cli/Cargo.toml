@@ -21,6 +21,7 @@ docspec = { path = "../docspec", version = "1.2.0", features = [
   "html",
   "blocknote",
   "oxa",
+  "html-writer",
 ] }
 docspec-core = { path = "../docspec-core", version = "1.0.0" }
 thiserror = "2"
