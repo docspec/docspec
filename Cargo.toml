@@ -151,4 +151,11 @@ unnecessary_wraps = "allow"
 # Reason: AnyReader enum variants (HtmlReader, MarkdownReader) are large but must be stack-allocated for zero heap allocation and zero virtual-dispatch overhead per MANIFESTO.md. Boxing would violate the design constraint.
 large_enum_variant = "allow"
 
+# --- Selective allows: self_cell macro ---
+# Reason: `self_cell!` uses `mem::forget` on an internal drop-guard type as the
+# fundamental mechanism for its safe self-referential struct abstraction. The lint
+# fires on macro-expanded code in `self_cell::unsafe_self_cell` internals that we
+# cannot modify. The `self_cell` crate is safety-audited; the pattern is correct.
+mem_forget = "allow"
+
 
