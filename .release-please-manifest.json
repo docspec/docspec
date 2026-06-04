@@ -1,13 +1,14 @@
 {
   "crates/docspec-wasm": "1.0.2",
-  "crates/docspec-http": "1.0.2",
+  "crates/docspec-http": "1.1.0",
   "crates/docspec-core": "1.0.0",
   "crates/docspec-markdown-reader": "1.0.2",
   "crates/docspec-json": "1.0.2",
   "crates/docspec-blocknote-writer": "1.0.2",
-  "crates/docspec-cli": "1.1.1",
+  "crates/docspec-cli": "1.2.0",
   "crates/docspec": "1.2.0",
   "crates/docspec-html-reader": "1.0.1",
   "crates/docspec-html-writer": "1.0.1",
-  "crates/docspec-oxa-writer": "1.0.0"
+  "crates/docspec-oxa-writer": "1.0.0",
+  "crates/docspec-docx-reader": "1.0.0"
 }

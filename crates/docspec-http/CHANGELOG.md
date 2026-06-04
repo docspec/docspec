@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/docspec/docspec/compare/docspec-http-v1.0.2...docspec-http-v1.1.0) (2026-06-04)
+
+
+### Features
+
+* **http:** hookup oxa writer ([788cce2](https://github.com/docspec/docspec/commit/788cce20b88571985d0d925ec146a080fd0b7133)), closes [#180](https://github.com/docspec/docspec/issues/180)
+
 ## [1.0.2](https://github.com/docspec/docspec/compare/docspec-http-v1.0.1...docspec-http-v1.0.2) (2026-06-03)
 
 
