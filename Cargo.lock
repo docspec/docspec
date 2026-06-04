@@ -470,6 +470,7 @@ version = "1.3.0"
 dependencies = [
  "docspec-blocknote-writer",
  "docspec-core",
+ "docspec-docx-reader",
  "docspec-html-reader",
  "docspec-html-writer",
  "docspec-json",
