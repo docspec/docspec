@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0](https://github.com/docspec/docspec/compare/docspec-cli-v1.1.1...docspec-cli-v1.0.0) (2026-06-04)
+
+
+### Features
+
+* **cli:** hookup oxa writer ([8f3d6bc](https://github.com/docspec/docspec/commit/8f3d6bc55d38c106b3229a17753000387b4f0583)), closes [#180](https://github.com/docspec/docspec/issues/180)
+* **docx-reader:** create minimal docx reader ([d3ff9a4](https://github.com/docspec/docspec/commit/d3ff9a434c692cdf0fc18e6d8bd34806af7fc89b))
+
 ## [1.1.1](https://github.com/docspec/docspec/compare/docspec-cli-v1.1.0...docspec-cli-v1.1.1) (2026-06-03)
 
 
