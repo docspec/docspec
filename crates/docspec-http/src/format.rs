@@ -14,3 +14,6 @@ pub const OUTPUT_MIME_ALIAS: &str = "application/vnd.blocknote+json";
 
 /// The primary output MIME type returned on success.
 pub const OUTPUT_MIME_PRIMARY: &str = "application/vnd.docspec.blocknote+json";
+
+/// The primary `oxa.dev` output MIME type returned when the `oxa.dev` writer is selected.
+pub const OUTPUT_MIME_OXA_PRIMARY: &str = "application/vnd.oxa+json";

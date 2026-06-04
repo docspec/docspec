@@ -3,8 +3,8 @@
 #![allow(clippy::tests_outside_test_module, clippy::unwrap_used)]
 
 use axum::http::HeaderValue;
+use docspec::OutputFormat;
 use docspec_http::error::HttpError;
-use docspec_http::format::OUTPUT_MIME_PRIMARY;
 use docspec_http::mime_parser::{negotiate_accept, validate_content_type};
 
 #[test]
@@ -89,35 +89,49 @@ fn content_type_missing_rejects_with_none() {
 }
 
 #[test]
-fn accept_missing_returns_primary() {
-    assert_eq!(negotiate_accept(None).unwrap(), OUTPUT_MIME_PRIMARY);
+fn accept_missing_returns_blocknote() {
+    assert_eq!(negotiate_accept(None).unwrap(), OutputFormat::Blocknote);
 }
 
 #[test]
-fn accept_wildcard_returns_primary() {
+fn accept_wildcard_returns_blocknote() {
     let header = HeaderValue::from_static("*/*");
     assert_eq!(
         negotiate_accept(Some(&header)).unwrap(),
-        OUTPUT_MIME_PRIMARY
+        OutputFormat::Blocknote
     );
 }
 
 #[test]
-fn accept_primary_mime_returns_primary() {
+fn accept_primary_mime_returns_blocknote() {
     let header = HeaderValue::from_static("application/vnd.docspec.blocknote+json");
     assert_eq!(
         negotiate_accept(Some(&header)).unwrap(),
-        OUTPUT_MIME_PRIMARY
+        OutputFormat::Blocknote
     );
 }
 
 #[test]
-fn accept_alias_mime_returns_primary() {
+fn accept_alias_mime_returns_blocknote() {
     let header = HeaderValue::from_static("application/vnd.blocknote+json");
     assert_eq!(
         negotiate_accept(Some(&header)).unwrap(),
-        OUTPUT_MIME_PRIMARY
+        OutputFormat::Blocknote
     );
+}
+
+#[test]
+fn accept_oxa_primary_mime_returns_oxa() {
+    let header = HeaderValue::from_static("application/vnd.oxa+json");
+    assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Oxa);
+}
+
+#[test]
+fn accept_list_oxa_first_returns_oxa() {
+    let header = HeaderValue::from_static(
+        "application/vnd.oxa+json, application/vnd.docspec.blocknote+json",
+    );
+    assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Oxa);
 }
 
 #[test]
@@ -134,7 +148,7 @@ fn accept_list_with_alias_and_quality_accepts() {
     let header = HeaderValue::from_static("text/html, application/vnd.blocknote+json;q=0.8");
     assert_eq!(
         negotiate_accept(Some(&header)).unwrap(),
-        OUTPUT_MIME_PRIMARY
+        OutputFormat::Blocknote
     );
 }
 
@@ -148,10 +162,10 @@ fn accept_incompatible_list_rejects() {
 }
 
 #[test]
-fn accept_application_wildcard_returns_primary() {
+fn accept_application_wildcard_returns_blocknote() {
     let header = HeaderValue::from_static("application/*");
     assert_eq!(
         negotiate_accept(Some(&header)).unwrap(),
-        OUTPUT_MIME_PRIMARY
+        OutputFormat::Blocknote
     );
 }

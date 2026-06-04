@@ -5,6 +5,7 @@ use axum::{
     http::{header, HeaderMap, HeaderValue, Response, StatusCode},
     response::IntoResponse,
 };
+use docspec::OutputFormat;
 use docspec_core::{EventSink as _, EventSource as _};
 
 use crate::{error::HttpError, mime_parser};
@@ -20,7 +21,10 @@ pub async fn options_conversion() -> impl IntoResponse {
     )
 }
 
-/// Handle `POST /conversion` — convert markdown to `BlockNote` JSON.
+/// Handle `POST /conversion` — convert markdown to `BlockNote` or `oxa.dev` JSON.
+///
+/// The output writer is selected by the request's `Accept` header (see
+/// [`crate::mime_parser::negotiate_accept`]).
 ///
 /// The request body is buffered, then converted to completion inside
 /// `spawn_blocking`, then returned in a single response. Conversion errors
@@ -71,12 +75,12 @@ pub async fn post_conversion(
         u64::try_from(conversion_duration.as_millis().min(u128::from(u64::MAX)))
             .unwrap_or(u64::MAX);
 
-    let (response_or_error, output_bytes) = match outcome {
-        Ok((response, bytes)) => (Ok(response), bytes),
-        Err(http_error) => (Err(http_error), 0),
+    let (response_or_error, output_bytes, chosen_format) = match outcome {
+        Ok((response, bytes, format)) => (Ok(response), bytes, Some(format)),
+        Err(http_error) => (Err(http_error), 0, None),
     };
     let conversion_ok = response_or_error.is_ok();
-    let output_mime_label = crate::mime_parser::bucket_output_mime(conversion_ok);
+    let output_mime_label = crate::mime_parser::bucket_output_mime(chosen_format);
 
     let (result_label, error_class_label) = match &response_or_error {
         Ok(_) => (
@@ -142,9 +146,9 @@ async fn do_conversion(
     input_mime_label: &'static str,
     headers: HeaderMap,
     body: Bytes,
-) -> Result<(Response<Body>, u64), HttpError> {
+) -> Result<(Response<Body>, u64, OutputFormat), HttpError> {
     mime_parser::validate_content_type(headers.get(header::CONTENT_TYPE))?;
-    mime_parser::negotiate_accept(headers.get(header::ACCEPT))?;
+    let output_format = mime_parser::negotiate_accept(headers.get(header::ACCEPT))?;
 
     if body.is_empty() {
         return Err(HttpError::EmptyBody);
@@ -171,8 +175,7 @@ async fn do_conversion(
     let join_result = tokio::task::spawn_blocking(move || -> Result<(Vec<u8>, u64), HttpError> {
         let mut output_buffer = Vec::new();
         let mut reader = docspec::AnyReader::new(docspec::InputFormat::Markdown, &markdown);
-        let mut sink =
-            docspec::AnyWriter::new(docspec::OutputFormat::Blocknote, &mut output_buffer);
+        let mut sink = docspec::AnyWriter::new(output_format, &mut output_buffer);
 
         loop {
             match reader.next_event() {
@@ -205,15 +208,19 @@ async fn do_conversion(
     })
     .await;
 
+    let content_type = match output_format {
+        OutputFormat::Blocknote => {
+            HeaderValue::from_static("application/vnd.docspec.blocknote+json; charset=utf-8")
+        }
+        OutputFormat::Oxa => HeaderValue::from_static("application/vnd.oxa+json; charset=utf-8"),
+    };
+
     match join_result {
         Ok(Ok((output, output_bytes))) => Response::builder()
             .status(StatusCode::OK)
-            .header(
-                header::CONTENT_TYPE,
-                HeaderValue::from_static("application/vnd.docspec.blocknote+json; charset=utf-8"),
-            )
+            .header(header::CONTENT_TYPE, content_type)
             .body(Body::from(output))
-            .map(|response| (response, output_bytes))
+            .map(|response| (response, output_bytes, output_format))
             .map_err(|error| {
                 tracing::error!(error = %error, "failed to build conversion response");
                 HttpError::Internal

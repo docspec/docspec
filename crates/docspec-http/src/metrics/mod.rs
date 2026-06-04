@@ -87,8 +87,11 @@ pub const INPUT_MIME_UNSUPPORTED: &str = "unsupported";
 /// Value for [`LABEL_INPUT_MIME_TYPE`] when the Content-Type header was absent.
 pub const INPUT_MIME_NONE: &str = "none";
 
-/// Value for [`LABEL_OUTPUT_MIME_TYPE`] when the conversion produced `BlockNote` JSON (current sole supported writer).
+/// Value for [`LABEL_OUTPUT_MIME_TYPE`] when the conversion produced `BlockNote` JSON.
 pub const OUTPUT_MIME_BLOCKNOTE: &str = "application/vnd.docspec.blocknote+json";
+
+/// Value for [`LABEL_OUTPUT_MIME_TYPE`] when the conversion produced `oxa.dev` JSON.
+pub const OUTPUT_MIME_OXA: &str = "application/vnd.oxa+json";
 
 /// Value for [`LABEL_OUTPUT_MIME_TYPE`] when no output was produced (any error path).
 pub const OUTPUT_MIME_NONE: &str = "none";

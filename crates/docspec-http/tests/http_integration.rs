@@ -19,6 +19,7 @@ use tower::ServiceExt as _;
 
 const CACHE_CONTROL: &str = "max-age=0, private, must-revalidate";
 const OUTPUT_MIME: &str = "application/vnd.docspec.blocknote+json; charset=utf-8";
+const OUTPUT_MIME_OXA: &str = "application/vnd.oxa+json; charset=utf-8";
 const PROBLEM_JSON_CT: &str = "application/problem+json; charset=utf-8";
 const HEALTH_CT: &str = "text/plain; charset=utf-8";
 
@@ -274,7 +275,7 @@ async fn post_conversion_wrong_accept() {
             "type": "about:blank",
             "title": "Not Acceptable",
             "status": 406,
-            "detail": "Accept header must include application/vnd.docspec.blocknote+json, application/vnd.blocknote+json, application/*, or */*",
+            "detail": "Accept header must include application/vnd.docspec.blocknote+json, application/vnd.blocknote+json, application/vnd.oxa+json, application/*, or */*",
         })
     );
 }
@@ -574,6 +575,61 @@ async fn unknown_path_returns_404() {
             "detail": "No route matches GET /unknown",
         })
     );
+}
+
+#[tokio::test]
+async fn post_conversion_oxa_happy_path() {
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[
+            ("content-type", "text/markdown"),
+            ("accept", "application/vnd.oxa+json"),
+        ],
+        Body::from("Hello world"),
+    );
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content-type present"),
+        OUTPUT_MIME_OXA
+    );
+
+    let body_text = response_body_text(response.into_body()).await;
+    assert_eq!(
+        body_text,
+        r#"{"type":"Document","children":[{"type":"Paragraph","children":[{"type":"Text","value":"Hello world"}]}]}"#
+    );
+}
+
+#[tokio::test]
+async fn post_conversion_wildcard_accept_defaults_to_blocknote_not_oxa() {
+    // Regression guard: `*/*` MUST select BlockNote so pre-oxa clients keep their responses.
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", "text/markdown"), ("accept", "*/*")],
+        Body::from("# Hello"),
+    );
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content-type present"),
+        OUTPUT_MIME
+    );
+
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(body, hello_blocknote_json());
 }
 
 #[tokio::test]

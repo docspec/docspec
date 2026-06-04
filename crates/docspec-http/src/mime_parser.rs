@@ -1,31 +1,27 @@
 //! HTTP `Accept` negotiation and `Content-Type` validation for the conversion API.
 
 use axum::http::HeaderValue;
+use docspec::OutputFormat;
 
 use crate::error::HttpError;
-use crate::format::{OUTPUT_MIME_ALIAS, OUTPUT_MIME_PRIMARY};
+use crate::format::{OUTPUT_MIME_ALIAS, OUTPUT_MIME_OXA_PRIMARY, OUTPUT_MIME_PRIMARY};
 
 /// Negotiates the `Accept` header for the `/conversion` endpoint.
 ///
-/// Returns the primary output MIME type string for:
-/// - Missing `Accept` header (HTTP default is `*/*`)
-/// - `Accept: */*`
-/// - `Accept: application/*`
-/// - `Accept: application/vnd.docspec.blocknote+json`
-/// - `Accept: application/vnd.blocknote+json` (alias)
-///
-/// Returns `Err(HttpError::NotAcceptable)` for any other value.
-///
-/// Quality parameters (`q=...`) are stripped and ignored.
+/// Returns [`OutputFormat::Oxa`] for `Accept: application/vnd.oxa+json`, and
+/// [`OutputFormat::Blocknote`] for the `BlockNote` MIMEs, `application/*`, `*/*`, and
+/// missing `Accept`. Wildcards default to `BlockNote` for back-compat with pre-oxa
+/// clients. When `Accept` lists multiple types, the first whose bare MIME matches a
+/// supported value wins (case-insensitive); `q=...` is stripped.
 ///
 /// # Errors
 ///
 /// Returns [`HttpError::NotAcceptable`] if no acceptable MIME type found.
 #[inline]
-pub fn negotiate_accept(header_value: Option<&HeaderValue>) -> Result<&'static str, HttpError> {
+pub fn negotiate_accept(header_value: Option<&HeaderValue>) -> Result<OutputFormat, HttpError> {
     // Missing Accept == */* per RFC 7231 §5.3.2
     let Some(header_val) = header_value else {
-        return Ok(OUTPUT_MIME_PRIMARY);
+        return Ok(OutputFormat::Blocknote);
     };
     let header_str = header_val
         .to_str()
@@ -33,12 +29,15 @@ pub fn negotiate_accept(header_value: Option<&HeaderValue>) -> Result<&'static s
 
     for part in header_str.split(',') {
         let type_part = part.trim().split(';').next().map_or("", str::trim);
+        if type_part.eq_ignore_ascii_case(OUTPUT_MIME_OXA_PRIMARY) {
+            return Ok(OutputFormat::Oxa);
+        }
         if type_part.eq_ignore_ascii_case("*/*")
             || type_part.eq_ignore_ascii_case("application/*")
             || type_part.eq_ignore_ascii_case(OUTPUT_MIME_PRIMARY)
             || type_part.eq_ignore_ascii_case(OUTPUT_MIME_ALIAS)
         {
-            return Ok(OUTPUT_MIME_PRIMARY);
+            return Ok(OutputFormat::Blocknote);
         }
     }
     Err(HttpError::NotAcceptable)
@@ -131,23 +130,14 @@ pub fn bucket_input_mime(header_value: Option<&HeaderValue>) -> &'static str {
 
 /// Returns the bounded `output_mime_type` label value for a conversion outcome.
 ///
-/// When `conversion_ok` is `false`, no output was produced, so the label is
-/// always [`crate::metrics::OUTPUT_MIME_NONE`].
-///
-/// When `conversion_ok` is `true`, the output is always `BlockNote` JSON because
-/// the writer is fixed today.
-///
-/// # Label values
-///
-/// - [`crate::metrics::OUTPUT_MIME_NONE`] — conversion failed (no output)
-/// - [`crate::metrics::OUTPUT_MIME_BLOCKNOTE`] — conversion succeeded
+/// `chosen_format` is `None` for any error path, and `Some(format)` on success.
 #[inline]
 #[must_use]
-pub fn bucket_output_mime(conversion_ok: bool) -> &'static str {
-    if conversion_ok {
-        crate::metrics::OUTPUT_MIME_BLOCKNOTE
-    } else {
-        crate::metrics::OUTPUT_MIME_NONE
+pub fn bucket_output_mime(chosen_format: Option<OutputFormat>) -> &'static str {
+    match chosen_format {
+        None => crate::metrics::OUTPUT_MIME_NONE,
+        Some(OutputFormat::Blocknote) => crate::metrics::OUTPUT_MIME_BLOCKNOTE,
+        Some(OutputFormat::Oxa) => crate::metrics::OUTPUT_MIME_OXA,
     }
 }
 
@@ -226,15 +216,23 @@ mod bucket_tests {
     // ─── bucket_output_mime tests ──────────────────────────────────────────
 
     #[test]
-    fn bucket_output_mime_blocknote_when_success() {
+    fn bucket_output_mime_blocknote_when_blocknote_succeeded() {
         assert_eq!(
-            bucket_output_mime(true),
+            bucket_output_mime(Some(OutputFormat::Blocknote)),
             crate::metrics::OUTPUT_MIME_BLOCKNOTE
         );
     }
 
     #[test]
-    fn bucket_output_mime_none_when_failure() {
-        assert_eq!(bucket_output_mime(false), crate::metrics::OUTPUT_MIME_NONE);
+    fn bucket_output_mime_oxa_when_oxa_succeeded() {
+        assert_eq!(
+            bucket_output_mime(Some(OutputFormat::Oxa)),
+            crate::metrics::OUTPUT_MIME_OXA
+        );
+    }
+
+    #[test]
+    fn bucket_output_mime_none_when_no_format_chosen() {
+        assert_eq!(bucket_output_mime(None), crate::metrics::OUTPUT_MIME_NONE);
     }
 }
