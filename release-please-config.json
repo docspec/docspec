@@ -39,6 +39,9 @@
     },
     "crates/docspec-html-reader": {
       "component": "docspec-html-reader"
+    },
+    "crates/docspec-docx-reader": {
+      "component": "docspec-docx-reader"
     }
   }
 }
