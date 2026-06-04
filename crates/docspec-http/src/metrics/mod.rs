@@ -78,8 +78,11 @@ pub const RESULT_SERVER_ERROR: &str = "server_error";
 /// Value for [`LABEL_ERROR_CLASS`] when no error occurred.
 pub const ERROR_CLASS_NONE: &str = "none";
 
-/// Value for [`LABEL_INPUT_MIME_TYPE`] when the request was text/markdown (current sole supported reader).
+/// Value for [`LABEL_INPUT_MIME_TYPE`] when the request was text/markdown.
 pub const INPUT_MIME_MARKDOWN: &str = "text/markdown";
+
+/// Value for [`LABEL_INPUT_MIME_TYPE`] when the request was text/html.
+pub const INPUT_MIME_HTML: &str = "text/html";
 
 /// Value for [`LABEL_INPUT_MIME_TYPE`] when the Content-Type header was present but not a supported reader format.
 pub const INPUT_MIME_UNSUPPORTED: &str = "unsupported";

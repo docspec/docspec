@@ -1,8 +1,10 @@
 # `docspec-http`
 
-HTTP API server for DocSpec markdown to BlockNote JSON conversion (oxa.dev JSON opt-in via `Accept`).
+HTTP API server for DocSpec markdown or HTML to BlockNote JSON conversion (oxa.dev JSON opt-in via `Accept`).
 
-Send markdown, receive BlockNote JSON (default) or oxa.dev JSON (`Accept: application/vnd.oxa+json`). The underlying DocSpec pipeline is streaming, but this v1 HTTP wrapper **buffers the request body and the conversion output in memory** before responding. End-to-end streaming over HTTP is planned for a future version. For now, request size scales with available memory.
+Send markdown (`Content-Type: text/markdown`) or HTML (`Content-Type: text/html`), receive BlockNote JSON (default) or oxa.dev JSON (`Accept: application/vnd.oxa+json`). The underlying DocSpec pipeline is streaming, but this v1 HTTP wrapper **buffers the request body and the conversion output in memory** before responding. End-to-end streaming over HTTP is planned for a future version. For now, request size scales with available memory.
+
+> **HTML input is paragraph-only.** The HTML reader currently parses `<p>` elements only; other elements (headings, lists, tables, etc.) are silently dropped. See [docspec-html-reader](../docspec-html-reader/README.md).
 
 ## Quick Start
 
@@ -19,13 +21,13 @@ Default host is `127.0.0.1`. Default port is `3000`.
 
 ## Endpoints
 
-| Method  | Path        | Description                                              |
-| ------- | ----------- | -------------------------------------------------------- |
-| POST    | /conversion | Convert markdown to BlockNote (default) or oxa.dev JSON  |
-| OPTIONS | /conversion | Preflight / allowed methods                              |
-| GET     | /health     | Liveness check                                           |
-| HEAD    | /health     | Liveness check (no body)                                 |
-| OPTIONS | /health     | Allowed methods                                          |
+| Method  | Path        | Description                                                      |
+| ------- | ----------- | ---------------------------------------------------------------- |
+| POST    | /conversion | Convert markdown or HTML to BlockNote (default) or oxa.dev JSON  |
+| OPTIONS | /conversion | Preflight / allowed methods                                      |
+| GET     | /health     | Liveness check                                                   |
+| HEAD    | /health     | Liveness check (no body)                                         |
+| OPTIONS | /health     | Allowed methods                                                  |
 
 ## curl Examples
 
@@ -36,11 +38,24 @@ curl -X POST \
      --data '# Hello World' \
      http://localhost:3000/conversion
 
+# Convert HTML to BlockNote JSON
+curl -X POST \
+     -H 'Content-Type: text/html' \
+     --data '<p>Hello World</p>' \
+     http://localhost:3000/conversion
+
 # Convert markdown to oxa.dev JSON (opt-in via Accept)
 curl -X POST \
      -H 'Content-Type: text/markdown' \
      -H 'Accept: application/vnd.oxa+json' \
      --data 'Hello World' \
+     http://localhost:3000/conversion
+
+# Convert HTML to oxa.dev JSON
+curl -X POST \
+     -H 'Content-Type: text/html' \
+     -H 'Accept: application/vnd.oxa+json' \
+     --data '<p>Hello World</p>' \
      http://localhost:3000/conversion
 
 # Check server health
@@ -65,15 +80,15 @@ curl -X OPTIONS -i http://localhost:3000/conversion
 
 All errors use RFC 7807 Problem Details JSON (`application/problem+json; charset=utf-8`).
 
-| Code | Meaning                                             |
-| ---- | --------------------------------------------------- |
-| 400  | Empty body or invalid UTF-8                         |
-| 404  | Unknown path                                        |
-| 405  | Wrong method (response includes `Allow` header)     |
-| 406  | `Accept` header excludes all supported output types |
-| 415  | `Content-Type` must be `text/markdown`              |
-| 422  | Markdown parse error                                |
-| 500  | Internal conversion error                           |
+| Code | Meaning                                                  |
+| ---- | -------------------------------------------------------- |
+| 400  | Empty body or invalid UTF-8                              |
+| 404  | Unknown path                                             |
+| 405  | Wrong method (response includes `Allow` header)          |
+| 406  | `Accept` header excludes all supported output types      |
+| 415  | `Content-Type` must be `text/markdown` or `text/html`    |
+| 422  | Input parse error (malformed markdown or HTML)           |
+| 500  | Internal conversion error                                |
 
 Accepted `Accept` values for `/conversion`: `application/vnd.oxa+json` (oxa.dev), `application/vnd.docspec.blocknote+json`, `application/vnd.blocknote+json` (BlockNote alias), `application/*`, or `*/*`. Wildcards and missing `Accept` default to BlockNote for back-compat. Anything else returns 406.
 
@@ -135,8 +150,8 @@ These follow Sentry's standard conventions:
 
 `docspec-http` does NOT send the following to Sentry:
 
-- Request bodies (markdown documents)
-- Response bodies (BlockNote JSON)
+- Request bodies (markdown or HTML documents)
+- Response bodies (BlockNote or oxa.dev JSON)
 - PII (Sentry default: `send_default_pii = false`)
 - DSN values (never logged or echoed)
 
@@ -147,7 +162,7 @@ Each captured event is tagged with `request_id` (UUID v4) and `trace_id`
 
 ## Wire Contract
 
-Mirrors `github.com/docspecio/api` v3.0.2 where feasible: same endpoint path, RFC 7807 errors, `X-Request-ID`/`X-Trace-ID` header handling. Diverges in input MIME (`text/markdown` vs DOCX) and adds `Cache-Control` on all responses.
+Mirrors `github.com/docspecio/api` v3.0.2 where feasible: same endpoint path, RFC 7807 errors, `X-Request-ID`/`X-Trace-ID` header handling. Diverges in supported conversions.
 
 ## Graceful Shutdown
 
@@ -242,7 +257,7 @@ TLS termination, CORS headers, authentication, and rate limiting are intentional
 
 **`error_class`**: `body_not_utf8`, `empty_body`, `internal`, `method_not_allowed`, `not_acceptable`, `not_found`, `unprocessable`, `unsupported_media_type`, `none` (only when `result=success`)
 
-**`input_mime_type`**: `text/markdown` (the request's Content-Type matched the markdown reader), `unsupported` (Content-Type header present but not a supported input format), `none` (Content-Type header absent).
+**`input_mime_type`**: `text/markdown` (the request's Content-Type matched the markdown reader), `text/html` (the request's Content-Type matched the HTML reader), `unsupported` (Content-Type header present but not a supported input format), `none` (Content-Type header absent).
 
 **`output_mime_type`**: `application/vnd.docspec.blocknote+json` (conversion succeeded; output produced by the BlockNote writer), `application/vnd.oxa+json` (conversion succeeded; output produced by the oxa.dev writer), `none` (no output produced — any error path).
 
@@ -254,7 +269,7 @@ TLS termination, CORS headers, authentication, and rate limiting are intentional
 
 ### Cardinality Guarantees
 
-`path` is bounded to `{"/conversion", "/health", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 3 values. `output_mime_type` is bounded to 3 values. Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
+`path` is bounded to `{"/conversion", "/health", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 4 values (`text/markdown`, `text/html`, `unsupported`, `none`). `output_mime_type` is bounded to 3 values. Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
 
 ### Scrape Model
 

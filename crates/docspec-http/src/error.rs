@@ -124,7 +124,7 @@ pub enum HttpError {
         /// Explanation of what made the input invalid.
         detail: String,
     },
-    /// The `Content-Type` header is not `text/markdown`.
+    /// The `Content-Type` header is neither `text/markdown` nor `text/html`.
     ///
     /// → HTTP 415 Unsupported Media Type.
     UnsupportedMediaType {
@@ -184,7 +184,7 @@ impl IntoResponse for HttpError {
             Self::UnsupportedMediaType { received: None } => (
                 StatusCode::UNSUPPORTED_MEDIA_TYPE,
                 "Unsupported Media Type",
-                Cow::Borrowed("Content-Type must be text/markdown"),
+                Cow::Borrowed("Content-Type must be text/markdown or text/html"),
                 None,
             ),
             Self::UnsupportedMediaType {
@@ -193,7 +193,7 @@ impl IntoResponse for HttpError {
                 StatusCode::UNSUPPORTED_MEDIA_TYPE,
                 "Unsupported Media Type",
                 Cow::Owned(format!(
-                    "Content-Type must be text/markdown, got {content_type}"
+                    "Content-Type must be text/markdown or text/html, got {content_type}"
                 )),
                 None,
             ),
@@ -478,7 +478,7 @@ mod tests {
                 "type": "about:blank",
                 "title": "Unsupported Media Type",
                 "status": 415,
-                "detail": "Content-Type must be text/markdown, got application/json",
+                "detail": "Content-Type must be text/markdown or text/html, got application/json",
             })
         );
     }

@@ -47,7 +47,7 @@ sentry = { version = "0.48", default-features = false, features = [
 ] }
 docspec-core = { path = "../docspec-core", version = "1.0.0" }
 docspec-json = { path = "../docspec-json", version = "1.0.0" }
-docspec = { path = "../docspec", version = "1.2.0", features = ["markdown", "blocknote", "oxa"] }
+docspec = { path = "../docspec", version = "1.2.0", features = ["markdown", "html", "blocknote", "oxa"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

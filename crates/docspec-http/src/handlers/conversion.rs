@@ -21,9 +21,11 @@ pub async fn options_conversion() -> impl IntoResponse {
     )
 }
 
-/// Handle `POST /conversion` — convert markdown to `BlockNote` or `oxa.dev` JSON.
+/// Handle `POST /conversion` — convert markdown or HTML to `BlockNote` or `oxa.dev` JSON.
 ///
-/// The output writer is selected by the request's `Accept` header (see
+/// The input reader is selected by the request's `Content-Type` header (see
+/// [`crate::mime_parser::validate_content_type`]). The output writer is
+/// selected by the request's `Accept` header (see
 /// [`crate::mime_parser::negotiate_accept`]).
 ///
 /// The request body is buffered, then converted to completion inside
@@ -147,7 +149,7 @@ async fn do_conversion(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<(Response<Body>, u64, OutputFormat), HttpError> {
-    mime_parser::validate_content_type(headers.get(header::CONTENT_TYPE))?;
+    let input_format = mime_parser::validate_content_type(headers.get(header::CONTENT_TYPE))?;
     let output_format = mime_parser::negotiate_accept(headers.get(header::ACCEPT))?;
 
     if body.is_empty() {
@@ -167,14 +169,14 @@ async fn do_conversion(
     )
     .record(body_len_bytes);
 
-    let markdown = String::from_utf8(body.into()).map_err(|error| {
+    let input_text = String::from_utf8(body.into()).map_err(|error| {
         tracing::debug!(error = %error, "request body is not valid UTF-8");
         HttpError::BodyNotUtf8
     })?;
 
     let join_result = tokio::task::spawn_blocking(move || -> Result<(Vec<u8>, u64), HttpError> {
         let mut output_buffer = Vec::new();
-        let mut reader = docspec::AnyReader::new(docspec::InputFormat::Markdown, &markdown);
+        let mut reader = docspec::AnyReader::new(input_format, &input_text);
         let mut sink = docspec::AnyWriter::new(output_format, &mut output_buffer);
 
         loop {
@@ -187,7 +189,7 @@ async fn do_conversion(
                 })?,
                 Ok(None) => break,
                 Err(error) => {
-                    tracing::debug!(error = %error, "markdown reader failed");
+                    tracing::debug!(error = %error, "reader failed");
                     return Err(HttpError::Unprocessable {
                         detail: error.to_string(),
                     });
