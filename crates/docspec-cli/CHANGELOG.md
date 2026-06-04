@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/docspec/docspec/compare/docspec-cli-v1.1.1...docspec-cli-v1.2.0) (2026-06-04)
+
+
+### Features
+
+* **cli:** hookup oxa writer ([8f3d6bc](https://github.com/docspec/docspec/commit/8f3d6bc55d38c106b3229a17753000387b4f0583)), closes [#180](https://github.com/docspec/docspec/issues/180)
+
 ## [1.1.1](https://github.com/docspec/docspec/compare/docspec-cli-v1.1.0...docspec-cli-v1.1.1) (2026-06-03)
 
 
