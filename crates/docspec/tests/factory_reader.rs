@@ -4,7 +4,9 @@
 
 #[cfg(test)]
 mod tests {
+    #[cfg(any(feature = "markdown", feature = "html"))]
     use docspec::{AnyReader, InputFormat};
+    #[cfg(any(feature = "markdown", feature = "html"))]
     use docspec_core::EventSource;
 
     #[cfg(feature = "markdown")]
@@ -74,5 +76,12 @@ mod tests {
     fn assert_is_event_source() {
         fn check<S: EventSource>(_: S) {}
         check(AnyReader::new(InputFormat::Markdown, ""));
+    }
+
+    #[cfg(feature = "html")]
+    #[test]
+    fn html_assert_is_event_source() {
+        fn check<S: EventSource>(_: S) {}
+        check(AnyReader::new(InputFormat::Html, ""));
     }
 }

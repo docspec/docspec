@@ -12,17 +12,18 @@
 //!
 //! ## Readers
 //!
-//! | Feature    | Format                                              | Re-exports                  |
-//! |------------|-----------------------------------------------------|-----------------------------|
-//! | `markdown` | Markdown (`CommonMark` + GFM tables/strikethrough)  | [`readers::MarkdownReader`] |
-//! | `html`     | HTML (paragraphs only)                              | `readers::HtmlReader`       |
+//! | Feature        | Format                                              | Re-exports                  |
+//! |----------------|-----------------------------------------------------|-----------------------------|
+//! | `markdown`     | Markdown (`CommonMark` + GFM tables/strikethrough)  | [`readers::MarkdownReader`] |
+//! | `html`         | HTML (paragraphs only)                              | `readers::HtmlReader`       |
 //!
 //! ## Writers
 //!
-//! | Feature     | Format           | Re-exports                    |
-//! |-------------|------------------|-------------------------------|
-//! | `blocknote` | `BlockNote` JSON | [`writers::BlockNoteWriter`]  |
-//! | `oxa`       | `oxa.dev` JSON   | `writers::OxaWriter`          |
+//! | Feature             | Format                  | Re-exports                    |
+//! |---------------------|-------------------------|-------------------------------|
+//! | `blocknote-writer`  | `BlockNote` JSON        | [`writers::BlockNoteWriter`]  |
+//! | `oxa-writer`        | `oxa.dev` JSON          | `writers::OxaWriter`          |
+//! | `html-writer`       | HTML (paragraphs only)  | `writers::HtmlWriter`         |
 //!
 //! ## Primitives
 //!
@@ -32,11 +33,14 @@
 //!
 //! ## Convenience
 //!
-//! | Feature       | Enables                                                |
-//! |---------------|--------------------------------------------------------|
-//! | `all-readers` | All reader features                                    |
-//! | `all-writers` | All writer features                                    |
-//! | `full`        | Everything (`all-readers` + `all-writers` + `json`)    |
+//! | Feature       | Enables                                                          |
+//! |---------------|------------------------------------------------------------------|
+//! | `blocknote`   | `BlockNote` in both directions (writer only until reader lands)  |
+//! | `oxa`         | `oxa.dev` in both directions (writer only until reader lands)    |
+//! | `all-readers` | All reader features                                              |
+//! | `all-writers` | All writer features                                              |
+//! | `all-libs`    | All primitive/library features (currently `json`)                |
+//! | `full`        | Everything (`all-readers` + `all-writers` + `all-libs`)          |
 //!
 //! # Choosing the Right Dependency
 //!
@@ -57,7 +61,7 @@
 //! Convert Markdown to `BlockNote` JSON:
 //!
 //! ```no_run
-//! # #[cfg(all(feature = "markdown", feature = "blocknote"))]
+//! # #[cfg(all(feature = "markdown", feature = "blocknote-writer"))]
 //! # fn run() -> Result<(), Box<dyn std::error::Error>> {
 //! use docspec::readers::MarkdownReader;
 //! use docspec::writers::BlockNoteWriter;
@@ -110,15 +114,24 @@ pub mod readers {
 /// Each writer is gated by a feature flag. See the crate-level documentation for the
 /// full list of supported formats and corresponding feature flags.
 pub mod writers {
-    /// Streaming `BlockNote` JSON writer. Available when the `blocknote` feature is enabled.
-    #[cfg(feature = "blocknote")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "blocknote")))]
+    /// Streaming `BlockNote` JSON writer. Available when the `blocknote-writer` feature
+    /// is enabled (either directly, or via the `blocknote` meta feature).
+    #[cfg(feature = "blocknote-writer")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "blocknote-writer")))]
     pub use docspec_blocknote_writer::BlockNoteWriter;
 
-    /// Streaming `oxa.dev` JSON writer. Available when the `oxa` feature is enabled.
-    #[cfg(feature = "oxa")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "oxa")))]
+    /// Streaming `oxa.dev` JSON writer. Available when the `oxa-writer` feature is
+    /// enabled (either directly, or via the `oxa` meta feature).
+    #[cfg(feature = "oxa-writer")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "oxa-writer")))]
     pub use docspec_oxa_writer::OxaWriter;
+
+    /// Streaming HTML5 writer. Available when the `html-writer` feature is enabled.
+    /// Note: currently emits only `<html>/<body>/<p>` and text within paragraphs;
+    /// other events are silently ignored.
+    #[cfg(feature = "html-writer")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "html-writer")))]
+    pub use docspec_html_writer::HtmlWriter;
 }
 
 /// Format detection and conversion helpers.

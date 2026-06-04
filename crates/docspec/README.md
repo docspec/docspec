@@ -37,13 +37,15 @@ writer.finish()?;
 | Feature    | Format                                           | Crate                     |
 | ---------- | ------------------------------------------------ | ------------------------- |
 | `markdown` | Markdown (CommonMark + GFM tables/strikethrough) | `docspec-markdown-reader` |
+| `html`     | HTML (paragraphs only)                           | `docspec-html-reader`     |
 
 ### Writers
 
-| Feature     | Format         | Crate                      |
-| ----------- | -------------- | -------------------------- |
-| `blocknote` | BlockNote JSON | `docspec-blocknote-writer` |
-| `oxa`       | oxa.dev JSON   | `docspec-oxa-writer`       |
+| Feature            | Format                 | Crate                      |
+| ------------------ | ---------------------- | -------------------------- |
+| `blocknote-writer` | BlockNote JSON         | `docspec-blocknote-writer` |
+| `oxa-writer`       | oxa.dev JSON           | `docspec-oxa-writer`       |
+| `html-writer`      | HTML (paragraphs only) | `docspec-html-writer`      |
 
 ### Primitives
 
@@ -53,11 +55,14 @@ writer.finish()?;
 
 ### Convenience
 
-| Feature       | Enables                                             |
-| ------------- | --------------------------------------------------- |
-| `all-readers` | All reader features                                 |
-| `all-writers` | All writer features                                 |
-| `full`        | Everything (`all-readers` + `all-writers` + `json`) |
+| Feature       | Enables                                                       |
+| ------------- | ------------------------------------------------------------- |
+| `blocknote`   | BlockNote in both directions (writer only until reader lands) |
+| `oxa`         | oxa.dev in both directions (writer only until reader lands)   |
+| `all-readers` | All reader features                                           |
+| `all-writers` | All writer features                                           |
+| `all-libs`    | All primitive/library features (currently `json`)             |
+| `full`        | Everything (`all-readers` + `all-writers` + `all-libs`)       |
 
 No features are enabled by default — opt into what you need.
 
