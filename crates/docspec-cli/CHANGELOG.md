@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/docspec/docspec/compare/docspec-cli-v1.2.0...docspec-cli-v1.3.0) (2026-06-04)
+
+
+### Features
+
+* **cli:** hookup html writer ([6f9f0a2](https://github.com/docspec/docspec/commit/6f9f0a231a6e4779d2da4ac8153ad4b9c2be9c2e)), closes [#26](https://github.com/docspec/docspec/issues/26)
+
 ## [1.2.0](https://github.com/docspec/docspec/compare/docspec-cli-v1.1.1...docspec-cli-v1.2.0) (2026-06-04)
 
 
