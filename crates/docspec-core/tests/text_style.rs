@@ -106,7 +106,7 @@ mod tests {
             g: 255,
             b: 0,
         };
-        let style = TextStyle::default().mark(color.clone());
+        let style = TextStyle::default().mark(color);
         assert_eq!(style.mark, Some(color));
     }
 
@@ -121,7 +121,7 @@ mod tests {
             .underline()
             .subscript()
             .superscript()
-            .mark(color.clone());
+            .mark(color);
         assert_eq!(
             style,
             TextStyle {

@@ -48,7 +48,7 @@ pub enum TableHeaderScope {
 }
 
 /// An RGB color value.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Color {
     /// RGB color with red, green, and blue components (0-255).
     Rgb {

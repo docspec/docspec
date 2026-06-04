@@ -59,7 +59,7 @@ mod tests {
             g: 128,
             b: 0,
         };
-        let cloned = color.clone();
+        let cloned = color;
         assert_eq!(color, cloned);
     }
 
@@ -209,5 +209,23 @@ mod tests {
         assert_eq!(TextAlignment::Left, TextAlignment::Left);
         assert_ne!(TextAlignment::Left, TextAlignment::Right);
         assert_eq!(TextAlignment::Justify, TextAlignment::Justify);
+    }
+
+    #[test]
+    fn color_is_copy() {
+        let c = Color::Rgb { r: 1, g: 2, b: 3 };
+
+        // Pass c by value to a function that takes ownership
+        let result = take_color(c);
+
+        // If Color is Copy, we can use c again here.
+        // If Color is not Copy, this would fail to compile.
+        assert_eq!(c, Color::Rgb { r: 1, g: 2, b: 3 });
+        assert_eq!(result, Color::Rgb { r: 1, g: 2, b: 3 });
+    }
+
+    /// Helper function that takes a Color by value.
+    fn take_color(c: Color) -> Color {
+        c
     }
 }
