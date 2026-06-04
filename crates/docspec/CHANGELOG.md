@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/docspec/docspec/compare/docspec-v1.3.0...docspec-v1.4.0) (2026-06-04)
+
+
+### Features
+
+* **docspec:** hookup docx reader behind docx feature flag ([6877941](https://github.com/docspec/docspec/commit/68779413fb4b0b510ec03a6d9ff02845e9d269e5))
+
 ## [1.3.0](https://github.com/docspec/docspec/compare/docspec-v1.2.0...docspec-v1.3.0) (2026-06-04)
 
 
