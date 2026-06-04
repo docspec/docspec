@@ -157,5 +157,8 @@ large_enum_variant = "allow"
 # fires on macro-expanded code in `self_cell::unsafe_self_cell` internals that we
 # cannot modify. The `self_cell` crate is safety-audited; the pattern is correct.
 mem_forget = "allow"
-
+# Reason: Public `self_cell!` wrappers generate constructors using `impl Trait` in
+# parameter position. The generated API is intentionally macro-owned and cannot be
+# rewritten without abandoning the audited self-referential abstraction.
+impl_trait_in_params = "allow"
 

@@ -14,13 +14,20 @@ footprint, depend directly on the individual sub-crates (`docspec-core`,
 docspec = { version = "0.5", features = ["markdown", "blocknote"] }
 ```
 
+[`AnyReader`] is the single entry point for all input formats. Pass a file path with
+`from_path`, or wrap any `Read + Seek` source with `from_reader`.
+
+Convert Markdown to BlockNote JSON:
+
 ```rust
-use docspec::readers::MarkdownReader;
+use std::io::Cursor;
+use docspec::{AnyReader, InputFormat};
 use docspec::writers::BlockNoteWriter;
 use docspec::{EventSink, EventSource, StackTrackingSink};
 
 let markdown = "# Hello\n\nWorld";
-let mut reader = MarkdownReader::new(markdown);
+let cursor = Cursor::new(markdown.as_bytes().to_vec());
+let mut reader = AnyReader::from_reader(InputFormat::Markdown, cursor)?;
 let mut buf = Vec::<u8>::new();
 let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 
@@ -28,6 +35,47 @@ while let Some(event) = reader.next_event()? {
     writer.handle_event(event)?;
 }
 writer.finish()?;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Or open a file directly by path:
+
+```rust,no_run
+use docspec::{AnyReader, InputFormat};
+use docspec::writers::BlockNoteWriter;
+use docspec::{EventSink, EventSource, StackTrackingSink};
+
+let mut reader = AnyReader::from_path(InputFormat::Markdown, "input.md")?;
+let mut buf = Vec::<u8>::new();
+let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+while let Some(event) = reader.next_event()? {
+    writer.handle_event(event)?;
+}
+writer.finish()?;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+### DOCX
+
+Enable the `docx` feature to read `.docx` files. The reader emits paragraphs and
+text only; styles, tables, lists, images, headers/footers, and tracked changes are
+silently dropped.
+
+```rust,no_run
+use docspec::{AnyReader, InputFormat};
+use docspec::writers::BlockNoteWriter;
+use docspec::{EventSink, EventSource, StackTrackingSink};
+
+let mut reader = AnyReader::from_path(InputFormat::Docx, "doc.docx")?;
+let mut buf = Vec::<u8>::new();
+let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+while let Some(event) = reader.next_event()? {
+    writer.handle_event(event)?;
+}
+writer.finish()?;
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 ## Feature Flags
@@ -39,10 +87,6 @@ writer.finish()?;
 | `markdown` | Markdown (CommonMark + GFM tables/strikethrough) | `docspec-markdown-reader` |
 | `html`     | HTML (paragraphs only)                           | `docspec-html-reader`     |
 | `docx`     | DOCX (paragraphs and text only)                  | `docspec-docx-reader`     |
-
-`DocxReader` takes a file path or `Read + Seek` source (not `&str`), so it cannot be
-dispatched through the text-based `AnyReader` factory. Construct it directly with
-`DocxReader::from_path` or `DocxReader::from_reader`.
 
 ### Writers
 

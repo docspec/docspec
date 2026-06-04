@@ -476,7 +476,9 @@ dependencies = [
  "docspec-json",
  "docspec-markdown-reader",
  "docspec-oxa-writer",
+ "docspec-test-fixtures",
  "self_cell",
+ "tempfile",
 ]
 
 [[package]]
@@ -492,7 +494,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-cli"
-version = "1.3.0"
+version = "1.3.1"
 dependencies = [
  "assert_cmd",
  "clap",

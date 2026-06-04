@@ -13,7 +13,7 @@ self_cell!(
     /// Owned Markdown reader: holds the input `String` and a `MarkdownReader` that
     /// borrows from it. Constructed via the macro-generated
     /// `MarkdownReaderOwned::new(owner, builder)`.
-    pub(crate) struct MarkdownReaderOwned {
+    pub struct MarkdownReaderOwned {
         owner: String,
         #[covariant]
         dependent: InnerMarkdown,
@@ -25,6 +25,7 @@ impl EventSource for MarkdownReaderOwned {
     ///
     /// Uses `with_dependent_mut` — the canonical `self_cell` 1.x API for mutable
     /// access to the dependent value.
+    #[inline]
     fn next_event(&mut self) -> Result<Option<Event>> {
         self.with_dependent_mut(|_owner, reader| reader.next_event())
     }
@@ -47,8 +48,12 @@ mod tests {
             events.push(event);
         }
         // Should contain StartHeading, Text("Hello"), EndHeading, EndDocument
-        assert!(events.iter().any(|e| matches!(e, Event::StartHeading { .. })));
-        assert!(events.iter().any(|e| matches!(e, Event::Text { content, .. } if content == "Hello")));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, Event::StartHeading { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, Event::Text { content, .. } if content == "Hello")));
         assert!(events.iter().any(|e| matches!(e, Event::EndHeading)));
     }
 
@@ -62,11 +67,17 @@ mod tests {
             events.push(event);
         }
         // Empty markdown: only StartDocument + EndDocument
-        assert!(events.iter().any(|e| matches!(e, Event::StartDocument { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, Event::StartDocument { .. })));
         assert!(events.iter().any(|e| matches!(e, Event::EndDocument)));
         // No headings, paragraphs, or text
-        assert!(!events.iter().any(|e| matches!(e, Event::StartHeading { .. })));
-        assert!(!events.iter().any(|e| matches!(e, Event::StartParagraph { .. })));
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e, Event::StartHeading { .. })));
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e, Event::StartParagraph { .. })));
     }
 
     #[test]

@@ -50,6 +50,10 @@ docspec-html-writer = { path = "../docspec-html-writer", version = "1.0.1", opti
 # unsafe. Approved as the single new dependency for the 2.0 migration.
 self_cell = "1"
 
+[dev-dependencies]
+docspec-test-fixtures = { path = "../docspec-test-fixtures" }
+tempfile = "3"
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
