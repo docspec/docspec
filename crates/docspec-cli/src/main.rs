@@ -9,7 +9,7 @@ mod format;
 use std::fs::File;
 use std::io::{BufWriter, IsTerminal as _, Read as _, Write};
 
-use clap::Parser as _;
+use clap::{CommandFactory as _, Parser as _};
 use docspec::{AnyReader, AnyWriter};
 
 use crate::args::{Cli, ColorChoice};
@@ -29,6 +29,17 @@ fn run_pipeline<W: Write>(
 
 /// Main entry point.
 fn main() {
+    if std::env::args_os().len() == 1 {
+        let mut cmd = Cli::command();
+        let mut stdout = std::io::stdout().lock();
+        if let Err(err) = cmd.write_long_help(&mut stdout) {
+            let write_result = writeln!(std::io::stderr(), "error: {err}");
+            drop(write_result);
+            std::process::exit(1);
+        }
+        return;
+    }
+
     let cli = Cli::parse();
 
     let result: Result<()> = (|| {

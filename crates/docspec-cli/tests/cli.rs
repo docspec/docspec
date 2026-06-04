@@ -212,6 +212,18 @@ mod tests {
     }
 
     #[test]
+    fn no_arguments_prints_help() {
+        let help_assert = docspec_cmd().arg("--help").assert().success();
+        let help_output = help_assert.get_output();
+
+        let bare_assert = docspec_cmd().assert().success();
+        let bare_output = bare_assert.get_output();
+
+        assert_eq!(bare_output.stdout.as_slice(), help_output.stdout.as_slice());
+        assert_eq!(bare_output.stderr.as_slice(), help_output.stderr.as_slice());
+    }
+
+    #[test]
     fn invalid_arguments_exits_2() {
         docspec_cmd()
             .arg("--invalid-flag-xyz")
