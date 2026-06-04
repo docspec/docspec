@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/docspec/docspec/compare/docspec-http-v1.2.0...docspec-http-v1.3.0) (2026-06-04)
+
+
+### Features
+
+* **http:** hookup html writer ([eb69144](https://github.com/docspec/docspec/commit/eb691444adc6a03e324cf7a24229a1c4608929cd)), closes [#26](https://github.com/docspec/docspec/issues/26)
+
 ## [1.2.0](https://github.com/docspec/docspec/compare/docspec-http-v1.1.0...docspec-http-v1.2.0) (2026-06-04)
 
 
