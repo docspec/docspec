@@ -1,9 +1,0 @@
-min-ident-chars-threshold = 3
-# Reason: `new` is the Rust constructor convention.
-# Reason: `fmt` is `Debug`/`Display` trait method name; cannot be renamed.
-# Reason: `buf` is the standard name for XML read buffers.
-# Reason: `tag` is the standard name for XML tag/element references.
-# Reason: `ok` is used in Result::ok() and similar short-form patterns.
-# Reason: `id` is the standard identifier field name.
-# Reason: `io` is the standard I/O module alias.
-allowed-idents-below-min-chars = ["new", "fmt", "buf", "tag", "ok", "id", "io"]
