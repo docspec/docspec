@@ -1,6 +1,6 @@
 {
   "crates/docspec-wasm": "1.0.2",
-  "crates/docspec-http": "1.1.0",
+  "crates/docspec-http": "1.2.0",
   "crates/docspec-core": "1.0.0",
   "crates/docspec-markdown-reader": "1.0.2",
   "crates/docspec-json": "1.0.2",

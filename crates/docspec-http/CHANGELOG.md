@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/docspec/docspec/compare/docspec-http-v1.1.0...docspec-http-v1.2.0) (2026-06-04)
+
+
+### Features
+
+* **http:** hookup html reader ([da9d8d9](https://github.com/docspec/docspec/commit/da9d8d9ef95bf5addd9a585e556803f6160a80ae)), closes [#155](https://github.com/docspec/docspec/issues/155)
+
 ## [1.1.0](https://github.com/docspec/docspec/compare/docspec-http-v1.0.2...docspec-http-v1.1.0) (2026-06-04)
 
 
