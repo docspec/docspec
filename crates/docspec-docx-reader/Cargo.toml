@@ -16,6 +16,7 @@ zip = { version = "8", default-features = false, features = ["deflate"] }
 flate2 = "1"
 
 [dev-dependencies]
+docspec-test-fixtures = { path = "../docspec-test-fixtures" }
 zip = { version = "8", default-features = false, features = ["deflate", "bzip2"] }
 tempfile = "3"
 

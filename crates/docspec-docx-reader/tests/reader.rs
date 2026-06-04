@@ -8,7 +8,7 @@
     clippy::unwrap_used
 )]
 
-mod fixture;
+use docspec_test_fixtures::synth_docx;
 
 #[test]
 fn synth_docx_roundtrips_through_zip_archive() {
@@ -24,7 +24,7 @@ fn synth_docx_roundtrips_through_zip_archive() {
   <w:body><w:p><w:r><w:t>hello</w:t></w:r></w:p></w:body>
 </w:document>"#;
 
-    let bytes = fixture::synth_docx(rels_xml, document_xml);
+    let bytes = synth_docx(rels_xml, document_xml);
     let cursor = Cursor::new(bytes);
     let archive = ZipArchive::new(cursor).expect("should be valid ZIP");
     assert_eq!(
@@ -42,12 +42,11 @@ mod constructor {
 
     use docspec_core::{Error, Event, EventSource as _};
     use docspec_docx_reader::DocxReader;
-
-    use crate::fixture;
+    use docspec_test_fixtures::{synth_docx, synth_docx_with_entries};
 
     #[test]
     fn from_reader_succeeds_on_minimal_docx() {
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
         );
@@ -102,7 +101,7 @@ mod constructor {
 
     #[test]
     fn from_reader_errors_when_rels_entry_header_is_malformed() {
-        let mut bytes = fixture::synth_docx(
+        let mut bytes = synth_docx(
             r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
         );
@@ -124,7 +123,7 @@ mod constructor {
 
     #[test]
     fn from_reader_errors_after_empty_non_matching_rels() {
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://example.com/not-office" Target="word/document.xml"/></Relationships>"#,
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
         );
@@ -140,7 +139,7 @@ mod constructor {
 
     #[test]
     fn from_reader_errors_after_balanced_nested_non_matching_rels() {
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Group><Relationship Id="rId1" Type="http://example.com/not-office" Target="word/document.xml"></Relationship></Group></Relationships>"#,
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
         );
@@ -156,7 +155,7 @@ mod constructor {
 
     #[test]
     fn from_reader_errors_on_unexpected_closing_rels_element() {
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             "</Relationships>",
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
         );
@@ -172,7 +171,7 @@ mod constructor {
 
     #[test]
     fn from_reader_errors_on_rels_xml_parser_error() {
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             "<Relationships><",
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
         );
@@ -188,7 +187,7 @@ mod constructor {
 
     #[test]
     fn from_reader_errors_on_unclosed_rels_xml() {
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             "<Relationships>",
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
         );
@@ -227,7 +226,7 @@ mod constructor {
 
     #[test]
     fn from_reader_errors_on_unsupported_compression() {
-        let bytes = fixture::synth_docx_with_entries(&[
+        let bytes = synth_docx_with_entries(&[
             (
                 "_rels/.rels",
                 zip::CompressionMethod::Deflated,
@@ -246,7 +245,7 @@ mod constructor {
 
     #[test]
     fn next_event_passes_through_mid_parse_io_error() {
-        let bytes = fixture::synth_docx_with_entries(&[
+        let bytes = synth_docx_with_entries(&[
             (
                 "_rels/.rels",
                 zip::CompressionMethod::Deflated,
@@ -345,7 +344,7 @@ mod constructor {
 
     #[test]
     fn from_reader_handles_stored_compression() {
-        let bytes = fixture::synth_docx_with_entries(&[
+        let bytes = synth_docx_with_entries(&[
             (
                 "_rels/.rels",
                 zip::CompressionMethod::Deflated,
@@ -363,7 +362,7 @@ mod constructor {
 
     #[test]
     fn from_reader_handles_deflated_compression() {
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
         );
@@ -373,7 +372,7 @@ mod constructor {
 
     #[test]
     fn from_reader_handles_absolute_target_path() {
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="/word/document.xml"/></Relationships>"#,
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
         );
@@ -383,7 +382,7 @@ mod constructor {
 
     #[test]
     fn from_reader_handles_non_empty_relationship_element() {
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"></Relationship></Relationships>"#,
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
         );
@@ -393,7 +392,7 @@ mod constructor {
 
     #[test]
     fn from_reader_errors_on_rels_parent_reference() {
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="../foo/document.xml"/></Relationships>"#,
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
         );
@@ -412,7 +411,7 @@ mod constructor {
 
     #[test]
     fn from_reader_errors_on_malformed_rels_attribute() {
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target=word/document.xml/></Relationships>"#,
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
         );
@@ -431,7 +430,7 @@ mod constructor {
 
     #[test]
     fn from_reader_errors_on_rels_attribute_entity() {
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/&bogus;.xml"/></Relationships>"#,
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
         );
@@ -463,7 +462,7 @@ mod constructor {
     fn from_path_succeeds_on_tempfile() {
         use std::io::Write as _;
 
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
         );
@@ -485,7 +484,7 @@ mod constructor {
             doc.push_str("</w:body></w:document>");
             doc
         };
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
             &big_doc,
         );
@@ -499,13 +498,12 @@ mod events {
 
     use docspec_core::{Event, TextStyle};
     use docspec_docx_reader::{DocxReader, EventSource as _};
-
-    use crate::fixture;
+    use docspec_test_fixtures::{synth_docx, synth_docx_with_entries};
 
     const SIMPLE_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
 
     fn make_reader(document_xml: &str) -> DocxReader {
-        let bytes = fixture::synth_docx(SIMPLE_RELS, document_xml);
+        let bytes = synth_docx(SIMPLE_RELS, document_xml);
         DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader")
     }
 
@@ -808,7 +806,7 @@ mod events {
 
     #[test]
     fn unknown_xml_entity_returns_parse_error() {
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             SIMPLE_RELS,
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>a &bogus; b</w:t></w:r></w:p></w:body></w:document>"#,
         );
@@ -868,7 +866,7 @@ mod events {
 
     #[test]
     fn malformed_document_xml_returns_error_parse() {
-        let bytes = fixture::synth_docx(SIMPLE_RELS, "<w:p");
+        let bytes = synth_docx(SIMPLE_RELS, "<w:p");
         let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
         let first = reader.next_event().expect("first call");
         assert_eq!(
@@ -917,7 +915,7 @@ mod events {
 
     #[test]
     fn malformed_utf8_text_returns_parse_error() {
-        let bytes = fixture::synth_docx_with_entries(&[
+        let bytes = synth_docx_with_entries(&[
             (
                 "_rels/.rels",
                 zip::CompressionMethod::Deflated,
@@ -988,7 +986,7 @@ mod events {
 
     #[test]
     fn malformed_utf8_cdata_returns_parse_error() {
-        let bytes = fixture::synth_docx_with_entries(&[
+        let bytes = synth_docx_with_entries(&[
             (
                 "_rels/.rels",
                 zip::CompressionMethod::Deflated,
@@ -1023,7 +1021,7 @@ mod events {
 
     #[test]
     fn eof_mid_text_flushes_text_and_closes_paragraph() {
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             SIMPLE_RELS,
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>partial"#,
         );
@@ -1043,7 +1041,7 @@ mod events {
 
     #[test]
     fn eof_mid_paragraph_auto_closes() {
-        let bytes = fixture::synth_docx(
+        let bytes = synth_docx(
             SIMPLE_RELS,
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>"#,
         );
