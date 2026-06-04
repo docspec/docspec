@@ -577,4 +577,11 @@ mod tests {
 
         assert!(!sink.has_open_content());
     }
+
+    #[test]
+    fn is_inside_text_style_fresh_instance() {
+        let mock = MockSink::new();
+        let sink = StackTrackingSink::new(mock);
+        assert!(!sink.is_inside_text_style(TextStyleKind::Bold));
+    }
 }

@@ -6,7 +6,7 @@
 
 use alloc::vec::Vec;
 
-use crate::{Error, Event, EventSink, Result};
+use crate::{Error, Event, EventSink, Result, TextStyleKind};
 
 /// Declarative macro that generates three block-kind lookup functions from a single table.
 ///
@@ -110,6 +110,7 @@ pub struct StackTrackingSink<S: EventSink> {
     document_finished: bool,
     sink: S,
     stack: Vec<BlockKind>,
+    style_stack: Vec<TextStyleKind>,
 }
 
 impl<S: EventSink> StackTrackingSink<S> {
@@ -261,6 +262,12 @@ impl<S: EventSink> StackTrackingSink<S> {
         self.stack.contains(&kind)
     }
 
+    /// Returns `true` if the given text style kind is anywhere in the current style stack.
+    #[inline]
+    pub fn is_inside_text_style(&self, kind: TextStyleKind) -> bool {
+        self.style_stack.contains(&kind)
+    }
+
     /// Creates a new stack-tracking wrapper around the given sink.
     #[inline]
     pub fn new(sink: S) -> Self {
@@ -268,6 +275,7 @@ impl<S: EventSink> StackTrackingSink<S> {
             document_finished: false,
             sink,
             stack: Vec::new(),
+            style_stack: Vec::new(),
         }
     }
 
