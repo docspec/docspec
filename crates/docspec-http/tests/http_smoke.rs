@@ -191,6 +191,38 @@ fn smoke_post_conversion() {
 }
 
 #[test]
+fn smoke_post_conversion_html() {
+    let (_guard, port) = start_server();
+    let url = format!("http://127.0.0.1:{port}/conversion");
+    let client = smoke_client();
+    let resp = client
+        .post(&url)
+        .header("Content-Type", "text/html")
+        .body("<p>Hello</p>")
+        .send()
+        .expect("HTTP request");
+    assert_eq!(resp.status(), reqwest::StatusCode::OK);
+    assert_eq!(
+        resp.headers()
+            .get("content-type")
+            .unwrap()
+            .to_str()
+            .unwrap(),
+        "application/vnd.docspec.blocknote+json; charset=utf-8"
+    );
+    let body: serde_json::Value = resp.json().expect("JSON body");
+    assert_eq!(
+        body,
+        serde_json::json!([{
+            "type": "paragraph",
+            "props": { "textAlignment": "left" },
+            "content": [{ "type": "text", "text": "Hello", "styles": {} }],
+            "children": [],
+        }])
+    );
+}
+
+#[test]
 fn smoke_get_health() {
     let (_guard, port) = start_server();
     let url = format!("http://127.0.0.1:{port}/health");

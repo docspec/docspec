@@ -31,6 +31,15 @@ fn post_markdown(body: impl Into<Body>) -> axum::http::Request<Body> {
     common::markdown_request(body)
 }
 
+fn post_html(body: impl Into<Body>) -> axum::http::Request<Body> {
+    common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", "text/html")],
+        body,
+    )
+}
+
 async fn response_body_text(body: axum::body::Body) -> String {
     let bytes = axum::body::to_bytes(body, usize::MAX)
         .await
@@ -197,7 +206,7 @@ async fn post_conversion_missing_content_type() {
             "type": "about:blank",
             "title": "Unsupported Media Type",
             "status": 415,
-            "detail": "Content-Type must be text/markdown",
+            "detail": "Content-Type must be text/markdown or text/html",
         })
     );
 }
@@ -222,7 +231,7 @@ async fn post_conversion_wrong_content_type() {
             "type": "about:blank",
             "title": "Unsupported Media Type",
             "status": 415,
-            "detail": "Content-Type must be text/markdown, got application/json",
+            "detail": "Content-Type must be text/markdown or text/html, got application/json",
         })
     );
 }
@@ -247,7 +256,7 @@ async fn post_conversion_multipart_content_type() {
             "type": "about:blank",
             "title": "Unsupported Media Type",
             "status": 415,
-            "detail": "Content-Type must be text/markdown, got multipart/form-data; boundary=x",
+            "detail": "Content-Type must be text/markdown or text/html, got multipart/form-data; boundary=x",
         })
     );
 }
@@ -630,6 +639,110 @@ async fn post_conversion_wildcard_accept_defaults_to_blocknote_not_oxa() {
 
     let body = response_body_json(response.into_body()).await;
     assert_eq!(body, hello_blocknote_json());
+}
+
+#[tokio::test]
+async fn post_conversion_html_happy_path() {
+    let response = app()
+        .oneshot(post_html("<p>Hello</p>"))
+        .await
+        .expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content-type present"),
+        OUTPUT_MIME
+    );
+
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        serde_json::json!([{
+            "type": "paragraph",
+            "props": { "textAlignment": "left" },
+            "content": [{ "type": "text", "text": "Hello", "styles": {} }],
+            "children": [],
+        }])
+    );
+}
+
+#[tokio::test]
+async fn post_conversion_html_with_utf8_charset_happy_path() {
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", "text/html; charset=utf-8")],
+        Body::from("<p>Hello</p>"),
+    );
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        serde_json::json!([{
+            "type": "paragraph",
+            "props": { "textAlignment": "left" },
+            "content": [{ "type": "text", "text": "Hello", "styles": {} }],
+            "children": [],
+        }])
+    );
+}
+
+#[tokio::test]
+async fn post_conversion_html_to_oxa_happy_path() {
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[
+            ("content-type", "text/html"),
+            ("accept", "application/vnd.oxa+json"),
+        ],
+        Body::from("<p>Hello</p>"),
+    );
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content-type present"),
+        OUTPUT_MIME_OXA
+    );
+
+    let body_text = response_body_text(response.into_body()).await;
+    assert_eq!(
+        body_text,
+        r#"{"type":"Document","children":[{"type":"Paragraph","children":[{"type":"Text","value":"Hello"}]}]}"#
+    );
+}
+
+#[tokio::test]
+async fn post_conversion_html_empty_body() {
+    let response = app()
+        .oneshot(post_html(""))
+        .await
+        .expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        serde_json::json!({
+            "type": "about:blank",
+            "title": "Bad Request",
+            "status": 400,
+            "detail": "Request body is empty",
+        })
+    );
 }
 
 #[tokio::test]

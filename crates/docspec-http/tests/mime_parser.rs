@@ -3,30 +3,41 @@
 #![allow(clippy::tests_outside_test_module, clippy::unwrap_used)]
 
 use axum::http::HeaderValue;
-use docspec::OutputFormat;
+use docspec::{InputFormat, OutputFormat};
 use docspec_http::error::HttpError;
 use docspec_http::mime_parser::{negotiate_accept, validate_content_type};
 
+// ─── validate_content_type: markdown ────────────────────────────────────────
+
 #[test]
-fn content_type_text_markdown_accepts() {
+fn content_type_text_markdown_returns_markdown_format() {
     let header = HeaderValue::from_static("text/markdown");
-    assert!(validate_content_type(Some(&header)).is_ok());
+    assert_eq!(
+        validate_content_type(Some(&header)).unwrap(),
+        InputFormat::Markdown
+    );
 }
 
 #[test]
-fn content_type_with_utf8_charset_accepts() {
+fn content_type_text_markdown_with_utf8_charset_returns_markdown() {
     let header = HeaderValue::from_static("text/markdown; charset=utf-8");
-    assert!(validate_content_type(Some(&header)).is_ok());
+    assert_eq!(
+        validate_content_type(Some(&header)).unwrap(),
+        InputFormat::Markdown
+    );
 }
 
 #[test]
-fn content_type_with_utf8_charset_case_insensitive() {
+fn content_type_text_markdown_charset_is_case_insensitive() {
     let header = HeaderValue::from_static("text/markdown; charset=UTF-8");
-    assert!(validate_content_type(Some(&header)).is_ok());
+    assert_eq!(
+        validate_content_type(Some(&header)).unwrap(),
+        InputFormat::Markdown
+    );
 }
 
 #[test]
-fn content_type_with_non_utf8_charset_rejects() {
+fn content_type_text_markdown_with_non_utf8_charset_rejects() {
     let header = HeaderValue::from_static("text/markdown; charset=iso-8859-1");
     assert!(matches!(
         validate_content_type(Some(&header)),
@@ -35,7 +46,7 @@ fn content_type_with_non_utf8_charset_rejects() {
 }
 
 #[test]
-fn content_type_with_unknown_param_rejects() {
+fn content_type_text_markdown_with_unknown_param_rejects() {
     let header = HeaderValue::from_static("text/markdown; boundary=xyz");
     assert!(matches!(
         validate_content_type(Some(&header)),
@@ -44,13 +55,62 @@ fn content_type_with_unknown_param_rejects() {
 }
 
 #[test]
-fn content_type_with_charset_and_unknown_param_rejects() {
+fn content_type_text_markdown_with_charset_and_unknown_param_rejects() {
     let header = HeaderValue::from_static("text/markdown; charset=utf-8; format=fixed");
     assert!(matches!(
         validate_content_type(Some(&header)),
         Err(HttpError::UnsupportedMediaType { received: Some(text) }) if text == "text/markdown; charset=utf-8; format=fixed"
     ));
 }
+
+// ─── validate_content_type: html ────────────────────────────────────────────
+
+#[test]
+fn content_type_text_html_returns_html_format() {
+    let header = HeaderValue::from_static("text/html");
+    assert_eq!(
+        validate_content_type(Some(&header)).unwrap(),
+        InputFormat::Html
+    );
+}
+
+#[test]
+fn content_type_text_html_with_utf8_charset_returns_html() {
+    let header = HeaderValue::from_static("text/html; charset=utf-8");
+    assert_eq!(
+        validate_content_type(Some(&header)).unwrap(),
+        InputFormat::Html
+    );
+}
+
+#[test]
+fn content_type_text_html_charset_is_case_insensitive() {
+    let header = HeaderValue::from_static("text/html; charset=UTF-8");
+    assert_eq!(
+        validate_content_type(Some(&header)).unwrap(),
+        InputFormat::Html
+    );
+}
+
+#[test]
+fn content_type_text_html_with_non_utf8_charset_rejects() {
+    let header = HeaderValue::from_static("text/html; charset=iso-8859-1");
+    assert!(matches!(
+        validate_content_type(Some(&header)),
+        Err(HttpError::UnsupportedMediaType { received: Some(text) }) if text == "text/html; charset=iso-8859-1"
+    ));
+}
+
+#[test]
+fn content_type_text_html_with_unknown_param_rejects() {
+    let header = HeaderValue::from_static("text/html; boundary=xyz");
+    assert!(matches!(
+        validate_content_type(Some(&header)),
+        Err(HttpError::UnsupportedMediaType { received: Some(text) }) if text == "text/html; boundary=xyz"
+    ));
+}
+
+// ─── validate_content_type: rejections ──────────────────────────────────────
 
 #[test]
 fn content_type_text_plain_rejects_with_received() {
@@ -72,6 +132,15 @@ fn content_type_application_json_rejects() {
 }
 
 #[test]
+fn content_type_application_xhtml_rejects() {
+    let header = HeaderValue::from_static("application/xhtml+xml");
+    assert!(matches!(
+        validate_content_type(Some(&header)),
+        Err(HttpError::UnsupportedMediaType { received: Some(text) }) if text == "application/xhtml+xml"
+    ));
+}
+
+#[test]
 fn content_type_multipart_rejects() {
     let header = HeaderValue::from_static("multipart/form-data; boundary=xxx");
     assert!(matches!(
@@ -87,6 +156,8 @@ fn content_type_missing_rejects_with_none() {
         Err(HttpError::UnsupportedMediaType { received: None })
     ));
 }
+
+// ─── negotiate_accept ───────────────────────────────────────────────────────
 
 #[test]
 fn accept_missing_returns_blocknote() {
