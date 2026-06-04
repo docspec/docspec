@@ -466,7 +466,7 @@ dependencies = [
 
 [[package]]
 name = "docspec"
-version = "1.4.0"
+version = "2.0.0"
 dependencies = [
  "docspec-blocknote-writer",
  "docspec-core",
@@ -494,7 +494,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-cli"
-version = "1.3.0"
+version = "2.0.0"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -502,6 +502,7 @@ dependencies = [
  "clap_mangen",
  "docspec",
  "docspec-core",
+ "docspec-test-fixtures",
  "predicates",
  "serde_json",
  "tempfile",
@@ -545,13 +546,14 @@ dependencies = [
 
 [[package]]
 name = "docspec-http"
-version = "1.3.0"
+version = "2.0.0"
 dependencies = [
  "axum",
  "clap",
  "docspec",
  "docspec-core",
  "docspec-json",
+ "docspec-test-fixtures",
  "metrics",
  "metrics-exporter-prometheus",
  "mime",
@@ -601,7 +603,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-wasm"
-version = "1.0.2"
+version = "2.0.0"
 dependencies = [
  "docspec",
  "docspec-core",
@@ -2922,6 +2924,7 @@ dependencies = [
  "futures-util",
  "http",
  "http-body",
+ "http-body-util",
  "pin-project-lite",
  "tower",
  "tower-layer",

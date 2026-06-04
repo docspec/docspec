@@ -474,6 +474,8 @@ fn docx_success_records_docx_input_mime() {
     let rendered = handle.render();
     assert_metric_line(
         &rendered,
-        &format!(r#"docspec_conversions_total{{result="success",error_class="none",input_mime_type="{DOCX_MIME}",output_mime_type="application/vnd.docspec.blocknote+json"}} 1"#),
+        &format!(
+            r#"docspec_conversions_total{{result="success",error_class="none",input_mime_type="{DOCX_MIME}",output_mime_type="application/vnd.docspec.blocknote+json"}} 1"#
+        ),
     );
 }

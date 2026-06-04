@@ -565,12 +565,9 @@ mod tests {
             .assert()
             .success();
 
-        let stdout =
-            String::from_utf8(assert.get_output().stdout.clone()).expect("utf8 stdout");
+        let stdout = String::from_utf8(assert.get_output().stdout.clone()).expect("utf8 stdout");
         let value: serde_json::Value = serde_json::from_str(&stdout).expect("valid json");
-        let text = value[0]["content"][0]["text"]
-            .as_str()
-            .expect("text field");
+        let text = value[0]["content"][0]["text"].as_str().expect("text field");
         assert_eq!(text, "Hello");
     }
 
@@ -582,20 +579,14 @@ mod tests {
             .assert()
             .success();
 
-        let stdout =
-            String::from_utf8(assert.get_output().stdout.clone()).expect("utf8 stdout");
+        let stdout = String::from_utf8(assert.get_output().stdout.clone()).expect("utf8 stdout");
         let value: serde_json::Value = serde_json::from_str(&stdout).expect("valid json");
-        let text = value[0]["content"][0]["text"]
-            .as_str()
-            .expect("text field");
+        let text = value[0]["content"][0]["text"].as_str().expect("text field");
         assert_eq!(text, "Hello");
     }
 
     #[test]
     fn clap_rejects_unknown_input_format() {
-        docspec_cmd()
-            .args(["--from", "pdf"])
-            .assert()
-            .failure();
+        docspec_cmd().args(["--from", "pdf"]).assert().failure();
     }
 }

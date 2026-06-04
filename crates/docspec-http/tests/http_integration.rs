@@ -19,8 +19,7 @@ use tower::ServiceExt as _;
 
 const CACHE_CONTROL: &str = "max-age=0, private, must-revalidate";
 const DOCX_HELLO_XML: &str = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Hello</w:t></w:r></w:p></w:body></w:document>"#;
-const DOCX_MIME: &str =
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const DOCX_MIME: &str = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const DOCX_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
 const HEALTH_CT: &str = "text/plain; charset=utf-8";
 const OUTPUT_MIME: &str = "application/vnd.docspec.blocknote+json; charset=utf-8";

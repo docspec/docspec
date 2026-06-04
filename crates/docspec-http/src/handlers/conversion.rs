@@ -187,12 +187,13 @@ async fn do_conversion(
     let join_result = tokio::task::spawn_blocking(move || -> Result<(Vec<u8>, u64), HttpError> {
         let mut output_buffer = Vec::new();
         let cursor = Cursor::new(body);
-        let mut reader = docspec::AnyReader::from_reader(input_format, cursor).map_err(|error| {
-            tracing::debug!(error = %error, "reader construction failed");
-            HttpError::Unprocessable {
-                detail: error.to_string(),
-            }
-        })?;
+        let mut reader =
+            docspec::AnyReader::from_reader(input_format, cursor).map_err(|error| {
+                tracing::debug!(error = %error, "reader construction failed");
+                HttpError::Unprocessable {
+                    detail: error.to_string(),
+                }
+            })?;
         let mut sink = docspec::AnyWriter::new(output_format, &mut output_buffer);
 
         loop {

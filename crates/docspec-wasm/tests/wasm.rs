@@ -47,7 +47,13 @@ mod tests {
     fn bom_prefixed_markdown_strips_bom() {
         let result = convert_markdown_to_blocknote("\u{FEFF}# Hello").unwrap();
         // The BOM should be stripped by the facade; heading text should be "Hello"
-        assert!(result.contains("Hello"), "Expected 'Hello' in output, got: {result}");
-        assert!(!result.contains("\u{FEFF}"), "BOM should not appear in output");
+        assert!(
+            result.contains("Hello"),
+            "Expected 'Hello' in output, got: {result}"
+        );
+        assert!(
+            !result.contains("\u{FEFF}"),
+            "BOM should not appear in output"
+        );
     }
 }
