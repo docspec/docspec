@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/docspec/docspec/compare/docspec-v1.2.0...docspec-v1.3.0) (2026-06-04)
+
+
+### Features
+
+* **docspec:** hookup html-writer and restructure writer feature taxonomy ([fc0c34f](https://github.com/docspec/docspec/commit/fc0c34fbf7213e4221400a3703ae5f5457049d10)), closes [#26](https://github.com/docspec/docspec/issues/26)
+
 ## [1.2.0](https://github.com/docspec/docspec/compare/docspec-v1.1.0...docspec-v1.2.0) (2026-06-03)
 
 
