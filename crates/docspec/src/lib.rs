@@ -16,6 +16,11 @@
 //! |----------------|-----------------------------------------------------|-----------------------------|
 //! | `markdown`     | Markdown (`CommonMark` + GFM tables/strikethrough)  | [`readers::MarkdownReader`] |
 //! | `html`         | HTML (paragraphs only)                              | `readers::HtmlReader`       |
+//! | `docx`         | DOCX (paragraphs and text only)                     | `readers::DocxReader`       |
+//!
+//! Note: [`readers::DocxReader`] takes a binary file or any `Read + Seek` source rather
+//! than a `&str`, so it is not dispatched through the text-based [`AnyReader`] factory.
+//! Construct it directly with `DocxReader::from_path` or `DocxReader::from_reader`.
 //!
 //! ## Writers
 //!
@@ -107,6 +112,15 @@ pub mod readers {
     #[cfg(feature = "html")]
     #[cfg_attr(docsrs, doc(cfg(feature = "html")))]
     pub use docspec_html_reader::HtmlReader;
+
+    /// Streaming DOCX reader. Available when the `docx` feature is enabled.
+    /// Takes a file path or `Read + Seek` source (not `&str`), so it is not
+    /// dispatched through the text-based [`crate::AnyReader`] factory. Emits
+    /// only paragraphs and text; styles, tables, lists, images, headers/footers,
+    /// metadata, and tracked changes are silently dropped.
+    #[cfg(feature = "docx")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "docx")))]
+    pub use docspec_docx_reader::DocxReader;
 }
 
 /// Document writers (event sinks).

@@ -38,6 +38,11 @@ writer.finish()?;
 | ---------- | ------------------------------------------------ | ------------------------- |
 | `markdown` | Markdown (CommonMark + GFM tables/strikethrough) | `docspec-markdown-reader` |
 | `html`     | HTML (paragraphs only)                           | `docspec-html-reader`     |
+| `docx`     | DOCX (paragraphs and text only)                  | `docspec-docx-reader`     |
+
+`DocxReader` takes a file path or `Read + Seek` source (not `&str`), so it cannot be
+dispatched through the text-based `AnyReader` factory. Construct it directly with
+`DocxReader::from_path` or `DocxReader::from_reader`.
 
 ### Writers
 
