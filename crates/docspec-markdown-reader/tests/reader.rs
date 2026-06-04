@@ -4,7 +4,7 @@
 mod helpers {
     #![allow(clippy::single_call_fn)]
 
-    use docspec_core::{Event, ImageSource, ListStyleType, TableHeaderScope, TextStyle};
+    use docspec_core::{Event, ImageSource, ListStyleType, TableHeaderScope};
 
     /// Returns a `StartDocument` event with all optional fields set to `None`.
     /// Use in tests that do not exercise document-level metadata.
@@ -30,10 +30,9 @@ mod helpers {
     }
 
     /// Returns a text event with exact content and style.
-    pub fn text(content: &str, style: TextStyle) -> Event {
+    pub fn text(content: &str) -> Event {
         Event::Text {
             content: content.to_string(),
-            style,
         }
     }
 
@@ -111,7 +110,7 @@ mod helpers {
 #[cfg(test)]
 mod tests {
     use super::helpers;
-    use docspec_core::{Event, EventSource as _, ImageSource, ListStyleType, TextStyle};
+    use docspec_core::{Event, EventSource as _, ImageSource, ListStyleType, TextStyleKind};
     use docspec_markdown_reader::MarkdownReader;
 
     fn collect_events(reader: &mut MarkdownReader<'_>) -> Vec<Event> {
@@ -144,7 +143,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "Quoted text".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndBlockQuote,
@@ -163,7 +161,15 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("both", TextStyle::default().bold().italic()),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Italic
+                },
+                helpers::text("both"),
+                Event::EndTextStyle,
+                Event::EndTextStyle,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -180,7 +186,11 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("bold", TextStyle::default().bold()),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold
+                },
+                helpers::text("bold"),
+                Event::EndTextStyle,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -198,14 +208,14 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_heading(1),
-                helpers::text("Title", TextStyle::default()),
+                helpers::text("Title"),
                 Event::EndHeading,
                 helpers::start_paragraph(),
-                helpers::text("Paragraph text.", TextStyle::default()),
+                helpers::text("Paragraph text."),
                 Event::EndParagraph,
                 Event::ThematicBreak { id: None },
                 helpers::start_heading(2),
-                helpers::text("Subtitle", TextStyle::default()),
+                helpers::text("Subtitle"),
                 Event::EndHeading,
                 Event::EndDocument,
             ]
@@ -230,9 +240,9 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("Line one", TextStyle::default()),
+                helpers::text("Line one"),
                 Event::LineBreak,
-                helpers::text("Line two", TextStyle::default()),
+                helpers::text("Line two"),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -249,7 +259,7 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_heading(1),
-                helpers::text("Hello", TextStyle::default()),
+                helpers::text("Hello"),
                 Event::EndHeading,
                 Event::EndDocument,
             ]
@@ -269,7 +279,7 @@ mod tests {
                 vec![
                     helpers::start_document(),
                     helpers::start_heading(expected),
-                    helpers::text("Heading", TextStyle::default()),
+                    helpers::text("Heading"),
                     Event::EndHeading,
                     Event::EndDocument,
                 ]
@@ -383,9 +393,13 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("Use ", TextStyle::default()),
-                helpers::text("code", TextStyle::default().code()),
-                helpers::text(" here", TextStyle::default()),
+                helpers::text("Use "),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Code
+                },
+                helpers::text("code"),
+                Event::EndTextStyle,
+                helpers::text(" here"),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -402,9 +416,25 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("bold ", TextStyle::default().bold()),
-                helpers::text("code", TextStyle::default().bold().code()),
-                helpers::text(" bold", TextStyle::default().bold()),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold
+                },
+                helpers::text("bold "),
+                Event::EndTextStyle,
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Code
+                },
+                helpers::text("code"),
+                Event::EndTextStyle,
+                Event::EndTextStyle,
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold
+                },
+                helpers::text(" bold"),
+                Event::EndTextStyle,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -421,9 +451,25 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("italic ", TextStyle::default().italic()),
-                helpers::text("code", TextStyle::default().italic().code()),
-                helpers::text(" italic", TextStyle::default().italic()),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Italic
+                },
+                helpers::text("italic "),
+                Event::EndTextStyle,
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Italic
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Code
+                },
+                helpers::text("code"),
+                Event::EndTextStyle,
+                Event::EndTextStyle,
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Italic
+                },
+                helpers::text(" italic"),
+                Event::EndTextStyle,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -440,9 +486,25 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("strikethrough ", TextStyle::default().strikethrough()),
-                helpers::text("code", TextStyle::default().strikethrough().code()),
-                helpers::text(" strikethrough", TextStyle::default().strikethrough()),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Strikethrough
+                },
+                helpers::text("strikethrough "),
+                Event::EndTextStyle,
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Strikethrough
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Code
+                },
+                helpers::text("code"),
+                Event::EndTextStyle,
+                Event::EndTextStyle,
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Strikethrough
+                },
+                helpers::text(" strikethrough"),
+                Event::EndTextStyle,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -459,7 +521,11 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("italic", TextStyle::default().italic()),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Italic
+                },
+                helpers::text("italic"),
+                Event::EndTextStyle,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -479,13 +545,11 @@ mod tests {
                 helpers::start_unordered_list_item(0),
                 Event::Text {
                     content: "Item one".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndUnorderedListItem,
                 helpers::start_unordered_list_item(0),
                 Event::Text {
                     content: "Item two".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndUnorderedListItem,
                 Event::EndDocument,
@@ -565,7 +629,7 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("Hello world", TextStyle::default()),
+                helpers::text("Hello world"),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -582,9 +646,9 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("Line one", TextStyle::default()),
+                helpers::text("Line one"),
                 Event::SoftBreak,
-                helpers::text("Line two", TextStyle::default()),
+                helpers::text("Line two"),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -621,11 +685,11 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("Before", TextStyle::default()),
+                helpers::text("Before"),
                 Event::EndParagraph,
                 Event::ThematicBreak { id: None },
                 helpers::start_paragraph(),
-                helpers::text("After", TextStyle::default()),
+                helpers::text("After"),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -669,7 +733,7 @@ mod tests {
                 helpers::start_document(),
                 Event::StartBlockQuote { id: None },
                 helpers::start_paragraph(),
-                helpers::text("Quoted", TextStyle::default()),
+                helpers::text("Quoted"),
                 Event::EndParagraph,
                 Event::EndBlockQuote,
                 Event::EndDocument,
@@ -688,7 +752,7 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_unordered_list_item(0),
-                helpers::text("Item", TextStyle::default()),
+                helpers::text("Item"),
                 Event::EndUnorderedListItem,
                 Event::EndDocument,
             ]
@@ -706,7 +770,7 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_preformatted(Some("rust")),
-                helpers::text("fn main() {}", TextStyle::default()),
+                helpers::text("fn main() {}"),
                 Event::EndPreformatted,
                 Event::EndDocument,
             ]
@@ -724,7 +788,7 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_preformatted(None),
-                helpers::text("some code", TextStyle::default()),
+                helpers::text("some code"),
                 Event::EndPreformatted,
                 Event::EndDocument,
             ]
@@ -742,7 +806,7 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_preformatted(None),
-                helpers::text("indented code", TextStyle::default()),
+                helpers::text("indented code"),
                 Event::EndPreformatted,
                 Event::EndDocument,
             ]
@@ -765,7 +829,7 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_preformatted(None),
-                helpers::text("code\n\n", TextStyle::default()),
+                helpers::text("code\n\n"),
                 Event::EndPreformatted,
                 Event::EndDocument,
             ]
@@ -787,10 +851,7 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_preformatted(None),
-                helpers::text(
-                    "*test* **bold** `code` _italic_ ~strike~",
-                    TextStyle::default(),
-                ),
+                helpers::text("*test* **bold** `code` _italic_ ~strike~",),
                 Event::EndPreformatted,
                 Event::EndDocument,
             ]
@@ -829,10 +890,10 @@ mod tests {
                 helpers::start_document(),
                 helpers::start_unordered_list_item(0),
                 helpers::start_paragraph(),
-                helpers::text("item", TextStyle::default()),
+                helpers::text("item"),
                 Event::EndParagraph,
                 helpers::start_preformatted(None),
-                helpers::text("code", TextStyle::default()),
+                helpers::text("code"),
                 Event::EndPreformatted,
                 Event::EndUnorderedListItem,
                 Event::EndDocument,
@@ -850,7 +911,11 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("struck", TextStyle::default().strikethrough()),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Strikethrough
+                },
+                helpers::text("struck"),
+                Event::EndTextStyle,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -867,7 +932,15 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("bold struck", TextStyle::default().bold().strikethrough()),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Strikethrough
+                },
+                helpers::text("bold struck"),
+                Event::EndTextStyle,
+                Event::EndTextStyle,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -884,10 +957,15 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text(
-                    "italic struck",
-                    TextStyle::default().italic().strikethrough()
-                ),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Italic,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Strikethrough,
+                },
+                helpers::text("italic struck"),
+                Event::EndTextStyle,
+                Event::EndTextStyle,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -905,9 +983,13 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("This is ", TextStyle::default()),
-                helpers::text("struck", TextStyle::default().strikethrough()),
-                helpers::text(" text in a paragraph.", TextStyle::default()),
+                helpers::text("This is "),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Strikethrough
+                },
+                helpers::text("struck"),
+                Event::EndTextStyle,
+                helpers::text(" text in a paragraph."),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -924,10 +1006,19 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text(
-                    "bold italic struck",
-                    TextStyle::default().bold().italic().strikethrough(),
-                ),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Italic,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Strikethrough,
+                },
+                helpers::text("bold italic struck"),
+                Event::EndTextStyle,
+                Event::EndTextStyle,
+                Event::EndTextStyle,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -976,10 +1067,7 @@ mod tests {
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(8), Some(&helpers::start_table_cell()));
-        assert_eq!(
-            events.get(9),
-            Some(&helpers::text("text", TextStyle::default()))
-        );
+        assert_eq!(events.get(9), Some(&helpers::text("text")));
         assert_eq!(events.get(10), Some(&Event::EndTableCell));
     }
 
@@ -990,16 +1078,41 @@ mod tests {
         let events = collect_events(&mut reader);
 
         assert_eq!(
-            events.get(4),
-            Some(&helpers::text("bold", TextStyle::default().bold()))
-        );
-        assert_eq!(
-            events.get(7),
-            Some(&helpers::text("code", TextStyle::default().code()))
-        );
-        assert_eq!(
-            events.get(12),
-            Some(&helpers::text("italic", TextStyle::default().italic()))
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_table(),
+                helpers::start_table_row(),
+                helpers::start_table_header(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                },
+                helpers::text("bold"),
+                Event::EndTextStyle,
+                Event::EndTableHeader,
+                helpers::start_table_header(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Code,
+                },
+                helpers::text("code"),
+                Event::EndTextStyle,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                helpers::start_table_row(),
+                helpers::start_table_cell(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Italic,
+                },
+                helpers::text("italic"),
+                Event::EndTextStyle,
+                Event::EndTableCell,
+                helpers::start_table_cell(),
+                helpers::text("plain"),
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
         );
     }
 
@@ -1046,10 +1159,7 @@ mod tests {
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
-        assert_eq!(
-            events.get(2),
-            Some(&helpers::text("a", TextStyle::default()))
-        );
+        assert_eq!(events.get(2), Some(&helpers::text("a")));
         assert_eq!(events.get(3), Some(&Event::EndUnorderedListItem));
         assert_eq!(events.get(4), Some(&helpers::start_unordered_list_item(0)));
         assert_eq!(events.get(6), Some(&Event::EndUnorderedListItem));
@@ -1160,10 +1270,7 @@ mod tests {
         assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
         // Nested item opens immediately inside outer item
         assert_eq!(events.get(2), Some(&helpers::start_unordered_list_item(1)));
-        assert_eq!(
-            events.get(3),
-            Some(&helpers::text("Nested item", TextStyle::default()))
-        );
+        assert_eq!(events.get(3), Some(&helpers::text("Nested item")));
         assert_eq!(events.get(4), Some(&Event::EndUnorderedListItem));
         // Outer item closes after nested
         assert_eq!(events.get(5), Some(&Event::EndUnorderedListItem));
@@ -1178,18 +1285,29 @@ mod tests {
         let mut reader = MarkdownReader::new("- **bold** item\n- *italic* item");
         let events = collect_events(&mut reader);
 
-        assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
         assert_eq!(
-            events.get(2),
-            Some(&helpers::text("bold", TextStyle::default().bold()))
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_unordered_list_item(0),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                },
+                helpers::text("bold"),
+                Event::EndTextStyle,
+                helpers::text(" item"),
+                Event::EndUnorderedListItem,
+                helpers::start_unordered_list_item(0),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Italic,
+                },
+                helpers::text("italic"),
+                Event::EndTextStyle,
+                helpers::text(" item"),
+                Event::EndUnorderedListItem,
+                Event::EndDocument,
+            ]
         );
-        assert_eq!(events.get(4), Some(&Event::EndUnorderedListItem));
-        assert_eq!(events.get(5), Some(&helpers::start_unordered_list_item(0)));
-        assert_eq!(
-            events.get(6),
-            Some(&helpers::text("italic", TextStyle::default().italic()))
-        );
-        assert_eq!(events.get(8), Some(&Event::EndUnorderedListItem));
     }
 
     #[test]
@@ -1199,16 +1317,10 @@ mod tests {
 
         // Continuation paragraph is inside parent item
         assert_eq!(events.get(8), Some(&helpers::start_paragraph()));
-        assert_eq!(
-            events.get(9),
-            Some(&helpers::text("Line one", TextStyle::default()))
-        );
+        assert_eq!(events.get(9), Some(&helpers::text("Line one")));
         // Hard break is inside the continuation paragraph (not orphaned)
         assert_eq!(events.get(10), Some(&Event::LineBreak));
-        assert_eq!(
-            events.get(11),
-            Some(&helpers::text("Line two", TextStyle::default()))
-        );
+        assert_eq!(events.get(11), Some(&helpers::text("Line two")));
         assert_eq!(events.get(12), Some(&Event::EndParagraph));
         // Parent closes AFTER continuation
         assert_eq!(events.get(13), Some(&Event::EndUnorderedListItem));
@@ -1223,10 +1335,7 @@ mod tests {
         assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
         assert_eq!(events.get(3), Some(&helpers::start_unordered_list_item(1)));
         assert_eq!(events.get(5), Some(&helpers::start_unordered_list_item(2)));
-        assert_eq!(
-            events.get(6),
-            Some(&helpers::text("C", TextStyle::default()))
-        );
+        assert_eq!(events.get(6), Some(&helpers::text("C")));
         // All three levels close in reverse order
         assert_eq!(events.get(7), Some(&Event::EndUnorderedListItem));
         assert_eq!(events.get(8), Some(&Event::EndUnorderedListItem));
@@ -1255,7 +1364,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "I2".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::StartBlockQuote { id: None },
                 Event::StartParagraph {
@@ -1264,21 +1372,17 @@ mod tests {
                 },
                 Event::Text {
                     content: "text".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 helpers::start_unordered_list_item(1),
                 Event::Text {
                     content: "[".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::Text {
                     content: "f".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::Text {
                     content: "]".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndUnorderedListItem,
                 Event::EndBlockQuote,
@@ -1308,7 +1412,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "text".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndLink,
                 Event::EndParagraph,
@@ -1337,7 +1440,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "text".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndLink,
                 Event::EndParagraph,
@@ -1389,13 +1491,15 @@ mod tests {
                     title: None,
                     id: None,
                 },
-                Event::Text {
-                    content: "bold".to_string(),
-                    style: TextStyle::default().bold(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold
                 },
                 Event::Text {
+                    content: "bold".to_string(),
+                },
+                Event::EndTextStyle,
+                Event::Text {
                     content: " text".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndLink,
                 Event::EndParagraph,
@@ -1422,10 +1526,13 @@ mod tests {
                     title: None,
                     id: None,
                 },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Code
+                },
                 Event::Text {
                     content: "code".to_string(),
-                    style: TextStyle::default().code(),
                 },
+                Event::EndTextStyle,
                 Event::EndLink,
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -1453,7 +1560,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "https://example.com".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndLink,
                 Event::EndParagraph,
@@ -1479,7 +1585,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "text".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndLink,
                 Event::EndHeading,
@@ -1503,7 +1608,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "before ".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::StartLink {
                     href: "https://example.com".to_string(),
@@ -1512,12 +1616,10 @@ mod tests {
                 },
                 Event::Text {
                     content: "link text".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndLink,
                 Event::Text {
                     content: " after".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -1580,10 +1682,10 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("Before", TextStyle::default()),
+                helpers::text("Before"),
                 Event::EndParagraph,
                 helpers::start_paragraph(),
-                helpers::text("After", TextStyle::default()),
+                helpers::text("After"),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -1601,8 +1703,8 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_paragraph(),
-                helpers::text("text ", TextStyle::default()),
-                helpers::text(" more", TextStyle::default()),
+                helpers::text("text "),
+                helpers::text(" more"),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -1680,9 +1782,9 @@ mod tests {
             vec![
                 helpers::start_document(),
                 helpers::start_unordered_list_item(0),
-                helpers::text("text", TextStyle::default()),
+                helpers::text("text"),
                 Event::SoftBreak,
-                helpers::text("more", TextStyle::default()),
+                helpers::text("more"),
                 Event::EndUnorderedListItem,
                 Event::EndDocument,
             ]

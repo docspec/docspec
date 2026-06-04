@@ -18,7 +18,7 @@
 //! # Example
 //!
 //! ```
-//! use docspec_core::{Event, EventSink, Result, TextStyle};
+//! use docspec_core::{Event, EventSink, Result};
 //! use docspec_oxa_writer::OxaWriter;
 //!
 //! let mut buf = Vec::<u8>::new();
@@ -27,7 +27,6 @@
 //! writer.handle_event(Event::StartParagraph { alignment: None, id: None })?;
 //! writer.handle_event(Event::Text {
 //!     content: "Hello".to_string(),
-//!     style: TextStyle::default(),
 //! })?;
 //! writer.handle_event(Event::EndParagraph)?;
 //! writer.handle_event(Event::EndDocument)?;

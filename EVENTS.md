@@ -6,7 +6,7 @@ DocSpec documents are streams of typed events. Readers emit events. Writers cons
 
 **SAX-like structure.** Block elements use Start/End pairs.
 
-**Formatting as attributes.** Inline formatting lives on `Text` as attributes, not wrapper events. Links are the exception: they use Start/End because they carry `href`.
+**Formatting as spans.** Inline formatting uses `StartTextStyle`/`EndTextStyle` spans around plain `Text` events. Links also use Start/End because they carry `href`.
 
 **Semantic fidelity.** Events capture meaning, not appearance. Visual properties (font, color, size) are not represented — except mark color for highlighting.
 
@@ -66,6 +66,17 @@ enum ListStyleType {
 enum TableHeaderScope { Column, Row }  // Column: header describes cells below; Row: header describes cells to the right
 
 enum Color { Rgb { r: u8, g: u8, b: u8 } }
+
+enum TextStyleKind {
+    Bold,
+    Italic,
+    Code,
+    Strikethrough,
+    Underline,
+    Subscript,
+    Superscript,
+    Mark(Color),
+}
 
 enum ImageSource {
     Asset { asset_id: String },   // resolved through AssetProvider
@@ -131,9 +142,10 @@ All events in the `Event` enum, grouped by category.
 
 **Inline containers:**
 
-| Event       | Fields                                  | Pair      |
-| ----------- | --------------------------------------- | --------- |
-| `StartLink` | `href: String`, `title: Option<String>` | `EndLink` |
+| Event            | Fields                                  | Pair           |
+| ---------------- | --------------------------------------- | -------------- |
+| `StartLink`      | `href: String`, `title: Option<String>` | `EndLink`      |
+| `StartTextStyle` | `kind: TextStyleKind`                   | `EndTextStyle` |
 
 **Block (self-contained):**
 
@@ -145,7 +157,7 @@ All events in the `Event` enum, grouped by category.
 
 | Event         | Fields                                                                           |
 | ------------- | -------------------------------------------------------------------------------- |
-| `Text`        | `content: String`, `style: TextStyle`                                            |
+| `Text`        | `content: String`                                                                 |
 | `Image`       | `source: ImageSource`, `alt: Option<String>`, `title: Option<String>`, `decorative: bool` |
 | `FootnoteRef` | `id: u32`                                                                        |
 | `LineBreak`   | —                                                                                |
@@ -167,7 +179,7 @@ Every `Start*` has a matching `End*`. They nest but never overlap.
 
 **BlockQuote.** May contain any block element.
 
-**Preformatted.** When `syntax` is present, block has code semantics. Formatting attributes on inner `Text` are ignored. Newlines in content are literal.
+**Preformatted.** When `syntax` is present, block has code semantics. Inline style spans inside preformatted blocks are ignored. Newlines in content are literal.
 
 **Definition list.** Terms contain inline content only. Details can contain any block element.
 
@@ -175,7 +187,9 @@ Every `Start*` has a matching `End*`. They nest but never overlap.
 
 **Link.** An inline container (uses Start/End because it carries `href`). Valid inside paragraphs, headings, list items, cells, definition details. Cannot nest.
 
-**Text.** Formatting changes produce new events. Default: `TextStyle::default()` — all formatting flags disabled and `mark` is `None`. Empty content is valid but meaningless. `subscript` and `superscript` may both be true; writers that can't represent both prefer `superscript`. Whitespace is significant. Outside preformatted blocks, newlines in content are collapsed to whitespace; readers emit `LineBreak` for explicit hard breaks (e.g., markdown two-space-newline, HTML `<br>`) and `SoftBreak` for soft breaks (e.g., source line wraps within a paragraph).
+**Text.** Plain UTF-8 inline content. Empty content is valid but meaningless. Whitespace is significant. Outside preformatted blocks, newlines in content are collapsed to whitespace; readers emit `LineBreak` for explicit hard breaks (e.g., markdown two-space-newline, HTML `<br>`) and `SoftBreak` for soft breaks (e.g., source line wraps within a paragraph).
+
+**TextStyle.** `StartTextStyle` opens an inline formatting span and `EndTextStyle` closes the most recently opened style span. Style spans may nest but must never overlap. Writers that cannot represent both `Subscript` and `Superscript` on the same text prefer `Superscript`.
 
 **Image.** Asset bytes resolve lazily via `AssetProvider`. `decorative` means purely visual. May appear inline or directly in block containers.
 
@@ -197,10 +211,11 @@ Readers MUST produce well-formed streams. Writers MAY assume well-formedness.
 2. Exactly one root: `StartDocument`. Empty containers (`Start*` immediately followed by `End*`) are valid.
 3. `Text` appears only inside containers, never at root.
 4. `StartLink` appears inside inline-accepting blocks (paragraphs, headings, list items, cells, definition details). Links do not nest.
-5. `StartOrderedListItem` and `StartUnorderedListItem` appear inside block containers. List items may nest (child items inside parent `Start*`/`End*` pairs); the `level` field indicates indentation depth and is 0-indexed.
-6. `StartCaption` appears at most once per table, before any rows.
-7. Each footnote ID appears in exactly one `FootnoteRef` and one `StartFootnote`.
-8. Table structure: `StartTableRow` appears only inside `StartTable`. `StartTableCell`/`StartTableHeader` appear only inside `StartTableRow`.
+5. `StartTextStyle` appears inside inline-accepting blocks. Text style spans may nest and close in strict last-in, first-out order.
+6. `StartOrderedListItem` and `StartUnorderedListItem` appear inside block containers. List items may nest (child items inside parent `Start*`/`End*` pairs); the `level` field indicates indentation depth and is 0-indexed.
+7. `StartCaption` appears at most once per table, before any rows.
+8. Each footnote ID appears in exactly one `FootnoteRef` and one `StartFootnote`.
+9. Table structure: `StartTableRow` appears only inside `StartTable`. `StartTableCell`/`StartTableHeader` appear only inside `StartTableRow`.
 
 ---
 

@@ -25,10 +25,10 @@
 //! - Paragraphs → `StartParagraph` / `EndParagraph`
 //! - Block quotes → `StartBlockQuote` / `EndBlockQuote`
 //! - Code blocks → `StartPreformatted` / `EndPreformatted`
-//! - Bold text → `Text { style: TextStyle { bold: true, .. }, .. }`
-//! - Italic text → `Text { style: TextStyle { italic: true, .. }, .. }`
-//! - Inline code → `Text { style: TextStyle { code: true, .. }, .. }`
-//! - Strikethrough → `Text { style: TextStyle { strikethrough: true, .. }, .. }`
+//! - Bold text → `StartTextStyle { kind: Bold }` / `Text` / `EndTextStyle`
+//! - Italic text → `StartTextStyle { kind: Italic }` / `Text` / `EndTextStyle`
+//! - Inline code → `StartTextStyle { kind: Code }` / `Text` / `EndTextStyle`
+//! - Strikethrough → `StartTextStyle { kind: Strikethrough }` / `Text` / `EndTextStyle`
 //! - Images → `Image { source: Uri, alt, title, decorative }`
 //! - Hard line breaks → `LineBreak`
 //! - Soft line breaks → `SoftBreak`
@@ -62,7 +62,9 @@ extern crate alloc;
 use alloc::collections::VecDeque;
 
 pub use docspec_core::EventSource;
-use docspec_core::{Depth, Event, ImageSource, ListStyleType, Result, TableHeaderScope, TextStyle};
+use docspec_core::{
+    Depth, Event, ImageSource, ListStyleType, Result, TableHeaderScope, TextStyleKind,
+};
 use pulldown_cmark::{CodeBlockKind, CowStr, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 /// Whether content is inside a block-level element.
@@ -180,18 +182,32 @@ impl<'a> MarkdownReader<'a> {
         }
     }
 
-    fn current_text_style(&self) -> TextStyle {
-        let mut style = TextStyle::default();
+    fn current_text_style_kinds(&self) -> alloc::vec::Vec<TextStyleKind> {
+        let mut kinds = alloc::vec::Vec::new();
         if self.bold_depth.is_positive() {
-            style = style.bold();
+            kinds.push(TextStyleKind::Bold);
         }
         if self.italic_depth.is_positive() {
-            style = style.italic();
+            kinds.push(TextStyleKind::Italic);
         }
         if self.strikethrough_depth.is_positive() {
-            style = style.strikethrough();
+            kinds.push(TextStyleKind::Strikethrough);
         }
-        style
+        kinds
+    }
+
+    fn push_styled_text(&mut self, content: String, extra_style: Option<TextStyleKind>) {
+        let mut styles = self.current_text_style_kinds();
+        if let Some(kind) = extra_style {
+            styles.push(kind);
+        }
+        for kind in &styles {
+            self.queue.push_back(Event::StartTextStyle { kind: *kind });
+        }
+        self.queue.push_back(Event::Text { content });
+        for _ in styles {
+            self.queue.push_back(Event::EndTextStyle);
+        }
     }
 
     /// Emits `StartLink` for the buffered link if it hasn't been emitted yet.
@@ -234,10 +250,7 @@ impl<'a> MarkdownReader<'a> {
                 });
                 self.block_state = BlockState::AutoParagraph;
             }
-            self.queue.push_back(Event::Text {
-                content,
-                style: self.current_text_style().code(),
-            });
+            self.push_styled_text(content, Some(TextStyleKind::Code));
         }
     }
 
@@ -247,10 +260,7 @@ impl<'a> MarkdownReader<'a> {
         if let Some(buf) = self.code_block_buffer.take() {
             let content = buf.strip_suffix('\n').unwrap_or(&buf).to_owned();
             if !content.is_empty() {
-                self.queue.push_back(Event::Text {
-                    content,
-                    style: TextStyle::default(),
-                });
+                self.queue.push_back(Event::Text { content });
             }
         }
         self.push_event_end(Event::EndPreformatted);
@@ -556,10 +566,7 @@ impl<'a> MarkdownReader<'a> {
                 });
                 self.block_state = BlockState::AutoParagraph;
             }
-            self.queue.push_back(Event::Text {
-                content,
-                style: self.current_text_style(),
-            });
+            self.push_styled_text(content, None);
         }
     }
 
@@ -689,7 +696,7 @@ mod tests {
         let mut reader = MarkdownReader::new("");
         reader.handle_code("code".to_string());
 
-        assert_eq!(reader.queue.len(), 2);
+        assert_eq!(reader.queue.len(), 4);
         assert_eq!(
             reader.queue.front(),
             Some(&Event::StartParagraph {
@@ -699,11 +706,17 @@ mod tests {
         );
         assert_eq!(
             reader.queue.get(1),
-            Some(&Event::Text {
-                content: "code".to_string(),
-                style: TextStyle::default().code(),
+            Some(&Event::StartTextStyle {
+                kind: TextStyleKind::Code,
             })
         );
+        assert_eq!(
+            reader.queue.get(2),
+            Some(&Event::Text {
+                content: "code".to_string(),
+            })
+        );
+        assert_eq!(reader.queue.get(3), Some(&Event::EndTextStyle));
     }
 
     #[test]
@@ -723,7 +736,6 @@ mod tests {
             reader.queue.get(1),
             Some(&Event::Text {
                 content: "hello".to_string(),
-                style: TextStyle::default(),
             })
         );
     }

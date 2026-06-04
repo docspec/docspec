@@ -17,7 +17,7 @@ Converts a DocSpec event stream into [BlockNote](https://www.blocknotejs.org/) J
 | Ordered list item                  | `numberedListItem`                                |
 | Inline link                        | `link` inline type with `href` (title is dropped) |
 
-Inline styles supported within text content: bold, italic, code, strikethrough, underline.
+Inline style spans supported around text content: bold, italic, code, strikethrough, underline.
 Inline links (`StartLink`/`EndLink`) emit a `link` inline type with the `href`. The optional `title` field is dropped (BlockNote's default link schema has no title).
 
 List items support arbitrary nesting via BlockNote's native `children: Block[]` arrays. The `start` prop on `numberedListItem` is preserved when the first item in a sequence carries an explicit start number.
@@ -37,7 +37,7 @@ Wrap `BlockNoteWriter` in `StackTrackingSink` before feeding list events. The wr
 
 ```rust
 use docspec_blocknote_writer::BlockNoteWriter;
-use docspec_core::{Event, EventSink, ListStyleType, StackTrackingSink, TextStyle};
+use docspec_core::{Event, EventSink, ListStyleType, StackTrackingSink};
 
 let mut buf = Vec::<u8>::new();
 let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
@@ -48,7 +48,6 @@ writer.handle_event(Event::StartDocument { id: None, language: None, metadata: N
 writer.handle_event(Event::StartParagraph { alignment: None, id: None })?;
 writer.handle_event(Event::Text {
     content: "Hello, world".to_string(),
-    style: TextStyle::default(),
 })?;
 writer.handle_event(Event::EndParagraph)?;
 
@@ -60,7 +59,6 @@ writer.handle_event(Event::StartUnorderedListItem {
 })?;
 writer.handle_event(Event::Text {
     content: "First bullet".to_string(),
-    style: TextStyle::default(),
 })?;
 writer.handle_event(Event::EndUnorderedListItem)?;
 
@@ -73,7 +71,6 @@ writer.handle_event(Event::StartOrderedListItem {
 })?;
 writer.handle_event(Event::Text {
     content: "Step one".to_string(),
-    style: TextStyle::default(),
 })?;
 writer.handle_event(Event::EndOrderedListItem)?;
 

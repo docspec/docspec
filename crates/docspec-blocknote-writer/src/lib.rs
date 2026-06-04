@@ -23,7 +23,7 @@
 //! - `StartTableRow` / `EndTableRow` — table rows
 //! - `StartTableCell` / `EndTableCell` — table cells (data)
 //! - `StartTableHeader` / `EndTableHeader` — table cells (header, emitted identically to data cells)
-//! - `Text` — inline text content with bold/italic/code/strikethrough/underline styles
+//! - `Text` — inline text content; active `StartTextStyle` spans become bold/italic/code/strikethrough/underline styles
 //! - `Image` — image blocks
 //! - `LineBreak` / `SoftBreak` — line breaks within content blocks
 //! - `ThematicBreak` — divider blocks
@@ -36,7 +36,7 @@
 //! `EVENTS.md` declares that `DocSpec` cells may contain any block element, so this writer
 //! flattens block-level events that appear inside a cell:
 //!
-//! - **Preserved**: [`Text`](docspec_core::Event::Text) (with all inline styles), [`LineBreak`](docspec_core::Event::LineBreak), [`SoftBreak`](docspec_core::Event::SoftBreak)
+//! - **Preserved**: [`Text`](docspec_core::Event::Text) with active style spans, [`LineBreak`](docspec_core::Event::LineBreak), [`SoftBreak`](docspec_core::Event::SoftBreak)
 //! - **Absorbed silently**: [`StartParagraph`](docspec_core::Event::StartParagraph) / [`EndParagraph`](docspec_core::Event::EndParagraph) (paragraph boundaries are dropped — adjacent paragraphs concatenate without separator)
 //! - **Dropped**: [`Image`](docspec_core::Event::Image), [`StartBlockQuote`](docspec_core::Event::StartBlockQuote), [`StartPreformatted`](docspec_core::Event::StartPreformatted), [`StartHeading`](docspec_core::Event::StartHeading), [`ThematicBreak`](docspec_core::Event::ThematicBreak), nested [`StartTable`](docspec_core::Event::StartTable) and their children — silently discarded
 //!
@@ -94,7 +94,7 @@
 //!
 //! ```
 //! use docspec_blocknote_writer::BlockNoteWriter;
-//! use docspec_core::{Event, EventSink, ListStyleType, StackTrackingSink, TextStyle};
+//! use docspec_core::{Event, EventSink, ListStyleType, StackTrackingSink};
 //!
 //! let mut buf = Vec::<u8>::new();
 //! let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
@@ -105,7 +105,6 @@
 //! writer.handle_event(Event::StartParagraph { alignment: None, id: None })?;
 //! writer.handle_event(Event::Text {
 //!     content: "Hello".to_string(),
-//!     style: TextStyle::default(),
 //! })?;
 //! writer.handle_event(Event::EndParagraph)?;
 //!
@@ -117,7 +116,6 @@
 //! })?;
 //! writer.handle_event(Event::Text {
 //!     content: "First bullet".to_string(),
-//!     style: TextStyle::default(),
 //! })?;
 //! writer.handle_event(Event::EndUnorderedListItem)?;
 //!
@@ -130,7 +128,6 @@
 //! })?;
 //! writer.handle_event(Event::Text {
 //!     content: "Step one".to_string(),
-//!     style: TextStyle::default(),
 //! })?;
 //! writer.handle_event(Event::EndOrderedListItem)?;
 //!
@@ -148,7 +145,9 @@ use std::io::Write;
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::write::EncoderWriter as Base64Encoder;
-use docspec_core::{AssetProvider, Depth, Error, Event, EventSink, ImageSource, Result, TextStyle};
+use docspec_core::{
+    AssetProvider, Depth, Error, Event, EventSink, ImageSource, Result, TextStyleKind,
+};
 use docspec_json::{JsonEmitter, Null, StrusonBackend};
 
 macro_rules! close_text_block {
@@ -238,10 +237,11 @@ pub struct BlockNoteWriter<'a, W: Write> {
     /// Whether the writer is currently inside an open link inline container.
     in_link: bool,
     json: JsonEmitter<StrusonBackend<W>>,
-    /// Whether at least one `StyledText` has been emitted into the current link's content array.
-    link_emitted_styled_text: bool,
+    /// Whether at least one text inline item has been emitted into the current link's content array.
+    link_emitted_text: bool,
     list_stack: Vec<ListStackEntry>,
     table_depth: Depth,
+    text_style_stack: Vec<TextStyleKind>,
 }
 
 impl<'a, W: Write> BlockNoteWriter<'a, W> {
@@ -367,14 +367,14 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
 
     /// Closes the current inline link object.
     ///
-    /// If no `StyledText` was emitted into the link's `content` array, inserts an empty
-    /// `StyledText` (`{"type":"text","text":"","styles":{}}`) to satisfy the `BlockNote`
+    /// If no text inline item was emitted into the link's `content` array, inserts an empty
+    /// text item (`{"type":"text","text":"","styles":{}}`) to satisfy the `BlockNote`
     /// schema (links must have at least one content item).
     fn handle_end_link(&mut self) -> Result<()> {
         if !self.in_link {
             return Ok(());
         }
-        if !self.link_emitted_styled_text {
+        if !self.link_emitted_text {
             self.json.open_object()?;
             self.json.key("type").value("text")?;
             self.json.key("text").value("")?;
@@ -385,7 +385,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.json.close_array()?;
         self.json.close_object()?;
         self.in_link = false;
-        self.link_emitted_styled_text = false;
+        self.link_emitted_text = false;
         Ok(())
     }
 
@@ -522,7 +522,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if (self.context.in_text_block || self.context.in_table_cell || self.in_list_item_content())
             && self.table_depth.get() <= 1
         {
-            self.handle_text("\n", &TextStyle::default())
+            self.handle_plain_text("\n")
         } else {
             Ok(())
         }
@@ -580,7 +580,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         }
         if self.blockquote_depth.is_positive() {
             if self.context.blockquote_has_content {
-                self.handle_text("\n\n", &TextStyle::default())?;
+                self.handle_plain_text("\n\n")?;
             }
             return Ok(());
         }
@@ -633,7 +633,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.json.key("href").value(href)?;
         self.json.key("content").open_array()?;
         self.in_link = true;
-        self.link_emitted_styled_text = false;
+        self.link_emitted_text = false;
         Ok(())
     }
 
@@ -749,7 +749,11 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Ok(())
     }
 
-    fn handle_text(&mut self, content: &str, style: &TextStyle) -> Result<()> {
+    fn handle_plain_text(&mut self, content: &str) -> Result<()> {
+        self.handle_text(content, &[])
+    }
+
+    fn handle_text(&mut self, content: &str, styles: &[TextStyleKind]) -> Result<()> {
         if self.drop_inside_list_depth.is_positive()
             || self.dropped_list_depth.is_positive()
             || (!self.context.in_text_block
@@ -762,16 +766,21 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if self.blockquote_depth.is_positive() {
             self.context.blockquote_has_content = true;
         }
+        let bold = styles.contains(&TextStyleKind::Bold);
+        let italic = styles.contains(&TextStyleKind::Italic);
+        let code = styles.contains(&TextStyleKind::Code);
+        let strikethrough = styles.contains(&TextStyleKind::Strikethrough);
+        let underline = styles.contains(&TextStyleKind::Underline);
         self.json.object(|j| {
             j.key("type").value("text")?;
             j.key("text").value(content)?;
             j.key("styles").object(|s| {
                 for (key, enabled) in [
-                    ("bold", style.bold),
-                    ("italic", style.italic),
-                    ("code", style.code),
-                    ("strike", style.strikethrough),
-                    ("underline", style.underline),
+                    ("bold", bold),
+                    ("italic", italic),
+                    ("code", code),
+                    ("strike", strikethrough),
+                    ("underline", underline),
                 ] {
                     if enabled {
                         s.key(key).value(true)?;
@@ -781,12 +790,12 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             })
         })?;
         if self.in_link {
-            self.link_emitted_styled_text = true;
+            self.link_emitted_text = true;
         }
         Ok(())
     }
 
-    fn handle_text_event(&mut self, content: &str, style: &TextStyle) -> Result<()> {
+    fn handle_text_event(&mut self, content: &str) -> Result<()> {
         // Auto-open paragraph for orphan text (e.g., text after image closed paragraph)
         if !self.context.in_text_block
             && self.blockquote_depth.is_zero()
@@ -795,7 +804,27 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         {
             self.handle_paragraph(None)?;
         }
-        self.handle_text(content, style)
+        let styles = self.text_style_stack.clone();
+        self.handle_text(content, &styles)
+    }
+
+    fn handle_thematic_break_event(&mut self, id: Option<&String>) -> Result<()> {
+        return_if_table_cell!(self);
+        if self.in_any_list_item() || self.drop_inside_list_depth.is_positive() {
+            return Ok(());
+        }
+        self.close_for_block_sibling()?;
+        self.handle_divider(id)
+    }
+
+    fn handle_start_text_style(&mut self, kind: TextStyleKind) -> Result<()> {
+        self.text_style_stack.push(kind);
+        Ok(())
+    }
+
+    fn handle_end_text_style(&mut self) -> Result<()> {
+        self.text_style_stack.pop();
+        Ok(())
     }
 
     /// Returns true when any list item is currently open on the stack, regardless of whether
@@ -832,9 +861,10 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             dropped_list_depth: Depth::default(),
             in_link: false,
             json: JsonEmitter::new(StrusonBackend::new(writer)),
-            link_emitted_styled_text: false,
+            link_emitted_text: false,
             list_stack: Vec::new(),
             table_depth: Depth::default(),
+            text_style_stack: Vec::new(),
         }
     }
 
@@ -926,9 +956,10 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             dropped_list_depth: Depth::default(),
             in_link: false,
             json: JsonEmitter::new(StrusonBackend::new(writer)),
-            link_emitted_styled_text: false,
+            link_emitted_text: false,
             list_stack: Vec::new(),
             table_depth: Depth::default(),
+            text_style_stack: Vec::new(),
         }
     }
 
@@ -1004,15 +1035,10 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 self.close_for_block_sibling()?;
                 self.handle_preformatted(id.as_ref(), syntax.as_ref())
             }
-            Event::ThematicBreak { id, .. } => {
-                return_if_table_cell!(self);
-                if self.in_any_list_item() || self.drop_inside_list_depth.is_positive() {
-                    return Ok(());
-                }
-                self.close_for_block_sibling()?;
-                self.handle_divider(id.as_ref())
-            }
-            Event::Text { content, style, .. } => self.handle_text_event(&content, &style),
+            Event::ThematicBreak { id, .. } => self.handle_thematic_break_event(id.as_ref()),
+            Event::Text { content, .. } => self.handle_text_event(&content),
+            Event::StartTextStyle { kind } => self.handle_start_text_style(kind),
+            Event::EndTextStyle => self.handle_end_text_style(),
             Event::Image {
                 source, alt, id, ..
             } => self.handle_image(source, alt, id.as_ref()),

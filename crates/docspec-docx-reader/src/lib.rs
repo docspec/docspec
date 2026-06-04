@@ -53,7 +53,7 @@ use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 
 pub use docspec_core::EventSource;
-use docspec_core::{Error, Event, Result, TextStyle};
+use docspec_core::{Error, Event, Result};
 use quick_xml::events::{BytesCData, BytesRef, BytesText};
 
 /// Document processing phase.
@@ -220,7 +220,6 @@ impl DocxReader {
         if !self.pending_text.is_empty() {
             self.queue.push_back(Event::Text {
                 content: core::mem::take(&mut self.pending_text),
-                style: TextStyle::default(),
             });
         }
     }

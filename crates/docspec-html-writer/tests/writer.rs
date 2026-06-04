@@ -3,7 +3,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use core::cell::Cell;
-use docspec_core::{Error, Event, EventSink as _, ImageSource, ListStyleType, TextStyle};
+use docspec_core::{Error, Event, EventSink as _, ImageSource, ListStyleType};
 use docspec_html_writer::HtmlWriter;
 use std::io::{self, Write};
 use std::rc::Rc;
@@ -76,7 +76,6 @@ mod tests {
         });
         let _r3 = writer.handle_event(Event::Text {
             content: "hello".to_string(),
-            style: TextStyle::default(),
         });
         let _r4 = writer.handle_event(Event::EndParagraph);
         let _r5 = writer.handle_event(Event::EndDocument);
@@ -99,7 +98,6 @@ mod tests {
         });
         let _r3 = writer.handle_event(Event::Text {
             content: "first".to_string(),
-            style: TextStyle::default(),
         });
         let _r4 = writer.handle_event(Event::EndParagraph);
         let _r5 = writer.handle_event(Event::StartParagraph {
@@ -108,7 +106,6 @@ mod tests {
         });
         let _r6 = writer.handle_event(Event::Text {
             content: "second".to_string(),
-            style: TextStyle::default(),
         });
         let _r7 = writer.handle_event(Event::EndParagraph);
         let _r8 = writer.handle_event(Event::EndDocument);
@@ -135,7 +132,6 @@ mod tests {
         });
         let _r3 = writer.handle_event(Event::Text {
             content: "hello world".to_string(),
-            style: TextStyle::default(),
         });
         let _r4 = writer.handle_event(Event::EndParagraph);
         let _r5 = writer.handle_event(Event::EndDocument);
@@ -155,7 +151,6 @@ mod tests {
         });
         let _r2 = writer.handle_event(Event::Text {
             content: "ignored".to_string(),
-            style: TextStyle::default(),
         });
         let _r3 = writer.handle_event(Event::EndDocument);
         let _r4 = writer.finish();
@@ -178,7 +173,6 @@ mod tests {
         });
         let _r3 = writer.handle_event(Event::Text {
             content: "a & b < c > d".to_string(),
-            style: TextStyle::default(),
         });
         let _r4 = writer.handle_event(Event::EndParagraph);
         let _r5 = writer.handle_event(Event::EndDocument);

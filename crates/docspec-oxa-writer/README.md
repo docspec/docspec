@@ -38,7 +38,6 @@ writer.handle_event(Event::StartDocument { id: None, language: None, metadata: N
 writer.handle_event(Event::StartParagraph { alignment: None, id: None })?;
 writer.handle_event(Event::Text {
     content: "Hello, world".to_string(),
-    style: Default::default(),
 })?;
 writer.handle_event(Event::EndParagraph)?;
 writer.handle_event(Event::EndDocument)?;

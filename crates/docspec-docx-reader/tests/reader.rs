@@ -497,7 +497,7 @@ mod constructor {
 mod events {
     use std::io::Cursor;
 
-    use docspec_core::{Event, TextStyle};
+    use docspec_core::Event;
     use docspec_docx_reader::{DocxReader, EventSource as _};
 
     use crate::fixture;
@@ -535,7 +535,6 @@ mod events {
     fn text(content: &str) -> Event {
         Event::Text {
             content: content.to_string(),
-            style: TextStyle::default(),
         }
     }
 

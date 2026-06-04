@@ -103,7 +103,7 @@ mod tests {
     #![allow(clippy::panic_in_result_fn, clippy::unwrap_used)]
 
     use super::HtmlWriter;
-    use docspec_core::{Event, EventSink as _, Result, TextStyle};
+    use docspec_core::{Event, EventSink as _, Result};
 
     fn assert_output(events: impl IntoIterator<Item = Event>, expected: &str) {
         let mut buf: Vec<u8> = Vec::new();
@@ -131,7 +131,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "oops".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndDocument,
             ],
@@ -205,7 +204,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "a & b < c > d".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -229,7 +227,6 @@ mod tests {
         })?;
         writer.handle_event(Event::Text {
             content: "hello".to_string(),
-            style: TextStyle::default(),
         })?;
         writer.handle_event(Event::EndParagraph)?;
         writer.handle_event(Event::EndDocument)?;
@@ -253,7 +250,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "x".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::ThematicBreak { id: None },
@@ -278,7 +274,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "hello".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -306,7 +301,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "x".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -326,7 +320,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "ignored".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndDocument,
             ],

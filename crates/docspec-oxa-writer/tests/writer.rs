@@ -4,7 +4,7 @@
 
 #[cfg(test)]
 mod tests {
-    use docspec_core::{Error, Event, EventSink as _, ImageSource, TextStyle};
+    use docspec_core::{Error, Event, EventSink as _, ImageSource};
     use docspec_oxa_writer::OxaWriter;
     use serde_json::{json, Value};
 
@@ -61,7 +61,6 @@ mod tests {
     fn text(s: &str) -> Event {
         Event::Text {
             content: s.to_string(),
-            style: TextStyle::default(),
         }
     }
 

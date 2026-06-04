@@ -34,7 +34,7 @@ extern crate alloc;
 use alloc::collections::VecDeque;
 
 pub use docspec_core::EventSource;
-use docspec_core::{Event, Result, TextStyle};
+use docspec_core::{Event, Result};
 use html5gum::{StringReader, Tokenizer};
 
 /// Document processing phase.
@@ -134,7 +134,6 @@ impl<'a> HtmlReader<'a> {
                 })?;
             self.queue.push_back(Event::Text {
                 content: text.to_string(),
-                style: TextStyle::default(),
             });
         }
         Ok(())

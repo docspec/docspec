@@ -9,7 +9,7 @@ mod tests {
         feature = "oxa-writer",
         feature = "html-writer"
     ))]
-    use docspec::{AnyWriter, OutputFormat, TextStyle};
+    use docspec::{AnyWriter, OutputFormat};
     #[cfg(any(
         feature = "blocknote-writer",
         feature = "oxa-writer",
@@ -50,7 +50,6 @@ mod tests {
     fn text(content: &str) -> Event {
         Event::Text {
             content: content.to_string(),
-            style: TextStyle::default(),
         }
     }
 

@@ -14,7 +14,7 @@ mod tests {
     use docspec_blocknote_writer::BlockNoteWriter;
     use docspec_core::{
         AssetProvider, Event, EventSink as _, EventSource as _, ImageSource, StackTrackingSink,
-        TextStyle,
+        TextStyleKind,
     };
     use docspec_markdown_reader::MarkdownReader;
 
@@ -156,7 +156,6 @@ mod tests {
     fn text(content: &str) -> Event {
         Event::Text {
             content: content.to_string(),
-            style: TextStyle::default(),
         }
     }
 
@@ -217,10 +216,13 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
             Event::Text {
                 content: "Bold".to_string(),
-                style: TextStyle::default().bold(),
             },
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -353,20 +355,26 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
             Event::Text {
                 content: "Bold line one".to_string(),
-                style: TextStyle::default().bold(),
             },
+            Event::EndTextStyle,
             Event::SoftBreak,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
             Event::Text {
                 content: "Bold line two".to_string(),
-                style: TextStyle::default().bold(),
             },
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        // Three text nodes: bold "Bold line one", default-style "\n", bold "Bold line two"
-        // The "\n" node has empty styles because handle_line_break calls handle_text with TextStyle::default()
+        // Three text nodes: bold "Bold line one", plain "\n", bold "Bold line two".
+        // The "\n" node has empty styles because line breaks are emitted without active text styles.
         assert_eq!(
             json,
             r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Bold line one","styles":{"bold":true}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Bold line two","styles":{"bold":true}}],"children":[]}]"#
@@ -378,10 +386,13 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
+            Event::StartTextStyle {
+                kind: TextStyleKind::Italic,
+            },
             Event::Text {
                 content: "Italic".to_string(),
-                style: TextStyle::default().italic(),
             },
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -396,10 +407,17 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
+            Event::StartTextStyle {
+                kind: TextStyleKind::Italic,
+            },
             Event::Text {
                 content: "Both".to_string(),
-                style: TextStyle::default().bold().italic(),
             },
+            Event::EndTextStyle,
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -588,10 +606,13 @@ mod tests {
             start_document(),
             start_blockquote(),
             start_paragraph(),
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
             Event::Text {
                 content: "bold quote".to_string(),
-                style: TextStyle::default().bold(),
             },
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndBlockQuote,
             Event::EndDocument,
@@ -890,10 +911,13 @@ mod tests {
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
             Event::Text {
                 content: "Bold bullet".to_string(),
-                style: TextStyle::default().bold(),
             },
+            Event::EndTextStyle,
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -1053,10 +1077,13 @@ mod tests {
             start_document(),
             start_paragraph(),
             text("Hello "),
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
             Event::Text {
                 content: "World".to_string(),
-                style: TextStyle::default().bold(),
             },
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -1856,10 +1883,13 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
+            Event::StartTextStyle {
+                kind: TextStyleKind::Code,
+            },
             Event::Text {
                 content: "code".to_string(),
-                style: TextStyle::default().code(),
             },
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -1874,10 +1904,13 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
+            Event::StartTextStyle {
+                kind: TextStyleKind::Strikethrough,
+            },
             Event::Text {
                 content: "struck".to_string(),
-                style: TextStyle::default().strikethrough(),
             },
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -1892,10 +1925,13 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
+            Event::StartTextStyle {
+                kind: TextStyleKind::Underline,
+            },
             Event::Text {
                 content: "underlined".to_string(),
-                style: TextStyle::default().underline(),
             },
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -1910,10 +1946,21 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
+            Event::StartTextStyle {
+                kind: TextStyleKind::Code,
+            },
+            Event::StartTextStyle {
+                kind: TextStyleKind::Strikethrough,
+            },
             Event::Text {
                 content: "combined".to_string(),
-                style: TextStyle::default().bold().code().strikethrough(),
             },
+            Event::EndTextStyle,
+            Event::EndTextStyle,
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -2000,10 +2047,13 @@ mod tests {
             start_table(),
             start_table_row(),
             start_table_cell(),
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
             Event::Text {
                 content: "bold".to_string(),
-                style: TextStyle::default().bold(),
             },
+            Event::EndTextStyle,
             Event::EndTableCell,
             Event::EndTableRow,
             Event::EndTable,
@@ -4150,14 +4200,20 @@ mod tests {
                 title: None,
                 id: None,
             },
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
             Event::Text {
                 content: "bold".to_string(),
-                style: TextStyle::default().bold(),
+            },
+            Event::EndTextStyle,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Italic,
             },
             Event::Text {
                 content: "italic".to_string(),
-                style: TextStyle::default().italic(),
             },
+            Event::EndTextStyle,
             text("plain"),
             Event::EndLink,
             Event::EndParagraph,
