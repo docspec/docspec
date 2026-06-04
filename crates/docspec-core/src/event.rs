@@ -142,6 +142,9 @@ pub enum Event {
     /// End a table row.
     EndTableRow,
 
+    /// End a text style.
+    EndTextStyle,
+
     /// End an unordered (bulleted) list item.
     EndUnorderedListItem,
 
@@ -302,6 +305,12 @@ pub enum Event {
     StartTableRow {
         /// Optional block identifier.
         id: Option<String>,
+    },
+
+    /// Begin a text style.
+    StartTextStyle {
+        /// The kind of text style being applied.
+        kind: TextStyleKind,
     },
 
     /// Begin an unordered (bulleted) list item.

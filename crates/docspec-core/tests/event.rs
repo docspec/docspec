@@ -130,6 +130,14 @@ mod tests {
     }
 
     #[test]
+    fn end_text_style() {
+        let event = Event::EndTextStyle;
+        assert_eq!(format!("{event:?}"), "EndTextStyle");
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
     fn footnote_ref() {
         let event = Event::FootnoteRef { id: 42 };
         let cloned = event.clone();
@@ -522,6 +530,33 @@ mod tests {
     #[test]
     fn start_table_row() {
         let event = Event::StartTableRow { id: None };
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_text_style_bold() {
+        let event = Event::StartTextStyle {
+            kind: TextStyleKind::Bold,
+        };
+        assert_eq!(format!("{event:?}"), "StartTextStyle { kind: Bold }");
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn start_text_style_mark() {
+        let event = Event::StartTextStyle {
+            kind: TextStyleKind::Mark(Color::Rgb {
+                r: 10,
+                g: 20,
+                b: 30,
+            }),
+        };
+        assert_eq!(
+            format!("{event:?}"),
+            "StartTextStyle { kind: Mark(Rgb { b: 30, g: 20, r: 10 }) }"
+        );
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
