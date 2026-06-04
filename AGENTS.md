@@ -14,19 +14,26 @@ DocSpec is a streaming document conversion library in Rust. Documents are stream
 
 ## Hard Rules
 
-- **No unsafe code** — workspace forbids it entirely
-- **No unwrap() or expect()** — use Result and ?
-- **No inline #[allow]** — fix the code, not the warning
+The rules below apply to **source code** unless marked otherwise. Test files (under `tests/` and `#[cfg(test)]` modules) may opt out of specific clippy strictness — see [Test Code Exceptions](#test-code-exceptions).
+
+- **No unsafe code** — workspace forbids it entirely (applies everywhere, including tests)
+- **No unwrap() or expect() in source code** — use Result and ? (tests may opt out)
+- **No inline #[allow] in source code** — fix the code, not the warning (tests may opt out at crate level)
 - **Never buffer full documents** — stream always
 - **Fail fast** — return errors immediately
 - **98% coverage floor for new and changed executable Rust lines in covered crates**
 - **Exact-value test assertions** — no substring, type-only, or shape-only checks, see [TESTING.md](TESTING.md#exact-value-assertions)
 
+### Test Code Exceptions
+
+Test files (`tests/**` integration tests and `#[cfg(test)]` modules) may use crate-level `#![allow(clippy::unwrap_used, clippy::expect_used, ...)]` to opt out of specific clippy lints that legitimately only apply to production code. Test setup, fixture loading, and assertions often need to panic on programmer error — banning unwrap there forces awkward boilerplate without making tests safer. Source code remains strictly enforced.
+
 See [CODING_STANDARDS.md](CODING_STANDARDS.md) for full details.
 
 ## Before You Submit
 
-- `cargo fmt` and `cargo clippy` pass with zero warnings
+- `cargo fmt` passes (applies to all `.rs` files, source and tests)
+- `cargo clippy` passes with zero warnings — source code holds the strict line; test files may suppress specific lints via crate-level `#![allow(...)]`
 - All tests pass, coverage maintained
 - All public items have doc comments
 - Commits follow conventional format: `type(scope): description`
