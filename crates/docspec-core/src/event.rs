@@ -91,6 +91,20 @@ pub enum TextStyleKind {
 /// - **Start/End pairs**: Container elements like headings, paragraphs, tables
 /// - **Self-contained**: Standalone elements like text, images, line breaks
 /// - **Block vs Inline**: Block events create new vertical sections; inline events flow within blocks
+///
+/// # Inline Text Styling
+///
+/// Inline formatting uses paired events: [`Event::StartTextStyle`] opens a style span,
+/// [`Event::EndTextStyle`] closes the innermost open style (strict LIFO). Example:
+///
+/// ```text
+/// StartTextStyle { kind: TextStyleKind::Bold }
+/// Text { content: "bold text" }
+/// EndTextStyle
+/// ```
+///
+/// Style spans must close before their surrounding block ends; [`crate::StackTrackingSink`]
+/// auto-closes any open styles when a block End or [`Event::EndDocument`] arrives.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
