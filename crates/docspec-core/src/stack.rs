@@ -124,6 +124,9 @@ impl<S: EventSink> StackTrackingSink<S> {
                 message: "EndDocument received without StartDocument".to_string(),
             });
         }
+        while self.style_stack.pop().is_some() {
+            self.sink.handle_event(Event::EndTextStyle)?;
+        }
         while let Some(kind) = self.stack.pop() {
             if kind != BlockKind::Document {
                 self.sink.handle_event(end_event_for(kind))?;

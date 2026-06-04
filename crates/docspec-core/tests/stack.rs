@@ -927,6 +927,111 @@ mod tests {
     }
 
     #[test]
+    fn styles_drained_on_end_document() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
+        );
+        send(&mut sink, Event::EndDocument);
+
+        let events = sink.into_inner().events;
+        assert_eq!(
+            events,
+            vec![
+                Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                },
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn styles_drained_on_end_document_multiple() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Italic,
+            },
+        );
+        send(&mut sink, Event::EndDocument);
+
+        let events = sink.into_inner().events;
+        assert_eq!(
+            events,
+            vec![
+                Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Italic,
+                },
+                Event::EndTextStyle,
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
     fn styles_drain_before_end_heading() {
         let mock = MockSink::new();
         let mut sink = StackTrackingSink::new(mock);
