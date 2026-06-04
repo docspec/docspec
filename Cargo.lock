@@ -476,7 +476,9 @@ dependencies = [
  "docspec-json",
  "docspec-markdown-reader",
  "docspec-oxa-writer",
+ "docspec-test-fixtures",
  "self_cell",
+ "tempfile",
 ]
 
 [[package]]
@@ -518,6 +520,7 @@ name = "docspec-docx-reader"
 version = "1.0.0"
 dependencies = [
  "docspec-core",
+ "docspec-test-fixtures",
  "flate2",
  "quick-xml",
  "tempfile",

@@ -1,79 +1,115 @@
-//! Reader factory for creating readers from input formats.
+//! Reader factory for creating readers from any `Read + Seek` source.
+
+use std::io::{Read, Seek};
+use std::path::Path;
 
 use docspec_core::{Event, EventSource, Result};
 
 #[cfg(feature = "html")]
-use docspec_html_reader::HtmlReader;
+use crate::factory::html_owned::HtmlReaderOwned;
 #[cfg(feature = "markdown")]
-use docspec_markdown_reader::MarkdownReader;
+use crate::factory::markdown_owned::MarkdownReaderOwned;
+#[cfg(feature = "docx")]
+use docspec_docx_reader::DocxReader;
 
 use crate::format::InputFormat;
 
 /// Enum-dispatch reader for any registered input format.
 ///
-/// Constructed via [`AnyReader::new`]. Implements [`EventSource`] by delegating
-/// `next_event` to the inner concrete reader. Zero heap allocation, zero
-/// virtual-dispatch overhead.
-pub enum AnyReader<'a> {
-    /// HTML reader from [`docspec_html_reader`] (paragraph-only; see crate docs).
+/// Constructed via [`AnyReader::from_reader`] or [`AnyReader::from_path`].
+/// Implements [`EventSource`] by delegating `next_event` to the inner concrete reader.
+pub enum AnyReader {
+    /// DOCX reader.
+    #[cfg(feature = "docx")]
+    Docx(DocxReader),
+    /// HTML reader (paragraph-only; see crate docs).
     #[cfg(feature = "html")]
-    Html(HtmlReader<'a>),
-    /// Markdown reader from [`docspec_markdown_reader`].
+    Html(HtmlReaderOwned),
+    /// Markdown reader (paragraph-only; see crate docs).
     #[cfg(feature = "markdown")]
-    Markdown(MarkdownReader<'a>),
+    Markdown(MarkdownReaderOwned),
     /// Phantom variant when no reader features are active.
-    #[cfg(not(any(feature = "markdown", feature = "html")))]
-    _Phantom(std::marker::PhantomData<&'a ()>),
+    #[cfg(not(any(feature = "markdown", feature = "html", feature = "docx")))]
+    _Phantom(core::convert::Infallible),
 }
 
-impl<'a> AnyReader<'a> {
-    /// Construct a reader for the given format from an in-memory string.
+impl AnyReader {
+    /// Convenience: open the file at `path` and call [`from_reader`](Self::from_reader).
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the file cannot be opened or if `from_reader` fails.
     #[inline]
-    #[must_use]
-    pub fn new(format: InputFormat, input: &'a str) -> Self {
+    pub fn from_path<P: AsRef<Path>>(format: InputFormat, path: P) -> Result<Self> {
+        let file = std::fs::File::open(path)?;
+        Self::from_reader(format, file)
+    }
+
+    /// Construct a reader for the given format from any `Read + Seek` source.
+    ///
+    /// For text formats (Markdown, HTML), the full input is read into a `String`
+    /// (UTF-8 validation is applied) and a leading UTF-8 BOM is stripped before
+    /// the inner reader is constructed.
+    ///
+    /// For binary formats (DOCX), the reader is passed through to the underlying
+    /// streaming reader; no buffering is performed by this factory beyond what the
+    /// inner reader requires.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if reading the input fails (including non-UTF-8 bytes for text
+    /// formats — `read_to_string` surfaces these as `io::ErrorKind::InvalidData`).
+    /// Returns `Err` if a binary archive is malformed.
+    #[inline]
+    pub fn from_reader<R: Read + Seek + 'static>(format: InputFormat, reader: R) -> Result<Self> {
         #[cfg(not(any(feature = "markdown", feature = "html", feature = "docx")))]
         {
-            let _ = input;
+            let _ = reader;
             match format {}
         }
         #[cfg(any(feature = "markdown", feature = "html", feature = "docx"))]
         match format {
-            #[cfg(feature = "html")]
-            InputFormat::Html => Self::Html(HtmlReader::new(input)),
-            #[cfg(feature = "markdown")]
-            InputFormat::Markdown => Self::Markdown(MarkdownReader::new(input)),
             #[cfg(feature = "docx")]
             InputFormat::Docx => {
-                // Docx reader requires a file path or binary reader, not a string.
-                // This arm is unreachable in correct usage; T7 will remove AnyReader::new entirely.
-                // Return a dummy value that will never be used in practice.
-                #[cfg(feature = "html")]
-                {
-                    Self::Html(HtmlReader::new(""))
-                }
-                #[cfg(all(not(feature = "html"), feature = "markdown"))]
-                {
-                    Self::Markdown(MarkdownReader::new(""))
-                }
-                #[cfg(all(not(feature = "html"), not(feature = "markdown")))]
-                {
-                    Self::_Phantom(std::marker::PhantomData)
-                }
+                let docx = DocxReader::from_reader(reader)?;
+                Ok(Self::Docx(docx))
+            }
+            #[cfg(feature = "html")]
+            InputFormat::Html => {
+                let mut raw_input = String::new();
+                let mut reader = reader;
+                reader.read_to_string(&mut raw_input)?;
+                let input = crate::format::strip_bom(&raw_input).to_owned();
+                Ok(Self::Html(HtmlReaderOwned::new(input, |owned| {
+                    docspec_html_reader::HtmlReader::new(owned)
+                })))
+            }
+            #[cfg(feature = "markdown")]
+            InputFormat::Markdown => {
+                let mut raw_input = String::new();
+                let mut reader = reader;
+                reader.read_to_string(&mut raw_input)?;
+                let input = crate::format::strip_bom(&raw_input).to_owned();
+                Ok(Self::Markdown(MarkdownReaderOwned::new(input, |owned| {
+                    docspec_markdown_reader::MarkdownReader::new(owned)
+                })))
             }
         }
     }
 }
 
-impl EventSource for AnyReader<'_> {
+impl EventSource for AnyReader {
     #[inline]
     fn next_event(&mut self) -> Result<Option<Event>> {
         match self {
+            #[cfg(feature = "docx")]
+            Self::Docx(reader) => reader.next_event(),
             #[cfg(feature = "html")]
-            Self::Html(r) => r.next_event(),
+            Self::Html(reader) => reader.next_event(),
             #[cfg(feature = "markdown")]
-            Self::Markdown(r) => r.next_event(),
-            #[cfg(not(any(feature = "markdown", feature = "html")))]
-            Self::_Phantom(_) => Ok(None),
+            Self::Markdown(reader) => reader.next_event(),
+            #[cfg(not(any(feature = "markdown", feature = "html", feature = "docx")))]
+            Self::_Phantom(infallible) => match *infallible {},
         }
     }
 }

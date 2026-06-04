@@ -25,6 +25,7 @@ impl EventSource for HtmlReaderOwned {
     ///
     /// Uses `with_dependent_mut` — the canonical `self_cell` 1.x API for mutable
     /// access to the dependent value.
+    #[inline]
     fn next_event(&mut self) -> Result<Option<Event>> {
         self.with_dependent_mut(|_owner, reader| reader.next_event())
     }
@@ -47,25 +48,32 @@ mod tests {
             events.push(event);
         }
         // Should contain StartParagraph, Text("hello"), EndParagraph, EndDocument
-        assert!(events.iter().any(|e| matches!(e, Event::StartParagraph { .. })));
-        assert!(events.iter().any(|e| matches!(e, Event::Text { content, .. } if content == "hello")));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, Event::StartParagraph { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, Event::Text { content, .. } if content == "hello")));
         assert!(events.iter().any(|e| matches!(e, Event::EndParagraph)));
     }
 
     #[test]
     fn empty_html_emits_only_document_envelope() {
-        let mut reader = HtmlReaderOwned::new(String::new(), |s| {
-            docspec_html_reader::HtmlReader::new(s)
-        });
+        let mut reader =
+            HtmlReaderOwned::new(String::new(), |s| docspec_html_reader::HtmlReader::new(s));
         let mut events = Vec::new();
         while let Some(event) = reader.next_event().unwrap() {
             events.push(event);
         }
         // Empty HTML: only StartDocument + EndDocument
-        assert!(events.iter().any(|e| matches!(e, Event::StartDocument { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, Event::StartDocument { .. })));
         assert!(events.iter().any(|e| matches!(e, Event::EndDocument)));
         // No paragraphs or text
-        assert!(!events.iter().any(|e| matches!(e, Event::StartParagraph { .. })));
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e, Event::StartParagraph { .. })));
     }
 
     #[test]

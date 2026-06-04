@@ -120,6 +120,9 @@ mod tests {
         std::io::Read::read_to_end(&mut file, &mut decompressed)
             .expect("should decompress successfully");
 
-        assert_eq!(decompressed, test_data, "decompressed data should match original");
+        assert_eq!(
+            decompressed, test_data,
+            "decompressed data should match original"
+        );
     }
 }
