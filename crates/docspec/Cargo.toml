@@ -45,6 +45,10 @@ docspec-html-reader = { path = "../docspec-html-reader", version = "1.0.1", opti
 docspec-docx-reader = { path = "../docspec-docx-reader", version = "1.0.0", optional = true }
 docspec-oxa-writer = { path = "../docspec-oxa-writer", version = "1.0.0", optional = true }
 docspec-html-writer = { path = "../docspec-html-writer", version = "1.0.1", optional = true }
+# Reason: self_cell provides safe self-referential structs for AnyReader's owned text wrappers
+# (MarkdownReaderOwned, HtmlReaderOwned). No unsafe in user code; macro hides the small internal
+# unsafe. Approved as the single new dependency for the 2.0 migration.
+self_cell = "1"
 
 [package.metadata.docs.rs]
 all-features = true
