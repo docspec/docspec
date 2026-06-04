@@ -2198,4 +2198,82 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn thematic_break_drains_styles_before_end_paragraph() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
+        );
+        send(&mut sink, Event::ThematicBreak { id: None });
+
+        assert!(!sink.is_inside_text_style(TextStyleKind::Bold));
+        let events = sink.into_inner().events;
+        assert_eq!(
+            events,
+            vec![
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                },
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::ThematicBreak { id: None },
+            ]
+        );
+    }
+
+    #[test]
+    fn new_block_start_drains_styles_before_implicit_end_paragraph() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
+        );
+        send(&mut sink, Event::StartHeading { id: None, level: 1 });
+
+        assert!(!sink.is_inside_text_style(TextStyleKind::Bold));
+        let events = sink.into_inner().events;
+        assert_eq!(
+            events,
+            vec![
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                },
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::StartHeading { id: None, level: 1 },
+            ]
+        );
+    }
 }

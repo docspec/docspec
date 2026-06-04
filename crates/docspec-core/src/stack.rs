@@ -114,6 +114,14 @@ pub struct StackTrackingSink<S: EventSink> {
 }
 
 impl<S: EventSink> StackTrackingSink<S> {
+    /// Drains all open text styles from the style stack, emitting `EndTextStyle` for each.
+    fn drain_text_styles(&mut self) -> Result<()> {
+        while self.style_stack.pop().is_some() {
+            self.sink.handle_event(Event::EndTextStyle)?;
+        }
+        Ok(())
+    }
+
     /// Handles an `EndDocument` event: drains all remaining open blocks in reverse order,
     /// emits their close events, sets `document_finished`, then forwards `EndDocument`.
     fn handle_end_document(&mut self) -> Result<()> {
@@ -124,9 +132,7 @@ impl<S: EventSink> StackTrackingSink<S> {
                 message: "EndDocument received without StartDocument".to_string(),
             });
         }
-        while self.style_stack.pop().is_some() {
-            self.sink.handle_event(Event::EndTextStyle)?;
-        }
+        self.drain_text_styles()?;
         while let Some(kind) = self.stack.pop() {
             if kind != BlockKind::Document {
                 self.sink.handle_event(end_event_for(kind))?;
@@ -164,9 +170,7 @@ impl<S: EventSink> StackTrackingSink<S> {
             });
         }
 
-        while self.style_stack.pop().is_some() {
-            self.sink.handle_event(Event::EndTextStyle)?;
-        }
+        self.drain_text_styles()?;
 
         while self.stack.last() != Some(&target_kind) {
             if let Some(popped_kind) = self.stack.pop() {
@@ -186,6 +190,7 @@ impl<S: EventSink> StackTrackingSink<S> {
         if matches!(event, Event::ThematicBreak { .. })
             && self.stack.last() == Some(&BlockKind::Paragraph)
         {
+            self.drain_text_styles()?;
             self.stack.pop();
             self.sink.handle_event(Event::EndParagraph)?;
         }
@@ -230,6 +235,7 @@ impl<S: EventSink> StackTrackingSink<S> {
             });
         }
         if kind != BlockKind::Link && self.stack.last() == Some(&BlockKind::Paragraph) {
+            self.drain_text_styles()?;
             self.stack.pop();
             self.sink.handle_event(Event::EndParagraph)?;
         }
