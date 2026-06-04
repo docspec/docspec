@@ -23,6 +23,7 @@ The rules below apply to **source code** unless marked otherwise. Test files (un
 - **Fail fast** — return errors immediately
 - **98% coverage floor for new and changed executable Rust lines in covered crates**
 - **Exact-value test assertions** — no substring, type-only, or shape-only checks, see [TESTING.md](TESTING.md#exact-value-assertions)
+- **Do not manually create or edit `CHANGELOG.md` files** — release-please maintains them automatically from Conventional Commits
 
 ### Test Code Exceptions
 

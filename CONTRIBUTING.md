@@ -177,7 +177,7 @@ During 0.x releases, breaking changes are expected and documented. After 1.0, br
 
 ## Releases
 
-DocSpec uses [release-please](https://github.com/googleapis/release-please) to generate changelogs automatically from conventional commits. Do not edit the changelog manually—it is a function of commit history.
+DocSpec uses [release-please](https://github.com/googleapis/release-please) to generate `CHANGELOG.md` files automatically from Conventional Commits. Do not create or edit changelog files manually; they are a function of commit history and are maintained by release-please.
 
 ### How It Works
 
