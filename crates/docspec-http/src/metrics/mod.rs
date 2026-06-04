@@ -93,6 +93,9 @@ pub const INPUT_MIME_NONE: &str = "none";
 /// Value for [`LABEL_OUTPUT_MIME_TYPE`] when the conversion produced `BlockNote` JSON.
 pub const OUTPUT_MIME_BLOCKNOTE: &str = "application/vnd.docspec.blocknote+json";
 
+/// Value for [`LABEL_OUTPUT_MIME_TYPE`] when the conversion produced HTML.
+pub const OUTPUT_MIME_HTML: &str = "text/html";
+
 /// Value for [`LABEL_OUTPUT_MIME_TYPE`] when the conversion produced `oxa.dev` JSON.
 pub const OUTPUT_MIME_OXA: &str = "application/vnd.oxa+json";
 

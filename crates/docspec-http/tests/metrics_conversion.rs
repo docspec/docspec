@@ -389,7 +389,35 @@ fn output_bytes_not_recorded_on_unsupported_media() {
     );
 }
 
-// ─── Test 14: oxa success records oxa output_mime_type ───────────────────────
+// ─── Test 14: HTML success records HTML output_mime_type ─────────────────────
+
+/// A successful conversion to HTML records `output_mime_type="text/html"`
+/// on `docspec_conversions_total`.
+#[test]
+fn html_success_records_html_output_mime() {
+    let rt = common::runtime();
+    let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
+    let router = docspec_http::router::router_with_metrics(handle.clone());
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/conversion")
+        .header("content-type", "text/markdown")
+        .header("accept", "text/html")
+        .body(Body::from("Hello"))
+        .unwrap();
+
+    metrics::with_local_recorder(&recorder, || rt.block_on(router.oneshot(request)))
+        .expect("oneshot succeeds");
+
+    let rendered = handle.render();
+    assert_metric_line(
+        &rendered,
+        r#"docspec_conversions_total{result="success",error_class="none",input_mime_type="text/markdown",output_mime_type="text/html"} 1"#,
+    );
+}
+
+// ─── Test 15: oxa success records oxa output_mime_type ───────────────────────
 
 /// A successful conversion to oxa records `output_mime_type="application/vnd.oxa+json"`
 /// on `docspec_conversions_total`.

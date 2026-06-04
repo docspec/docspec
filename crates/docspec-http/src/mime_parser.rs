@@ -4,15 +4,18 @@ use axum::http::HeaderValue;
 use docspec::{InputFormat, OutputFormat};
 
 use crate::error::HttpError;
-use crate::format::{OUTPUT_MIME_ALIAS, OUTPUT_MIME_OXA_PRIMARY, OUTPUT_MIME_PRIMARY};
+use crate::format::{
+    OUTPUT_MIME_ALIAS, OUTPUT_MIME_HTML_PRIMARY, OUTPUT_MIME_OXA_PRIMARY, OUTPUT_MIME_PRIMARY,
+};
 
 /// Negotiates the `Accept` header for the `/conversion` endpoint.
 ///
-/// Returns [`OutputFormat::Oxa`] for `Accept: application/vnd.oxa+json`, and
-/// [`OutputFormat::Blocknote`] for the `BlockNote` MIMEs, `application/*`, `*/*`, and
-/// missing `Accept`. Wildcards default to `BlockNote` for back-compat with pre-oxa
-/// clients. When `Accept` lists multiple types, the first whose bare MIME matches a
-/// supported value wins (case-insensitive); `q=...` is stripped.
+/// Returns [`OutputFormat::Oxa`] for `Accept: application/vnd.oxa+json`,
+/// [`OutputFormat::Html`] for `Accept: text/html`, and [`OutputFormat::Blocknote`]
+/// for the `BlockNote` MIMEs, `application/*`, `*/*`, and missing `Accept`.
+/// Wildcards default to `BlockNote` for back-compat with pre-oxa clients. When
+/// `Accept` lists multiple types, the first whose bare MIME matches a supported
+/// value wins (case-insensitive); `q=...` is stripped.
 ///
 /// # Errors
 ///
@@ -31,6 +34,9 @@ pub fn negotiate_accept(header_value: Option<&HeaderValue>) -> Result<OutputForm
         let type_part = part.trim().split(';').next().map_or("", str::trim);
         if type_part.eq_ignore_ascii_case(OUTPUT_MIME_OXA_PRIMARY) {
             return Ok(OutputFormat::Oxa);
+        }
+        if type_part.eq_ignore_ascii_case(OUTPUT_MIME_HTML_PRIMARY) {
+            return Ok(OutputFormat::Html);
         }
         if type_part.eq_ignore_ascii_case("*/*")
             || type_part.eq_ignore_ascii_case("application/*")
@@ -145,6 +151,7 @@ pub fn bucket_output_mime(chosen_format: Option<OutputFormat>) -> &'static str {
     match chosen_format {
         None => crate::metrics::OUTPUT_MIME_NONE,
         Some(OutputFormat::Blocknote) => crate::metrics::OUTPUT_MIME_BLOCKNOTE,
+        Some(OutputFormat::Html) => crate::metrics::OUTPUT_MIME_HTML,
         Some(OutputFormat::Oxa) => crate::metrics::OUTPUT_MIME_OXA,
     }
 }
@@ -264,6 +271,14 @@ mod bucket_tests {
         assert_eq!(
             bucket_output_mime(Some(OutputFormat::Blocknote)),
             crate::metrics::OUTPUT_MIME_BLOCKNOTE
+        );
+    }
+
+    #[test]
+    fn bucket_output_mime_html_when_html_succeeded() {
+        assert_eq!(
+            bucket_output_mime(Some(OutputFormat::Html)),
+            crate::metrics::OUTPUT_MIME_HTML
         );
     }
 
