@@ -192,6 +192,18 @@ fn accept_alias_mime_returns_blocknote() {
 }
 
 #[test]
+fn accept_html_mime_returns_html() {
+    let header = HeaderValue::from_static("text/html");
+    assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Html);
+}
+
+#[test]
+fn accept_html_mime_with_quality_returns_html() {
+    let header = HeaderValue::from_static("text/html;q=0.8");
+    assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Html);
+}
+
+#[test]
 fn accept_oxa_primary_mime_returns_oxa() {
     let header = HeaderValue::from_static("application/vnd.oxa+json");
     assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Oxa);
@@ -216,7 +228,7 @@ fn accept_application_json_rejects() {
 
 #[test]
 fn accept_list_with_alias_and_quality_accepts() {
-    let header = HeaderValue::from_static("text/html, application/vnd.blocknote+json;q=0.8");
+    let header = HeaderValue::from_static("text/plain, application/vnd.blocknote+json;q=0.8");
     assert_eq!(
         negotiate_accept(Some(&header)).unwrap(),
         OutputFormat::Blocknote
@@ -225,7 +237,7 @@ fn accept_list_with_alias_and_quality_accepts() {
 
 #[test]
 fn accept_incompatible_list_rejects() {
-    let header = HeaderValue::from_static("text/html, application/xml");
+    let header = HeaderValue::from_static("text/plain, application/xml");
     assert!(matches!(
         negotiate_accept(Some(&header)),
         Err(HttpError::NotAcceptable)
