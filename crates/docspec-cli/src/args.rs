@@ -65,6 +65,9 @@ pub enum CliOutputFormat {
     /// `BlockNote` JSON format.
     #[value(name = "blocknote")]
     Blocknote,
+    /// `oxa.dev` JSON format.
+    #[value(name = "oxa")]
+    Oxa,
 }
 
 #[cfg(test)]
@@ -86,6 +89,22 @@ mod tests {
         assert!(
             result.is_err(),
             "markdown should not be a valid output format"
+        );
+    }
+
+    #[test]
+    fn clap_accepts_oxa_as_output_format() {
+        let result = Cli::try_parse_from(["docspec", "--to", "oxa", "x.md"]);
+        assert!(
+            result.is_ok(),
+            "oxa should be a valid output format, got error: {:?}",
+            result.as_ref().err()
+        );
+        let cli = result.unwrap_or_else(|_| std::process::abort());
+        assert!(
+            matches!(cli.to, Some(CliOutputFormat::Oxa)),
+            "expected CliOutputFormat::Oxa, got {:?}",
+            cli.to
         );
     }
 }

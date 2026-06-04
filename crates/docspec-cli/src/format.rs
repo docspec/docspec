@@ -29,8 +29,8 @@ pub fn resolve_input_format(
 /// Resolves output format from explicit flag or path detection.
 ///
 /// Uses explicit format if provided, otherwise detects from path extension via the facade.
-/// Defaults to `BlockNote` when no output format can be detected, because it is the only
-/// currently supported output format.
+/// Defaults to `BlockNote` when no output format can be detected: the `.json` extension is
+/// ambiguous between writers, so `oxa.dev` must be selected explicitly via `--to oxa`.
 pub fn resolve_output_format(
     explicit: Option<crate::args::CliOutputFormat>,
     path: Option<&Path>,
@@ -136,6 +136,13 @@ mod tests {
     #[test]
     fn none_path_defaults_to_blocknote_output() {
         let result = resolve_output_format(None, None, "no path err");
+        assert!(matches!(result, Ok(docspec::OutputFormat::Blocknote)));
+    }
+
+    #[test]
+    fn json_path_without_explicit_flag_defaults_to_blocknote_not_oxa() {
+        // Regression guard: .json is ambiguous; auto-detection must NOT pick oxa.
+        let result = resolve_output_format(None, Some(Path::new("doc.json")), "err");
         assert!(matches!(result, Ok(docspec::OutputFormat::Blocknote)));
     }
 }

@@ -18,7 +18,7 @@ docspec [OPTIONS] [INPUT]
 
 - `-o, --output <FILE>` — Output file (stdout if omitted)
 - `-f, --from <FORMAT>` — Input format (auto-detected from extension if omitted). Valid values: `markdown`, `html`
-- `-t, --to <FORMAT>` — Output format (auto-detected from extension if omitted). Valid values: `blocknote`
+- `-t, --to <FORMAT>` — Output format (auto-detected from extension if omitted). Valid values: `blocknote`, `oxa`
 - `--color <WHEN>` — When to use colors: `auto`, `always`, `never` (default: `auto`)
 - `-h, --help` — Print help
 - `-V, --version` — Print version
@@ -51,3 +51,6 @@ Convert Markdown from stdin to BlockNote JSON on stdout:
 ```bash
 echo "# Hello" | docspec --from markdown --to blocknote
 ```
+
+`--to oxa` selects the [oxa.dev](https://oxa.dev/) JSON writer in place of BlockNote. The `.json`
+extension is ambiguous, so `--to oxa` must be explicit.
