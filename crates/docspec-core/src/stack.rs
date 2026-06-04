@@ -398,7 +398,6 @@ mod tests {
     use alloc::vec::Vec;
 
     use super::*;
-    use crate::TextStyle;
 
     struct MockSink {
         events: Vec<Event>,
@@ -528,7 +527,6 @@ mod tests {
             &mut sink,
             Event::Text {
                 content: "hello".to_string(),
-                style: TextStyle::default(),
             },
         );
         send(&mut sink, Event::EndParagraph);
@@ -575,7 +573,6 @@ mod tests {
             &mut sink,
             Event::Text {
                 content: "hello".to_string(),
-                style: TextStyle::default(),
             },
         );
         send(&mut sink, Event::EndDocument);
@@ -630,7 +627,6 @@ mod tests {
             &mut sink,
             Event::Text {
                 content: "cell".to_string(),
-                style: TextStyle::default(),
             },
         );
         send(&mut sink, Event::EndTableCell);
@@ -667,7 +663,6 @@ mod tests {
             &mut sink,
             Event::Text {
                 content: "quoted".to_string(),
-                style: TextStyle::default(),
             },
         );
         send(&mut sink, Event::EndBlockQuote);
@@ -729,14 +724,12 @@ mod tests {
             &mut sink,
             Event::Text {
                 content: "hello".to_string(),
-                style: TextStyle::default(),
             },
         );
         send(
             &mut sink,
             Event::Text {
                 content: "world".to_string(),
-                style: TextStyle::default(),
             },
         );
         send(&mut sink, Event::EndParagraph);
@@ -779,7 +772,6 @@ mod tests {
             &mut sink,
             Event::Text {
                 content: "cell".to_string(),
-                style: TextStyle::default(),
             },
         );
         send(&mut sink, Event::EndTable);
@@ -816,7 +808,6 @@ mod tests {
             &mut sink,
             Event::Text {
                 content: "quote".to_string(),
-                style: TextStyle::default(),
             },
         );
         send(&mut sink, Event::EndBlockQuote);

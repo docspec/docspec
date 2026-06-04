@@ -183,7 +183,6 @@ mod tests {
     fn block_kind_for_end_text_returns_none() {
         let event = Event::Text {
             content: "hello".to_string(),
-            style: TextStyle::default(),
         };
         assert_eq!(block_kind_for_end(&event), None);
     }
@@ -342,7 +341,6 @@ mod tests {
     fn block_kind_for_start_text_returns_none() {
         let event = Event::Text {
             content: "hello".to_string(),
-            style: TextStyle::default(),
         };
         assert_eq!(block_kind_for_start(&event), None);
     }
@@ -504,12 +502,11 @@ mod tests {
 
         let result = sink.handle_event(Event::Text {
             content: "orphan".to_string(),
-            style: TextStyle::default(),
         });
         assert_invalid_sequence(
             &result,
             "end of stream",
-            "Text { content: \"orphan\", style: TextStyle { bold: false, code: false, italic: false, mark: None, strikethrough: false, subscript: false, superscript: false, underline: false } }",
+            "Text { content: \"orphan\" }",
             "event received after document already finished",
         );
     }

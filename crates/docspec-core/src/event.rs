@@ -337,12 +337,10 @@ pub enum Event {
         style_type: crate::ListStyleType,
     },
 
-    /// A text run with formatting attributes.
+    /// A text run.
     Text {
         /// The text content.
         content: String,
-        /// Text formatting attributes.
-        style: TextStyle,
     },
 
     /// A horizontal rule / thematic break.
