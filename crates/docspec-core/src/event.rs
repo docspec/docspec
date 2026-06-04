@@ -3,63 +3,6 @@
 //! Events represent the atomic units of document structure. Sources emit events
 //! in document order; sinks consume them. This decouples all readers from all writers.
 
-/// Generates boolean builder methods for a struct field.
-///
-/// Each method takes `self`, sets the corresponding field to `true`, and returns `self`.
-/// Doc comments are auto-generated via `concat!` and `stringify!`.
-macro_rules! bool_setters {
-    ($($field:ident),+ $(,)?) => {
-        $(
-            #[inline]
-            #[must_use]
-            #[doc = concat!("Enables ", stringify!($field), " formatting.")]
-            pub fn $field(mut self) -> Self {
-                self.$field = true;
-                self
-            }
-        )+
-    };
-}
-
-/// Text formatting attributes for an [`Event::Text`] event.
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "TextStyle intentionally stores one boolean per formatting attribute for a simple builder API"
-)]
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct TextStyle {
-    /// Bold formatting.
-    pub bold: bool,
-    /// Monospace/code formatting.
-    pub code: bool,
-    /// Italic formatting.
-    pub italic: bool,
-    /// Highlight/mark color.
-    pub mark: Option<crate::Color>,
-    /// Strikethrough formatting.
-    pub strikethrough: bool,
-    /// Subscript formatting.
-    pub subscript: bool,
-    /// Superscript formatting.
-    pub superscript: bool,
-    /// Underline formatting.
-    pub underline: bool,
-}
-
-impl TextStyle {
-    bool_setters!(bold, code, italic);
-
-    /// Sets the highlight/mark color.
-    #[inline]
-    #[must_use]
-    pub fn mark(mut self, color: crate::Color) -> Self {
-        self.mark = Some(color);
-        self
-    }
-
-    bool_setters!(strikethrough, subscript, superscript, underline);
-}
-
 /// Text styling kind enumeration.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
