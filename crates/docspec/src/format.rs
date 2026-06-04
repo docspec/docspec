@@ -69,3 +69,34 @@ pub fn detect_output_format(path: &Path) -> Option<OutputFormat> {
         _ => None,
     }
 }
+
+/// Strips a leading UTF-8 BOM from a text input if present. Used by [`crate::AnyReader`]
+/// when constructing text-format readers; binary formats never see this helper.
+pub(crate) fn strip_bom(s: &str) -> &str {
+    s.strip_prefix('\u{FEFF}').unwrap_or(s)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strip_bom_removes_leading_bom() {
+        assert_eq!(strip_bom("\u{FEFF}hello"), "hello");
+    }
+
+    #[test]
+    fn strip_bom_preserves_text_without_bom() {
+        assert_eq!(strip_bom("hello"), "hello");
+    }
+
+    #[test]
+    fn strip_bom_handles_empty_string() {
+        assert_eq!(strip_bom(""), "");
+    }
+
+    #[test]
+    fn strip_bom_preserves_bom_not_at_start() {
+        assert_eq!(strip_bom("a\u{FEFF}b"), "a\u{FEFF}b");
+    }
+}

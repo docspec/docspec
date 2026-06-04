@@ -100,6 +100,8 @@ missing_docs_in_private_items = "allow"
 partial_pub_fields = "allow"
 # Reason: let _ = expr is standard discard pattern; type annotation adds noise
 let_underscore_untyped = "allow"
+# Reason: pub(crate) is the idiomatic Rust shorthand for crate-private visibility
+pub_with_shorthand = "allow"
 # Reason: .to_string() is more readable than .to_owned() in many contexts
 str_to_string = "allow"
 # Reason: Both semicolon positions are valid Rust; no strong convention
