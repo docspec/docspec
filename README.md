@@ -13,11 +13,11 @@ See our [Manifesto](MANIFESTO.md) for what we stand for: memory extremism, strea
 | DOCX | ✓‡ | — |
 | ODT | ✓ | — |
 | RTF | ✓ | ✓ |
-| HTML | ✓† | — |
+| HTML | ✓† | ✓† |
 | Markdown | ✓ | ✓ |
 | BlockNote JSON | ✓ | ✓ |
 
-† HTML reader currently supports only `<p>` paragraph elements; other elements are silently dropped.
+† HTML reader and writer currently support only `<p>` paragraph elements; other elements are silently dropped.
 
 ‡ DOCX reader is intentionally minimal: only paragraphs and text are emitted; styles, breaks, tables, lists, images, tracked changes, headers/footers, and metadata are silently dropped. See the [docspec-docx-reader README](crates/docspec-docx-reader/README.md) for the full scope.
 

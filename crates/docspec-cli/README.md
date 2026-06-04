@@ -18,7 +18,7 @@ docspec [OPTIONS] [INPUT]
 
 - `-o, --output <FILE>` — Output file (stdout if omitted)
 - `-f, --from <FORMAT>` — Input format (auto-detected from extension if omitted). Valid values: `markdown`, `html`
-- `-t, --to <FORMAT>` — Output format (auto-detected from extension if omitted). Valid values: `blocknote`, `oxa`
+- `-t, --to <FORMAT>` — Output format (auto-detected from extension if omitted). Valid values: `blocknote`, `html`, `oxa`
 - `--color <WHEN>` — When to use colors: `auto`, `always`, `never` (default: `auto`)
 - `-h, --help` — Print help
 - `-V, --version` — Print version
@@ -28,9 +28,10 @@ docspec [OPTIONS] [INPUT]
 - `markdown` — Full Markdown support including headings, lists, tables, and inline formatting
 - `html` — HTML input (see note below)
 
-> **Note:** The HTML reader currently parses only `<p>` paragraph elements and the text within
-> them. All other HTML elements (headings, lists, tables, formatting tags, etc.) are silently
-> dropped. For full feature coverage, use Markdown input.
+> **Note:** HTML input and output currently preserve only paragraph text. Other HTML input
+> elements and non-paragraph output events (headings, lists, tables, formatting tags, etc.)
+> are silently dropped. For fuller feature coverage, use Markdown input with BlockNote JSON
+> output.
 
 ## Examples
 
@@ -52,5 +53,12 @@ Convert Markdown from stdin to BlockNote JSON on stdout:
 echo "# Hello" | docspec --from markdown --to blocknote
 ```
 
+Convert Markdown to HTML:
+
+```bash
+echo "Hello" | docspec --from markdown --to html
+```
+
 `--to oxa` selects the [oxa.dev](https://oxa.dev/) JSON writer in place of BlockNote. The `.json`
-extension is ambiguous, so `--to oxa` must be explicit.
+extension is ambiguous, so `--to oxa` must be explicit. HTML output is selected by `--to html`
+or auto-detected from `.html` and `.htm` output paths.
