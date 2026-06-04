@@ -1,4 +1,5 @@
 //! Integration tests for the `docspec` CLI binary.
+#![allow(clippy::expect_used, clippy::indexing_slicing, clippy::unwrap_used)]
 
 use std::io::Write as _;
 
@@ -514,5 +515,87 @@ mod tests {
                 "\n"
             )
         );
+    }
+
+    #[test]
+    fn convert_docx_file_to_blocknote_stdout() {
+        use docspec_test_fixtures::synth_docx;
+
+        let rels_xml = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+        let doc_xml = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>hello</w:t></w:r></w:p></w:body></w:document>"#;
+        let bytes = synth_docx(rels_xml, doc_xml);
+
+        let mut tmp = tempfile::Builder::new()
+            .suffix(".docx")
+            .tempfile()
+            .expect("tempfile");
+        tmp.write_all(&bytes).expect("write docx");
+
+        docspec_cmd()
+            .arg(tmp.path())
+            .args(["--to", "blocknote"])
+            .assert()
+            .success()
+            .stdout(contains("paragraph"));
+    }
+
+    #[test]
+    fn convert_docx_stdin_to_blocknote_stdout() {
+        use docspec_test_fixtures::synth_docx;
+
+        let rels_xml = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+        let doc_xml = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>hello</w:t></w:r></w:p></w:body></w:document>"#;
+        let bytes = synth_docx(rels_xml, doc_xml);
+
+        docspec_cmd()
+            .args(["--from", "docx", "--to", "blocknote"])
+            .write_stdin(bytes)
+            .assert()
+            .success()
+            .stdout(contains("paragraph"));
+    }
+
+    #[test]
+    fn bom_prefixed_markdown_file_strips_bom() {
+        let input = markdown_tempfile("\u{FEFF}# Hello".as_bytes(), ".md");
+
+        let assert = docspec_cmd()
+            .arg(input.path())
+            .args(["--to", "blocknote"])
+            .assert()
+            .success();
+
+        let stdout =
+            String::from_utf8(assert.get_output().stdout.clone()).expect("utf8 stdout");
+        let value: serde_json::Value = serde_json::from_str(&stdout).expect("valid json");
+        let text = value[0]["content"][0]["text"]
+            .as_str()
+            .expect("text field");
+        assert_eq!(text, "Hello");
+    }
+
+    #[test]
+    fn bom_prefixed_markdown_stdin_strips_bom() {
+        let assert = docspec_cmd()
+            .args(["--from", "markdown", "--to", "blocknote"])
+            .write_stdin(b"\xef\xbb\xbf# Hello")
+            .assert()
+            .success();
+
+        let stdout =
+            String::from_utf8(assert.get_output().stdout.clone()).expect("utf8 stdout");
+        let value: serde_json::Value = serde_json::from_str(&stdout).expect("valid json");
+        let text = value[0]["content"][0]["text"]
+            .as_str()
+            .expect("text field");
+        assert_eq!(text, "Hello");
+    }
+
+    #[test]
+    fn clap_rejects_unknown_input_format() {
+        docspec_cmd()
+            .args(["--from", "pdf"])
+            .assert()
+            .failure();
     }
 }

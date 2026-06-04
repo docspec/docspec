@@ -7,7 +7,7 @@ mod error;
 mod format;
 
 use std::fs::File;
-use std::io::{BufWriter, IsTerminal as _, Read as _, Write};
+use std::io::{BufWriter, IsTerminal as _, Write};
 
 use clap::{CommandFactory as _, Parser as _};
 use docspec::{AnyReader, AnyWriter};
@@ -17,12 +17,10 @@ use crate::error::{CliError, Result};
 
 /// Runs the streaming conversion pipeline.
 fn run_pipeline<W: Write>(
-    input_format: docspec::InputFormat,
-    content: &str,
+    reader: AnyReader,
     output_format: docspec::OutputFormat,
     output: W,
 ) -> Result<()> {
-    let reader = AnyReader::new(input_format, content);
     let sink = AnyWriter::new(output_format, output);
     docspec_core::pipe(reader, sink).map_err(Into::into)
 }
@@ -65,39 +63,28 @@ fn main() {
             "cannot detect output format: use --to",
         )?;
 
-        // Read input AFTER format validation
-        let raw_content = match cli.input.as_ref() {
-            None => {
-                let mut buf = String::new();
-                std::io::stdin().lock().read_to_string(&mut buf)?;
-                buf
+        // Build reader AFTER format validation
+        let reader = match cli.input.as_ref() {
+            Some(path) if path.as_os_str() != "-" => AnyReader::from_path(input_format, path)?,
+            _ => {
+                let mut buf = Vec::new();
+                std::io::Read::read_to_end(&mut std::io::stdin(), &mut buf)?;
+                let cursor = std::io::Cursor::new(buf);
+                AnyReader::from_reader(input_format, cursor)?
             }
-            Some(path) if path.as_os_str() == "-" => {
-                let mut buf = String::new();
-                std::io::stdin().lock().read_to_string(&mut buf)?;
-                buf
-            }
-            Some(path) => std::fs::read_to_string(path)?,
         };
-        let content = raw_content
-            .strip_prefix('\u{FEFF}')
-            .unwrap_or(&raw_content)
-            .to_string();
 
-        cli.output.as_ref().map_or_else(
-            || {
-                let mut stdout = std::io::stdout().lock();
-                run_pipeline(input_format, &content, output_format, &mut stdout)?;
-                write_cli_terminating_newline(&mut stdout)
-            },
-            |path| {
-                let mut writer = BufWriter::new(File::create(path)?);
-                run_pipeline(input_format, &content, output_format, &mut writer)?;
-                write_cli_terminating_newline(&mut writer)?;
-                writer.flush()?;
-                Ok(())
-            },
-        )
+        if let Some(path) = cli.output.as_ref() {
+            let mut writer = BufWriter::new(File::create(path)?);
+            run_pipeline(reader, output_format, &mut writer)?;
+            write_cli_terminating_newline(&mut writer)?;
+            writer.flush()?;
+        } else {
+            let mut stdout = std::io::stdout().lock();
+            run_pipeline(reader, output_format, &mut stdout)?;
+            write_cli_terminating_newline(&mut stdout)?;
+        }
+        Ok(())
     })();
 
     if let Err(err) = result {

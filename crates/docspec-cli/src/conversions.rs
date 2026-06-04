@@ -8,6 +8,7 @@ impl From<CliInputFormat> for InputFormat {
     #[inline]
     fn from(f: CliInputFormat) -> Self {
         match f {
+            CliInputFormat::Docx => Self::Docx,
             CliInputFormat::Markdown => Self::Markdown,
             CliInputFormat::Html => Self::Html,
         }

@@ -8,7 +8,7 @@ use clap::{Parser, ValueEnum};
 #[command(version = "0.1.0")]
 #[command(
     about = "Convert documents between formats using streaming event pipeline",
-    long_about = "Convert documents between formats using streaming event pipeline.\n\nSupports converting Markdown or HTML input to BlockNote JSON, HTML, or oxa.dev JSON output.\n\nNote: HTML input and output currently preserve only paragraph text. Other HTML input\nelements and non-paragraph output events (headings, lists, tables, formatting, etc.)\nare silently dropped. Use BlockNote JSON output for fuller feature coverage."
+    long_about = "Convert documents between formats using streaming event pipeline.\n\nSupports converting Markdown, HTML, or DOCX input to BlockNote or oxa.dev JSON output.\n\nNote: the HTML reader currently parses only <p> paragraph elements and the\ntext within them. The DOCX reader currently emits paragraphs and text only;\nstyles, tables, lists, images, headers/footers, metadata, and tracked changes\nare silently dropped. Use Markdown input for full feature coverage."
 )]
 pub struct Cli {
     /// When to use colors.
@@ -51,6 +51,9 @@ pub enum ColorChoice {
 /// Input format for document conversion.
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum CliInputFormat {
+    /// DOCX format (paragraphs and text only).
+    #[value(name = "docx")]
+    Docx,
     /// HTML format (paragraph-only; `<p>` elements and text within them only).
     #[value(name = "html")]
     Html,
