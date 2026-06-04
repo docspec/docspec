@@ -13,6 +13,7 @@ on:
           - docspec-json
           - docspec-markdown-reader
           - docspec-html-reader
+          - docspec-docx-reader
           - docspec-blocknote-writer
           - docspec-cli
           - docspec-http

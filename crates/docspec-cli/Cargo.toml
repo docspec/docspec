@@ -12,6 +12,7 @@ categories = ["command-line-utilities"]
 [[bin]]
 name = "docspec"
 path = "src/main.rs"
+doc = false
 
 [dependencies]
 clap = { version = "4", features = ["derive", "color"] }
