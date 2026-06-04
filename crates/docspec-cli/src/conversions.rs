@@ -19,6 +19,7 @@ impl From<CliOutputFormat> for OutputFormat {
     fn from(f: CliOutputFormat) -> Self {
         match f {
             CliOutputFormat::Blocknote => Self::Blocknote,
+            CliOutputFormat::Oxa => Self::Oxa,
         }
     }
 }
@@ -46,5 +47,10 @@ mod tests {
             OutputFormat::from(CliOutputFormat::Blocknote),
             OutputFormat::Blocknote
         );
+    }
+
+    #[test]
+    fn from_oxa_converts_to_facade_oxa() {
+        assert_eq!(OutputFormat::from(CliOutputFormat::Oxa), OutputFormat::Oxa);
     }
 }

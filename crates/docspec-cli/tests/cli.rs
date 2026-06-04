@@ -398,4 +398,35 @@ mod tests {
             .success()
             .stdout(contains("0.1.0"));
     }
+
+    #[test]
+    fn convert_markdown_stdin_to_oxa_stdout() {
+        docspec_cmd()
+            .args(["--from", "markdown", "--to", "oxa"])
+            .write_stdin("Hello world")
+            .assert()
+            .success()
+            .stdout(
+                r#"{"type":"Document","children":[{"type":"Paragraph","children":[{"type":"Text","value":"Hello world"}]}]}"#,
+            );
+    }
+
+    #[test]
+    fn json_extension_without_to_flag_still_picks_blocknote() {
+        // Regression guard: .json is ambiguous; auto-detection must NOT pick oxa.
+        let input = markdown_tempfile(b"Hello\n", ".md");
+        let output = empty_tempfile(".json");
+        let output_path = output.path().to_path_buf();
+
+        docspec_cmd()
+            .arg(input.path())
+            .args(["-o", output_path.to_str().unwrap_or("")])
+            .assert()
+            .success();
+
+        assert_eq!(
+            read_output(&output_path),
+            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#
+        );
+    }
 }
