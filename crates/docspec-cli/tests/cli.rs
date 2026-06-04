@@ -73,7 +73,10 @@ mod tests {
 
         assert_eq!(
             read_output(&output_path),
-            r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Auto Detected","styles":{}}],"children":[]}]"#
+            concat!(
+                r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Auto Detected","styles":{}}],"children":[]}]"#,
+                "\n"
+            )
         );
     }
 
@@ -121,7 +124,10 @@ mod tests {
 
         assert_eq!(
             read_output(&output_path),
-            r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Hello World","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Some paragraph text.","styles":{}}],"children":[]}]"#
+            concat!(
+                r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Hello World","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Some paragraph text.","styles":{}}],"children":[]}]"#,
+                "\n"
+            )
         );
     }
 
@@ -132,7 +138,10 @@ mod tests {
             .write_stdin("# Hello\n")
             .assert()
             .success()
-            .stdout(r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#);
+            .stdout(concat!(
+                r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#,
+                "\n"
+            ));
     }
 
     #[test]
@@ -142,7 +151,10 @@ mod tests {
             .write_stdin("# Dash Input\n")
             .assert()
             .success()
-            .stdout(r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Dash Input","styles":{}}],"children":[]}]"#);
+            .stdout(concat!(
+                r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Dash Input","styles":{}}],"children":[]}]"#,
+                "\n"
+            ));
     }
 
     #[test]
@@ -157,7 +169,7 @@ mod tests {
             .assert()
             .success();
 
-        assert_eq!(read_output(&output_path), "[]");
+        assert_eq!(read_output(&output_path), "[]\n");
     }
 
     #[test]
@@ -181,7 +193,10 @@ mod tests {
 
         assert_eq!(
             read_output(&output_path),
-            r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Explicit","styles":{}}],"children":[]}]"#
+            concat!(
+                r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Explicit","styles":{}}],"children":[]}]"#,
+                "\n"
+            )
         );
     }
 
@@ -196,7 +211,10 @@ mod tests {
             .args([fixture, "--to", "blocknote"])
             .assert()
             .success()
-            .stdout(r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 1","styles":{}}],"children":[]},{"type":"heading","props":{"level":2,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 2","styles":{}}],"children":[]},{"type":"heading","props":{"level":3,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 3","styles":{}}],"children":[]},{"type":"heading","props":{"level":4,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 4","styles":{}}],"children":[]},{"type":"heading","props":{"level":5,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 5","styles":{}}],"children":[]},{"type":"heading","props":{"level":6,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 6","styles":{}}],"children":[]}]"#);
+            .stdout(concat!(
+                r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 1","styles":{}}],"children":[]},{"type":"heading","props":{"level":2,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 2","styles":{}}],"children":[]},{"type":"heading","props":{"level":3,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 3","styles":{}}],"children":[]},{"type":"heading","props":{"level":4,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 4","styles":{}}],"children":[]},{"type":"heading","props":{"level":5,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 5","styles":{}}],"children":[]},{"type":"heading","props":{"level":6,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 6","styles":{}}],"children":[]}]"#,
+                "\n"
+            ));
     }
 
     #[test]
@@ -259,7 +277,10 @@ mod tests {
             .args([fixture, "--to", "blocknote"])
             .assert()
             .success()
-            .stdout(r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Single paragraph with plain text.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Multiple paragraphs. This is the second paragraph.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"bold text","styles":{"bold":true}},{"type":"text","text":" in the middle.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"italic text","styles":{"italic":true}},{"type":"text","text":" in the middle.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"bold and italic text","styles":{"bold":true,"italic":true}},{"type":"text","text":" combined.","styles":{}}],"children":[]}]"#);
+            .stdout(concat!(
+                r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Single paragraph with plain text.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Multiple paragraphs. This is the second paragraph.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"bold text","styles":{"bold":true}},{"type":"text","text":" in the middle.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"italic text","styles":{"italic":true}},{"type":"text","text":" in the middle.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"bold and italic text","styles":{"bold":true,"italic":true}},{"type":"text","text":" combined.","styles":{}}],"children":[]}]"#,
+                "\n"
+            ));
     }
 
     #[test]
@@ -320,6 +341,10 @@ mod tests {
 
         let stdout = String::from_utf8(assert.get_output().stdout.clone())
             .unwrap_or_else(|_| std::process::abort());
+        assert!(
+            stdout.ends_with('\n'),
+            "CLI stdout output should end with a newline: {stdout:?}"
+        );
         let actual_value: serde_json::Value =
             serde_json::from_str(&stdout).unwrap_or_else(|_| std::process::abort());
         assert_eq!(actual_value, expected_value);
@@ -342,6 +367,10 @@ mod tests {
 
         let stdout = String::from_utf8(assert.get_output().stdout.clone())
             .unwrap_or_else(|_| std::process::abort());
+        assert!(
+            stdout.ends_with('\n'),
+            "CLI stdout output should end with a newline: {stdout:?}"
+        );
         let actual_value: serde_json::Value =
             serde_json::from_str(&stdout).unwrap_or_else(|_| std::process::abort());
         assert_eq!(actual_value, expected_value);
@@ -354,7 +383,10 @@ mod tests {
             .write_stdin("<p>hello world</p>")
             .assert()
             .success()
-            .stdout(r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"hello world","styles":{}}],"children":[]}]"#);
+            .stdout(concat!(
+                r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"hello world","styles":{}}],"children":[]}]"#,
+                "\n"
+            ));
     }
 
     #[test]
@@ -367,7 +399,7 @@ mod tests {
             .args([fixture, "--to", "blocknote"])
             .assert()
             .success()
-            .stdout("[]");
+            .stdout("[]\n");
     }
 
     #[test]
@@ -406,7 +438,7 @@ mod tests {
             .write_stdin("Hello world")
             .assert()
             .success()
-            .stdout("<html><body><p>Hello world</p></body></html>");
+            .stdout("<html><body><p>Hello world</p></body></html>\n");
     }
 
     #[test]
@@ -416,7 +448,7 @@ mod tests {
             .write_stdin("# Dropped\n\nKept paragraph")
             .assert()
             .success()
-            .stdout("<html><body><p>Kept paragraph</p></body></html>");
+            .stdout("<html><body><p>Kept paragraph</p></body></html>\n");
     }
 
     #[test]
@@ -433,7 +465,7 @@ mod tests {
 
         assert_eq!(
             read_output(&output_path),
-            "<html><body><p>Hello world</p></body></html>"
+            "<html><body><p>Hello world</p></body></html>\n"
         );
     }
 
@@ -444,9 +476,10 @@ mod tests {
             .write_stdin("Hello world")
             .assert()
             .success()
-            .stdout(
+            .stdout(concat!(
                 r#"{"type":"Document","children":[{"type":"Paragraph","children":[{"type":"Text","value":"Hello world"}]}]}"#,
-            );
+                "\n"
+            ));
     }
 
     #[test]
@@ -464,7 +497,10 @@ mod tests {
 
         assert_eq!(
             read_output(&output_path),
-            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#
+            concat!(
+                r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#,
+                "\n"
+            )
         );
     }
 }

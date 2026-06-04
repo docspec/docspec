@@ -27,6 +27,10 @@ fn run_pipeline<W: Write>(
     docspec_core::pipe(reader, sink).map_err(Into::into)
 }
 
+fn write_cli_terminating_newline<W: Write>(output: &mut W) -> Result<()> {
+    output.write_all(b"\n").map_err(Into::into)
+}
+
 /// Main entry point.
 fn main() {
     let cli = Cli::parse();
@@ -71,16 +75,14 @@ fn main() {
 
         cli.output.as_ref().map_or_else(
             || {
-                run_pipeline(
-                    input_format,
-                    &content,
-                    output_format,
-                    std::io::stdout().lock(),
-                )
+                let mut stdout = std::io::stdout().lock();
+                run_pipeline(input_format, &content, output_format, &mut stdout)?;
+                write_cli_terminating_newline(&mut stdout)
             },
             |path| {
                 let mut writer = BufWriter::new(File::create(path)?);
                 run_pipeline(input_format, &content, output_format, &mut writer)?;
+                write_cli_terminating_newline(&mut writer)?;
                 writer.flush()?;
                 Ok(())
             },
