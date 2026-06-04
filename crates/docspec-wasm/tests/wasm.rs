@@ -40,4 +40,12 @@ mod tests {
             r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"bold","styles":{"bold":true}},{"type":"text","text":" and ","styles":{}},{"type":"text","text":"italic","styles":{"italic":true}}],"children":[]}]"#
         );
     }
+
+    #[test]
+    fn bom_prefixed_markdown_strips_bom() {
+        let result = convert_markdown_to_blocknote("\u{FEFF}# Hello").unwrap();
+        // The BOM should be stripped by the facade; heading text should be "Hello"
+        assert!(result.contains("Hello"), "Expected 'Hello' in output, got: {result}");
+        assert!(!result.contains("\u{FEFF}"), "BOM should not appear in output");
+    }
 }
