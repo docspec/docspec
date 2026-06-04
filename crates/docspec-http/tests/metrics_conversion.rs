@@ -444,3 +444,36 @@ fn oxa_success_records_oxa_output_mime() {
         r#"docspec_conversions_total{result="success",error_class="none",input_mime_type="text/markdown",output_mime_type="application/vnd.oxa+json"} 1"#,
     );
 }
+
+// ─── Test 16: DOCX success records DOCX input_mime_type ──────────────────────
+
+/// A successful DOCX conversion records the DOCX MIME as `input_mime_type`
+/// on `docspec_conversions_total`.
+#[test]
+fn docx_success_records_docx_input_mime() {
+    const DOCX_MIME: &str =
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+    const DOC_XML: &str = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Hello</w:t></w:r></w:p></w:body></w:document>"#;
+
+    let rt = common::runtime();
+    let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
+    let router = docspec_http::router::router_with_metrics(handle.clone());
+
+    let docx_bytes = docspec_test_fixtures::synth_docx(RELS, DOC_XML);
+    let request = Request::builder()
+        .method("POST")
+        .uri("/conversion")
+        .header("content-type", DOCX_MIME)
+        .body(Body::from(docx_bytes))
+        .unwrap();
+
+    metrics::with_local_recorder(&recorder, || rt.block_on(router.oneshot(request)))
+        .expect("oneshot succeeds");
+
+    let rendered = handle.render();
+    assert_metric_line(
+        &rendered,
+        &format!(r#"docspec_conversions_total{{result="success",error_class="none",input_mime_type="{DOCX_MIME}",output_mime_type="application/vnd.docspec.blocknote+json"}} 1"#),
+    );
+}

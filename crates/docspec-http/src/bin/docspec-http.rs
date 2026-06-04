@@ -40,7 +40,12 @@ fn main() -> ExitCode {
 
     runtime.block_on(async move {
         docspec_http::tracing_init::init();
-        let config = ServerConfig::new(args.host, args.port);
+        let body_limit: usize = std::env::var("DOCSPEC_HTTP_MAX_BODY_BYTES")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(docspec_http::router::DEFAULT_BODY_LIMIT_BYTES);
+        let mut config = ServerConfig::new(args.host, args.port);
+        config.body_limit_bytes = body_limit;
         match serve(config).await {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {

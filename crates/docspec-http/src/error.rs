@@ -184,7 +184,10 @@ impl IntoResponse for HttpError {
             Self::UnsupportedMediaType { received: None } => (
                 StatusCode::UNSUPPORTED_MEDIA_TYPE,
                 "Unsupported Media Type",
-                Cow::Borrowed("Content-Type must be text/markdown or text/html"),
+                Cow::Borrowed(
+                    "Content-Type must be text/markdown, text/html, or \
+                     application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ),
                 None,
             ),
             Self::UnsupportedMediaType {
@@ -193,7 +196,9 @@ impl IntoResponse for HttpError {
                 StatusCode::UNSUPPORTED_MEDIA_TYPE,
                 "Unsupported Media Type",
                 Cow::Owned(format!(
-                    "Content-Type must be text/markdown or text/html, got {content_type}"
+                    "Content-Type must be text/markdown, text/html, or \
+                     application/vnd.openxmlformats-officedocument.wordprocessingml.document, \
+                     got {content_type}"
                 )),
                 None,
             ),
@@ -478,7 +483,7 @@ mod tests {
                 "type": "about:blank",
                 "title": "Unsupported Media Type",
                 "status": 415,
-                "detail": "Content-Type must be text/markdown or text/html, got application/json",
+                "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document, got application/json",
             })
         );
     }

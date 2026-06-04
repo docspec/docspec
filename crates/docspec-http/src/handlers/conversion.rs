@@ -1,11 +1,13 @@
 //! Document conversion request handlers.
 
+use std::io::Cursor;
+
 use axum::{
     body::{Body, Bytes},
     http::{header, HeaderMap, HeaderValue, Response, StatusCode},
     response::IntoResponse,
 };
-use docspec::OutputFormat;
+use docspec::{InputFormat, OutputFormat};
 use docspec_core::{EventSink as _, EventSource as _};
 
 use crate::{error::HttpError, mime_parser};
@@ -169,14 +171,28 @@ async fn do_conversion(
     )
     .record(body_len_bytes);
 
-    let input_text = String::from_utf8(body.into()).map_err(|error| {
-        tracing::debug!(error = %error, "request body is not valid UTF-8");
-        HttpError::BodyNotUtf8
-    })?;
+    // For text formats: prevalidate UTF-8 before constructing reader.
+    // This preserves the HTTP 400 contract for invalid-UTF-8 bodies (Oracle finding #3).
+    // Docx is binary — no UTF-8 requirement.
+    match input_format {
+        InputFormat::Markdown | InputFormat::Html => {
+            core::str::from_utf8(&body).map_err(|_err| {
+                tracing::debug!("request body is not valid UTF-8");
+                HttpError::BodyNotUtf8
+            })?;
+        }
+        InputFormat::Docx => {}
+    }
 
     let join_result = tokio::task::spawn_blocking(move || -> Result<(Vec<u8>, u64), HttpError> {
         let mut output_buffer = Vec::new();
-        let mut reader = docspec::AnyReader::new(input_format, &input_text);
+        let cursor = Cursor::new(body);
+        let mut reader = docspec::AnyReader::from_reader(input_format, cursor).map_err(|error| {
+            tracing::debug!(error = %error, "reader construction failed");
+            HttpError::Unprocessable {
+                detail: error.to_string(),
+            }
+        })?;
         let mut sink = docspec::AnyWriter::new(output_format, &mut output_buffer);
 
         loop {

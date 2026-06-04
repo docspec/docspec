@@ -19,6 +19,12 @@ pub enum ServerError {
 
 /// Configuration for the HTTP server.
 pub struct ServerConfig {
+    /// Maximum request body size in bytes for the `/conversion` route.
+    ///
+    /// Defaults to [`crate::router::DEFAULT_BODY_LIMIT_BYTES`] (10 MiB).
+    /// Override via the `DOCSPEC_HTTP_MAX_BODY_BYTES` environment variable in
+    /// the binary entry point.
+    pub body_limit_bytes: usize,
     /// Network address to bind. Accepts IPv4 literals (`127.0.0.1`), IPv6
     /// literals (`::1`), and hostnames (`localhost`). Default: `127.0.0.1`.
     pub host: String,
@@ -27,7 +33,7 @@ pub struct ServerConfig {
 }
 
 impl ServerConfig {
-    /// Create a new server configuration.
+    /// Create a new server configuration with the default body size limit.
     #[inline]
     #[must_use]
     pub fn new<Host>(host: Host, port: u16) -> Self
@@ -37,6 +43,7 @@ impl ServerConfig {
         Self {
             host: host.into(),
             port,
+            body_limit_bytes: crate::router::DEFAULT_BODY_LIMIT_BYTES,
         }
     }
 }
@@ -89,9 +96,12 @@ pub async fn serve(config: ServerConfig) -> Result<(), ServerError> {
 
     tracing::info!(addr = %bound_addr, "docspec-http listening");
 
-    let server_result = axum::serve(listener, crate::router::router_with_metrics(handle))
-        .with_graceful_shutdown(shutdown_signal())
-        .await;
+    let server_result = axum::serve(
+        listener,
+        crate::router::router_with_metrics_and_body_limit(handle, config.body_limit_bytes),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await;
 
     upkeep_task.abort();
     match upkeep_task.await {

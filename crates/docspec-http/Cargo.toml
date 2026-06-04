@@ -24,6 +24,7 @@ tokio = { version = "1", features = [
 ] }
 tower = "0.5"
 tower-http = { version = "0.6", features = [
+  "limit",
   "trace",
   "request-id",
   "util",
@@ -48,6 +49,7 @@ sentry = { version = "0.48", default-features = false, features = [
 docspec-core = { path = "../docspec-core", version = "1.0.0" }
 docspec-json = { path = "../docspec-json", version = "1.0.0" }
 docspec = { path = "../docspec", version = "1.2.0", features = [
+  "docx",
   "markdown",
   "html",
   "blocknote",
@@ -60,6 +62,7 @@ tower = { version = "0.5", features = ["util"] }
 serde_json = "1"
 reqwest = { version = "0.13", features = ["blocking", "json"] }
 uuid = "1"
+docspec-test-fixtures = { path = "../docspec-test-fixtures" }
 sentry = { version = "0.48", default-features = false, features = [
   "backtrace",
   "contexts",

@@ -6,6 +6,9 @@ use tower_http::request_id::{MakeRequestId, RequestId};
 
 use crate::metrics::{metrics_handler, middleware::record_http_metrics};
 
+/// Default request body size limit for the `/conversion` route: 10 MiB.
+pub const DEFAULT_BODY_LIMIT_BYTES: usize = 10 * 1024 * 1024;
+
 /// A [`MakeRequestId`] implementation that never generates a request ID.
 ///
 /// Used for `X-Trace-ID`: the header is echoed if present but never generated
@@ -21,15 +24,28 @@ impl MakeRequestId for EchoOnly {
     }
 }
 
-/// Build the HTTP API router with all routes and middleware.
+/// Build the HTTP API router using the default body size limit.
+///
+/// Equivalent to `router_with_body_limit(DEFAULT_BODY_LIMIT_BYTES)`.
 #[inline]
 pub fn router() -> Router {
+    router_with_body_limit(DEFAULT_BODY_LIMIT_BYTES)
+}
+
+/// Build the HTTP API router with a custom `/conversion` body size limit.
+///
+/// `body_limit_bytes` is applied only to the `/conversion` route via
+/// [`tower_http::limit::RequestBodyLimitLayer`]. Bodies exceeding the limit
+/// are rejected with HTTP 413.
+#[inline]
+pub fn router_with_body_limit(body_limit_bytes: usize) -> Router {
     use axum::body::Body;
     use axum::http::header::HeaderName;
     use axum::middleware::{self, Next};
     use axum::routing::{get, post};
     use tower::util::option_layer;
     use tower::ServiceBuilder;
+    use tower_http::limit::RequestBodyLimitLayer;
     use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
     use tower_http::trace::TraceLayer;
 
@@ -72,7 +88,8 @@ pub fn router() -> Router {
 
     let conversion_route = post(post_conversion)
         .options(options_conversion)
-        .fallback(conversion_method_not_allowed);
+        .fallback(conversion_method_not_allowed)
+        .layer(RequestBodyLimitLayer::new(body_limit_bytes));
 
     let health_route = get(get_health)
         .head(head_health)
@@ -101,8 +118,8 @@ pub fn router() -> Router {
         )
 }
 
-/// Builds the public router and additionally registers `GET /metrics`
-/// using the provided Prometheus handle.
+/// Builds the public router with the default body limit and additionally registers
+/// `GET /metrics` using the provided Prometheus handle.
 ///
 /// The `/metrics` route is intentionally registered **after** the
 /// `ServiceBuilder` layer stack so it does NOT inherit:
@@ -116,5 +133,19 @@ pub fn router() -> Router {
 ///     scrape from incrementing counters).
 #[inline]
 pub fn router_with_metrics(handle: PrometheusHandle) -> Router {
-    router().route("/metrics", axum::routing::get(metrics_handler(handle)))
+    router_with_metrics_and_body_limit(handle, DEFAULT_BODY_LIMIT_BYTES)
+}
+
+/// Builds the public router with a custom body limit and additionally registers
+/// `GET /metrics` using the provided Prometheus handle.
+///
+/// See [`router_with_metrics`] for details on the middleware exclusions that apply
+/// to the `/metrics` route.
+#[inline]
+pub fn router_with_metrics_and_body_limit(
+    handle: PrometheusHandle,
+    body_limit_bytes: usize,
+) -> Router {
+    router_with_body_limit(body_limit_bytes)
+        .route("/metrics", axum::routing::get(metrics_handler(handle)))
 }

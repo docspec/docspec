@@ -18,18 +18,22 @@ use serde_json::Value;
 use tower::ServiceExt as _;
 
 const CACHE_CONTROL: &str = "max-age=0, private, must-revalidate";
+const DOCX_HELLO_XML: &str = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Hello</w:t></w:r></w:p></w:body></w:document>"#;
+const DOCX_MIME: &str =
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const DOCX_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+const HEALTH_CT: &str = "text/plain; charset=utf-8";
 const OUTPUT_MIME: &str = "application/vnd.docspec.blocknote+json; charset=utf-8";
 const OUTPUT_MIME_HTML: &str = "text/html; charset=utf-8";
 const OUTPUT_MIME_OXA: &str = "application/vnd.oxa+json; charset=utf-8";
 const PROBLEM_JSON_CT: &str = "application/problem+json; charset=utf-8";
-const HEALTH_CT: &str = "text/plain; charset=utf-8";
 
 fn app() -> Router {
     docspec_http::router::router()
 }
 
-fn post_markdown(body: impl Into<Body>) -> axum::http::Request<Body> {
-    common::markdown_request(body)
+fn post_docx(body: impl Into<Body>) -> axum::http::Request<Body> {
+    common::request("POST", "/conversion", &[("content-type", DOCX_MIME)], body)
 }
 
 fn post_html(body: impl Into<Body>) -> axum::http::Request<Body> {
@@ -39,6 +43,14 @@ fn post_html(body: impl Into<Body>) -> axum::http::Request<Body> {
         &[("content-type", "text/html")],
         body,
     )
+}
+
+fn post_markdown(body: impl Into<Body>) -> axum::http::Request<Body> {
+    common::markdown_request(body)
+}
+
+fn synth_hello_docx() -> Vec<u8> {
+    docspec_test_fixtures::synth_docx(DOCX_RELS, DOCX_HELLO_XML)
 }
 
 async fn response_body_text(body: axum::body::Body) -> String {
@@ -207,7 +219,7 @@ async fn post_conversion_missing_content_type() {
             "type": "about:blank",
             "title": "Unsupported Media Type",
             "status": 415,
-            "detail": "Content-Type must be text/markdown or text/html",
+            "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         })
     );
 }
@@ -232,7 +244,7 @@ async fn post_conversion_wrong_content_type() {
             "type": "about:blank",
             "title": "Unsupported Media Type",
             "status": 415,
-            "detail": "Content-Type must be text/markdown or text/html, got application/json",
+            "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document, got application/json",
         })
     );
 }
@@ -257,7 +269,7 @@ async fn post_conversion_multipart_content_type() {
             "type": "about:blank",
             "title": "Unsupported Media Type",
             "status": 415,
-            "detail": "Content-Type must be text/markdown or text/html, got multipart/form-data; boundary=x",
+            "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document, got multipart/form-data; boundary=x",
         })
     );
 }
@@ -810,6 +822,205 @@ async fn query_string_not_in_404_detail() {
             "title": "Not Found",
             "status": 404,
             "detail": "No route matches GET /unknown",
+        })
+    );
+}
+
+#[tokio::test]
+async fn post_conversion_docx_happy_path() {
+    let docx_bytes = synth_hello_docx();
+    let response = app()
+        .oneshot(post_docx(docx_bytes))
+        .await
+        .expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content-type present"),
+        OUTPUT_MIME
+    );
+
+    let response_body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        response_body,
+        serde_json::json!([{
+            "type": "paragraph",
+            "props": { "textAlignment": "left" },
+            "content": [{ "type": "text", "text": "Hello", "styles": {} }],
+            "children": [],
+        }])
+    );
+}
+
+#[tokio::test]
+async fn post_conversion_docx_to_oxa_happy_path() {
+    let body = synth_hello_docx();
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[
+            ("content-type", DOCX_MIME),
+            ("accept", "application/vnd.oxa+json"),
+        ],
+        body,
+    );
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content-type present"),
+        OUTPUT_MIME_OXA
+    );
+
+    let body_text = response_body_text(response.into_body()).await;
+    assert_eq!(
+        body_text,
+        r#"{"type":"Document","children":[{"type":"Paragraph","children":[{"type":"Text","value":"Hello"}]}]}"#
+    );
+}
+
+#[tokio::test]
+async fn post_conversion_docx_empty_body() {
+    let response = app()
+        .oneshot(post_docx(""))
+        .await
+        .expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        serde_json::json!({
+            "type": "about:blank",
+            "title": "Bad Request",
+            "status": 400,
+            "detail": "Request body is empty",
+        })
+    );
+}
+
+#[tokio::test]
+async fn post_conversion_docx_invalid_zip() {
+    let response = app()
+        .oneshot(post_docx("not a zip archive"))
+        .await
+        .expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+    let response_body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        response_body
+            .get("status")
+            .and_then(serde_json::Value::as_u64),
+        Some(422)
+    );
+    assert_eq!(
+        response_body
+            .get("title")
+            .and_then(serde_json::Value::as_str),
+        Some("Unprocessable Entity")
+    );
+}
+
+#[tokio::test]
+async fn post_conversion_octet_stream_rejected() {
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", "application/octet-stream")],
+        Body::from("some bytes"),
+    );
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        serde_json::json!({
+            "type": "about:blank",
+            "title": "Unsupported Media Type",
+            "status": 415,
+            "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document, got application/octet-stream",
+        })
+    );
+}
+
+#[tokio::test]
+async fn post_conversion_docx_with_charset_param_rejected() {
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document; charset=utf-8")],
+        Body::from("some bytes"),
+    );
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        serde_json::json!({
+            "type": "about:blank",
+            "title": "Unsupported Media Type",
+            "status": 415,
+            "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document, got application/vnd.openxmlformats-officedocument.wordprocessingml.document; charset=utf-8",
+        })
+    );
+}
+
+#[tokio::test]
+async fn post_conversion_oversized_body_rejected() {
+    let limited_router = docspec_http::router::router_with_body_limit(100);
+    let body = vec![b'x'; 200];
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", "text/markdown")],
+        body,
+    );
+
+    let response = limited_router
+        .oneshot(request)
+        .await
+        .expect("request completes");
+
+    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+}
+
+#[tokio::test]
+async fn post_conversion_markdown_with_invalid_utf8_still_400() {
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", "text/markdown")],
+        Body::from(b"\xFF\xFE\x00".to_vec()),
+    );
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        serde_json::json!({
+            "type": "about:blank",
+            "title": "Bad Request",
+            "status": 400,
+            "detail": "Request body is not valid UTF-8",
         })
     );
 }

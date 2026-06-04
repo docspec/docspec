@@ -20,3 +20,7 @@ pub const OUTPUT_MIME_HTML_PRIMARY: &str = "text/html";
 
 /// The primary `oxa.dev` output MIME type returned when the `oxa.dev` writer is selected.
 pub const OUTPUT_MIME_OXA_PRIMARY: &str = "application/vnd.oxa+json";
+
+/// MIME type for DOCX documents.
+pub const INPUT_MIME_DOCX_PRIMARY: &str =
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
