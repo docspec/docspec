@@ -13,6 +13,7 @@ members = [
   "crates/docspec-http",
   "crates/docspec-oxa-writer",
   "crates/docspec-wasm",
+  "crates/docspec-test-fixtures",
 ]
 
 [workspace.package]
