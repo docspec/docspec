@@ -17,7 +17,7 @@ docspec [OPTIONS] [INPUT]
 ### Options
 
 - `-o, --output <FILE>` — Output file (stdout if omitted)
-- `-f, --from <FORMAT>` — Input format (auto-detected from extension if omitted). Valid values: `markdown`, `html`
+- `-f, --from <FORMAT>` — Input format (auto-detected from extension if omitted). Valid values: `markdown`, `html`, `docx`
 - `-t, --to <FORMAT>` — Output format (auto-detected from extension if omitted). Valid values: `blocknote`, `html`, `oxa`
 - `--color <WHEN>` — When to use colors: `auto`, `always`, `never` (default: `auto`)
 - `-h, --help` — Print help
@@ -27,11 +27,15 @@ docspec [OPTIONS] [INPUT]
 
 - `markdown` — Full Markdown support including headings, lists, tables, and inline formatting
 - `html` — HTML input (see note below)
+- `docx` — DOCX input (see note below)
 
 > **Note:** HTML input and output currently preserve only paragraph text. Other HTML input
 > elements and non-paragraph output events (headings, lists, tables, formatting tags, etc.)
 > are silently dropped. For fuller feature coverage, use Markdown input with BlockNote JSON
 > output.
+
+> **Note:** DOCX input currently emits only paragraphs and text. Styles, breaks, tables,
+> lists, images, tracked changes, headers/footers, and metadata are silently dropped.
 
 ## Examples
 
@@ -45,6 +49,12 @@ Convert an HTML file to BlockNote JSON (paragraphs only):
 
 ```bash
 docspec --from html --to blocknote input.html --output output.json
+```
+
+Convert a DOCX file to BlockNote JSON (paragraphs and text only):
+
+```bash
+docspec --from docx --to blocknote input.docx --output output.json
 ```
 
 Convert Markdown from stdin to BlockNote JSON on stdout:

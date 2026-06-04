@@ -1,10 +1,12 @@
 # `docspec-http`
 
-HTTP API server for DocSpec markdown or HTML conversion to BlockNote JSON (default), HTML, or oxa.dev JSON via `Accept`.
+HTTP API server for DocSpec document conversion to BlockNote JSON (default), HTML, or oxa.dev JSON via `Accept`.
 
-Send markdown (`Content-Type: text/markdown`) or HTML (`Content-Type: text/html`), receive BlockNote JSON (default), HTML (`Accept: text/html`), or oxa.dev JSON (`Accept: application/vnd.oxa+json`). The underlying DocSpec pipeline is streaming, but this v1 HTTP wrapper **buffers the request body and the conversion output in memory** before responding. End-to-end streaming over HTTP is planned for a future version. For now, request size scales with available memory.
+Send markdown (`Content-Type: text/markdown`), HTML (`Content-Type: text/html`), or DOCX (`Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document`), receive BlockNote JSON (default), HTML (`Accept: text/html`), or oxa.dev JSON (`Accept: application/vnd.oxa+json`). The underlying DocSpec pipeline is streaming, but this v1 HTTP wrapper **buffers the request body and the conversion output in memory** before responding. End-to-end streaming over HTTP is planned for a future version. For now, request size scales with available memory.
 
 > **HTML is paragraph-only.** The HTML reader currently parses `<p>` elements only, and the HTML writer currently emits only paragraph events. Other HTML input elements and non-paragraph output events (headings, lists, tables, formatting, etc.) are silently dropped. See [docspec-html-reader](../docspec-html-reader/README.md) and [docspec-html-writer](../docspec-html-writer/README.md).
+
+> **DOCX is paragraph-only.** The DOCX reader emits only paragraph and text events. Styles, breaks, tables, lists, images, tracked changes, headers/footers, and metadata are silently dropped. See [docspec-docx-reader](../docspec-docx-reader/README.md).
 
 ## Quick Start
 
@@ -21,10 +23,10 @@ Default host is `127.0.0.1`. Default port is `3000`.
 
 ## Endpoints
 
-| Method  | Path        | Description                                                      |
-| ------- | ----------- | ---------------------------------------------------------------- |
-| POST    | /conversion | Convert markdown or HTML to BlockNote (default), HTML, or oxa.dev JSON |
-| OPTIONS | /conversion | Preflight / allowed methods                                      |
+| Method  | Path        | Description                                                               |
+| ------- | ----------- | ------------------------------------------------------------------------- |
+| POST    | /conversion | Convert markdown, HTML, or DOCX to BlockNote (default), HTML, or oxa.dev JSON |
+| OPTIONS | /conversion | Preflight / allowed methods                                               |
 | GET     | /health     | Liveness check                                                   |
 | HEAD    | /health     | Liveness check (no body)                                         |
 | OPTIONS | /health     | Allowed methods                                                  |
@@ -65,6 +67,19 @@ curl -X POST \
      --data '<p>Hello World</p>' \
      http://localhost:3000/conversion
 
+# Convert a DOCX file to BlockNote JSON
+curl -X POST \
+     -H 'Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document' \
+     --data-binary @document.docx \
+     http://localhost:3000/conversion
+
+# Convert a DOCX file to oxa.dev JSON
+curl -X POST \
+     -H 'Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document' \
+     -H 'Accept: application/vnd.oxa+json' \
+     --data-binary @document.docx \
+     http://localhost:3000/conversion
+
 # Check server health
 curl http://localhost:3000/health
 
@@ -93,9 +108,11 @@ All errors use RFC 7807 Problem Details JSON (`application/problem+json; charset
 | 404  | Unknown path                                             |
 | 405  | Wrong method (response includes `Allow` header)          |
 | 406  | `Accept` header excludes all supported output types      |
-| 415  | `Content-Type` must be `text/markdown` or `text/html`    |
+| 415  | `Content-Type` must be `text/markdown`, `text/html`, or `application/vnd.openxmlformats-officedocument.wordprocessingml.document` |
 | 422  | Input parse error (malformed markdown or HTML)           |
 | 500  | Internal conversion error                                |
+
+Accepted `Content-Type` values for `/conversion`: `text/markdown`, `text/html`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`. The MIME type must match exactly — no aliases, no charset parameters. Anything else returns 415.
 
 Accepted `Accept` values for `/conversion`: `text/html` (HTML), `application/vnd.oxa+json` (oxa.dev), `application/vnd.docspec.blocknote+json`, `application/vnd.blocknote+json` (BlockNote alias), `application/*`, or `*/*`. Wildcards and missing `Accept` default to BlockNote for back-compat. Anything else returns 406.
 
@@ -107,7 +124,7 @@ Accepted `Accept` values for `/conversion`: `text/html` (HTML), `application/vnd
 
 **Auth**: Use a reverse proxy or upstream gateway.
 
-**Body size**: No limit. Large documents are accepted. DoS risk is accepted. Both the request body and the conversion output are held in memory for the duration of the request.
+**Body size**: Default 10 MiB. Configurable via the `DOCSPEC_HTTP_MAX_BODY_BYTES` environment variable. Requests exceeding the limit are rejected with 413. Both the request body and the conversion output are held in memory for the duration of the request.
 
 **Request timeout**: No timeout. Slow clients can hang a connection indefinitely.
 
