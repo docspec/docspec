@@ -18,10 +18,6 @@
 //! | `html`         | HTML (paragraphs only)                              | `readers::HtmlReader`       |
 //! | `docx`         | DOCX (paragraphs and text only)                     | `readers::DocxReader`       |
 //!
-//! Note: [`readers::DocxReader`] takes a binary file or any `Read + Seek` source rather
-//! than a `&str`, so it is not dispatched through the text-based [`AnyReader`] factory.
-//! Construct it directly with `DocxReader::from_path` or `DocxReader::from_reader`.
-//!
 //! ## Writers
 //!
 //! | Feature             | Format                  | Re-exports                    |
@@ -63,17 +59,26 @@
 //! docspec = { version = "0.5", features = ["markdown", "blocknote"] }
 //! ```
 //!
-//! Convert Markdown to `BlockNote` JSON:
+//! ## Unified Reader Factory
+//!
+//! [`AnyReader`] is the single entry point for all input formats. Use
+//! [`AnyReader::from_path`] when you have a file path, or
+//! [`AnyReader::from_reader`] when you have any `Read + Seek` source (a file,
+//! a network buffer, an in-memory cursor, etc.).
+//!
+//! Convert Markdown to `BlockNote` JSON via the unified factory:
 //!
 //! ```no_run
 //! # #[cfg(all(feature = "markdown", feature = "blocknote-writer"))]
 //! # fn run() -> Result<(), Box<dyn std::error::Error>> {
-//! use docspec::readers::MarkdownReader;
+//! use std::io::Cursor;
+//! use docspec::{AnyReader, InputFormat};
 //! use docspec::writers::BlockNoteWriter;
 //! use docspec::{EventSink, EventSource, StackTrackingSink};
 //!
 //! let markdown = "# Hello\n\nWorld";
-//! let mut reader = MarkdownReader::new(markdown);
+//! let cursor = Cursor::new(markdown.as_bytes().to_vec());
+//! let mut reader = AnyReader::from_reader(InputFormat::Markdown, cursor)?;
 //! let mut buf = Vec::<u8>::new();
 //! let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 //!
@@ -86,6 +91,81 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! Or open a file directly by path:
+//!
+//! ```no_run
+//! # #[cfg(all(feature = "markdown", feature = "blocknote-writer"))]
+//! # fn run() -> Result<(), Box<dyn std::error::Error>> {
+//! use docspec::{AnyReader, InputFormat};
+//! use docspec::writers::BlockNoteWriter;
+//! use docspec::{EventSink, EventSource, StackTrackingSink};
+//!
+//! let mut reader = AnyReader::from_path(InputFormat::Markdown, "input.md")?;
+//! let mut buf = Vec::<u8>::new();
+//! let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+//!
+//! while let Some(event) = reader.next_event()? {
+//!     writer.handle_event(event)?;
+//! }
+//! writer.finish()?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## DOCX Support
+//!
+//! DOCX is a binary format. Enable the `docx` feature and pass a file path or
+//! any `Read + Seek` source. The reader emits paragraphs and text only; styles,
+//! tables, lists, images, headers/footers, and tracked changes are silently
+//! dropped.
+//!
+//! ```no_run
+//! # #[cfg(all(feature = "docx", feature = "blocknote-writer"))]
+//! # fn run() -> Result<(), Box<dyn std::error::Error>> {
+//! use docspec::{AnyReader, InputFormat};
+//! use docspec::writers::BlockNoteWriter;
+//! use docspec::{EventSink, EventSource, StackTrackingSink};
+//!
+//! let mut reader = AnyReader::from_path(InputFormat::Docx, "doc.docx")?;
+//! let mut buf = Vec::<u8>::new();
+//! let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+//!
+//! while let Some(event) = reader.next_event()? {
+//!     writer.handle_event(event)?;
+//! }
+//! writer.finish()?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Migrating from 1.x
+//!
+//! The 1.x `AnyReader::new(format, &str)` constructor is gone. Replace it with
+//! one of the following:
+//!
+//! ```no_run
+//! # #[cfg(feature = "markdown")]
+//! # fn run() -> Result<(), Box<dyn std::error::Error>> {
+//! use std::io::Cursor;
+//! use docspec::{AnyReader, InputFormat};
+//!
+//! // From a string (wrap in a Cursor):
+//! let text = "# Hello\n\nWorld";
+//! let mut reader = AnyReader::from_reader(
+//!     InputFormat::Markdown,
+//!     Cursor::new(text.as_bytes().to_vec()),
+//! )?;
+//!
+//! // From a file path:
+//! let mut reader = AnyReader::from_path(InputFormat::Markdown, "input.md")?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! Note: text readers (Markdown, HTML) still read the full input string into
+//! memory before parsing. The unified factory is about a consistent user-facing
+//! API, not about making text parsing incremental.
 
 #![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -114,10 +194,9 @@ pub mod readers {
     pub use docspec_html_reader::HtmlReader;
 
     /// Streaming DOCX reader. Available when the `docx` feature is enabled.
-    /// Takes a file path or `Read + Seek` source (not `&str`), so it is not
-    /// dispatched through the text-based [`crate::AnyReader`] factory. Emits
-    /// only paragraphs and text; styles, tables, lists, images, headers/footers,
-    /// metadata, and tracked changes are silently dropped.
+    /// Takes a file path or `Read + Seek` source. Emits only paragraphs and text;
+    /// styles, tables, lists, images, headers/footers, metadata, and tracked changes
+    /// are silently dropped.
     #[cfg(feature = "docx")]
     #[cfg_attr(docsrs, doc(cfg(feature = "docx")))]
     pub use docspec_docx_reader::DocxReader;
