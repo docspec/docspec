@@ -2136,4 +2136,66 @@ mod tests {
         let result = sink.finish();
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn mismatched_end_with_open_style_does_not_drain_style() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
+        );
+
+        // Attempt to end a mismatched block (EndBlockQuote instead of EndParagraph)
+        let result = sink.handle_event(Event::EndBlockQuote);
+
+        // Should return InvalidSequence error
+        assert_invalid_sequence(
+            &result,
+            "Paragraph",
+            "Blockquote",
+            "End event for Blockquote does not match any open block",
+        );
+
+        // Style stack should NOT be drained: Bold should still be open
+        assert!(sink.is_inside_text_style(TextStyleKind::Bold));
+
+        // No synthetic EndTextStyle should have been forwarded
+        let events = sink.into_inner().events;
+        assert_eq!(
+            events,
+            vec![
+                Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                },
+            ]
+        );
+    }
 }

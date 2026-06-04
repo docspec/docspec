@@ -139,10 +139,6 @@ impl<S: EventSink> StackTrackingSink<S> {
     /// Handles any intermediate End event (not `EndDocument`): validates the stack,
     /// auto-closes intervening blocks, pops the target frame, and forwards the event.
     fn handle_end_event(&mut self, event: Event) -> Result<()> {
-        while self.style_stack.pop().is_some() {
-            self.sink.handle_event(Event::EndTextStyle)?;
-        }
-
         let Some(target_kind) = block_kind_for_end(&event) else {
             return Err(Error::InvalidSequence {
                 expected: "valid End event".to_string(),
@@ -157,23 +153,28 @@ impl<S: EventSink> StackTrackingSink<S> {
                 message: "received End event with empty stack".to_string(),
             });
         }
-        if self.stack.contains(&target_kind) {
-            while self.stack.last() != Some(&target_kind) {
-                if let Some(popped_kind) = self.stack.pop() {
-                    self.sink.handle_event(end_event_for(popped_kind))?;
-                }
-            }
-            self.stack.pop();
-            return self.sink.handle_event(event);
+        if !self.stack.contains(&target_kind) {
+            return Err(Error::InvalidSequence {
+                expected: self
+                    .stack
+                    .last()
+                    .map_or("empty".to_string(), |k| format!("{k:?}")),
+                found: format!("{target_kind:?}"),
+                message: format!("End event for {target_kind:?} does not match any open block"),
+            });
         }
-        Err(Error::InvalidSequence {
-            expected: self
-                .stack
-                .last()
-                .map_or("empty".to_string(), |k| format!("{k:?}")),
-            found: format!("{target_kind:?}"),
-            message: format!("End event for {target_kind:?} does not match any open block"),
-        })
+
+        while self.style_stack.pop().is_some() {
+            self.sink.handle_event(Event::EndTextStyle)?;
+        }
+
+        while self.stack.last() != Some(&target_kind) {
+            if let Some(popped_kind) = self.stack.pop() {
+                self.sink.handle_event(end_event_for(popped_kind))?;
+            }
+        }
+        self.stack.pop();
+        self.sink.handle_event(event)
     }
 
     /// Handles `ThematicBreak` and `Text` events (all non-block, non-End events).
