@@ -733,4 +733,109 @@ mod tests {
         assert!(sink.is_inside_text_style(TextStyleKind::Bold));
         assert!(sink.is_inside(BlockKind::Paragraph));
     }
+
+    #[test]
+    fn end_text_style_happy_path() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
+        );
+        send(&mut sink, Event::EndTextStyle);
+
+        assert!(!sink.is_inside_text_style(TextStyleKind::Bold));
+        let events = sink.into_inner().events;
+        assert_eq!(
+            events.last(),
+            Some(&Event::EndTextStyle),
+            "last forwarded event should be EndTextStyle"
+        );
+    }
+
+    #[test]
+    fn end_text_style_empty_stack_errors() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        );
+
+        let result = sink.handle_event(Event::EndTextStyle);
+        assert_invalid_sequence(
+            &result,
+            "open text style",
+            "EndTextStyle",
+            "EndTextStyle received with empty style stack",
+        );
+    }
+
+    #[test]
+    fn end_text_style_pops_lifo() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Italic,
+            },
+        );
+        send(&mut sink, Event::EndTextStyle);
+
+        assert!(!sink.is_inside_text_style(TextStyleKind::Italic));
+        assert!(sink.is_inside_text_style(TextStyleKind::Bold));
+    }
 }

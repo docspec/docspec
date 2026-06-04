@@ -350,6 +350,18 @@ impl<S: EventSink> EventSink for StackTrackingSink<S> {
             return self.sink.handle_event(Event::StartTextStyle { kind });
         }
 
+        if matches!(event, Event::EndTextStyle) {
+            if self.style_stack.is_empty() {
+                return Err(Error::InvalidSequence {
+                    expected: "open text style".to_string(),
+                    found: "EndTextStyle".to_string(),
+                    message: "EndTextStyle received with empty style stack".to_string(),
+                });
+            }
+            self.style_stack.pop();
+            return self.sink.handle_event(Event::EndTextStyle);
+        }
+
         self.handle_other_event(event)
     }
 }
