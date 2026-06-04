@@ -60,6 +60,28 @@ impl TextStyle {
     bool_setters!(strikethrough, subscript, superscript, underline);
 }
 
+/// Text styling kind enumeration.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextStyleKind {
+    /// Bold text styling.
+    Bold,
+    /// Italic text styling.
+    Italic,
+    /// Code/monospace text styling.
+    Code,
+    /// Strikethrough text styling.
+    Strikethrough,
+    /// Underline text styling.
+    Underline,
+    /// Subscript text styling.
+    Subscript,
+    /// Superscript text styling.
+    Superscript,
+    /// Highlight/mark color styling.
+    Mark(crate::Color),
+}
+
 /// A streaming document event.
 ///
 /// Events flow from [`crate::EventSource`] readers to [`crate::EventSink`] writers. The enum is

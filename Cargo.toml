@@ -147,5 +147,7 @@ unnecessary_wraps = "allow"
 # --- Selective allows: perf group (continued) ---
 # Reason: AnyReader enum variants (HtmlReader, MarkdownReader) are large but must be stack-allocated for zero heap allocation and zero virtual-dispatch overhead per MANIFESTO.md. Boxing would violate the design constraint.
 large_enum_variant = "allow"
+# Reason: TextStyleKind enum requires non-alphabetical ordering per specification (Bold, Italic, Code, Strikethrough, Underline, Subscript, Superscript, Mark)
+arbitrary_source_item_ordering = "allow"
 
 

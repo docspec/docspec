@@ -1,10 +1,13 @@
 //! Tests.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 #[cfg(test)]
 mod tests {
     use docspec_core::*;
     use docspec_core::{
         Author, Color, DocumentMeta, ImageSource, ListStyleType, TableHeaderScope, TextAlignment,
+        TextStyleKind,
     };
 
     #[test]
@@ -615,5 +618,74 @@ mod tests {
         let event = Event::ThematicBreak { id: None };
         let cloned = event.clone();
         assert_eq!(event, cloned);
+    }
+
+    #[test]
+    fn text_style_kind_bold() {
+        let kind = TextStyleKind::Bold;
+        assert_eq!(format!("{kind:?}"), "Bold");
+        let copied = kind;
+        assert_eq!(kind, copied);
+    }
+
+    #[test]
+    fn text_style_kind_italic() {
+        let kind = TextStyleKind::Italic;
+        assert_eq!(format!("{kind:?}"), "Italic");
+        let copied = kind;
+        assert_eq!(kind, copied);
+    }
+
+    #[test]
+    fn text_style_kind_code() {
+        let kind = TextStyleKind::Code;
+        assert_eq!(format!("{kind:?}"), "Code");
+        let copied = kind;
+        assert_eq!(kind, copied);
+    }
+
+    #[test]
+    fn text_style_kind_strikethrough() {
+        let kind = TextStyleKind::Strikethrough;
+        assert_eq!(format!("{kind:?}"), "Strikethrough");
+        let copied = kind;
+        assert_eq!(kind, copied);
+    }
+
+    #[test]
+    fn text_style_kind_underline() {
+        let kind = TextStyleKind::Underline;
+        assert_eq!(format!("{kind:?}"), "Underline");
+        let copied = kind;
+        assert_eq!(kind, copied);
+    }
+
+    #[test]
+    fn text_style_kind_subscript() {
+        let kind = TextStyleKind::Subscript;
+        assert_eq!(format!("{kind:?}"), "Subscript");
+        let copied = kind;
+        assert_eq!(kind, copied);
+    }
+
+    #[test]
+    fn text_style_kind_superscript() {
+        let kind = TextStyleKind::Superscript;
+        assert_eq!(format!("{kind:?}"), "Superscript");
+        let copied = kind;
+        assert_eq!(kind, copied);
+    }
+
+    #[test]
+    fn text_style_kind_mark() {
+        let color = Color::Rgb {
+            b: 0,
+            g: 128,
+            r: 255,
+        };
+        let kind = TextStyleKind::Mark(color);
+        assert_eq!(format!("{kind:?}"), "Mark(Rgb { b: 0, g: 128, r: 255 })");
+        let copied = kind;
+        assert_eq!(kind, copied);
     }
 }
