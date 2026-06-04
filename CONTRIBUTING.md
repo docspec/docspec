@@ -120,7 +120,7 @@ Every pull request requires at least one reviewer approval before merging. Revie
 - New and changed executable Rust lines in covered crates meet the 98% coverage floor
 - New code has tests covering the changes
 - Public APIs are documented
-- Error handling is thorough (no unwrap, no expect)
+- Error handling in source code is thorough (no unwrap, no expect; test files may opt out via crate-level `#![allow(clippy::unwrap_used, clippy::expect_used)]`)
 - Memory usage is reasonable and documented if changed
 - The change fits the streaming-first architecture
 
@@ -136,7 +136,7 @@ Review is collaboration, not gatekeeping. Ask questions. Push back when needed.
 
 ## Code Standards
 
-See [CODING_STANDARDS.md](CODING_STANDARDS.md) for complete rules. The essentials: no unsafe, no unwrap/expect, no #[allow], all public items documented, 98% coverage for new and changed executable Rust lines in covered crates, `cargo fmt` before every commit.
+See [CODING_STANDARDS.md](CODING_STANDARDS.md) for complete rules. The essentials: no unsafe anywhere; in source code, no `unwrap`/`expect` and no inline `#[allow]`; all public items documented; 98% coverage for new and changed executable Rust lines in covered crates; `cargo fmt` before every commit. Test files (`tests/**` and `#[cfg(test)]` modules) may opt out of `unwrap_used` / `expect_used` (and related test-only lints) via crate-level `#![allow(...)]`; source code may not.
 
 ## Adding Dependencies
 

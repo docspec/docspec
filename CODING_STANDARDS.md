@@ -28,19 +28,23 @@ Undocumented public API is incomplete API. Document the intent, not the implemen
 
 ---
 
-## 4. Error Handling: Unwrap and Expect Are Banned
+## 4. Error Handling: Unwrap and Expect Are Banned in Source Code
 
-`unwrap()` and `expect()` are banned across the codebase. Every operation that can fail returns a Result. Every error propagates with the `?` operator.
+`unwrap()` and `expect()` are banned in source code. The workspace sets `unwrap_used = "deny"` and `expect_used = "deny"` under `[workspace.lints.clippy]`. Every operation in source code that can fail returns a Result. Every error propagates with the `?` operator.
 
 `unwrap()` is a panic waiting to happen. In a library, panics are unacceptable. The `?` operator makes propagation ergonomic. If you need a default, use `unwrap_or` or `unwrap_or_else`. Error types are descriptive and implement `std::error::Error` for interoperability.
 
+**Test code exception**: Test files (under `tests/**` and `#[cfg(test)]` modules) may opt out via crate-level `#![allow(clippy::unwrap_used, clippy::expect_used)]`. Test setup, fixture parsing, and assertions frequently want to panic on programmer error — forcing `Result` propagation through every line of every test produces awkward boilerplate without making tests safer. The exception is scoped: it covers `unwrap_used` and `expect_used` (and a small number of related lints like `indexing_slicing`, `panic`), not the broader linting policy. Source code remains strictly enforced.
+
 ---
 
-## 5. Linting: No Warning Suppressions
+## 5. Linting: No Warning Suppressions in Source Code
 
-`allow_attributes` is set to `"deny"`. No `#[allow]` attribute is permitted in source code. If clippy flags something, we fix it.
+No inline `#[allow]` attribute is permitted in source code. If clippy flags something in source code, we fix it — not the warning.
 
-Warnings are signal. Suppressing them hides the signal. We run Clippy at the strictest settings: restriction, pedantic, and correctness groups, all at deny level. If Clippy is genuinely wrong (rare), we add a workspace-level exception in `Cargo.toml` with documented reasoning — never inline `#[allow]`.
+Warnings are signal. Suppressing them hides the signal. We run Clippy at the strictest settings: restriction, pedantic, correctness, and a curated set of nursery lints, all at deny level. If Clippy is genuinely wrong about a source-code lint (rare), we add a workspace-level exception in `Cargo.toml` with documented reasoning — never inline `#[allow]` in source files.
+
+**Test code exception**: The workspace sets `clippy::allow_attributes = "allow"` precisely so that test files can use crate-level `#![allow(...)]` to opt out of specific lints that legitimately only apply to production code (most commonly `clippy::unwrap_used` and `clippy::expect_used`; sometimes `clippy::indexing_slicing` or `clippy::panic`). The test exception is for `#![allow(...)]` at the crate root of a test file — not for sprinkling inline `#[allow]` attributes throughout test bodies. Source code is held to the stricter standard by convention and by the per-lint denials that remain in effect everywhere (e.g. `unwrap_used = "deny"`).
 
 ---
 
