@@ -48,25 +48,46 @@ mod tests {
         assert_eq!(result, Some(docspec::InputFormat::Markdown));
     }
 
-    #[cfg(feature = "blocknote")]
+    #[cfg(feature = "blocknote-writer")]
     #[test]
     fn detect_blocknote_from_json() {
         let result = docspec::detect_output_format(Path::new("file.json"));
         assert_eq!(result, Some(docspec::OutputFormat::Blocknote));
     }
 
-    #[cfg(feature = "blocknote")]
+    #[cfg(feature = "blocknote-writer")]
     #[test]
     fn case_insensitive_json() {
         let result = docspec::detect_output_format(Path::new("file.JSON"));
         assert_eq!(result, Some(docspec::OutputFormat::Blocknote));
     }
 
-    #[cfg(all(feature = "oxa", not(feature = "blocknote")))]
+    #[cfg(all(feature = "oxa-writer", not(feature = "blocknote-writer")))]
     #[test]
     fn oxa_is_not_auto_detected_from_json() {
         let result = docspec::detect_output_format(Path::new("file.json"));
         assert_eq!(result, None);
+    }
+
+    #[cfg(feature = "html-writer")]
+    #[test]
+    fn detect_html_output_from_html() {
+        let result = docspec::detect_output_format(Path::new("file.html"));
+        assert_eq!(result, Some(docspec::OutputFormat::Html));
+    }
+
+    #[cfg(feature = "html-writer")]
+    #[test]
+    fn detect_html_output_from_htm() {
+        let result = docspec::detect_output_format(Path::new("file.htm"));
+        assert_eq!(result, Some(docspec::OutputFormat::Html));
+    }
+
+    #[cfg(feature = "html-writer")]
+    #[test]
+    fn case_insensitive_html_output() {
+        let result = docspec::detect_output_format(Path::new("file.HTML"));
+        assert_eq!(result, Some(docspec::OutputFormat::Html));
     }
 
     #[test]
@@ -94,30 +115,58 @@ mod tests {
         assert_eq!(debug_str, "Markdown");
     }
 
-    #[cfg(feature = "blocknote")]
+    #[cfg(feature = "blocknote-writer")]
     #[test]
     fn output_format_debug() {
         let debug_str = format!("{:?}", docspec::OutputFormat::Blocknote);
         assert_eq!(debug_str, "Blocknote");
     }
 
-    #[cfg(feature = "oxa")]
+    #[cfg(feature = "oxa-writer")]
     #[test]
     fn output_format_debug_oxa() {
         let debug_str = format!("{:?}", docspec::OutputFormat::Oxa);
         assert_eq!(debug_str, "Oxa");
     }
 
-    #[cfg(feature = "oxa")]
+    #[cfg(feature = "oxa-writer")]
     #[test]
     fn output_format_eq_oxa() {
         assert_eq!(docspec::OutputFormat::Oxa, docspec::OutputFormat::Oxa);
     }
 
-    #[cfg(all(feature = "blocknote", feature = "oxa"))]
+    #[cfg(all(feature = "blocknote-writer", feature = "oxa-writer"))]
     #[test]
     fn output_format_ne_oxa_blocknote() {
         assert_ne!(docspec::OutputFormat::Oxa, docspec::OutputFormat::Blocknote);
+    }
+
+    #[cfg(feature = "html-writer")]
+    #[test]
+    fn output_format_debug_html() {
+        let debug_str = format!("{:?}", docspec::OutputFormat::Html);
+        assert_eq!(debug_str, "Html");
+    }
+
+    #[cfg(feature = "html-writer")]
+    #[test]
+    fn output_format_eq_html() {
+        assert_eq!(docspec::OutputFormat::Html, docspec::OutputFormat::Html);
+    }
+
+    #[cfg(all(feature = "blocknote-writer", feature = "html-writer"))]
+    #[test]
+    fn output_format_ne_html_blocknote() {
+        assert_ne!(
+            docspec::OutputFormat::Html,
+            docspec::OutputFormat::Blocknote
+        );
+    }
+
+    #[cfg(all(feature = "oxa-writer", feature = "html-writer"))]
+    #[test]
+    fn output_format_ne_html_oxa() {
+        assert_ne!(docspec::OutputFormat::Html, docspec::OutputFormat::Oxa);
     }
 
     #[cfg(feature = "markdown")]

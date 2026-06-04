@@ -4,9 +4,11 @@ use std::io::Write;
 
 use docspec_core::{AssetProvider, Event, EventSink, Result, StackTrackingSink};
 
-#[cfg(feature = "blocknote")]
+#[cfg(feature = "blocknote-writer")]
 use docspec_blocknote_writer::BlockNoteWriter;
-#[cfg(feature = "oxa")]
+#[cfg(feature = "html-writer")]
+use docspec_html_writer::HtmlWriter;
+#[cfg(feature = "oxa-writer")]
 use docspec_oxa_writer::OxaWriter;
 
 use crate::format::OutputFormat;
@@ -21,11 +23,13 @@ pub struct AnyWriter<'a, W: Write> {
 }
 
 enum AnyWriterInner<'a, W: Write> {
-    #[cfg(feature = "blocknote")]
+    #[cfg(feature = "blocknote-writer")]
     BlockNote(BlockNoteWriter<'a, W>),
-    #[cfg(feature = "oxa")]
+    #[cfg(feature = "html-writer")]
+    Html(HtmlWriter<W>),
+    #[cfg(feature = "oxa-writer")]
     Oxa(OxaWriter<W>),
-    #[cfg(not(feature = "blocknote"))]
+    #[cfg(not(feature = "blocknote-writer"))]
     _Phantom(std::marker::PhantomData<&'a W>),
 }
 
@@ -34,17 +38,27 @@ impl<'a, W: Write> AnyWriter<'a, W> {
     #[inline]
     #[must_use]
     pub fn new(format: OutputFormat, writer: W) -> Self {
-        #[cfg(not(any(feature = "blocknote", feature = "oxa")))]
+        #[cfg(not(any(
+            feature = "blocknote-writer",
+            feature = "oxa-writer",
+            feature = "html-writer"
+        )))]
         {
-            let _ = writer;
+            drop(writer);
             match format {}
         }
-        #[cfg(any(feature = "blocknote", feature = "oxa"))]
+        #[cfg(any(
+            feature = "blocknote-writer",
+            feature = "oxa-writer",
+            feature = "html-writer"
+        ))]
         {
             let inner = match format {
-                #[cfg(feature = "blocknote")]
+                #[cfg(feature = "blocknote-writer")]
                 OutputFormat::Blocknote => AnyWriterInner::BlockNote(BlockNoteWriter::new(writer)),
-                #[cfg(feature = "oxa")]
+                #[cfg(feature = "html-writer")]
+                OutputFormat::Html => AnyWriterInner::Html(HtmlWriter::new(writer)),
+                #[cfg(feature = "oxa-writer")]
                 OutputFormat::Oxa => AnyWriterInner::Oxa(OxaWriter::new(writer)),
             };
             Self {
@@ -55,24 +69,39 @@ impl<'a, W: Write> AnyWriter<'a, W> {
 
     /// Construct a writer with an asset provider, where supported.
     ///
-    /// Writers that do not consume an [`AssetProvider`] (currently
-    /// `OxaWriter`) silently ignore the `assets` argument.
+    /// Writers that do not consume an [`AssetProvider`] (currently `OxaWriter`
+    /// and `HtmlWriter`) silently ignore the `assets` argument; the resulting
+    /// writer behaves identically to [`AnyWriter::new`].
     #[inline]
     #[must_use]
     pub fn with_assets(format: OutputFormat, writer: W, assets: &'a dyn AssetProvider) -> Self {
-        #[cfg(not(any(feature = "blocknote", feature = "oxa")))]
+        #[cfg(not(any(
+            feature = "blocknote-writer",
+            feature = "oxa-writer",
+            feature = "html-writer"
+        )))]
         {
-            let _ = (writer, assets);
+            drop(writer);
+            let _ = assets;
             match format {}
         }
-        #[cfg(any(feature = "blocknote", feature = "oxa"))]
+        #[cfg(any(
+            feature = "blocknote-writer",
+            feature = "oxa-writer",
+            feature = "html-writer"
+        ))]
         {
             let inner = match format {
-                #[cfg(feature = "blocknote")]
+                #[cfg(feature = "blocknote-writer")]
                 OutputFormat::Blocknote => {
                     AnyWriterInner::BlockNote(BlockNoteWriter::with_assets(writer, assets))
                 }
-                #[cfg(feature = "oxa")]
+                #[cfg(feature = "html-writer")]
+                OutputFormat::Html => {
+                    let _ = assets;
+                    AnyWriterInner::Html(HtmlWriter::new(writer))
+                }
+                #[cfg(feature = "oxa-writer")]
                 OutputFormat::Oxa => {
                     let _ = assets;
                     AnyWriterInner::Oxa(OxaWriter::new(writer))
@@ -88,22 +117,26 @@ impl<'a, W: Write> AnyWriter<'a, W> {
 impl<W: Write> EventSink for AnyWriterInner<'_, W> {
     fn finish(self) -> Result<()> {
         match self {
-            #[cfg(feature = "blocknote")]
+            #[cfg(feature = "blocknote-writer")]
             Self::BlockNote(w) => w.finish(),
-            #[cfg(feature = "oxa")]
+            #[cfg(feature = "html-writer")]
+            Self::Html(w) => w.finish(),
+            #[cfg(feature = "oxa-writer")]
             Self::Oxa(w) => w.finish(),
-            #[cfg(not(feature = "blocknote"))]
+            #[cfg(not(feature = "blocknote-writer"))]
             Self::_Phantom(_) => Ok(()),
         }
     }
 
     fn handle_event(&mut self, event: Event) -> Result<()> {
         match self {
-            #[cfg(feature = "blocknote")]
+            #[cfg(feature = "blocknote-writer")]
             Self::BlockNote(w) => w.handle_event(event),
-            #[cfg(feature = "oxa")]
+            #[cfg(feature = "html-writer")]
+            Self::Html(w) => w.handle_event(event),
+            #[cfg(feature = "oxa-writer")]
             Self::Oxa(w) => w.handle_event(event),
-            #[cfg(not(feature = "blocknote"))]
+            #[cfg(not(feature = "blocknote-writer"))]
             Self::_Phantom(_) => {
                 let _ = event;
                 Ok(())
@@ -129,8 +162,19 @@ mod tests {
     use std::borrow::Cow;
     use std::io::Write;
 
-    use docspec_core::{AssetProvider, Event, EventSink as _};
+    use docspec_core::AssetProvider;
+    #[cfg(any(
+        feature = "blocknote-writer",
+        feature = "html-writer",
+        feature = "oxa-writer"
+    ))]
+    use docspec_core::{Event, EventSink as _};
 
+    #[cfg(any(
+        feature = "blocknote-writer",
+        feature = "html-writer",
+        feature = "oxa-writer"
+    ))]
     use super::{AnyWriter, OutputFormat};
 
     struct NullAssets;
@@ -149,7 +193,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "blocknote")]
+    #[cfg(feature = "blocknote-writer")]
     #[test]
     fn with_assets_constructs_writer_for_blocknote() {
         let assets = NullAssets;
@@ -169,7 +213,7 @@ mod tests {
         assert!(!buf.is_empty());
     }
 
-    #[cfg(feature = "oxa")]
+    #[cfg(feature = "oxa-writer")]
     #[test]
     fn with_assets_constructs_writer_for_oxa() {
         let assets = NullAssets;
@@ -185,5 +229,23 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         assert!(writer.finish().is_ok());
         assert_eq!(buf, br#"{"type":"Document","children":[]}"#);
+    }
+
+    #[cfg(feature = "html-writer")]
+    #[test]
+    fn with_assets_ignores_provider_for_html_writer() {
+        let assets = NullAssets;
+        let mut buf = Vec::new();
+        let mut writer = AnyWriter::with_assets(OutputFormat::Html, &mut buf, &assets);
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+        assert_eq!(buf, b"<html><body></body></html>");
     }
 }

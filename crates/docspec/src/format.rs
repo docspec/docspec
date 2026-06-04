@@ -16,10 +16,14 @@ pub enum InputFormat {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OutputFormat {
     /// `BlockNote` JSON. Available when the `blocknote` feature is enabled.
-    #[cfg(feature = "blocknote")]
+    #[cfg(feature = "blocknote-writer")]
     Blocknote,
+    /// HTML5 (paragraph-only; `<p>` elements and text within them only).
+    /// Available when the `html-writer` feature is enabled.
+    #[cfg(feature = "html-writer")]
+    Html,
     /// `oxa.dev` JSON. Available when the `oxa` feature is enabled.
-    #[cfg(feature = "oxa")]
+    #[cfg(feature = "oxa-writer")]
     Oxa,
 }
 
@@ -53,8 +57,10 @@ pub fn detect_input_format(path: &Path) -> Option<InputFormat> {
 pub fn detect_output_format(path: &Path) -> Option<OutputFormat> {
     let ext = path.extension()?.to_str()?.to_ascii_lowercase();
     match ext.as_str() {
-        #[cfg(feature = "blocknote")]
+        #[cfg(feature = "blocknote-writer")]
         "json" => Some(OutputFormat::Blocknote),
+        #[cfg(feature = "html-writer")]
+        "html" | "htm" => Some(OutputFormat::Html),
         _ => None,
     }
 }

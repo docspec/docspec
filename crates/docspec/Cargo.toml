@@ -18,16 +18,22 @@ markdown = ["dep:docspec-markdown-reader"]
 html = ["dep:docspec-html-reader"]
 
 # Format writers (event sinks).
-blocknote = ["dep:docspec-blocknote-writer"]
-oxa = ["dep:docspec-oxa-writer"]
+blocknote-writer = ["dep:docspec-blocknote-writer"]
+oxa-writer = ["dep:docspec-oxa-writer"]
+html-writer = ["dep:docspec-html-writer"]
 
 # Lower-level primitives for implementing custom writers.
 json = ["dep:docspec-json"]
 
 # Convenience meta-features.
+# `blocknote`/`oxa` currently enable only the writer; once their readers exist
+# the meta will expand to enable both directions.
+blocknote = ["blocknote-writer"]
+oxa = ["oxa-writer"]
 all-readers = ["markdown", "html"]
-all-writers = ["blocknote", "oxa"]
-full = ["all-readers", "all-writers", "json"]
+all-writers = ["blocknote-writer", "oxa-writer", "html-writer"]
+all-libs = ["json"]
+full = ["all-readers", "all-writers", "all-libs"]
 
 [dependencies]
 docspec-core = { path = "../docspec-core", version = "1.0.0" }
@@ -36,6 +42,7 @@ docspec-markdown-reader = { path = "../docspec-markdown-reader", version = "1.0.
 docspec-blocknote-writer = { path = "../docspec-blocknote-writer", version = "1.0.2", optional = true }
 docspec-html-reader = { path = "../docspec-html-reader", version = "1.0.1", optional = true }
 docspec-oxa-writer = { path = "../docspec-oxa-writer", version = "1.0.0", optional = true }
+docspec-html-writer = { path = "../docspec-html-writer", version = "1.0.1", optional = true }
 
 [package.metadata.docs.rs]
 all-features = true
