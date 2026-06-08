@@ -12,6 +12,7 @@ members = [
   "crates/docspec-cli",
   "crates/docspec-http",
   "crates/docspec-oxa-writer",
+  "crates/docspec-pandoc-native-writer",
   "crates/docspec-wasm",
 ]
 

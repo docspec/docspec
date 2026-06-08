@@ -1,0 +1,16 @@
+[package]
+name = "docspec-pandoc-native-writer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+description = "Streaming Pandoc native (block-list) writer for DocSpec events"
+keywords = ["pandoc", "native", "writer", "streaming", "document"]
+categories = ["text-processing"]
+
+[dependencies]
+docspec-core = { workspace = true }
+
+[lints]
+workspace = true

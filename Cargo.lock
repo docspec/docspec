@@ -589,6 +589,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "docspec-pandoc-native-writer"
+version = "1.5.0"
+dependencies = [
+ "docspec-core",
+]
+
+[[package]]
 name = "docspec-wasm"
 version = "1.5.1"
 dependencies = [
