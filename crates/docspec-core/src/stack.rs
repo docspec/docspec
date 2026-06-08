@@ -54,6 +54,7 @@ macro_rules! block_kinds {
 /// Each variant corresponds to a Start/End event pair. The stack tracker uses this
 /// to maintain the nesting structure as events flow through.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum BlockKind {
     /// A block quote container.
     Blockquote,

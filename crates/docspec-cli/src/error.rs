@@ -9,6 +9,7 @@ pub type Result<T> = core::result::Result<T, CliError>;
 ///
 /// Wraps underlying library errors and adds CLI-specific error conditions.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum CliError {
     /// Conversion pipeline error from `docspec_core`.
     #[error(transparent)]

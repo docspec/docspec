@@ -56,8 +56,5 @@ serde_json = "1"
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
-[package.metadata.cargo-semver-checks.lints]
-feature_not_enabled_by_default = { level = "warn" }
-
 [lints]
 workspace = true

@@ -498,6 +498,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         let url = match source {
             ImageSource::Uri { uri } => uri,
             ImageSource::Asset { asset_id } => self.encode_asset_as_data_uri(&asset_id)?,
+            _ => return Ok(()),
         };
         let caption = alt.unwrap_or_default();
 

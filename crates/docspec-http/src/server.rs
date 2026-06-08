@@ -7,6 +7,7 @@ use tokio::net::TcpListener;
 
 /// Errors that can occur while starting or running the HTTP server.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum ServerError {
     /// A TCP bind or Axum serve I/O failure.
     #[error(transparent)]
