@@ -124,9 +124,9 @@ release-plz publishes crates in topological dependency order so that each crate'
 4. `docspec` (the facade, depends on readers and writers)
 5. `docspec-cli` and `docspec-http` (depend on the facade and core crates)
 
-After each publish, crates.io needs time to propagate the new version to its index before the next crate can resolve it as a dependency. The `release-plz-release.yml` workflow wraps the publish step with `nick-fields/retry@v3`: 3 attempts, 30-minute timeout per attempt. This handles normal propagation lag without manual intervention.
+After each publish, crates.io needs time to propagate the new version to its index before the next crate can resolve it as a dependency. `release-plz` waits for newly published crates according to `publish_timeout = "30m"` in `release-plz.toml`, so normal propagation lag should not need manual intervention.
 
-If propagation takes longer than 90 minutes (3 attempts × 30 minutes), the workflow will fail. In that case, wait for the index to catch up and re-run the workflow manually. release-plz skips crates that are already published at the target version, so re-running is safe.
+If propagation takes longer than the configured timeout, the workflow will fail. In that case, wait for the index to catch up and re-run the workflow manually. release-plz skips crates that are already published at the target version, so re-running is safe.
 
 ## Manual Operations
 

@@ -30,20 +30,13 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      # Wrap in a retry to absorb crates.io index propagation lag between
-      # dependent crate publishes (e.g., docspec-core must be visible before
-      # docspec can publish). See plan §6 / Metis gap 6.2.
-      - name: Run release-plz (release) with retry
-        uses: nick-fields/retry@v3
+      # Trusted Publishing (OIDC) is the only auth path — release-plz
+      # mints a short-lived token from crates.io via the workflow's
+      # id-token: write permission. No long-lived secret is needed.
+      - name: Run release-plz (release)
+        uses: release-plz/action@v0.5
         with:
-          timeout_minutes: 30
-          max_attempts: 3
-          retry_wait_seconds: 60
-          command: |
-            cargo install --locked release-plz --version "0.3"
-            release-plz release --config release-plz.toml --git-token "$GITHUB_TOKEN"
+          command: release
+          config: release-plz.toml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Trusted Publishing (OIDC) is the only auth path — release-plz
-          # mints a short-lived token from crates.io via the workflow's
-          # id-token: write permission. No long-lived secret is needed.
