@@ -7,7 +7,7 @@ use docspec::writers::BlockNoteWriter;
 use docspec::{EventSink as _, EventSource as _, StackTrackingSink};
 
 fn try_run_pipeline(markdown: &str) -> Result<String, String> {
-    let mut reader = MarkdownReader::new(markdown);
+    let mut reader = MarkdownReader::from_str(markdown);
     let mut buf = Vec::<u8>::new();
     let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 

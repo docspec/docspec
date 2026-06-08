@@ -20,7 +20,7 @@ use docspec::writers::BlockNoteWriter;
 use docspec::{EventSink, EventSource, StackTrackingSink};
 
 let markdown = "# Hello\n\nWorld";
-let mut reader = MarkdownReader::new(markdown);
+let mut reader = MarkdownReader::from_str(markdown);
 let mut buf = Vec::<u8>::new();
 let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 
@@ -40,9 +40,9 @@ writer.finish()?;
 | `html`     | HTML (paragraphs only)                           | `docspec-html-reader`     |
 | `docx`     | DOCX (paragraphs and text only)                  | `docspec-docx-reader`     |
 
-`DocxReader` takes a file path or `Read + Seek` source (not `&str`), so it cannot be
-dispatched through the text-based `AnyReader` factory. Construct it directly with
-`DocxReader::from_path` or `DocxReader::from_reader`.
+`DocxReader` takes a file path or `Read + Seek` source. Construct it directly with
+`DocxReader::from_path` or `DocxReader::from_reader`. Support for dispatching
+`DocxReader` through `AnyReader::from_reader` is planned for a future release.
 
 ### Writers
 

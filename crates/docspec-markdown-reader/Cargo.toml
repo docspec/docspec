@@ -12,6 +12,7 @@ categories = ["parsing"]
 [dependencies]
 docspec-core = { workspace = true }
 pulldown-cmark = "0.13"
+self_cell = { workspace = true }
 
 [lints]
 workspace = true

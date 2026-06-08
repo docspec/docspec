@@ -111,10 +111,11 @@ mod helpers {
 #[cfg(test)]
 mod tests {
     use super::helpers;
-    use docspec_core::{Event, EventSource as _, ImageSource, ListStyleType, TextStyle};
+    use docspec_core::{Error, Event, EventSource as _, ImageSource, ListStyleType, TextStyle};
     use docspec_markdown_reader::MarkdownReader;
+    use std::io::Cursor;
 
-    fn collect_events(reader: &mut MarkdownReader<'_>) -> Vec<Event> {
+    fn collect_events(reader: &mut MarkdownReader) -> Vec<Event> {
         let mut events = Vec::new();
         loop {
             let result = reader.next_event();
@@ -128,9 +129,44 @@ mod tests {
     }
 
     #[test]
+    fn from_reader_matches_from_str() {
+        let input = "# H\n\nParagraph";
+        let mut from_str = MarkdownReader::from_str(input);
+        let mut from_reader = MarkdownReader::from_reader(Cursor::new(input.as_bytes())).unwrap();
+
+        assert_eq!(
+            collect_events(&mut from_str),
+            collect_events(&mut from_reader)
+        );
+    }
+
+    #[test]
+    fn from_reader_invalid_utf8() {
+        let result = MarkdownReader::from_reader(Cursor::new(&[0xFF, 0xFE][..]));
+
+        assert!(matches!(result, Err(Error::Io { .. })));
+    }
+
+    #[test]
+    fn from_reader_one_megabyte() {
+        let big = "# Heading\n\nParagraph.\n".repeat(50_000);
+        let mut reader = MarkdownReader::from_reader(Cursor::new(big.into_bytes())).unwrap();
+        let mut count: usize = 0;
+        let mut last = None;
+
+        while let Some(event) = reader.next_event().unwrap() {
+            last = Some(event);
+            count += 1;
+        }
+
+        assert!(count > 50_000);
+        assert_eq!(last, Some(Event::EndDocument));
+    }
+
+    #[test]
     fn blockquote_content_extraction() {
         let markdown = "> Quoted text";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -155,7 +191,7 @@ mod tests {
 
     #[test]
     fn bold_and_italic_text() {
-        let mut reader = MarkdownReader::new("***both***");
+        let mut reader = MarkdownReader::from_str("***both***");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -172,7 +208,7 @@ mod tests {
 
     #[test]
     fn bold_text() {
-        let mut reader = MarkdownReader::new("**bold**");
+        let mut reader = MarkdownReader::from_str("**bold**");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -190,7 +226,7 @@ mod tests {
     #[test]
     fn document_structure_preserved() {
         let markdown = "# Title\n\nParagraph text.\n\n---\n\n## Subtitle";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -214,7 +250,7 @@ mod tests {
 
     #[test]
     fn empty_document() {
-        let mut reader = MarkdownReader::new("");
+        let mut reader = MarkdownReader::from_str("");
         let events = collect_events(&mut reader);
 
         assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
@@ -222,7 +258,7 @@ mod tests {
 
     #[test]
     fn hard_break() {
-        let mut reader = MarkdownReader::new("Line one  \nLine two");
+        let mut reader = MarkdownReader::from_str("Line one  \nLine two");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -241,7 +277,7 @@ mod tests {
 
     #[test]
     fn heading_level_1() {
-        let mut reader = MarkdownReader::new("# Hello");
+        let mut reader = MarkdownReader::from_str("# Hello");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -261,7 +297,7 @@ mod tests {
         let expected_levels: [u8; 5] = [2, 3, 4, 5, 6];
         for expected in expected_levels {
             let markdown = format!("{} Heading", "#".repeat(usize::from(expected)));
-            let mut reader = MarkdownReader::new(&markdown);
+            let mut reader = MarkdownReader::from_str(&markdown);
             let events = collect_events(&mut reader);
 
             assert_eq!(
@@ -280,7 +316,7 @@ mod tests {
     #[test]
     fn image_with_alt_and_title() {
         let mut reader =
-            MarkdownReader::new("![Alt text](https://example.com/img.png \"Image Title\")");
+            MarkdownReader::from_str("![Alt text](https://example.com/img.png \"Image Title\")");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -302,7 +338,7 @@ mod tests {
 
     #[test]
     fn image_with_alt_only() {
-        let mut reader = MarkdownReader::new("![Alt text only](https://example.com/img.png)");
+        let mut reader = MarkdownReader::from_str("![Alt text only](https://example.com/img.png)");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -324,7 +360,7 @@ mod tests {
 
     #[test]
     fn image_with_no_alt() {
-        let mut reader = MarkdownReader::new("![](https://example.com/img.png)");
+        let mut reader = MarkdownReader::from_str("![](https://example.com/img.png)");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -342,7 +378,7 @@ mod tests {
     #[test]
     fn images_fixture() {
         let markdown = include_str!("../../../tests/fixtures/markdown/images.md");
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -375,7 +411,7 @@ mod tests {
 
     #[test]
     fn inline_code() {
-        let mut reader = MarkdownReader::new("Use `code` here");
+        let mut reader = MarkdownReader::from_str("Use `code` here");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -394,7 +430,7 @@ mod tests {
 
     #[test]
     fn inline_code_inherits_bold() {
-        let mut reader = MarkdownReader::new("**bold `code` bold**");
+        let mut reader = MarkdownReader::from_str("**bold `code` bold**");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -413,7 +449,7 @@ mod tests {
 
     #[test]
     fn inline_code_inherits_italic() {
-        let mut reader = MarkdownReader::new("*italic `code` italic*");
+        let mut reader = MarkdownReader::from_str("*italic `code` italic*");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -432,7 +468,7 @@ mod tests {
 
     #[test]
     fn inline_code_inherits_strikethrough() {
-        let mut reader = MarkdownReader::new("~~strikethrough `code` strikethrough~~");
+        let mut reader = MarkdownReader::from_str("~~strikethrough `code` strikethrough~~");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -451,7 +487,7 @@ mod tests {
 
     #[test]
     fn italic_text() {
-        let mut reader = MarkdownReader::new("*italic*");
+        let mut reader = MarkdownReader::from_str("*italic*");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -469,7 +505,7 @@ mod tests {
     #[test]
     fn list_content_extraction() {
         let markdown = "- Item one\n- Item two";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -496,7 +532,7 @@ mod tests {
     #[test]
     fn nested_content_fixture() {
         let markdown = include_str!("../../../tests/fixtures/markdown/nested_content.md");
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         let text_contents: Vec<&str> = events
@@ -517,7 +553,7 @@ mod tests {
 
     #[test]
     fn nested_list_with_continuation_keeps_parent_item_open() {
-        let mut reader = MarkdownReader::new(
+        let mut reader = MarkdownReader::from_str(
             "- Outer A\n  - Inner nested\n\n  Continuation paragraph for Outer A\n- Outer B\n",
         );
         let events = collect_events(&mut reader);
@@ -536,7 +572,7 @@ mod tests {
 
     #[test]
     fn next_event_returns_none_after_end_document() {
-        let mut reader = MarkdownReader::new("");
+        let mut reader = MarkdownReader::from_str("");
         let events = collect_events(&mut reader);
 
         assert_eq!(events.len(), 2);
@@ -557,7 +593,7 @@ mod tests {
 
     #[test]
     fn paragraph() {
-        let mut reader = MarkdownReader::new("Hello world");
+        let mut reader = MarkdownReader::from_str("Hello world");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -574,7 +610,7 @@ mod tests {
 
     #[test]
     fn soft_break_emits_soft_break_event() {
-        let mut reader = MarkdownReader::new("Line one\nLine two");
+        let mut reader = MarkdownReader::from_str("Line one\nLine two");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -596,7 +632,7 @@ mod tests {
         // The image alt text flattens the soft break to a single space.
         // No SoftBreak event is emitted — the soft break is absorbed
         // into the image's alt buffer.
-        let mut reader = MarkdownReader::new("![alt one\nalt two](image.png)");
+        let mut reader = MarkdownReader::from_str("![alt one\nalt two](image.png)");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -613,7 +649,7 @@ mod tests {
 
     #[test]
     fn thematic_break() {
-        let mut reader = MarkdownReader::new("Before\n\n---\n\nAfter");
+        let mut reader = MarkdownReader::from_str("Before\n\n---\n\nAfter");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -634,7 +670,7 @@ mod tests {
 
     #[test]
     fn code_in_image_alt_appends_to_alt_buffer() {
-        let mut reader = MarkdownReader::new("![`code`](https://example.com/img.png)");
+        let mut reader = MarkdownReader::from_str("![`code`](https://example.com/img.png)");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -651,7 +687,7 @@ mod tests {
 
     #[test]
     fn html_events_silently_ignored() {
-        let mut reader = MarkdownReader::new("<div>hello</div>");
+        let mut reader = MarkdownReader::from_str("<div>hello</div>");
         let events = collect_events(&mut reader);
 
         assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
@@ -660,7 +696,7 @@ mod tests {
     #[test]
     fn blockquote_text_wrapped_in_auto_paragraph() {
         let markdown = "> Quoted";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -680,7 +716,7 @@ mod tests {
     #[test]
     fn list_item_emits_start_text_end_directly() {
         let markdown = "- Item";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -698,7 +734,7 @@ mod tests {
     #[test]
     fn fenced_code_block_with_language() {
         let markdown = "```rust\nfn main() {}\n```";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -716,7 +752,7 @@ mod tests {
     #[test]
     fn fenced_code_block_without_language() {
         let markdown = "```\nsome code\n```";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -734,7 +770,7 @@ mod tests {
     #[test]
     fn indented_code_block() {
         let markdown = "    indented code\n";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -755,7 +791,7 @@ mod tests {
         // The parser adds a newline terminator, but we should only remove that one,
         // not all trailing newlines
         let markdown = "```\ncode\n\n\n```";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         // The content should preserve the blank lines (two newlines after "code").
@@ -779,7 +815,7 @@ mod tests {
         // inline markdown inside code blocks, and the reader's code_block_buffer
         // branch never consults bold/italic depth.
         let markdown = "```\n*test* **bold** `code` _italic_ ~strike~\n```";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -803,7 +839,7 @@ mod tests {
         // followed by EndPreformatted with NO Text event in between
         // (the `if !content.is_empty()` guard at src/lib.rs:234 suppresses it).
         let markdown = "```\n```";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -820,7 +856,7 @@ mod tests {
     #[test]
     fn code_block_inside_list_item() {
         let markdown = "- item\n\n  ```\n  code\n  ```";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -842,7 +878,7 @@ mod tests {
 
     #[test]
     fn strikethrough_basic() {
-        let mut reader = MarkdownReader::new("~~struck~~");
+        let mut reader = MarkdownReader::from_str("~~struck~~");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -859,7 +895,7 @@ mod tests {
 
     #[test]
     fn strikethrough_with_bold() {
-        let mut reader = MarkdownReader::new("~~**bold struck**~~");
+        let mut reader = MarkdownReader::from_str("~~**bold struck**~~");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -876,7 +912,7 @@ mod tests {
 
     #[test]
     fn strikethrough_with_italic() {
-        let mut reader = MarkdownReader::new("~~*italic struck*~~");
+        let mut reader = MarkdownReader::from_str("~~*italic struck*~~");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -897,7 +933,7 @@ mod tests {
     #[test]
     fn strikethrough_in_paragraph() {
         let markdown = "This is ~~struck~~ text in a paragraph.";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -916,7 +952,7 @@ mod tests {
 
     #[test]
     fn strikethrough_with_bold_and_italic() {
-        let mut reader = MarkdownReader::new("~~***bold italic struck***~~");
+        let mut reader = MarkdownReader::from_str("~~***bold italic struck***~~");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -937,7 +973,7 @@ mod tests {
     #[test]
     fn simple_table_emits_structured_events() {
         let markdown = "| A | B |\n|---|---|\n| C | D |";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(1), Some(&helpers::start_table()));
@@ -951,7 +987,7 @@ mod tests {
     #[test]
     fn table_header_cells_have_column_scope() {
         let markdown = "| H1 | H2 |\n|----|----|";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(3), Some(&helpers::start_table_header()));
@@ -961,7 +997,7 @@ mod tests {
     #[test]
     fn table_body_cells_have_no_scope_field() {
         let markdown = "| H |\n|---|\n| C |";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(3), Some(&helpers::start_table_header()));
@@ -972,7 +1008,7 @@ mod tests {
     #[test]
     fn table_cell_text_emits_raw_not_wrapped() {
         let markdown = "| H |\n|---|\n| text |";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(8), Some(&helpers::start_table_cell()));
@@ -986,7 +1022,7 @@ mod tests {
     #[test]
     fn table_with_inline_formatting_in_cells() {
         let markdown = "| **bold** | `code` |\n|-----------|--------|\n| *italic* | plain |";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -1006,7 +1042,7 @@ mod tests {
     #[test]
     fn header_only_table() {
         let markdown = "| H1 | H2 |\n|----|----|";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(1), Some(&helpers::start_table()));
@@ -1019,7 +1055,7 @@ mod tests {
     #[test]
     fn table_with_empty_cells() {
         let markdown = "| A |  |\n|---|---|\n|  | B |";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(6), Some(&helpers::start_table_header()));
@@ -1031,7 +1067,7 @@ mod tests {
     #[test]
     fn multiple_tables_in_sequence() {
         let markdown = "| A |\n|---|\n| B |\n\n| C |\n|---|\n| D |";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(1), Some(&helpers::start_table()));
@@ -1042,7 +1078,7 @@ mod tests {
 
     #[test]
     fn simple_bullet_list_emits_unordered_items() {
-        let mut reader = MarkdownReader::new("- a\n- b\n- c");
+        let mut reader = MarkdownReader::from_str("- a\n- b\n- c");
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
@@ -1059,7 +1095,7 @@ mod tests {
 
     #[test]
     fn simple_numbered_list_emits_ordered_items() {
-        let mut reader = MarkdownReader::new("1. a\n2. b\n3. c");
+        let mut reader = MarkdownReader::from_str("1. a\n2. b\n3. c");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -1079,7 +1115,7 @@ mod tests {
 
     #[test]
     fn numbered_list_with_explicit_start() {
-        let mut reader = MarkdownReader::new("5. a\n6. b\n7. c");
+        let mut reader = MarkdownReader::from_str("5. a\n6. b\n7. c");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -1098,7 +1134,7 @@ mod tests {
 
     #[test]
     fn bullet_list_emits_disc_style() {
-        let mut reader = MarkdownReader::new("- a");
+        let mut reader = MarkdownReader::from_str("- a");
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
@@ -1106,7 +1142,7 @@ mod tests {
 
     #[test]
     fn ordered_list_emits_decimal_style() {
-        let mut reader = MarkdownReader::new("1. a");
+        let mut reader = MarkdownReader::from_str("1. a");
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -1117,7 +1153,7 @@ mod tests {
 
     #[test]
     fn nested_bullet_lists_emit_increasing_level() {
-        let mut reader = MarkdownReader::new("- A\n  - B\n  - C\n- D");
+        let mut reader = MarkdownReader::from_str("- A\n  - B\n  - C\n- D");
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
@@ -1132,7 +1168,7 @@ mod tests {
 
     #[test]
     fn mixed_nested_lists() {
-        let mut reader = MarkdownReader::new("- A\n  1. B\n  2. C\n- D");
+        let mut reader = MarkdownReader::from_str("- A\n  1. B\n  2. C\n- D");
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
@@ -1153,7 +1189,7 @@ mod tests {
 
     #[test]
     fn list_item_containing_only_nested_list_no_text() {
-        let mut reader = MarkdownReader::new("- \n  - Nested item\n- Sibling\n");
+        let mut reader = MarkdownReader::from_str("- \n  - Nested item\n- Sibling\n");
         let events = collect_events(&mut reader);
 
         // Outer item opens without any text of its own
@@ -1175,7 +1211,7 @@ mod tests {
 
     #[test]
     fn list_items_with_inline_formatting() {
-        let mut reader = MarkdownReader::new("- **bold** item\n- *italic* item");
+        let mut reader = MarkdownReader::from_str("- **bold** item\n- *italic* item");
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
@@ -1194,7 +1230,7 @@ mod tests {
 
     #[test]
     fn nested_list_with_hard_break_in_continuation() {
-        let mut reader = MarkdownReader::new("- A\n  - B\n\n  Line one  \n  Line two\n");
+        let mut reader = MarkdownReader::from_str("- A\n  - B\n\n  Line one  \n  Line two\n");
         let events = collect_events(&mut reader);
 
         // Continuation paragraph is inside parent item
@@ -1217,7 +1253,7 @@ mod tests {
 
     #[test]
     fn three_levels_deeply_nested_unordered_list() {
-        let mut reader = MarkdownReader::new("- A\n  - B\n    - C\n");
+        let mut reader = MarkdownReader::from_str("- A\n  - B\n    - C\n");
         let events = collect_events(&mut reader);
 
         assert_eq!(events.get(1), Some(&helpers::start_unordered_list_item(0)));
@@ -1240,7 +1276,7 @@ mod tests {
         // a well-formed event stream. The outer item's EndOrderedListItem must be
         // emitted AFTER the inner EndBlockQuote, not before.
         let markdown = "5) I2\n   > text\n   > - [f]\n";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -1291,7 +1327,7 @@ mod tests {
     #[test]
     fn link_simple() {
         let markdown = "[text](https://example.com)";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
         assert_eq!(
             events,
@@ -1320,7 +1356,7 @@ mod tests {
     #[test]
     fn link_with_title() {
         let markdown = r#"[text](https://example.com "a title")"#;
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
         assert_eq!(
             events,
@@ -1349,7 +1385,7 @@ mod tests {
     #[test]
     fn link_empty_text() {
         let markdown = "[](https://example.com)";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
         assert_eq!(
             events,
@@ -1374,7 +1410,7 @@ mod tests {
     #[test]
     fn link_styled_content() {
         let markdown = "[**bold** text](https://example.com)";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
         assert_eq!(
             events,
@@ -1407,7 +1443,7 @@ mod tests {
     #[test]
     fn link_with_code_span() {
         let markdown = "[`code`](https://example.com)";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
         assert_eq!(
             events,
@@ -1436,7 +1472,7 @@ mod tests {
     #[test]
     fn autolink() {
         let markdown = "<https://example.com>";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
         assert_eq!(
             events,
@@ -1465,7 +1501,7 @@ mod tests {
     #[test]
     fn link_in_heading() {
         let markdown = "# [text](https://example.com)";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
         assert_eq!(
             events,
@@ -1491,7 +1527,7 @@ mod tests {
     #[test]
     fn link_in_paragraph_with_surrounding_text() {
         let markdown = "before [link text](https://example.com) after";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
         assert_eq!(
             events,
@@ -1531,7 +1567,7 @@ mod tests {
         // Reader should emit: StartParagraph, StartLink, EndLink, Image, EndParagraph
         // (Image appears BEFORE EndParagraph because pulldown fires End(Image) before End(Paragraph))
         let markdown = "[![alt](img.png)](https://example.com)";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
         assert_eq!(
             events,
@@ -1564,7 +1600,7 @@ mod tests {
 
     #[test]
     fn inline_html_only_paragraph_emits_nothing() {
-        let mut reader = MarkdownReader::new("<span id=\"ferris\"></span>");
+        let mut reader = MarkdownReader::from_str("<span id=\"ferris\"></span>");
         let events = collect_events(&mut reader);
         assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
     }
@@ -1572,7 +1608,7 @@ mod tests {
     #[test]
     fn inline_html_between_paragraphs_preserves_surrounding() {
         let markdown = "Before\n\n<span id=\"ferris\"></span>\n\nAfter";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -1593,7 +1629,7 @@ mod tests {
     #[test]
     fn inline_html_with_text_still_emits_paragraph() {
         let markdown = "text <span></span> more";
-        let mut reader = MarkdownReader::new(markdown);
+        let mut reader = MarkdownReader::from_str(markdown);
         let events = collect_events(&mut reader);
 
         assert_eq!(
@@ -1613,21 +1649,21 @@ mod tests {
     fn inline_html_inside_emphasis_emits_nothing() {
         // pulldown-cmark emits: Start(Paragraph), Start(Emphasis), InlineHtml(...), InlineHtml(...), End(Emphasis), End(Paragraph)
         // No Text events are emitted, so the paragraph should be deferred and ultimately not emitted.
-        let mut reader = MarkdownReader::new("*<span></span>*");
+        let mut reader = MarkdownReader::from_str("*<span></span>*");
         let events = collect_events(&mut reader);
         assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
     }
 
     #[test]
     fn softbreak_only_after_html_filter_emits_nothing() {
-        let mut reader = MarkdownReader::new("<span></span>\n<span></span>");
+        let mut reader = MarkdownReader::from_str("<span></span>\n<span></span>");
         let events = collect_events(&mut reader);
         assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
     }
 
     #[test]
     fn image_only_paragraph_emits_paragraph_wrapper() {
-        let mut reader = MarkdownReader::new("![alt](img.png)");
+        let mut reader = MarkdownReader::from_str("![alt](img.png)");
         let events = collect_events(&mut reader);
         assert_eq!(
             events,
@@ -1643,21 +1679,21 @@ mod tests {
 
     #[test]
     fn hardbreak_only_paragraph_emits_nothing() {
-        let mut reader = MarkdownReader::new("  \n");
+        let mut reader = MarkdownReader::from_str("  \n");
         let events = collect_events(&mut reader);
         assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
     }
 
     #[test]
     fn inline_html_with_hardbreak_emits_nothing() {
-        let mut reader = MarkdownReader::new("<span></span>  \n<span></span>");
+        let mut reader = MarkdownReader::from_str("<span></span>  \n<span></span>");
         let events = collect_events(&mut reader);
         assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
     }
 
     #[test]
     fn list_item_with_only_softbreak_emits_softbreak() {
-        let mut reader = MarkdownReader::new("- <span></span>\n  <span></span>");
+        let mut reader = MarkdownReader::from_str("- <span></span>\n  <span></span>");
         let events = collect_events(&mut reader);
         assert_eq!(
             events,
@@ -1673,7 +1709,7 @@ mod tests {
 
     #[test]
     fn list_item_with_text_and_softbreak_emits_text_and_break() {
-        let mut reader = MarkdownReader::new("- text\n  more");
+        let mut reader = MarkdownReader::from_str("- text\n  more");
         let events = collect_events(&mut reader);
         assert_eq!(
             events,

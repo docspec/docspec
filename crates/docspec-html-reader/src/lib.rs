@@ -11,7 +11,7 @@
 //! use docspec_html_reader::{HtmlReader, EventSource};
 //!
 //! let html = "<p>Hello world</p>";
-//! let mut reader = HtmlReader::new(html);
+//! let mut reader = HtmlReader::from_str(html);
 //!
 //! while let Some(event) = reader.next_event()? {
 //!     println!("{event:?}");
@@ -28,14 +28,22 @@
 //! All other HTML elements are silently ignored. Text content inside inline
 //! elements (e.g., `<strong>`, `<em>`) is preserved as `Text` events, but
 //! the formatting structure is dropped.
+//!
+//! # Streaming
+//!
+//! `HtmlReader` streams its source via `html5gum::IoReader`'s 16 KB sliding-window
+//! buffer. Memory usage is constant regardless of document size — the document need
+//! not fit in memory. Both [`HtmlReader::from_str`] and [`HtmlReader::from_reader`]
+//! use this streaming path internally.
 
 extern crate alloc;
 
 use alloc::collections::VecDeque;
+use std::io::{Cursor, Read, Seek};
 
 pub use docspec_core::EventSource;
 use docspec_core::{Event, Result, TextStyle};
-use html5gum::{StringReader, Tokenizer};
+use html5gum::{IoReader, Tokenizer};
 
 /// Document processing phase.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -59,13 +67,13 @@ enum Phase {
 /// ```
 /// use docspec_html_reader::{HtmlReader, EventSource};
 ///
-/// let mut reader = HtmlReader::new("<p>hello</p>");
+/// let mut reader = HtmlReader::from_str("<p>hello</p>");
 /// while let Some(event) = reader.next_event()? {
 ///     // Process events...
 /// }
 /// # Ok::<(), docspec_core::Error>(())
 /// ```
-pub struct HtmlReader<'a> {
+pub struct HtmlReader {
     /// Whether the reader is currently inside a `<p>` element.
     in_paragraph: bool,
     /// Document processing phase.
@@ -73,13 +81,56 @@ pub struct HtmlReader<'a> {
     /// Queue of `DocSpec` events to emit.
     queue: VecDeque<Event>,
     /// The html5gum tokenizer iterator.
-    tokens: Tokenizer<StringReader<'a>>,
+    tokens: Tokenizer<IoReader<Box<dyn Read + Send>>>,
 }
 
-impl<'a> HtmlReader<'a> {
+impl HtmlReader {
     /// Pops the front event from the queue, if any.
     fn drain_queue(&mut self) -> Option<Event> {
         self.queue.pop_front()
+    }
+
+    fn from_boxed_reader(reader: Box<dyn Read + Send>) -> Self {
+        Self {
+            in_paragraph: false,
+            phase: Phase::NotStarted,
+            queue: VecDeque::new(),
+            tokens: Tokenizer::new(IoReader::new(reader)),
+        }
+    }
+
+    /// Creates an `HtmlReader` from any `Read + Seek` source.
+    ///
+    /// The source is streamed via `html5gum::IoReader`'s 16 KB sliding-window
+    /// buffer. Memory usage is constant regardless of document size.
+    ///
+    /// The `Seek` bound is required for API symmetry with other `DocSpec` readers
+    /// (e.g., `DocxReader`), even though `html5gum::IoReader` only needs `Read`.
+    ///
+    /// # Errors
+    ///
+    /// This constructor does not read from the source eagerly and therefore
+    /// currently cannot fail.
+    #[inline]
+    pub fn from_reader<R: Read + Seek + Send + 'static>(reader: R) -> Result<Self> {
+        let boxed: Box<dyn Read + Send> = Box::new(reader);
+        Ok(Self::from_boxed_reader(boxed))
+    }
+
+    /// Creates an `HtmlReader` from a string slice.
+    ///
+    /// The input bytes are copied into an owned `Vec<u8>` and streamed via
+    /// `html5gum::IoReader`'s 16 KB sliding-window buffer.
+    #[expect(
+        clippy::should_implement_trait,
+        reason = "Public API requires an infallible constructor named from_str."
+    )]
+    #[inline]
+    #[must_use]
+    pub fn from_str(input: &str) -> Self {
+        let bytes: Vec<u8> = input.as_bytes().to_vec();
+        let reader: Box<dyn Read + Send> = Box::new(Cursor::new(bytes));
+        Self::from_boxed_reader(reader)
     }
 
     /// Translates an end tag token into queued events.
@@ -139,32 +190,9 @@ impl<'a> HtmlReader<'a> {
         }
         Ok(())
     }
-
-    /// Creates a new `HtmlReader` from the given HTML string.
-    ///
-    /// The reader will emit `StartDocument` as its first event and `EndDocument`
-    /// as its last event, with the parsed content events in between.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use docspec_html_reader::HtmlReader;
-    ///
-    /// let reader = HtmlReader::new("<p>Hello World</p>");
-    /// ```
-    #[inline]
-    #[must_use]
-    pub fn new(input: &'a str) -> Self {
-        Self {
-            in_paragraph: false,
-            phase: Phase::NotStarted,
-            queue: VecDeque::new(),
-            tokens: Tokenizer::new(input),
-        }
-    }
 }
 
-impl EventSource for HtmlReader<'_> {
+impl EventSource for HtmlReader {
     #[inline]
     fn next_event(&mut self) -> Result<Option<Event>> {
         loop {
@@ -210,10 +238,20 @@ impl EventSource for HtmlReader<'_> {
                                 });
                             }
                         },
-                        Err(infallible) => match infallible {},
+                        Err(source) => return Err(docspec_core::Error::Io { source }),
                     }
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod send_static_assertions {
+    fn assert_send_static<T: Send + 'static>() {}
+
+    #[test]
+    fn html_reader_is_send_static() {
+        assert_send_static::<crate::HtmlReader>();
     }
 }

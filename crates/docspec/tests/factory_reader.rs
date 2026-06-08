@@ -14,9 +14,9 @@ mod tests {
     fn markdown_dispatch_emits_first_event() {
         use docspec_markdown_reader::MarkdownReader;
 
-        let mut reader = AnyReader::new(InputFormat::Markdown, "# h");
+        let mut reader = AnyReader::from_str(InputFormat::Markdown, "# h");
         let event = reader.next_event().expect("AnyReader should not fail");
-        let expected = MarkdownReader::new("# h")
+        let expected = MarkdownReader::from_str("# h")
             .next_event()
             .expect("direct reader should not fail");
         assert_eq!(event, expected);
@@ -27,9 +27,9 @@ mod tests {
     fn html_dispatch_emits_first_event() {
         use docspec_html_reader::HtmlReader;
 
-        let mut reader = AnyReader::new(InputFormat::Html, "<p>x</p>");
+        let mut reader = AnyReader::from_str(InputFormat::Html, "<p>x</p>");
         let event = reader.next_event().expect("AnyReader should not fail");
-        let expected = HtmlReader::new("<p>x</p>")
+        let expected = HtmlReader::from_str("<p>x</p>")
             .next_event()
             .expect("direct reader should not fail");
         assert_eq!(event, expected);
@@ -41,8 +41,8 @@ mod tests {
         use docspec_markdown_reader::MarkdownReader;
 
         let input = "# Hello\n\nWorld";
-        let mut any_reader = AnyReader::new(InputFormat::Markdown, input);
-        let mut direct_reader = MarkdownReader::new(input);
+        let mut any_reader = AnyReader::from_str(InputFormat::Markdown, input);
+        let mut direct_reader = MarkdownReader::from_str(input);
         loop {
             let any_event = any_reader.next_event().expect("AnyReader failed");
             let direct_event = direct_reader.next_event().expect("MarkdownReader failed");
@@ -59,8 +59,8 @@ mod tests {
         use docspec_html_reader::HtmlReader;
 
         let input = "<p>hello</p>";
-        let mut any_reader = AnyReader::new(InputFormat::Html, input);
-        let mut direct_reader = HtmlReader::new(input);
+        let mut any_reader = AnyReader::from_str(InputFormat::Html, input);
+        let mut direct_reader = HtmlReader::from_str(input);
         loop {
             let any_event = any_reader.next_event().expect("AnyReader failed");
             let direct_event = direct_reader.next_event().expect("HtmlReader failed");
@@ -75,13 +75,41 @@ mod tests {
     #[test]
     fn assert_is_event_source() {
         fn check<S: EventSource>(_: S) {}
-        check(AnyReader::new(InputFormat::Markdown, ""));
+        check(AnyReader::from_str(InputFormat::Markdown, ""));
     }
 
     #[cfg(feature = "html")]
     #[test]
     fn html_assert_is_event_source() {
         fn check<S: EventSource>(_: S) {}
-        check(AnyReader::new(InputFormat::Html, ""));
+        check(AnyReader::from_str(InputFormat::Html, ""));
+    }
+
+    #[cfg(feature = "markdown")]
+    #[test]
+    fn any_reader_from_reader_matches_from_str_markdown() {
+        use std::io::Cursor;
+
+        let input = "# Hello\n\nWorld";
+        let mut r1 = AnyReader::from_str(InputFormat::Markdown, input);
+        let mut r2 =
+            AnyReader::from_reader(InputFormat::Markdown, Cursor::new(input.as_bytes())).unwrap();
+        let events1: Vec<_> = core::iter::from_fn(|| r1.next_event().unwrap()).collect();
+        let events2: Vec<_> = core::iter::from_fn(|| r2.next_event().unwrap()).collect();
+        assert_eq!(events1, events2);
+    }
+
+    #[cfg(feature = "html")]
+    #[test]
+    fn any_reader_from_reader_matches_from_str_html() {
+        use std::io::Cursor;
+
+        let input = "<p>hello</p>";
+        let mut r1 = AnyReader::from_str(InputFormat::Html, input);
+        let mut r2 =
+            AnyReader::from_reader(InputFormat::Html, Cursor::new(input.as_bytes())).unwrap();
+        let events1: Vec<_> = core::iter::from_fn(|| r1.next_event().unwrap()).collect();
+        let events2: Vec<_> = core::iter::from_fn(|| r2.next_event().unwrap()).collect();
+        assert_eq!(events1, events2);
     }
 }

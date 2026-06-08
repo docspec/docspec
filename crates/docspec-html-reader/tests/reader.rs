@@ -1,6 +1,6 @@
 //! Integration tests for `HtmlReader`.
 
-#![allow(clippy::expect_used, clippy::panic)]
+#![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
 
 #[cfg(test)]
 mod tests {
@@ -8,7 +8,7 @@ mod tests {
     use docspec_html_reader::{EventSource as _, HtmlReader};
 
     fn collect_events(input: &str) -> Vec<Event> {
-        let mut reader = HtmlReader::new(input);
+        let mut reader = HtmlReader::from_str(input);
         let mut events = Vec::new();
         while let Some(ev) = reader.next_event().expect("unexpected parse error") {
             events.push(ev);
@@ -17,7 +17,7 @@ mod tests {
     }
 
     fn collect_events_result(input: &str) -> Result<Vec<Event>> {
-        let mut reader = HtmlReader::new(input);
+        let mut reader = HtmlReader::from_str(input);
         let mut events = Vec::new();
         loop {
             match reader.next_event()? {
@@ -406,7 +406,7 @@ mod tests {
 
     #[test]
     fn idempotent_after_eof() {
-        let mut reader = HtmlReader::new("");
+        let mut reader = HtmlReader::from_str("");
         // Drain to Ok(None)
         while reader.next_event().expect("no error").is_some() {}
         // Call twice more — must return Ok(None) both times
@@ -516,5 +516,37 @@ mod tests {
             }
             other => panic!("expected Parse error, got: {other:?}"),
         }
+    }
+
+    #[test]
+    fn from_reader_matches_from_str() {
+        use std::io::Cursor;
+
+        let input = "<p>hi</p>";
+        let mut r1 = HtmlReader::from_str(input);
+        let mut r2 = HtmlReader::from_reader(Cursor::new(input.as_bytes())).unwrap();
+        let events1: Vec<_> = core::iter::from_fn(|| r1.next_event().unwrap()).collect();
+        let events2: Vec<_> = core::iter::from_fn(|| r2.next_event().unwrap()).collect();
+        assert_eq!(events1, events2);
+    }
+
+    #[test]
+    fn from_reader_invalid_utf8_in_paragraph() {
+        use std::io::Cursor;
+
+        let mut reader = HtmlReader::from_reader(Cursor::new(b"<p>\xFF</p>")).unwrap();
+        let mut found_error = false;
+        loop {
+            match reader.next_event() {
+                Err(Error::Parse { .. }) => {
+                    found_error = true;
+                    break;
+                }
+                Err(e) => panic!("unexpected error: {e:?}"),
+                Ok(None) => break,
+                Ok(Some(_)) => {}
+            }
+        }
+        assert!(found_error, "expected Error::Parse for invalid UTF-8");
     }
 }
