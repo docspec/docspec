@@ -90,6 +90,20 @@ mod tests {
         assert_eq!(result, Some(docspec::OutputFormat::Html));
     }
 
+    #[cfg(feature = "pandoc-native-writer")]
+    #[test]
+    fn detect_pandoc_native_output_from_native() {
+        let result = docspec::detect_output_format(Path::new("file.native"));
+        assert_eq!(result, Some(docspec::OutputFormat::PandocNative));
+    }
+
+    #[cfg(feature = "pandoc-native-writer")]
+    #[test]
+    fn case_insensitive_native_output() {
+        let result = docspec::detect_output_format(Path::new("file.NATIVE"));
+        assert_eq!(result, Some(docspec::OutputFormat::PandocNative));
+    }
+
     #[test]
     fn unknown_extension_returns_none() {
         let result = docspec::detect_input_format(Path::new("file.txt"));
@@ -154,6 +168,22 @@ mod tests {
         assert_eq!(docspec::OutputFormat::Html, docspec::OutputFormat::Html);
     }
 
+    #[cfg(feature = "pandoc-native-writer")]
+    #[test]
+    fn output_format_debug_pandoc_native() {
+        let debug_str = format!("{:?}", docspec::OutputFormat::PandocNative);
+        assert_eq!(debug_str, "PandocNative");
+    }
+
+    #[cfg(feature = "pandoc-native-writer")]
+    #[test]
+    fn output_format_eq_pandoc_native() {
+        assert_eq!(
+            docspec::OutputFormat::PandocNative,
+            docspec::OutputFormat::PandocNative
+        );
+    }
+
     #[cfg(all(feature = "blocknote-writer", feature = "html-writer"))]
     #[test]
     fn output_format_ne_html_blocknote() {
@@ -167,6 +197,15 @@ mod tests {
     #[test]
     fn output_format_ne_html_oxa() {
         assert_ne!(docspec::OutputFormat::Html, docspec::OutputFormat::Oxa);
+    }
+
+    #[cfg(all(feature = "blocknote-writer", feature = "pandoc-native-writer"))]
+    #[test]
+    fn output_format_ne_pandoc_native_blocknote() {
+        assert_ne!(
+            docspec::OutputFormat::PandocNative,
+            docspec::OutputFormat::Blocknote
+        );
     }
 
     #[cfg(feature = "markdown")]

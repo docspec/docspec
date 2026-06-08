@@ -444,3 +444,32 @@ fn oxa_success_records_oxa_output_mime() {
         r#"docspec_conversions_total{result="success",error_class="none",input_mime_type="text/markdown",output_mime_type="application/vnd.oxa+json"} 1"#,
     );
 }
+
+// ─── Test 16: Pandoc native success records pandoc output_mime_type ───────────
+
+/// A successful conversion to Pandoc native records
+/// `output_mime_type="application/vnd.pandoc.native"` on
+/// `docspec_conversions_total`.
+#[test]
+fn pandoc_native_success_records_pandoc_native_output_mime() {
+    let rt = common::runtime();
+    let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
+    let router = docspec_http::router::router_with_metrics(handle.clone());
+
+    let request = Request::builder()
+        .method("POST")
+        .uri("/conversion")
+        .header("content-type", "text/markdown")
+        .header("accept", "application/vnd.pandoc.native")
+        .body(Body::from("Hello"))
+        .unwrap();
+
+    metrics::with_local_recorder(&recorder, || rt.block_on(router.oneshot(request)))
+        .expect("oneshot succeeds");
+
+    let rendered = handle.render();
+    assert_metric_line(
+        &rendered,
+        r#"docspec_conversions_total{result="success",error_class="none",input_mime_type="text/markdown",output_mime_type="application/vnd.pandoc.native"} 1"#,
+    );
+}

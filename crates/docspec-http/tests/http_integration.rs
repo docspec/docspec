@@ -21,6 +21,7 @@ const CACHE_CONTROL: &str = "max-age=0, private, must-revalidate";
 const OUTPUT_MIME: &str = "application/vnd.docspec.blocknote+json; charset=utf-8";
 const OUTPUT_MIME_HTML: &str = "text/html; charset=utf-8";
 const OUTPUT_MIME_OXA: &str = "application/vnd.oxa+json; charset=utf-8";
+const OUTPUT_MIME_PANDOC_NATIVE: &str = "application/vnd.pandoc.native; charset=utf-8";
 const PROBLEM_JSON_CT: &str = "application/problem+json; charset=utf-8";
 const HEALTH_CT: &str = "text/plain; charset=utf-8";
 
@@ -285,7 +286,7 @@ async fn post_conversion_wrong_accept() {
             "type": "about:blank",
             "title": "Not Acceptable",
             "status": 406,
-            "detail": "Accept header must include application/vnd.docspec.blocknote+json, application/vnd.blocknote+json, application/vnd.oxa+json, text/html, application/*, or */*",
+            "detail": "Accept header must include application/vnd.docspec.blocknote+json, application/vnd.blocknote+json, application/vnd.oxa+json, application/vnd.pandoc.native, text/html, application/*, or */*",
         })
     );
 }
@@ -663,6 +664,33 @@ async fn post_conversion_oxa_happy_path() {
         body_text,
         r#"{"type":"Document","children":[{"type":"Paragraph","children":[{"type":"Text","value":"Hello world"}]}]}"#
     );
+}
+
+#[tokio::test]
+async fn post_conversion_pandoc_native_happy_path() {
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[
+            ("content-type", "text/markdown"),
+            ("accept", "application/vnd.pandoc.native"),
+        ],
+        Body::from("Hello world"),
+    );
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content-type present"),
+        OUTPUT_MIME_PANDOC_NATIVE
+    );
+
+    let body_text = response_body_text(response.into_body()).await;
+    assert_eq!(body_text, r#"[Para [Str "Hello world"]]"#);
 }
 
 #[tokio::test]

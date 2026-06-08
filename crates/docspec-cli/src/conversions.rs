@@ -21,6 +21,7 @@ impl From<CliOutputFormat> for OutputFormat {
             CliOutputFormat::Blocknote => Self::Blocknote,
             CliOutputFormat::Html => Self::Html,
             CliOutputFormat::Oxa => Self::Oxa,
+            CliOutputFormat::PandocNative => Self::PandocNative,
         }
     }
 }
@@ -61,5 +62,13 @@ mod tests {
     #[test]
     fn from_oxa_converts_to_facade_oxa() {
         assert_eq!(OutputFormat::from(CliOutputFormat::Oxa), OutputFormat::Oxa);
+    }
+
+    #[test]
+    fn from_pandoc_native_converts_to_facade_pandoc_native() {
+        assert_eq!(
+            OutputFormat::from(CliOutputFormat::PandocNative),
+            OutputFormat::PandocNative
+        );
     }
 }

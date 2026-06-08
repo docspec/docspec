@@ -12,6 +12,7 @@ members = [
   "crates/docspec-cli",
   "crates/docspec-http",
   "crates/docspec-oxa-writer",
+  "crates/docspec-pandoc-native-writer",
   "crates/docspec-wasm",
 ]
 
@@ -31,6 +32,7 @@ docspec-docx-reader = { path = "crates/docspec-docx-reader", version = "1.5.1" }
 docspec-blocknote-writer = { path = "crates/docspec-blocknote-writer", version = "1.5.1" }
 docspec-html-writer = { path = "crates/docspec-html-writer", version = "1.5.1" }
 docspec-oxa-writer = { path = "crates/docspec-oxa-writer", version = "1.5.1" }
+docspec-pandoc-native-writer = { path = "crates/docspec-pandoc-native-writer", version = "1.5.1" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -210,6 +210,24 @@ fn accept_oxa_primary_mime_returns_oxa() {
 }
 
 #[test]
+fn accept_pandoc_native_primary_mime_returns_pandoc_native() {
+    let header = HeaderValue::from_static("application/vnd.pandoc.native");
+    assert_eq!(
+        negotiate_accept(Some(&header)).unwrap(),
+        OutputFormat::PandocNative
+    );
+}
+
+#[test]
+fn accept_pandoc_native_mime_with_quality_returns_pandoc_native() {
+    let header = HeaderValue::from_static("application/vnd.pandoc.native;q=0.8");
+    assert_eq!(
+        negotiate_accept(Some(&header)).unwrap(),
+        OutputFormat::PandocNative
+    );
+}
+
+#[test]
 fn accept_list_oxa_first_returns_oxa() {
     let header = HeaderValue::from_static(
         "application/vnd.oxa+json, application/vnd.docspec.blocknote+json",

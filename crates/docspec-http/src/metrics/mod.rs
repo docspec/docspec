@@ -99,6 +99,9 @@ pub const OUTPUT_MIME_HTML: &str = "text/html";
 /// Value for [`LABEL_OUTPUT_MIME_TYPE`] when the conversion produced `oxa.dev` JSON.
 pub const OUTPUT_MIME_OXA: &str = "application/vnd.oxa+json";
 
+/// Value for [`LABEL_OUTPUT_MIME_TYPE`] when the conversion produced Pandoc native syntax.
+pub const OUTPUT_MIME_PANDOC_NATIVE: &str = "application/vnd.pandoc.native";
+
 /// Value for [`LABEL_OUTPUT_MIME_TYPE`] when no output was produced (any error path).
 pub const OUTPUT_MIME_NONE: &str = "none";
 

@@ -10,7 +10,8 @@ keywords = ["document", "conversion", "streaming"]
 categories = ["parsing", "encoding"]
 
 [features]
-default = []
+# Default features: markdown reader, blocknote writer, and pandoc native writer.
+default = ["markdown", "blocknote", "pandoc-native"]
 
 # Format readers (event sources).
 markdown = ["dep:docspec-markdown-reader"]
@@ -21,17 +22,19 @@ docx = ["dep:docspec-docx-reader"]
 blocknote-writer = ["dep:docspec-blocknote-writer"]
 oxa-writer = ["dep:docspec-oxa-writer"]
 html-writer = ["dep:docspec-html-writer"]
+pandoc-native-writer = ["dep:docspec-pandoc-native-writer"]
 
 # Lower-level primitives for implementing custom writers.
 json = ["dep:docspec-json"]
 
 # Convenience meta-features.
-# `blocknote`/`oxa` currently enable only the writer; once their readers exist
+# `blocknote`/`oxa`/`pandoc-native` currently enable only the writer; once their readers exist
 # the meta will expand to enable both directions.
 blocknote = ["blocknote-writer"]
 oxa = ["oxa-writer"]
+pandoc-native = ["pandoc-native-writer"]
 all-readers = ["markdown", "html", "docx"]
-all-writers = ["blocknote-writer", "oxa-writer", "html-writer"]
+all-writers = ["blocknote-writer", "oxa-writer", "html-writer", "pandoc-native-writer"]
 all-libs = ["json"]
 full = ["all-readers", "all-writers", "all-libs"]
 
@@ -44,6 +47,7 @@ docspec-html-reader = { workspace = true, optional = true }
 docspec-docx-reader = { workspace = true, optional = true }
 docspec-oxa-writer = { workspace = true, optional = true }
 docspec-html-writer = { workspace = true, optional = true }
+docspec-pandoc-native-writer = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json = "1"

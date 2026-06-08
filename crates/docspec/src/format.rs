@@ -25,6 +25,9 @@ pub enum OutputFormat {
     /// `oxa.dev` JSON. Available when the `oxa` feature is enabled.
     #[cfg(feature = "oxa-writer")]
     Oxa,
+    /// Pandoc native block-list syntax. Available when the `pandoc-native` feature is enabled.
+    #[cfg(feature = "pandoc-native-writer")]
+    PandocNative,
 }
 
 /// Detect the input format from a file path's extension.
@@ -61,6 +64,8 @@ pub fn detect_output_format(path: &Path) -> Option<OutputFormat> {
         "json" => Some(OutputFormat::Blocknote),
         #[cfg(feature = "html-writer")]
         "html" | "htm" => Some(OutputFormat::Html),
+        #[cfg(feature = "pandoc-native-writer")]
+        "native" => Some(OutputFormat::PandocNative),
         _ => None,
     }
 }

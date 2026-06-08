@@ -18,7 +18,7 @@ docspec [OPTIONS] [INPUT]
 
 - `-o, --output <FILE>` — Output file (stdout if omitted)
 - `-f, --from <FORMAT>` — Input format (auto-detected from extension if omitted). Valid values: `markdown`, `html`
-- `-t, --to <FORMAT>` — Output format (auto-detected from extension if omitted). Valid values: `blocknote`, `html`, `oxa`
+- `-t, --to <FORMAT>` — Output format (auto-detected from extension if omitted). Valid values: `blocknote`, `html`, `oxa`, `pandoc-native`
 - `--color <WHEN>` — When to use colors: `auto`, `always`, `never` (default: `auto`)
 - `-h, --help` — Print help
 - `-V, --version` — Print version
@@ -59,6 +59,13 @@ Convert Markdown to HTML:
 echo "Hello" | docspec --from markdown --to html
 ```
 
+Convert Markdown to Pandoc native syntax:
+
+```bash
+echo "Hello" | docspec --from markdown --to pandoc-native
+```
+
 `--to oxa` selects the [oxa.dev](https://oxa.dev/) JSON writer in place of BlockNote. The `.json`
 extension is ambiguous, so `--to oxa` must be explicit. HTML output is selected by `--to html`
-or auto-detected from `.html` and `.htm` output paths.
+or auto-detected from `.html` and `.htm` output paths. Pandoc native output is selected by
+`--to pandoc-native` or auto-detected from `.native` output paths.
