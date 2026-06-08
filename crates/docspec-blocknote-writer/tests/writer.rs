@@ -13,10 +13,8 @@ mod tests {
 
     use docspec_blocknote_writer::BlockNoteWriter;
     use docspec_core::{
-        AssetProvider, Event, EventSink as _, EventSource as _, ImageSource, StackTrackingSink,
-        TextStyle,
+        AssetProvider, Event, EventSink as _, ImageSource, StackTrackingSink, TextStyle,
     };
-    use docspec_markdown_reader::MarkdownReader;
 
     struct FailingWriter {
         fail_after: usize,
@@ -2832,72 +2830,6 @@ mod tests {
             json,
             r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[],"children":[]},{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"second","styles":{}}],"children":[]}]"#
         );
-    }
-
-    fn load_fixture(name: &str) -> serde_json::Value {
-        let path = format!(
-            "{}/../../tests/fixtures/blocknote/{}",
-            env!("CARGO_MANIFEST_DIR"),
-            name
-        );
-        let content = std::fs::read_to_string(&path).expect("fixture should be readable");
-        serde_json::from_str(&content).expect("fixture should be valid JSON")
-    }
-
-    fn run_markdown(input: &str) -> String {
-        let mut reader = MarkdownReader::new(input);
-        let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
-        while let Some(event) = reader
-            .next_event()
-            .expect("markdown reader should not error")
-        {
-            writer
-                .handle_event(event)
-                .expect("handle_event should accept event");
-        }
-        writer.finish().expect("pipeline should finish cleanly");
-        String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8")
-    }
-
-    #[test]
-    fn integration_simple_bullet_list_matches_fixture() {
-        let json = run_markdown("- a\n- b\n- c");
-        let actual: serde_json::Value =
-            serde_json::from_str(&json).expect("actual output must be valid JSON");
-        assert_eq!(actual, load_fixture("lists_simple_bullet.json"));
-    }
-
-    #[test]
-    fn integration_simple_numbered_list_matches_fixture() {
-        let json = run_markdown("1. one\n2. two\n3. three");
-        let actual: serde_json::Value =
-            serde_json::from_str(&json).expect("actual output must be valid JSON");
-        assert_eq!(actual, load_fixture("lists_simple_numbered.json"));
-    }
-
-    #[test]
-    fn integration_nested_bullets_matches_fixture() {
-        let json = run_markdown("- a\n  - b\n  - c\n- d");
-        let actual: serde_json::Value =
-            serde_json::from_str(&json).expect("actual output must be valid JSON");
-        assert_eq!(actual, load_fixture("lists_nested_bullets.json"));
-    }
-
-    #[test]
-    fn integration_mixed_types_matches_fixture() {
-        let json = run_markdown("- bullet\n1. numbered\n- another bullet");
-        let actual: serde_json::Value =
-            serde_json::from_str(&json).expect("actual output must be valid JSON");
-        assert_eq!(actual, load_fixture("lists_mixed_types.json"));
-    }
-
-    #[test]
-    fn integration_multi_paragraph_item_matches_fixture() {
-        let json = run_markdown("- first para\n\n  second para\n- next item");
-        let actual: serde_json::Value =
-            serde_json::from_str(&json).expect("actual output must be valid JSON");
-        assert_eq!(actual, load_fixture("lists_multi_paragraph_item.json"));
     }
 
     // ============================================================================

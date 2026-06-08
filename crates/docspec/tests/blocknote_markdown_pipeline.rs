@@ -1,9 +1,10 @@
 //! Markdown to `BlockNote` JSON pipeline integration tests.
+#![cfg(all(feature = "markdown", feature = "blocknote-writer"))]
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-use docspec_blocknote_writer::BlockNoteWriter;
-use docspec_core::{EventSink as _, EventSource as _, StackTrackingSink};
-use docspec_markdown_reader::MarkdownReader;
+use docspec::readers::MarkdownReader;
+use docspec::writers::BlockNoteWriter;
+use docspec::{EventSink as _, EventSource as _, StackTrackingSink};
 
 fn try_run_pipeline(markdown: &str) -> Result<String, String> {
     let mut reader = MarkdownReader::new(markdown);
@@ -36,6 +37,22 @@ fn assert_json_eq(actual: &str, expected: &str) {
 #[cfg(test)]
 mod tests {
     use super::{assert_json_eq, run_pipeline};
+
+    fn load_blocknote_fixture(name: &str) -> serde_json::Value {
+        let path = format!(
+            "{}/../../tests/fixtures/blocknote/{}",
+            env!("CARGO_MANIFEST_DIR"),
+            name
+        );
+        let content = std::fs::read_to_string(&path).expect("fixture should be readable");
+        serde_json::from_str(&content).expect("fixture should be valid JSON")
+    }
+
+    fn assert_fixture_eq(actual: &str, fixture: &str) {
+        let actual_json: serde_json::Value =
+            serde_json::from_str(actual).expect("actual output must be valid JSON");
+        assert_eq!(actual_json, load_blocknote_fixture(fixture));
+    }
 
     #[test]
     fn pipeline_empty() {
@@ -160,5 +177,35 @@ mod tests {
             &actual,
             r#"[{"type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left","start":5},"content":[{"type":"text","text":"I2","styles":{}}],"children":[]}]"#,
         );
+    }
+
+    #[test]
+    fn integration_simple_bullet_list_matches_fixture() {
+        let json = run_pipeline("- a\n- b\n- c");
+        assert_fixture_eq(&json, "lists_simple_bullet.json");
+    }
+
+    #[test]
+    fn integration_simple_numbered_list_matches_fixture() {
+        let json = run_pipeline("1. one\n2. two\n3. three");
+        assert_fixture_eq(&json, "lists_simple_numbered.json");
+    }
+
+    #[test]
+    fn integration_nested_bullets_matches_fixture() {
+        let json = run_pipeline("- a\n  - b\n  - c\n- d");
+        assert_fixture_eq(&json, "lists_nested_bullets.json");
+    }
+
+    #[test]
+    fn integration_mixed_types_matches_fixture() {
+        let json = run_pipeline("- bullet\n1. numbered\n- another bullet");
+        assert_fixture_eq(&json, "lists_mixed_types.json");
+    }
+
+    #[test]
+    fn integration_multi_paragraph_item_matches_fixture() {
+        let json = run_pipeline("- first para\n\n  second para\n- next item");
+        assert_fixture_eq(&json, "lists_multi_paragraph_item.json");
     }
 }

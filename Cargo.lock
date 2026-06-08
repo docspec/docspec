@@ -476,6 +476,7 @@ dependencies = [
  "docspec-json",
  "docspec-markdown-reader",
  "docspec-oxa-writer",
+ "serde_json",
 ]
 
 [[package]]
@@ -485,7 +486,6 @@ dependencies = [
  "base64",
  "docspec-core",
  "docspec-json",
- "docspec-markdown-reader",
  "serde_json",
 ]
 
