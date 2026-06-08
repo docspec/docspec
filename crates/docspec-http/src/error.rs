@@ -176,8 +176,8 @@ impl IntoResponse for HttpError {
                 "Not Acceptable",
                 Cow::Borrowed(
                     "Accept header must include application/vnd.docspec.blocknote+json, \
-                     application/vnd.blocknote+json, application/vnd.oxa+json, text/html, \
-                     application/*, or */*",
+                     application/vnd.blocknote+json, application/vnd.oxa+json, \
+                     application/vnd.pandoc.native, text/html, application/*, or */*",
                 ),
                 None,
             ),

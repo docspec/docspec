@@ -1,8 +1,8 @@
 # `docspec-http`
 
-HTTP API server for DocSpec markdown or HTML conversion to BlockNote JSON (default), HTML, or oxa.dev JSON via `Accept`.
+HTTP API server for DocSpec markdown or HTML conversion to BlockNote JSON (default), HTML, oxa.dev JSON, or Pandoc native via `Accept`.
 
-Send markdown (`Content-Type: text/markdown`) or HTML (`Content-Type: text/html`), receive BlockNote JSON (default), HTML (`Accept: text/html`), or oxa.dev JSON (`Accept: application/vnd.oxa+json`). The underlying DocSpec pipeline is streaming, but this v1 HTTP wrapper **buffers the request body and the conversion output in memory** before responding. End-to-end streaming over HTTP is planned for a future version. For now, request size scales with available memory.
+Send markdown (`Content-Type: text/markdown`) or HTML (`Content-Type: text/html`), receive BlockNote JSON (default), HTML (`Accept: text/html`), oxa.dev JSON (`Accept: application/vnd.oxa+json`), or Pandoc native (`Accept: application/vnd.pandoc.native`). The underlying DocSpec pipeline is streaming, but this v1 HTTP wrapper **buffers the request body and the conversion output in memory** before responding. End-to-end streaming over HTTP is planned for a future version. For now, request size scales with available memory.
 
 > **HTML is paragraph-only.** The HTML reader currently parses `<p>` elements only, and the HTML writer currently emits only paragraph events. Other HTML input elements and non-paragraph output events (headings, lists, tables, formatting, etc.) are silently dropped. See [docspec-html-reader](../docspec-html-reader/README.md) and [docspec-html-writer](../docspec-html-writer/README.md).
 
@@ -23,7 +23,7 @@ Default host is `127.0.0.1`. Default port is `3000`.
 
 | Method  | Path        | Description                                                      |
 | ------- | ----------- | ---------------------------------------------------------------- |
-| POST    | /conversion | Convert markdown or HTML to BlockNote (default), HTML, or oxa.dev JSON |
+| POST    | /conversion | Convert markdown or HTML to BlockNote (default), HTML, oxa.dev JSON, or Pandoc native |
 | OPTIONS | /conversion | Preflight / allowed methods                                      |
 | GET     | /health     | Liveness check                                                   |
 | HEAD    | /health     | Liveness check (no body)                                         |
@@ -55,6 +55,13 @@ curl -X POST \
 curl -X POST \
      -H 'Content-Type: text/markdown' \
      -H 'Accept: application/vnd.oxa+json' \
+     --data 'Hello World' \
+     http://localhost:3000/conversion
+
+# Convert markdown to Pandoc native syntax
+curl -X POST \
+     -H 'Content-Type: text/markdown' \
+     -H 'Accept: application/vnd.pandoc.native' \
      --data 'Hello World' \
      http://localhost:3000/conversion
 
@@ -97,7 +104,7 @@ All errors use RFC 7807 Problem Details JSON (`application/problem+json; charset
 | 422  | Input parse error (malformed markdown or HTML)           |
 | 500  | Internal conversion error                                |
 
-Accepted `Accept` values for `/conversion`: `text/html` (HTML), `application/vnd.oxa+json` (oxa.dev), `application/vnd.docspec.blocknote+json`, `application/vnd.blocknote+json` (BlockNote alias), `application/*`, or `*/*`. Wildcards and missing `Accept` default to BlockNote for back-compat. Anything else returns 406.
+Accepted `Accept` values for `/conversion`: `text/html` (HTML), `application/vnd.oxa+json` (oxa.dev), `application/vnd.pandoc.native` (Pandoc native), `application/vnd.docspec.blocknote+json`, `application/vnd.blocknote+json` (BlockNote alias), `application/*`, or `*/*`. Wildcards and missing `Accept` default to BlockNote for back-compat. Anything else returns 406.
 
 ## Deployment Notes
 
@@ -158,7 +165,7 @@ These follow Sentry's standard conventions:
 `docspec-http` does NOT send the following to Sentry:
 
 - Request bodies (markdown or HTML documents)
-- Response bodies (BlockNote JSON, HTML, or oxa.dev JSON)
+- Response bodies (BlockNote JSON, HTML, oxa.dev JSON, or Pandoc native)
 - PII (Sentry default: `send_default_pii = false`)
 - DSN values (never logged or echoed)
 
@@ -266,7 +273,7 @@ TLS termination, CORS headers, authentication, and rate limiting are intentional
 
 **`input_mime_type`**: `text/markdown` (the request's Content-Type matched the markdown reader), `text/html` (the request's Content-Type matched the HTML reader), `unsupported` (Content-Type header present but not a supported input format), `none` (Content-Type header absent).
 
-**`output_mime_type`**: `application/vnd.docspec.blocknote+json` (conversion succeeded; output produced by the BlockNote writer), `text/html` (conversion succeeded; output produced by the HTML writer), `application/vnd.oxa+json` (conversion succeeded; output produced by the oxa.dev writer), `none` (no output produced — any error path).
+**`output_mime_type`**: `application/vnd.docspec.blocknote+json` (conversion succeeded; output produced by the BlockNote writer), `text/html` (conversion succeeded; output produced by the HTML writer), `application/vnd.oxa+json` (conversion succeeded; output produced by the oxa.dev writer), `application/vnd.pandoc.native` (conversion succeeded; output produced by the Pandoc native writer), `none` (no output produced — any error path).
 
 **`path`**: matched route template (`/conversion`, `/health`) or `unknown` for fallback handlers
 
@@ -276,7 +283,7 @@ TLS termination, CORS headers, authentication, and rate limiting are intentional
 
 ### Cardinality Guarantees
 
-`path` is bounded to `{"/conversion", "/health", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 4 values (`text/markdown`, `text/html`, `unsupported`, `none`). `output_mime_type` is bounded to 4 values (`application/vnd.docspec.blocknote+json`, `text/html`, `application/vnd.oxa+json`, `none`). Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
+`path` is bounded to `{"/conversion", "/health", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 4 values (`text/markdown`, `text/html`, `unsupported`, `none`). `output_mime_type` is bounded to 5 values (`application/vnd.docspec.blocknote+json`, `text/html`, `application/vnd.oxa+json`, `application/vnd.pandoc.native`, `none`). Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
 
 ### Scrape Model
 

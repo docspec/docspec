@@ -5,12 +5,14 @@ use docspec::{InputFormat, OutputFormat};
 
 use crate::error::HttpError;
 use crate::format::{
-    OUTPUT_MIME_ALIAS, OUTPUT_MIME_HTML_PRIMARY, OUTPUT_MIME_OXA_PRIMARY, OUTPUT_MIME_PRIMARY,
+    OUTPUT_MIME_ALIAS, OUTPUT_MIME_HTML_PRIMARY, OUTPUT_MIME_OXA_PRIMARY,
+    OUTPUT_MIME_PANDOC_NATIVE_PRIMARY, OUTPUT_MIME_PRIMARY,
 };
 
 /// Negotiates the `Accept` header for the `/conversion` endpoint.
 ///
 /// Returns [`OutputFormat::Oxa`] for `Accept: application/vnd.oxa+json`,
+/// [`OutputFormat::PandocNative`] for `Accept: application/vnd.pandoc.native`,
 /// [`OutputFormat::Html`] for `Accept: text/html`, and [`OutputFormat::Blocknote`]
 /// for the `BlockNote` MIMEs, `application/*`, `*/*`, and missing `Accept`.
 /// Wildcards default to `BlockNote` for back-compat with pre-oxa clients. When
@@ -34,6 +36,9 @@ pub fn negotiate_accept(header_value: Option<&HeaderValue>) -> Result<OutputForm
         let type_part = part.trim().split(';').next().map_or("", str::trim);
         if type_part.eq_ignore_ascii_case(OUTPUT_MIME_OXA_PRIMARY) {
             return Ok(OutputFormat::Oxa);
+        }
+        if type_part.eq_ignore_ascii_case(OUTPUT_MIME_PANDOC_NATIVE_PRIMARY) {
+            return Ok(OutputFormat::PandocNative);
         }
         if type_part.eq_ignore_ascii_case(OUTPUT_MIME_HTML_PRIMARY) {
             return Ok(OutputFormat::Html);
@@ -153,6 +158,7 @@ pub fn bucket_output_mime(chosen_format: Option<OutputFormat>) -> &'static str {
         Some(OutputFormat::Blocknote) => crate::metrics::OUTPUT_MIME_BLOCKNOTE,
         Some(OutputFormat::Html) => crate::metrics::OUTPUT_MIME_HTML,
         Some(OutputFormat::Oxa) => crate::metrics::OUTPUT_MIME_OXA,
+        Some(OutputFormat::PandocNative) => crate::metrics::OUTPUT_MIME_PANDOC_NATIVE,
     }
 }
 
@@ -287,6 +293,14 @@ mod bucket_tests {
         assert_eq!(
             bucket_output_mime(Some(OutputFormat::Oxa)),
             crate::metrics::OUTPUT_MIME_OXA
+        );
+    }
+
+    #[test]
+    fn bucket_output_mime_pandoc_native_when_pandoc_native_succeeded() {
+        assert_eq!(
+            bucket_output_mime(Some(OutputFormat::PandocNative)),
+            crate::metrics::OUTPUT_MIME_PANDOC_NATIVE
         );
     }
 

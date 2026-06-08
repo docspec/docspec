@@ -21,7 +21,7 @@ pub async fn options_conversion() -> impl IntoResponse {
     )
 }
 
-/// Handle `POST /conversion` — convert markdown or HTML to `BlockNote` JSON, HTML, or `oxa.dev` JSON.
+/// Handle `POST /conversion` — convert markdown or HTML to `BlockNote` JSON, HTML, `oxa.dev` JSON, or Pandoc native.
 ///
 /// The input reader is selected by the request's `Content-Type` header (see
 /// [`crate::mime_parser::validate_content_type`]). The output writer is
@@ -216,6 +216,9 @@ async fn do_conversion(
         }
         OutputFormat::Html => HeaderValue::from_static("text/html; charset=utf-8"),
         OutputFormat::Oxa => HeaderValue::from_static("application/vnd.oxa+json; charset=utf-8"),
+        OutputFormat::PandocNative => {
+            HeaderValue::from_static("application/vnd.pandoc.native; charset=utf-8")
+        }
     };
 
     match join_result {
