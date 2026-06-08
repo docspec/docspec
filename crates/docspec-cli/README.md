@@ -51,7 +51,9 @@ Starts the HTTP API server. Listens on `127.0.0.1:3000` by default.
 
 `docspec-cli` ships with `http` enabled by default. For a slim install without the HTTP server stack:
 
-    cargo install docspec-cli --no-default-features
+```bash
+cargo install docspec-cli --no-default-features
+```
 
 The resulting binary will only support `docspec convert`; running `docspec http` will print "unknown subcommand".
 

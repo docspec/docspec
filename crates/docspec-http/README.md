@@ -16,7 +16,7 @@ For end users who want a running HTTP server without writing Rust code, install 
 
 ```toml
 [dependencies]
-docspec-http = "0.1"
+docspec-http = "1.5"
 tokio = { version = "1", features = ["full"] }
 ```
 

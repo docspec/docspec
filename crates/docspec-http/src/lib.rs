@@ -27,10 +27,14 @@ pub fn init_telemetry() -> telemetry::TelemetryGuard {
 }
 
 /// Initialize the global tracing subscriber. Called internally by [`run_server`].
-/// Panics if called twice (global subscriber is a singleton).
+///
+/// Idempotent: if a global subscriber is already installed, this is a no-op so library
+/// consumers can safely call [`run_server`] more than once per process.
 #[inline]
 pub fn init_tracing() {
-    tracing_init::init();
+    // Discard the "already initialized" error — the global subscriber is a process-wide
+    // singleton, so subsequent calls are correctly handled as no-ops.
+    drop(tracing_init::try_init());
 }
 
 /// Synchronous server entrypoint. Builds a multi-threaded tokio runtime, installs the

@@ -4,6 +4,7 @@
 
 #![allow(
     clippy::expect_used,
+    clippy::panic,
     clippy::tests_outside_test_module,
     clippy::unwrap_used
 )]
@@ -47,11 +48,16 @@ fn http_subcommand_routes() {
 }
 
 /// Verify the http subcommand actually binds and serves /health.
+///
+/// Uses an in-process retry loop with a bounded deadline rather than a fixed
+/// sleep + shelling out to `curl`, so the test is deterministic and has no
+/// dependency on an external binary.
 #[cfg(feature = "http")]
 #[test]
 fn http_subcommand_binds_and_serves_health() {
     use core::time::Duration;
     use std::process::Stdio;
+    use std::time::Instant;
 
     // Pick a random ephemeral port
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -65,14 +71,28 @@ fn http_subcommand_binds_and_serves_health() {
         .spawn()
         .unwrap();
 
-    // Wait briefly for server to bind
-    std::thread::sleep(Duration::from_millis(500));
-
-    // Probe /health via curl
-    let response = std::process::Command::new("curl")
-        .args(["-fsS", &format!("http://127.0.0.1:{port}/health")])
-        .output()
+    // Poll /health until ready or timeout. Each request has its own short timeout
+    // so a slow/missing server cannot stall the loop.
+    let url = format!("http://127.0.0.1:{port}/health");
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_millis(500))
+        .build()
         .unwrap();
+
+    let body = loop {
+        if let Ok(resp) = client.get(&url).send() {
+            if resp.status().is_success() {
+                break resp.text().unwrap_or_default();
+            }
+        }
+        if Instant::now() >= deadline {
+            drop(child.kill());
+            drop(child.wait());
+            panic!("docspec http /health did not respond within 5s");
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    };
 
     child.kill().unwrap();
     let wait_result = child.wait();
@@ -83,9 +103,7 @@ fn http_subcommand_binds_and_serves_health() {
     );
 
     assert!(
-        response.status.success(),
-        "curl failed: stderr={:?}",
-        String::from_utf8_lossy(&response.stderr)
+        body.contains("Healthy"),
+        "expected 'Healthy' in body, got: {body}"
     );
-    assert!(String::from_utf8_lossy(&response.stdout).contains("Healthy"));
 }

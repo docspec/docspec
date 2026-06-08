@@ -502,6 +502,7 @@ dependencies = [
  "docspec-core",
  "docspec-http",
  "predicates",
+ "reqwest",
  "serde_json",
  "tempfile",
  "thiserror",
