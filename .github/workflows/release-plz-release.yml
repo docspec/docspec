@@ -34,7 +34,7 @@ jobs:
       # dependent crate publishes (e.g., docspec-core must be visible before
       # docspec can publish). See plan §6 / Metis gap 6.2.
       - name: Run release-plz (release) with retry
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         with:
           timeout_minutes: 30
           max_attempts: 3
