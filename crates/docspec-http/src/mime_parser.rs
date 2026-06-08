@@ -154,11 +154,11 @@ pub fn bucket_input_mime(header_value: Option<&HeaderValue>) -> &'static str {
 #[must_use]
 pub fn bucket_output_mime(chosen_format: Option<OutputFormat>) -> &'static str {
     match chosen_format {
-        None => crate::metrics::OUTPUT_MIME_NONE,
         Some(OutputFormat::Blocknote) => crate::metrics::OUTPUT_MIME_BLOCKNOTE,
         Some(OutputFormat::Html) => crate::metrics::OUTPUT_MIME_HTML,
         Some(OutputFormat::Oxa) => crate::metrics::OUTPUT_MIME_OXA,
         Some(OutputFormat::PandocNative) => crate::metrics::OUTPUT_MIME_PANDOC_NATIVE,
+        None | Some(_) => crate::metrics::OUTPUT_MIME_NONE,
     }
 }
 

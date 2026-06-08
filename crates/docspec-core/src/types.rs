@@ -2,6 +2,7 @@
 
 /// Text alignment options for paragraphs.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum TextAlignment {
     /// Center-aligned text.
     Center,
@@ -17,6 +18,7 @@ pub enum TextAlignment {
 ///
 /// Writers ignore mismatched styles (e.g., Disc on an ordered list).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ListStyleType {
     /// Hollow circle bullet.
     Circle,
@@ -40,6 +42,7 @@ pub enum ListStyleType {
 ///
 /// Column: header describes cells below; Row: header describes cells to the right.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum TableHeaderScope {
     /// Header describes cells in the column below.
     Column,
@@ -49,6 +52,7 @@ pub enum TableHeaderScope {
 
 /// An RGB color value.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Color {
     /// RGB color with red, green, and blue components (0-255).
     Rgb {
@@ -63,6 +67,7 @@ pub enum Color {
 
 /// A reference to an image asset, either embedded or external.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ImageSource {
     /// An embedded asset resolved through [`crate::AssetProvider`].
     Asset {

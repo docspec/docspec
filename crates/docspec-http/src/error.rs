@@ -84,6 +84,7 @@ impl ProblemJson {
 /// Each variant maps to a specific HTTP status code and is serialized as
 /// an RFC 7807 Problem JSON body via [`IntoResponse`].
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum HttpError {
     /// The request body bytes are not valid UTF-8.
     ///

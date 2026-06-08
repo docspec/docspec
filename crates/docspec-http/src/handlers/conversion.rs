@@ -219,6 +219,7 @@ async fn do_conversion(
         OutputFormat::PandocNative => {
             HeaderValue::from_static("application/vnd.pandoc.native; charset=utf-8")
         }
+        _ => HeaderValue::from_static("application/vnd.docspec.blocknote+json; charset=utf-8"),
     };
 
     match join_result {

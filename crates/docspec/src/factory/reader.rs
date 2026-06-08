@@ -14,6 +14,7 @@ use crate::format::InputFormat;
 /// Constructed via [`AnyReader::new`]. Implements [`EventSource`] by delegating
 /// `next_event` to the inner concrete reader. Zero heap allocation, zero
 /// virtual-dispatch overhead.
+#[non_exhaustive]
 pub enum AnyReader<'a> {
     /// HTML reader from [`docspec_html_reader`] (paragraph-only; see crate docs).
     #[cfg(feature = "html")]

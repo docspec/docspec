@@ -34,6 +34,7 @@ pub struct Cli {
 
 /// Color output choice.
 #[derive(Clone, Copy, Debug, ValueEnum)]
+#[non_exhaustive]
 pub enum ColorChoice {
     /// Always use colors.
     #[value(name = "always")]
@@ -50,6 +51,7 @@ pub enum ColorChoice {
 
 /// Input format for document conversion.
 #[derive(Clone, Copy, Debug, ValueEnum)]
+#[non_exhaustive]
 pub enum CliInputFormat {
     /// HTML format (paragraph-only; `<p>` elements and text within them only).
     #[value(name = "html")]
@@ -61,6 +63,7 @@ pub enum CliInputFormat {
 
 /// Output format for document conversion.
 #[derive(Clone, Copy, Debug, ValueEnum)]
+#[non_exhaustive]
 pub enum CliOutputFormat {
     /// `BlockNote` JSON format.
     #[value(name = "blocknote")]

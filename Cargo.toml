@@ -134,9 +134,9 @@ print_stderr = "allow"
 # Reason: Telemetry init helpers are intentionally factored for testability
 single_call_fn = "allow"
 
-# --- Selective allows: library API design (reassess at 1.0) ---
-# Reason: Event enum must be exhaustive for downstream pattern matching. Reassess at 1.0.
-exhaustive_enums = "allow"
+# --- Library API design ---
+# Reason: Public enums are forward-compatible extension points; downstream matches must include a wildcard arm.
+exhaustive_enums = "deny"
 # Reason: Public structs are intentionally exhaustive for construction. Reassess at 1.0.
 exhaustive_structs = "allow"
 
@@ -161,6 +161,11 @@ unnecessary_wraps = "allow"
 # --- Selective allows: perf group (continued) ---
 # Reason: AnyReader enum variants (HtmlReader, MarkdownReader) are large but must be stack-allocated for zero heap allocation and zero virtual-dispatch overhead per MANIFESTO.md. Boxing would violate the design constraint.
 large_enum_variant = "allow"
+
+[workspace.metadata.cargo-semver-checks.lints]
+feature_not_enabled_by_default = { required-update = "minor" }
+enum_variant_added = { required-update = "minor" }
+enum_marked_non_exhaustive = { required-update = "minor" }
 
 [workspace.metadata.dist]
 # Cargo-dist version

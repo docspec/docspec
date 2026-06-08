@@ -4,6 +4,7 @@ use docspec_core::{Error, Result};
 
 /// A single frame on the emission stack.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Frame {
     /// Inside an array.
     Array,
@@ -15,6 +16,7 @@ pub enum Frame {
 
 /// Sub-state within an [`Frame::Object`] frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum KeyState {
     /// The object is expecting the next key.
     ExpectingKey,

@@ -2,6 +2,7 @@ use std::path::Path;
 
 /// Input format for document conversion.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum InputFormat {
     /// HTML (paragraph-only; `<p>` elements and text within them only).
     /// Available when the `html` feature is enabled.
@@ -14,6 +15,7 @@ pub enum InputFormat {
 
 /// Output format for document conversion.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum OutputFormat {
     /// `BlockNote` JSON. Available when the `blocknote` feature is enabled.
     #[cfg(feature = "blocknote-writer")]

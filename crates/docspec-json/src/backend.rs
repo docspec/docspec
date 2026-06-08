@@ -73,6 +73,7 @@ pub trait JsonBackend {
 
 /// A token captured by [`CapturingBackend`].
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Token {
     /// Represents `[`.
     BeginArray,
