@@ -18,7 +18,12 @@ doc = false
 clap = { version = "4", features = ["derive", "color"] }
 docspec = { workspace = true, features = ["full"] }
 docspec-core = { workspace = true }
+docspec-http = { workspace = true, optional = true }
 thiserror = "2"
+
+[features]
+default = ["http"]
+http = ["dep:docspec-http"]
 
 [dev-dependencies]
 assert_cmd = "2"

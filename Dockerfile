@@ -10,9 +10,9 @@ WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 
-RUN cargo build -p docspec-http --bin docspec-http --release && \
+RUN cargo build -p docspec-cli --release && \
   mkdir -p /out && \
-  cp target/release/docspec-http /out/docspec-http
+  cp target/release/docspec /out/docspec
 
 # ─ Runtime ─
 FROM alpine:3.23
@@ -25,7 +25,7 @@ FROM alpine:3.23
 RUN addgroup -S -g 10001 docspec \
   && adduser -S -D -u 10001 -G docspec docspec
 
-COPY --from=builder /out/docspec-http /usr/local/bin/docspec-http
+COPY --from=builder /out/docspec /usr/local/bin/docspec
 
 USER 10001:10001
 
@@ -39,12 +39,12 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 ARG IMAGE_VERSION=0.1.0
 ARG IMAGE_REVISION=unknown
 
-LABEL org.opencontainers.image.title="docspec-http" \
-  org.opencontainers.image.description="HTTP API server for DocSpec markdown to BlockNote JSON conversion" \
+LABEL org.opencontainers.image.title="docspec" \
+  org.opencontainers.image.description="docspec binary serving the http subcommand" \
   org.opencontainers.image.source="https://github.com/docspec/docspec" \
   org.opencontainers.image.version="${IMAGE_VERSION}" \
   org.opencontainers.image.revision="${IMAGE_REVISION}" \
   org.opencontainers.image.licenses="MIT"
 
-ENTRYPOINT ["/usr/local/bin/docspec-http"]
+ENTRYPOINT ["/usr/local/bin/docspec", "http"]
 CMD ["--host", "0.0.0.0", "--port", "3000"]

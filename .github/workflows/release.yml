@@ -125,7 +125,7 @@ jobs:
           name: signed-artifacts
           path: artifacts
 
-  # 5. DOCKER: Build and push Docker image (docspec-http)
+   # 5. DOCKER: Build and push Docker image (docspec)
   docker:
     name: Build and push Docker image
     runs-on: ubuntu-latest

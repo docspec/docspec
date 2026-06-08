@@ -1,122 +1,71 @@
 #![warn(missing_docs)]
-//! Command-line interface for `DocSpec` document conversion.
+//! `docspec` CLI entry point. Dispatches to subcommand handlers.
 
 mod args;
+mod commands;
 mod conversions;
 mod error;
 mod format;
 
-use std::fs::File;
-use std::io::{BufWriter, IsTerminal as _, Read as _, Write};
+use std::io::{IsTerminal as _, Write as _};
+use std::process::ExitCode;
 
-use clap::{CommandFactory as _, Parser as _};
-use docspec::{AnyReader, AnyWriter};
+use clap::Parser as _;
 
-use crate::args::{Cli, ColorChoice};
-use crate::error::{CliError, Result};
-
-/// Runs the streaming conversion pipeline.
-fn run_pipeline<W: Write>(
-    input_format: docspec::InputFormat,
-    content: &str,
-    output_format: docspec::OutputFormat,
-    output: W,
-) -> Result<()> {
-    let reader = AnyReader::from_str(input_format, content);
-    let sink = AnyWriter::new(output_format, output);
-    docspec_core::pipe(reader, sink).map_err(Into::into)
-}
-
-fn write_cli_terminating_newline<W: Write>(output: &mut W) -> Result<()> {
-    output.write_all(b"\n").map_err(Into::into)
-}
+use crate::args::{Cli, ColorChoice, Commands};
+use crate::error::CliError;
 
 /// Main entry point.
-fn main() {
-    if std::env::args_os().len() == 1 {
-        let mut cmd = Cli::command();
-        let mut stdout = std::io::stdout().lock();
-        if let Err(err) = cmd.write_long_help(&mut stdout) {
-            let write_result = writeln!(std::io::stderr(), "error: {err}");
-            drop(write_result);
-            std::process::exit(1);
-        }
-        return;
-    }
-
+fn main() -> ExitCode {
     let cli = Cli::parse();
+    let color = command_color(&cli.command);
 
-    let result: Result<()> = (|| {
-        if let (Some(input), Some(output)) = (&cli.input, &cli.output) {
-            if input == output {
-                return Err(CliError::SameInputOutput);
-            }
+    // CRITICAL: Sentry guard MUST live for the entire process lifetime.
+    // Initialized only for the http subcommand; convert stays silent.
+    #[cfg(feature = "http")]
+    let _telemetry_guard = match &cli.command {
+        Commands::Http(_) => Some(docspec_http::init_telemetry()),
+        _ => None,
+    };
+
+    let result = match cli.command {
+        Commands::Convert(args) => commands::convert::run(args),
+        #[cfg(feature = "http")]
+        Commands::Http(args) => commands::http::run(args),
+    };
+
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            write_error(&err, color);
+            ExitCode::FAILURE
         }
-
-        // Resolve formats BEFORE reading input (fail-fast)
-        let input_format = format::resolve_input_format(
-            cli.from,
-            cli.input.as_deref(),
-            "cannot detect input format: use --from",
-        )?;
-        let output_format = format::resolve_output_format(
-            cli.to,
-            cli.output.as_deref(),
-            "cannot detect output format: use --to",
-        )?;
-
-        // Read input AFTER format validation
-        let raw_content = match cli.input.as_ref() {
-            None => {
-                let mut buf = String::new();
-                std::io::stdin().lock().read_to_string(&mut buf)?;
-                buf
-            }
-            Some(path) if path.as_os_str() == "-" => {
-                let mut buf = String::new();
-                std::io::stdin().lock().read_to_string(&mut buf)?;
-                buf
-            }
-            Some(path) => std::fs::read_to_string(path)?,
-        };
-        let content = raw_content
-            .strip_prefix('\u{FEFF}')
-            .unwrap_or(&raw_content)
-            .to_string();
-
-        cli.output.as_ref().map_or_else(
-            || {
-                let mut stdout = std::io::stdout().lock();
-                run_pipeline(input_format, &content, output_format, &mut stdout)?;
-                write_cli_terminating_newline(&mut stdout)
-            },
-            |path| {
-                let mut writer = BufWriter::new(File::create(path)?);
-                run_pipeline(input_format, &content, output_format, &mut writer)?;
-                write_cli_terminating_newline(&mut writer)?;
-                writer.flush()?;
-                Ok(())
-            },
-        )
-    })();
-
-    if let Err(err) = result {
-        let use_color = if std::env::var("NO_COLOR").is_ok() {
-            false
-        } else {
-            match cli.color {
-                ColorChoice::Always => true,
-                ColorChoice::Auto => std::io::stderr().is_terminal(),
-                ColorChoice::Never => false,
-            }
-        };
-        let msg = if use_color {
-            format!("\x1b[1;31merror:\x1b[0m {err}\n")
-        } else {
-            format!("error: {err}\n")
-        };
-        let write_result = std::io::Write::write_all(&mut std::io::stderr(), msg.as_bytes());
-        drop(write_result);
-        std::process::exit(1);
     }
+}
+
+fn command_color(command: &Commands) -> ColorChoice {
+    match command {
+        Commands::Convert(args) => args.color,
+        #[cfg(feature = "http")]
+        Commands::Http(_) => ColorChoice::Auto,
+    }
+}
+
+fn write_error(err: &CliError, color: ColorChoice) {
+    let use_color = if std::env::var("NO_COLOR").is_ok() {
+        false
+    } else {
+        match color {
+            ColorChoice::Always => true,
+            ColorChoice::Auto => std::io::stderr().is_terminal(),
+            ColorChoice::Never => false,
+        }
+    };
+    let msg = if use_color {
+        format!("\x1b[1;31merror:\x1b[0m {err}\n")
+    } else {
+        format!("error: {err}\n")
+    };
+    let write_result = std::io::stderr().write_all(msg.as_bytes());
+    drop(write_result);
 }

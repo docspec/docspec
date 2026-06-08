@@ -16,6 +16,10 @@ pub enum ServerError {
     /// Failed to install the Prometheus metrics recorder.
     #[error("failed to initialize Prometheus metrics recorder: {0}")]
     MetricsInit(#[source] BuildError),
+
+    /// Failed to build the tokio runtime.
+    #[error("failed to build tokio runtime: {0}")]
+    RuntimeBuild(#[source] std::io::Error),
 }
 
 /// Configuration for the HTTP server.

@@ -500,6 +500,7 @@ dependencies = [
  "clap_mangen",
  "docspec",
  "docspec-core",
+ "docspec-http",
  "predicates",
  "serde_json",
  "tempfile",

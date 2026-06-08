@@ -21,6 +21,28 @@ To convert a document:
 
 No buffering. No intermediate representations. No loading the entire document into memory. The document streams through, event by event.
 
+### CLI
+
+Install the `docspec` binary:
+
+```sh
+cargo install docspec-cli
+```
+
+Convert a document:
+
+```sh
+docspec convert input.docx output.md
+```
+
+Start the HTTP API server:
+
+```sh
+docspec http
+```
+
+The Docker image (`ghcr.io/docspec/api`) runs `docspec http` internally.
+
 ## Documentation
 
 - **[Manifesto](MANIFESTO.md)** — Philosophy and values: memory extremism, streaming design, quality standards

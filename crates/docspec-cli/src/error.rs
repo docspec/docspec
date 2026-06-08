@@ -2,6 +2,9 @@
 
 use thiserror::Error;
 
+#[cfg(feature = "http")]
+use docspec_http::server::ServerError;
+
 /// Result type alias for CLI operations.
 pub type Result<T> = core::result::Result<T, CliError>;
 
@@ -32,6 +35,11 @@ pub enum CliError {
         /// The format that is not supported.
         format: String,
     },
+
+    /// HTTP server error.
+    #[cfg(feature = "http")]
+    #[error("HTTP server error: {0}")]
+    Http(#[from] ServerError),
 
     /// I/O error from file operations.
     #[error(transparent)]
