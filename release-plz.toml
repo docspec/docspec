@@ -10,7 +10,8 @@
 git_tag_enable = false
 git_release_enable = false
 
-# Keep CHANGELOG.md synchronized with the release PR.
+# Keep the canonical root CHANGELOG.md synchronized with the release PR.
+changelog_path = "./CHANGELOG.md"
 changelog_update = true
 
 # Only publish after a release PR has been merged.
