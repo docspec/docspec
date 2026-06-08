@@ -16,13 +16,7 @@ doc = false
 
 [dependencies]
 clap = { version = "4", features = ["derive", "color"] }
-docspec = { workspace = true, features = [
-  "markdown",
-  "html",
-  "blocknote",
-  "oxa",
-  "html-writer",
-] }
+docspec = { workspace = true, features = ["full"] }
 docspec-core = { workspace = true }
 thiserror = "2"
 

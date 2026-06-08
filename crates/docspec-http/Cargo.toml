@@ -51,13 +51,7 @@ sentry = { version = "0.48", default-features = false, features = [
 ] }
 docspec-core = { workspace = true }
 docspec-json = { workspace = true }
-docspec = { workspace = true, features = [
-  "markdown",
-  "html",
-  "blocknote",
-  "oxa",
-  "html-writer",
-] }
+docspec = { workspace = true, features = ["full"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

@@ -10,8 +10,7 @@ keywords = ["document", "conversion", "streaming"]
 categories = ["parsing", "encoding"]
 
 [features]
-# Default features: markdown reader and blocknote writer.
-default = ["markdown", "blocknote"]
+default = []
 
 # Format readers (event sources).
 markdown = ["dep:docspec-markdown-reader"]
