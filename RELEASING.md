@@ -6,7 +6,7 @@ This document is the maintainer runbook for releasing DocSpec. It covers the ful
 
 DocSpec uses a unified ecosystem version across all 12 crates. Every release is tagged `vX.Y.Z` at the workspace level, and all publishable crates carry that same version. [release-plz](https://release-plz.dev) is the canonical release driver: it reads Conventional Commits, opens a release PR, and on merge handles tagging and publishing.
 
-Crates publish to crates.io via Trusted Publishing (OIDC). No long-lived API tokens are stored in repository secrets. Binaries for `docspec-cli` are built and distributed by [cargo-dist](https://opensource.axo.dev/cargo-dist/). Docker images are built and pushed by `release.yml`. All artifacts carry SLSA L2 build provenance attestations and cosign keyless signatures.
+Crates publish to crates.io via Trusted Publishing (OIDC). No long-lived API tokens are stored in repository secrets. Binaries for `docspec-cli` are built and distributed by [cargo-dist](https://opensource.axo.dev/cargo-dist/). Docker images are built and pushed from release-plz's native release outputs via the reusable `docker.yml` workflow. All artifacts carry SLSA L2 build provenance attestations and cosign keyless signatures.
 
 The release process is designed to be boring. Most releases require a maintainer to review and merge a single PR. The automation handles the rest.
 
@@ -29,7 +29,7 @@ The typical release flows like this:
 3. A maintainer reviews the release PR (see the next section for what to check).
 4. The maintainer merges the release PR.
 5. The `release-plz-release.yml` workflow runs release-plz, which tags `vX.Y.Z` and publishes all 11 publishable crates to crates.io in topological order, with a 30-minute retry wrapper to handle index propagation lag.
-6. The `release.yml` workflow fires on the new tag, builds `docspec-cli` binaries via cargo-dist, builds and pushes the Docker image, attaches everything to the GitHub Release, and generates SLSA attestations and cosign signatures.
+6. If release-plz reports that a release was created, the same workflow calls `docker.yml` to build, push, sign, and attest the Docker image. The Docker image tags strip the Git tag's `v` prefix, so `v1.5.0` publishes `ghcr.io/docspec/api:1.5.0` plus `1.5`, `1`, and `latest`.
 
 From merge to fully published artifacts typically takes 30 to 60 minutes, depending on crates.io index propagation.
 
@@ -107,9 +107,9 @@ To verify the Docker image:
 
 ```bash
 cosign verify \
-  --certificate-identity-regexp "https://github.com/docspec/docspec/.github/workflows/release.yml" \
+  --certificate-identity-regexp "https://github.com/docspec/docspec/.github/workflows/release-plz-release.yml" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-  ghcr.io/docspec/docspec:v1.5.0
+  ghcr.io/docspec/api:1.5.0
 ```
 
 The `.pem` and `.sig` files are attached to the GitHub Release alongside the tarballs.
