@@ -8,7 +8,7 @@ use clap::{Parser, ValueEnum};
 #[command(version = "0.1.0")]
 #[command(
     about = "Convert documents between formats using streaming event pipeline",
-    long_about = "Convert documents between formats using streaming event pipeline.\n\nSupports converting Markdown or HTML input to BlockNote JSON, HTML, or oxa.dev JSON output.\n\nNote: HTML input and output currently preserve only paragraph text. Other HTML input\nelements and non-paragraph output events (headings, lists, tables, formatting, etc.)\nare silently dropped. Use BlockNote JSON output for fuller feature coverage."
+    long_about = "Convert documents between formats using streaming event pipeline.\n\nSupports converting Markdown or HTML input to BlockNote JSON, HTML, oxa.dev JSON, or Pandoc native output.\n\nNote: HTML input and output currently preserve only paragraph text. Other HTML input\nelements and non-paragraph output events (headings, lists, tables, formatting, etc.)\nare silently dropped. Use BlockNote JSON output for fuller feature coverage."
 )]
 pub struct Cli {
     /// When to use colors.
@@ -71,6 +71,9 @@ pub enum CliOutputFormat {
     /// `oxa.dev` JSON format.
     #[value(name = "oxa")]
     Oxa,
+    /// Pandoc native block-list syntax.
+    #[value(name = "pandoc-native")]
+    PandocNative,
 }
 
 #[cfg(test)]
@@ -123,6 +126,22 @@ mod tests {
         assert!(
             matches!(cli.to, Some(CliOutputFormat::Oxa)),
             "expected CliOutputFormat::Oxa, got {:?}",
+            cli.to
+        );
+    }
+
+    #[test]
+    fn clap_accepts_pandoc_native_as_output_format() {
+        let result = Cli::try_parse_from(["docspec", "--to", "pandoc-native", "x.md"]);
+        assert!(
+            result.is_ok(),
+            "pandoc-native should be a valid output format, got error: {:?}",
+            result.as_ref().err()
+        );
+        let cli = result.unwrap_or_else(|_| std::process::abort());
+        assert!(
+            matches!(cli.to, Some(CliOutputFormat::PandocNative)),
+            "expected CliOutputFormat::PandocNative, got {:?}",
             cli.to
         );
     }

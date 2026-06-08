@@ -1,6 +1,6 @@
 # DocSpec
 
-DocSpec is a streaming document conversion library. It converts DOCX, ODT, RTF, HTML, Markdown, and BlockNote JSON — event by event, byte by byte, without buffering the world. Built in Rust for memory-conscious systems, from microcontrollers to servers.
+DocSpec is a streaming document conversion library. It converts DOCX, ODT, RTF, HTML, Markdown, BlockNote JSON, and Pandoc native — event by event, byte by byte, without buffering the world. Built in Rust for memory-conscious systems, from microcontrollers to servers.
 
 ## Philosophy
 
@@ -16,6 +16,7 @@ See our [Manifesto](MANIFESTO.md) for what we stand for: memory extremism, strea
 | HTML | ✓† | ✓† |
 | Markdown | ✓ | ✓ |
 | BlockNote JSON | ✓ | ✓ |
+| Pandoc native | — | ✓ |
 
 † HTML reader and writer currently support only `<p>` paragraph elements; other elements are silently dropped.
 

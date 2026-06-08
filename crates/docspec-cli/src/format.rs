@@ -123,6 +123,12 @@ mod tests {
     }
 
     #[test]
+    fn detect_pandoc_native_from_native_output() {
+        let result = resolve_output_format(None, Some(Path::new("doc.native")), "err");
+        assert!(matches!(result, Ok(docspec::OutputFormat::PandocNative)));
+    }
+
+    #[test]
     fn case_insensitive_extension_output() {
         let result = resolve_output_format(None, Some(Path::new("doc.JSON")), "err");
         assert!(matches!(result, Ok(docspec::OutputFormat::Blocknote)));
