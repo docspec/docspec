@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0](https://github.com/docspec/docspec/compare/docspec-pandoc-native-writer-v1.5.1...docspec-pandoc-native-writer-v2.0.0) - 2026-06-08
+
+### Added
+
+- *(pandoc-native-writer)* Pandoc native writer
+
 ## [1.5.1](https://github.com/docspec/docspec/compare/v1.5.0...v1.5.1) - 2026-06-08
 
 ### Fixed

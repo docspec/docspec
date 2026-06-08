@@ -466,7 +466,7 @@ dependencies = [
 
 [[package]]
 name = "docspec"
-version = "1.5.1"
+version = "2.0.0"
 dependencies = [
  "docspec-blocknote-writer",
  "docspec-core",
@@ -482,7 +482,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-blocknote-writer"
-version = "1.5.1"
+version = "2.0.0"
 dependencies = [
  "base64",
  "docspec-core",
@@ -492,7 +492,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-cli"
-version = "1.5.1"
+version = "2.0.0"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -508,14 +508,14 @@ dependencies = [
 
 [[package]]
 name = "docspec-core"
-version = "1.5.1"
+version = "2.0.0"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "docspec-docx-reader"
-version = "1.5.1"
+version = "2.0.0"
 dependencies = [
  "docspec-core",
  "flate2",
@@ -526,7 +526,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-html-reader"
-version = "1.5.1"
+version = "2.0.0"
 dependencies = [
  "docspec-core",
  "html5gum",
@@ -534,7 +534,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-html-writer"
-version = "1.5.1"
+version = "2.0.0"
 dependencies = [
  "docspec-core",
  "html5ever",
@@ -542,7 +542,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-http"
-version = "1.5.1"
+version = "2.0.0"
 dependencies = [
  "axum",
  "clap",
@@ -566,7 +566,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-json"
-version = "1.5.1"
+version = "2.0.0"
 dependencies = [
  "docspec-core",
  "struson",
@@ -574,7 +574,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-markdown-reader"
-version = "1.5.1"
+version = "2.0.0"
 dependencies = [
  "docspec-core",
  "pulldown-cmark",
@@ -582,7 +582,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-oxa-writer"
-version = "1.5.1"
+version = "2.0.0"
 dependencies = [
  "docspec-core",
  "docspec-json",
@@ -591,14 +591,14 @@ dependencies = [
 
 [[package]]
 name = "docspec-pandoc-native-writer"
-version = "1.5.1"
+version = "2.0.0"
 dependencies = [
  "docspec-core",
 ]
 
 [[package]]
 name = "docspec-wasm"
-version = "1.5.1"
+version = "2.0.0"
 dependencies = [
  "docspec",
  "docspec-core",
