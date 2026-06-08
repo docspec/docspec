@@ -1,6 +1,6 @@
 [package]
 name = "docspec-html-reader"
-version = "1.0.1"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -10,7 +10,7 @@ keywords = ["document", "conversion", "streaming", "html"]
 categories = ["parsing"]
 
 [dependencies]
-docspec-core = { path = "../docspec-core", version = "1.0.0" }
+docspec-core = { workspace = true }
 html5gum = "0.8"
 
 [lints]

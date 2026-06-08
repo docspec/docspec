@@ -11,7 +11,7 @@ footprint, depend directly on the individual sub-crates (`docspec-core`,
 
 ```toml
 [dependencies]
-docspec = { version = "0.5", features = ["markdown", "blocknote"] }
+docspec = { version = "1.5", features = ["markdown", "blocknote"] }
 ```
 
 ```rust

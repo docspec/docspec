@@ -158,11 +158,15 @@ Example:
 
 ## Versioning
 
-DocSpec follows strict Semantic Versioning (semver):
+DocSpec uses a single ecosystem version across all 12 crates. The version lives in `[workspace.package].version` in the root `Cargo.toml`, and every crate inherits it via `version.workspace = true`. Internal crate-to-crate dependencies are declared in `[workspace.dependencies]` and track the workspace version exactly.
 
-- **MAJOR**: Breaking changes (API changes, behavior changes)
+SemVer applies at the ecosystem level:
+
+- **MAJOR**: Any breaking change in any crate bumps the ecosystem major version
 - **MINOR**: New features, backwards compatible
 - **PATCH**: Bug fixes, backwards compatible
+
+Ecosystem coherence takes priority over per-crate precision. A breaking change in one crate bumps the major version for the entire ecosystem, even for users who don't use that crate. This keeps the compatibility story simple: one version number means one coherent set of crates.
 
 ### Breaking Changes
 
@@ -173,38 +177,27 @@ Breaking changes ALWAYS bump the major version. No exceptions. Breaking changes 
 - Removing support for features or formats
 - Changing error types or their behavior
 
-During 0.x releases, breaking changes are expected and documented. After 1.0, breaking changes require strong justification. When in doubt, bump major.
+After 1.0, breaking changes require strong justification. When in doubt, bump major.
+
+The unified ecosystem version policy started at v1.5.0. Before that, crates used independent per-crate versioning. See [RELEASING.md §Historical Notes](RELEASING.md#historical-notes) for context on the old tags.
 
 ## Releases
 
-DocSpec uses [release-please](https://github.com/googleapis/release-please) to generate `CHANGELOG.md` files automatically from Conventional Commits. Do not create or edit changelog files manually; they are a function of commit history and are maintained by release-please.
+DocSpec uses [release-plz](https://release-plz.dev) to automate version bumps, changelog updates, and publishing. release-plz reads Conventional Commits from `main`, opens a release PR, and on merge: tags `vX.Y.Z`, publishes all publishable crates via Trusted Publishing (OIDC), and creates a GitHub Release.
 
-### How It Works
-
-1. Commits land on main with conventional commit format
-2. Release Please opens a release PR when enough changes accumulate
-3. The release PR contains the proposed version bump and generated changelog
-4. A maintainer merges the release PR
-5. A new release is tagged and published automatically
-6. The crates.io publish workflow publishes all publishable workspace crates in dependency order
-
-### Crates.io Publishing
-
-Crates are published from the `Publish crates` GitHub Actions workflow when release-please creates a non-prerelease GitHub release. The workflow requires a repository secret named `CARGO_REGISTRY_TOKEN` containing a crates.io API token with publish access for all publishable DocSpec crates. `docspec-wasm` remains `publish = false`; WebAssembly package publishing is handled separately from crates.io.
-
-For local development, first-party dependencies use both `path` and `version`. Cargo uses the path inside the workspace, then strips the path and keeps the version requirement when packaging crates for crates.io.
-
-Before publishing manually, run:
-
-```bash
-cargo publish --workspace --dry-run
-```
+For the full maintainer runbook (Trusted Publishing setup, recovery procedures, manual operations, supply chain verification), see [RELEASING.md](RELEASING.md).
 
 ### Release Types
 
 - `feat` commits trigger a minor version bump
 - `fix` commits trigger a patch version bump
-- Commits with `BREAKING CHANGE` in the body trigger a major version bump
+- Commits with `BREAKING CHANGE` in the footer trigger a major version bump
+
+### Crates.io Publishing
+
+Crates.io publishes use Trusted Publishing (OIDC); no stored API token is required. See [RELEASING.md](RELEASING.md) for setup instructions and the publish order.
+
+Before merging a release PR, maintainers review the generated version bump, `CHANGELOG.md` diff, and publish plan as described in [RELEASING.md](RELEASING.md).
 
 ### Writing Good Commit Messages for Changelog
 

@@ -1,0 +1,39 @@
+# release-plz configuration for unified ecosystem versioning.
+# All crates share a single version via [workspace.package].version.
+# release-plz maintains the root CHANGELOG.md from Conventional Commits.
+
+[workspace]
+# Single combined release PR is release-plz's default behaviour.
+# Tags and GitHub releases are disabled at workspace level, then enabled for
+# the facade crate below so the workspace gets one `vX.Y.Z` tag instead of
+# every publishable crate racing to create the same tag.
+git_tag_enable = false
+git_release_enable = false
+
+# Keep CHANGELOG.md synchronized with the release PR.
+changelog_update = true
+
+# Only release when the release PR is merged (no per-push releases)
+release_always = false
+
+# Run cargo-semver-checks before opening the release PR
+semver_check = true
+
+# Don't run `cargo update` during release PR (avoids unrelated lockfile churn)
+dependencies_update = false
+
+# Absorb crates.io index propagation lag between dependent crate publishes
+publish_timeout = "30m"
+
+# The facade crate owns the single workspace tag and GitHub Release.
+[[package]]
+name = "docspec"
+git_tag_name = "v{{ version }}"
+git_tag_enable = true
+git_release_enable = true
+
+# Override default: docspec-wasm must never publish, even if Cargo.toml
+# is edited later. Belt-and-suspenders with Cargo.toml's publish = false.
+[[package]]
+name = "docspec-wasm"
+publish = false

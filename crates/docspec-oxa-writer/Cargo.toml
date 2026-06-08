@@ -1,6 +1,6 @@
 [package]
 name = "docspec-oxa-writer"
-version = "1.0.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -10,8 +10,8 @@ keywords = ["document", "conversion", "streaming"]
 categories = ["encoding"]
 
 [dependencies]
-docspec-core = { path = "../docspec-core", version = "1.0.0" }
-docspec-json = { path = "../docspec-json", version = "1.0.2" }
+docspec-core = { workspace = true }
+docspec-json = { workspace = true }
 
 [dev-dependencies]
 serde_json = "1"

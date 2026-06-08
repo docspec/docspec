@@ -1,6 +1,6 @@
 [package]
 name = "docspec-cli"
-version = "1.3.1"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -16,14 +16,14 @@ doc = false
 
 [dependencies]
 clap = { version = "4", features = ["derive", "color"] }
-docspec = { path = "../docspec", version = "1.2.0", features = [
+docspec = { workspace = true, features = [
   "markdown",
   "html",
   "blocknote",
   "oxa",
   "html-writer",
 ] }
-docspec-core = { path = "../docspec-core", version = "1.0.0" }
+docspec-core = { workspace = true }
 thiserror = "2"
 
 [dev-dependencies]
@@ -39,3 +39,7 @@ clap_complete = "4"
 
 [lints]
 workspace = true
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-v{ version }-{ target }.tar.xz"
+bin-dir = "{ bin }{ binary-ext }"
