@@ -6,22 +6,6 @@ DocSpec is a streaming document conversion library. It converts DOCX, ODT, RTF, 
 
 See our [Manifesto](MANIFESTO.md) for what we stand for: memory extremism, streaming-first design, and the belief that software should earn every byte it uses.
 
-## Supported Formats
-
-| Format | Read | Write |
-|--------|------|-------|
-| DOCX | ✓‡ | — |
-| ODT | ✓ | — |
-| RTF | ✓ | ✓ |
-| HTML | ✓† | ✓† |
-| Markdown | ✓ | ✓ |
-| BlockNote JSON | ✓ | ✓ |
-| Pandoc native | — | ✓ |
-
-† HTML reader and writer currently support only `<p>` paragraph elements; other elements are silently dropped.
-
-‡ DOCX reader is intentionally minimal: only paragraphs and text are emitted; styles, breaks, tables, lists, images, tracked changes, headers/footers, and metadata are silently dropped. See the [docspec-docx-reader README](crates/docspec-docx-reader/README.md) for the full scope.
-
 ## Quick Start
 
 DocSpec works through a pipeline of readers and writers. A reader (EventSource) parses a document and emits events: StartParagraph, Text, EndParagraph, StartHeading, etc. A writer (EventSink) consumes these events and produces output in the target format.
