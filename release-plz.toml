@@ -13,9 +13,8 @@ git_release_enable = false
 # Keep CHANGELOG.md synchronized with the release PR.
 changelog_update = true
 
-# TEMPORARY: bootstrap the unified v1.5.0 release directly from main.
-# Revert to `false` after v1.5.0 publishes so future releases go through release PRs.
-release_always = true
+# Only publish after a release PR has been merged.
+release_always = false
 
 # Run cargo-semver-checks before opening the release PR
 semver_check = true
