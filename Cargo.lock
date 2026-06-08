@@ -476,6 +476,7 @@ dependencies = [
  "docspec-json",
  "docspec-markdown-reader",
  "docspec-oxa-writer",
+ "docspec-pandoc-native-writer",
  "serde_json",
 ]
 

@@ -7,20 +7,23 @@ mod tests {
     #[cfg(any(
         feature = "blocknote-writer",
         feature = "oxa-writer",
-        feature = "html-writer"
+        feature = "html-writer",
+        feature = "pandoc-native-writer"
     ))]
     use docspec::{AnyWriter, OutputFormat, TextStyle};
     #[cfg(any(
         feature = "blocknote-writer",
         feature = "oxa-writer",
-        feature = "html-writer"
+        feature = "html-writer",
+        feature = "pandoc-native-writer"
     ))]
     use docspec_core::{Event, EventSink};
 
     #[cfg(any(
         feature = "blocknote-writer",
         feature = "oxa-writer",
-        feature = "html-writer"
+        feature = "html-writer",
+        feature = "pandoc-native-writer"
     ))]
     fn start_document() -> Event {
         Event::StartDocument {
@@ -33,7 +36,8 @@ mod tests {
     #[cfg(any(
         feature = "blocknote-writer",
         feature = "oxa-writer",
-        feature = "html-writer"
+        feature = "html-writer",
+        feature = "pandoc-native-writer"
     ))]
     fn start_paragraph() -> Event {
         Event::StartParagraph {
@@ -45,7 +49,8 @@ mod tests {
     #[cfg(any(
         feature = "blocknote-writer",
         feature = "oxa-writer",
-        feature = "html-writer"
+        feature = "html-writer",
+        feature = "pandoc-native-writer"
     ))]
     fn text(content: &str) -> Event {
         Event::Text {
@@ -168,6 +173,58 @@ mod tests {
         fn check<K: EventSink>(_: K) {}
         let output = Vec::new();
         check(AnyWriter::new(OutputFormat::Oxa, output));
+    }
+
+    #[cfg(feature = "pandoc-native-writer")]
+    #[test]
+    fn pandoc_native_dispatch_writes_expected_bytes_simple() {
+        let mut output = Vec::new();
+        let mut writer = AnyWriter::new(OutputFormat::PandocNative, &mut output);
+        writer
+            .handle_event(start_document())
+            .expect("handle_event failed");
+        writer
+            .handle_event(start_paragraph())
+            .expect("handle_event failed");
+        writer
+            .handle_event(text("hello"))
+            .expect("handle_event failed");
+        writer
+            .handle_event(Event::EndParagraph)
+            .expect("handle_event failed");
+        writer
+            .handle_event(Event::EndDocument)
+            .expect("handle_event failed");
+        writer.finish().expect("finish failed");
+        let native = String::from_utf8(output).expect("not utf8");
+        assert_eq!(native, r#"[Para [Str "hello"]]"#);
+    }
+
+    #[cfg(feature = "pandoc-native-writer")]
+    #[test]
+    fn pandoc_native_stack_tracking_normalizes_bare_text() {
+        let mut output = Vec::new();
+        let mut writer = AnyWriter::new(OutputFormat::PandocNative, &mut output);
+        writer
+            .handle_event(start_document())
+            .expect("handle_event failed");
+        writer
+            .handle_event(text("bare text"))
+            .expect("handle_event failed");
+        writer
+            .handle_event(Event::EndDocument)
+            .expect("handle_event failed");
+        writer.finish().expect("finish failed");
+        let native = String::from_utf8(output).expect("not utf8");
+        assert_eq!(native, r#"[Para [Str "bare text"]]"#);
+    }
+
+    #[cfg(feature = "pandoc-native-writer")]
+    #[test]
+    fn pandoc_native_assert_is_event_sink() {
+        fn check<K: EventSink>(_: K) {}
+        let output = Vec::new();
+        check(AnyWriter::new(OutputFormat::PandocNative, output));
     }
 
     #[cfg(feature = "html-writer")]

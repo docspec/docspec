@@ -51,6 +51,7 @@ dispatched through the text-based `AnyReader` factory. Construct it directly wit
 | `blocknote-writer` | BlockNote JSON         | `docspec-blocknote-writer` |
 | `oxa-writer`       | oxa.dev JSON           | `docspec-oxa-writer`       |
 | `html-writer`      | HTML (paragraphs only) | `docspec-html-writer`      |
+| `pandoc-native-writer` | Pandoc native block list | `docspec-pandoc-native-writer` |
 
 ### Primitives
 
@@ -64,12 +65,13 @@ dispatched through the text-based `AnyReader` factory. Construct it directly wit
 | ------------- | ------------------------------------------------------------- |
 | `blocknote`   | BlockNote in both directions (writer only until reader lands) |
 | `oxa`         | oxa.dev in both directions (writer only until reader lands)   |
+| `pandoc-native` | Pandoc native in both directions (writer only until reader lands) |
 | `all-readers` | All reader features                                           |
 | `all-writers` | All writer features                                           |
 | `all-libs`    | All primitive/library features (currently `json`)             |
 | `full`        | Everything (`all-readers` + `all-writers` + `all-libs`)       |
 
-No features are enabled by default — opt into what you need.
+Default features are `markdown`, `blocknote`, and `pandoc-native`; disable default features when you need the smallest possible dependency footprint.
 
 ## Documentation
 

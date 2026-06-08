@@ -29,6 +29,7 @@
 //! | `blocknote-writer`  | `BlockNote` JSON        | [`writers::BlockNoteWriter`]  |
 //! | `oxa-writer`        | `oxa.dev` JSON          | `writers::OxaWriter`          |
 //! | `html-writer`       | HTML (paragraphs only)  | `writers::HtmlWriter`         |
+//! | `pandoc-native-writer` | Pandoc native block list | `writers::PandocNativeWriter` |
 //!
 //! ## Primitives
 //!
@@ -42,6 +43,7 @@
 //! |---------------|------------------------------------------------------------------|
 //! | `blocknote`   | `BlockNote` in both directions (writer only until reader lands)  |
 //! | `oxa`         | `oxa.dev` in both directions (writer only until reader lands)    |
+//! | `pandoc-native` | Pandoc native in both directions (writer only until reader lands) |
 //! | `all-readers` | All reader features                                              |
 //! | `all-writers` | All writer features                                              |
 //! | `all-libs`    | All primitive/library features (currently `json`)                |
@@ -146,6 +148,13 @@ pub mod writers {
     #[cfg(feature = "html-writer")]
     #[cfg_attr(docsrs, doc(cfg(feature = "html-writer")))]
     pub use docspec_html_writer::HtmlWriter;
+
+    /// Streaming Pandoc native block-list writer. Available when the
+    /// `pandoc-native-writer` feature is enabled (either directly, or via the
+    /// `pandoc-native` meta feature).
+    #[cfg(feature = "pandoc-native-writer")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "pandoc-native-writer")))]
+    pub use docspec_pandoc_native_writer::PandocNativeWriter;
 }
 
 /// Format detection and conversion helpers.
