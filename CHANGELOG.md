@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0](https://github.com/docspec/docspec/compare/docspec-core-v1.5.1...docspec-core-v1.6.0) - 2026-06-08
+
+### Added
+
+- make public enums non-exhaustive
+
 ## [1.5.1](https://github.com/docspec/docspec/compare/v1.5.0...v1.5.1) - 2026-06-08
 
 ### Fixed
