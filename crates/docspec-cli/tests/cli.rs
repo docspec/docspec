@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Integration tests for the `docspec` CLI binary.
 
 use std::io::Write as _;
@@ -66,6 +67,7 @@ mod tests {
         let output_path = output.path().to_path_buf();
 
         docspec_cmd()
+            .arg("convert")
             .arg(input.path())
             .args(["-o", output_path.to_str().unwrap_or("")])
             .assert()
@@ -84,6 +86,7 @@ mod tests {
     fn color_always_flag_enables_ansi() {
         docspec_cmd()
             .args([
+                "convert",
                 "--color",
                 "always",
                 "/tmp/nonexistent-docspec-test-file-xyz.md",
@@ -99,6 +102,7 @@ mod tests {
     fn color_never_flag_disables_ansi() {
         docspec_cmd()
             .args([
+                "convert",
                 "--color",
                 "never",
                 "/tmp/nonexistent-docspec-test-file-xyz.md",
@@ -117,6 +121,7 @@ mod tests {
         let output_path = output.path().to_path_buf();
 
         docspec_cmd()
+            .arg("convert")
             .arg(input.path())
             .args(["-o", output_path.to_str().unwrap_or("")])
             .assert()
@@ -134,7 +139,7 @@ mod tests {
     #[test]
     fn convert_stdin_to_stdout() {
         docspec_cmd()
-            .args(["--from", "markdown", "--to", "blocknote"])
+            .args(["convert", "--from", "markdown", "--to", "blocknote"])
             .write_stdin("# Hello\n")
             .assert()
             .success()
@@ -147,7 +152,7 @@ mod tests {
     #[test]
     fn dash_means_stdin() {
         docspec_cmd()
-            .args(["-", "--from", "markdown", "--to", "blocknote"])
+            .args(["convert", "-", "--from", "markdown", "--to", "blocknote"])
             .write_stdin("# Dash Input\n")
             .assert()
             .success()
@@ -164,6 +169,7 @@ mod tests {
         let output_path = output.path().to_path_buf();
 
         docspec_cmd()
+            .arg("convert")
             .arg(input.path())
             .args(["-o", output_path.to_str().unwrap_or("")])
             .assert()
@@ -179,6 +185,7 @@ mod tests {
         let output_path = output.path().to_path_buf();
 
         docspec_cmd()
+            .arg("convert")
             .arg(input.path())
             .args([
                 "--from",
@@ -208,7 +215,7 @@ mod tests {
         );
 
         docspec_cmd()
-            .args([fixture, "--to", "blocknote"])
+            .args(["convert", fixture, "--to", "blocknote"])
             .assert()
             .success()
             .stdout(concat!(
@@ -220,7 +227,7 @@ mod tests {
     #[test]
     fn help_flag() {
         docspec_cmd()
-            .arg("--help")
+            .args(["convert", "--help"])
             .assert()
             .success()
             .stdout(contains("--from"))
@@ -231,14 +238,10 @@ mod tests {
 
     #[test]
     fn no_arguments_prints_help() {
-        let help_assert = docspec_cmd().arg("--help").assert().success();
-        let help_output = help_assert.get_output();
-
-        let bare_assert = docspec_cmd().assert().success();
-        let bare_output = bare_assert.get_output();
-
-        assert_eq!(bare_output.stdout.as_slice(), help_output.stdout.as_slice());
-        assert_eq!(bare_output.stderr.as_slice(), help_output.stderr.as_slice());
+        docspec_cmd()
+            .assert()
+            .failure()
+            .stderr(predicates::str::contains("Usage"));
     }
 
     #[test]
@@ -254,6 +257,7 @@ mod tests {
     fn missing_input_file_exits_1() {
         docspec_cmd()
             .args([
+                "convert",
                 "/tmp/nonexistent-docspec-test-file-xyz.md",
                 "-t",
                 "blocknote",
@@ -269,6 +273,7 @@ mod tests {
         docspec_cmd()
             .env("NO_COLOR", "1")
             .args([
+                "convert",
                 "/tmp/nonexistent-docspec-test-file-xyz.md",
                 "-t",
                 "blocknote",
@@ -286,7 +291,7 @@ mod tests {
         );
 
         docspec_cmd()
-            .args([fixture, "--to", "blocknote"])
+            .args(["convert", fixture, "--to", "blocknote"])
             .assert()
             .success()
             .stdout(concat!(
@@ -301,7 +306,7 @@ mod tests {
         let path_str = input.path().to_str().unwrap_or("");
 
         docspec_cmd()
-            .args([path_str, "-o", path_str])
+            .args(["convert", path_str, "-o", path_str])
             .assert()
             .failure()
             .code(1)
@@ -313,6 +318,7 @@ mod tests {
         let input = markdown_tempfile(b"# Hello\n", ".xyz");
 
         docspec_cmd()
+            .arg("convert")
             .arg(input.path())
             .args(["-t", "blocknote"])
             .assert()
@@ -325,6 +331,7 @@ mod tests {
         let input = markdown_tempfile(b"[]", ".json");
 
         docspec_cmd()
+            .arg("convert")
             .arg(input.path())
             .args(["-t", "blocknote"])
             .assert()
@@ -347,7 +354,7 @@ mod tests {
             serde_json::from_str(expected).unwrap_or_else(|_| std::process::abort());
 
         let assert = docspec_cmd()
-            .args([fixture, "--to", "blocknote"])
+            .args(["convert", fixture, "--to", "blocknote"])
             .assert()
             .success();
 
@@ -375,7 +382,7 @@ mod tests {
         let expected_value: serde_json::Value =
             serde_json::from_str(expected).unwrap_or_else(|_| std::process::abort());
 
-        let assert = docspec_cmd().arg(fixture).assert().success();
+        let assert = docspec_cmd().arg("convert").arg(fixture).assert().success();
 
         let stdout = String::from_utf8(assert.get_output().stdout.clone())
             .unwrap_or_else(|_| std::process::abort());
@@ -391,7 +398,7 @@ mod tests {
     #[test]
     fn html_explicit_from_flag_via_stdin() {
         docspec_cmd()
-            .args(["--from", "html", "--to", "blocknote", "-"])
+            .args(["convert", "--from", "html", "--to", "blocknote", "-"])
             .write_stdin("<p>hello world</p>")
             .assert()
             .success()
@@ -408,7 +415,7 @@ mod tests {
             "/../../tests/fixtures/html/empty.html"
         );
         docspec_cmd()
-            .args([fixture, "--to", "blocknote"])
+            .args(["convert", fixture, "--to", "blocknote"])
             .assert()
             .success()
             .stdout("[]\n");
@@ -417,7 +424,7 @@ mod tests {
     #[test]
     fn clap_rejects_blocknote_input_with_exit_code_2() {
         docspec_cmd()
-            .args(["--from", "blocknote", "x.md"])
+            .args(["convert", "--from", "blocknote", "x.md"])
             .assert()
             .failure()
             .code(2)
@@ -427,7 +434,7 @@ mod tests {
     #[test]
     fn clap_rejects_markdown_output_with_exit_code_2() {
         docspec_cmd()
-            .args(["--to", "markdown", "x.md"])
+            .args(["convert", "--to", "markdown", "x.md"])
             .assert()
             .failure()
             .code(2)
@@ -440,13 +447,13 @@ mod tests {
             .arg("--version")
             .assert()
             .success()
-            .stdout(contains("0.1.0"));
+            .stdout(predicates::str::is_match(r"docspec \d+\.\d+\.\d+").unwrap());
     }
 
     #[test]
     fn convert_markdown_stdin_to_html_stdout() {
         docspec_cmd()
-            .args(["--from", "markdown", "--to", "html"])
+            .args(["convert", "--from", "markdown", "--to", "html"])
             .write_stdin("Hello world")
             .assert()
             .success()
@@ -456,7 +463,7 @@ mod tests {
     #[test]
     fn markdown_heading_is_dropped_by_paragraph_only_html_writer() {
         docspec_cmd()
-            .args(["--from", "markdown", "--to", "html"])
+            .args(["convert", "--from", "markdown", "--to", "html"])
             .write_stdin("# Dropped\n\nKept paragraph")
             .assert()
             .success()
@@ -470,6 +477,7 @@ mod tests {
         let output_path = output.path().to_path_buf();
 
         docspec_cmd()
+            .arg("convert")
             .arg(input.path())
             .args(["-o", output_path.to_str().unwrap_or("")])
             .assert()
@@ -484,7 +492,7 @@ mod tests {
     #[test]
     fn convert_markdown_stdin_to_oxa_stdout() {
         docspec_cmd()
-            .args(["--from", "markdown", "--to", "oxa"])
+            .args(["convert", "--from", "markdown", "--to", "oxa"])
             .write_stdin("Hello world")
             .assert()
             .success()
@@ -497,7 +505,7 @@ mod tests {
     #[test]
     fn convert_markdown_stdin_to_pandoc_native_stdout() {
         docspec_cmd()
-            .args(["--from", "markdown", "--to", "pandoc-native"])
+            .args(["convert", "--from", "markdown", "--to", "pandoc-native"])
             .write_stdin("Hello world")
             .assert()
             .success()
@@ -512,6 +520,7 @@ mod tests {
         let output_path = output.path().to_path_buf();
 
         docspec_cmd()
+            .arg("convert")
             .arg(input.path())
             .args(["-o", output_path.to_str().unwrap_or("")])
             .assert()
@@ -532,6 +541,7 @@ mod tests {
         let output_path = output.path().to_path_buf();
 
         docspec_cmd()
+            .arg("convert")
             .arg(input.path())
             .args(["-o", output_path.to_str().unwrap_or("")])
             .assert()
@@ -541,5 +551,13 @@ mod tests {
             read_output(&output_path),
             concat!(r#"[Para [Str "Hello"]]"#, "\n")
         );
+    }
+
+    #[test]
+    fn bare_invocation_shows_help_and_exits_nonzero() {
+        docspec_cmd()
+            .assert()
+            .failure()
+            .stderr(predicates::str::contains("subcommand").or(predicates::str::contains("Usage")));
     }
 }

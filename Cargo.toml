@@ -31,6 +31,7 @@ docspec-html-reader = { path = "crates/docspec-html-reader", version = "1.5.1" }
 docspec-docx-reader = { path = "crates/docspec-docx-reader", version = "1.5.1" }
 docspec-blocknote-writer = { path = "crates/docspec-blocknote-writer", version = "1.5.1" }
 docspec-html-writer = { path = "crates/docspec-html-writer", version = "1.5.1" }
+docspec-http = { path = "crates/docspec-http", version = "1.5.1" }
 docspec-oxa-writer = { path = "crates/docspec-oxa-writer", version = "1.5.1" }
 docspec-pandoc-native-writer = { path = "crates/docspec-pandoc-native-writer", version = "1.5.1" }
 self_cell = "1.2"

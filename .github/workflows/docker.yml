@@ -55,7 +55,7 @@ jobs:
             type=semver,pattern={{major}},value=${{ inputs.tag_name }}
             type=raw,value=latest,enable=${{ !contains(inputs.tag_name, '-') }}
           labels: |
-            org.opencontainers.image.title=docspec-http
+            org.opencontainers.image.title=docspec
             org.opencontainers.image.description=HTTP API server for DocSpec markdown to BlockNote JSON conversion
             org.opencontainers.image.source=https://github.com/docspec/docspec
             org.opencontainers.image.licenses=MIT

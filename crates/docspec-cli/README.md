@@ -7,14 +7,24 @@ See the [main DocSpec repository](https://github.com/docspec/docspec) for docume
 ## Usage
 
 ```bash
-docspec [OPTIONS] [INPUT]
+docspec <COMMAND> [OPTIONS]
 ```
 
-### Arguments
+Commands:
+- `convert` — Convert documents between formats
+- `http` — Run the HTTP API server
+
+### `convert` subcommand
+
+```bash
+docspec convert [OPTIONS] [INPUT]
+```
+
+#### Arguments
 
 - `INPUT` — Input file (use `-` or omit for stdin)
 
-### Options
+#### Options
 
 - `-o, --output <FILE>` — Output file (stdout if omitted)
 - `-f, --from <FORMAT>` — Input format (auto-detected from extension if omitted). Valid values: `markdown`, `html`
@@ -22,6 +32,30 @@ docspec [OPTIONS] [INPUT]
 - `--color <WHEN>` — When to use colors: `auto`, `always`, `never` (default: `auto`)
 - `-h, --help` — Print help
 - `-V, --version` — Print version
+
+### `http` subcommand
+
+```bash
+docspec http [OPTIONS]
+```
+
+Starts the HTTP API server. Listens on `127.0.0.1:3000` by default.
+
+#### Options
+
+- `--host <HOST>` — Address to bind the server to (default: `127.0.0.1`)
+- `--port <PORT>` — Port to listen on. Use `0` for OS-assigned (default: `3000`)
+- `-h, --help` — Print help
+
+### Feature flags
+
+`docspec-cli` ships with `http` enabled by default. For a slim install without the HTTP server stack:
+
+```bash
+cargo install docspec-cli --no-default-features
+```
+
+The resulting binary will only support `docspec convert`; running `docspec http` will print "unknown subcommand".
 
 ## Supported Input Formats
 
@@ -38,31 +72,37 @@ docspec [OPTIONS] [INPUT]
 Convert a Markdown file to BlockNote JSON:
 
 ```bash
-docspec --from markdown --to blocknote input.md --output output.json
+docspec convert --from markdown --to blocknote input.md --output output.json
 ```
 
 Convert an HTML file to BlockNote JSON (paragraphs only):
 
 ```bash
-docspec --from html --to blocknote input.html --output output.json
+docspec convert --from html --to blocknote input.html --output output.json
 ```
 
 Convert Markdown from stdin to BlockNote JSON on stdout:
 
 ```bash
-echo "# Hello" | docspec --from markdown --to blocknote
+echo "# Hello" | docspec convert --from markdown --to blocknote
 ```
 
 Convert Markdown to HTML:
 
 ```bash
-echo "Hello" | docspec --from markdown --to html
+echo "Hello" | docspec convert --from markdown --to html
 ```
 
 Convert Markdown to Pandoc native syntax:
 
 ```bash
-echo "Hello" | docspec --from markdown --to pandoc-native
+echo "Hello" | docspec convert --from markdown --to pandoc-native
+```
+
+Start the HTTP API server on a custom port:
+
+```bash
+docspec http --port 8080
 ```
 
 `--to oxa` selects the [oxa.dev](https://oxa.dev/) JSON writer in place of BlockNote. The `.json`

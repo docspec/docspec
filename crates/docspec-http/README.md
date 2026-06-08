@@ -1,23 +1,46 @@
 # `docspec-http`
 
-HTTP API server for DocSpec markdown or HTML conversion to BlockNote JSON (default), HTML, oxa.dev JSON, or Pandoc native via `Accept`.
+Library providing an Axum-based HTTP server that wraps a DocSpec conversion pipeline. Designed for embedding in custom binaries or running via the unified `docspec http` subcommand.
 
 Send markdown (`Content-Type: text/markdown`) or HTML (`Content-Type: text/html`), receive BlockNote JSON (default), HTML (`Accept: text/html`), oxa.dev JSON (`Accept: application/vnd.oxa+json`), or Pandoc native (`Accept: application/vnd.pandoc.native`). The underlying DocSpec pipeline is streaming, but this v1 HTTP wrapper **buffers the request body and the conversion output in memory** before responding. End-to-end streaming over HTTP is planned for a future version. For now, request size scales with available memory.
 
 > **HTML is paragraph-only.** The HTML reader currently parses `<p>` elements only, and the HTML writer currently emits only paragraph events. Other HTML input elements and non-paragraph output events (headings, lists, tables, formatting, etc.) are silently dropped. See [docspec-html-reader](../docspec-html-reader/README.md) and [docspec-html-writer](../docspec-html-writer/README.md).
 
+## When to Use This Crate
+
+Use `docspec-http` directly when you're embedding the HTTP server into your own binary or need programmatic control over server startup, configuration, or telemetry initialization.
+
+For end users who want a running HTTP server without writing Rust code, install `docspec-cli` and run `docspec http`.
+
 ## Quick Start
 
-```bash
-cargo build -p docspec-http --bin docspec-http --release
-./target/release/docspec-http --port 3000
+```toml
+[dependencies]
+docspec-http = "1.5"
+tokio = { version = "1", features = ["full"] }
 ```
 
-Default host is `127.0.0.1`. Default port is `3000`.
+```rust
+use docspec_http::{serve, server::ServerConfig};
 
-```bash
-./target/release/docspec-http --host 0.0.0.0 --port 8080
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ServerConfig { host: "127.0.0.1".to_string(), port: 3000 };
+    serve(config).await?;
+    Ok(())
+}
 ```
+
+## Public API
+
+| Item | Kind | Description |
+| ---- | ---- | ----------- |
+| `serve(config: ServerConfig)` | async fn | Start the HTTP server with the given configuration. Runs until SIGINT or SIGTERM. |
+| `ServerConfig` | struct | Server bind configuration: `host: String`, `port: u16`. |
+| `cli::Args` | struct | Clap-derived argument struct for `--host` and `--port`. Useful when building a CLI that delegates to this library. |
+| `init_telemetry(dsn: Option<&str>)` | fn | Initialize Sentry integration. Call before `serve()` if you want error reporting. |
+| `init_tracing()` | fn | Initialize the tracing subscriber (stderr, INFO, pretty format). Call before `serve()`. |
+| `TelemetryGuard` | struct | Drop guard returned by `init_telemetry()`. Keep alive for the duration of the process to ensure Sentry flushes on exit. |
 
 ## Endpoints
 
@@ -28,59 +51,7 @@ Default host is `127.0.0.1`. Default port is `3000`.
 | GET     | /health     | Liveness check                                                   |
 | HEAD    | /health     | Liveness check (no body)                                         |
 | OPTIONS | /health     | Allowed methods                                                  |
-
-## curl Examples
-
-```bash
-# Convert markdown to BlockNote JSON (default)
-curl -X POST \
-     -H 'Content-Type: text/markdown' \
-     --data '# Hello World' \
-     http://localhost:3000/conversion
-
-# Convert HTML to BlockNote JSON
-curl -X POST \
-     -H 'Content-Type: text/html' \
-     --data '<p>Hello World</p>' \
-     http://localhost:3000/conversion
-
-# Convert markdown to HTML
-curl -X POST \
-     -H 'Content-Type: text/markdown' \
-     -H 'Accept: text/html' \
-     --data 'Hello World' \
-     http://localhost:3000/conversion
-
-# Convert markdown to oxa.dev JSON (opt-in via Accept)
-curl -X POST \
-     -H 'Content-Type: text/markdown' \
-     -H 'Accept: application/vnd.oxa+json' \
-     --data 'Hello World' \
-     http://localhost:3000/conversion
-
-# Convert markdown to Pandoc native syntax
-curl -X POST \
-     -H 'Content-Type: text/markdown' \
-     -H 'Accept: application/vnd.pandoc.native' \
-     --data 'Hello World' \
-     http://localhost:3000/conversion
-
-# Convert HTML to oxa.dev JSON
-curl -X POST \
-     -H 'Content-Type: text/html' \
-     -H 'Accept: application/vnd.oxa+json' \
-     --data '<p>Hello World</p>' \
-     http://localhost:3000/conversion
-
-# Check server health
-curl http://localhost:3000/health
-
-# HEAD health check (no body in response)
-curl -I http://localhost:3000/health
-
-# OPTIONS — see allowed methods
-curl -X OPTIONS -i http://localhost:3000/conversion
-```
+| GET     | /metrics    | Prometheus metrics in exposition format 0.0.4                    |
 
 ## Request / Response Headers
 
@@ -181,68 +152,6 @@ Mirrors `github.com/docspecio/api` v3.0.2 where feasible: same endpoint path, RF
 ## Graceful Shutdown
 
 The server handles SIGINT and SIGTERM. In-flight requests complete before the process exits.
-
-## Docker
-
-### Build
-
-```bash
-DOCKER_BUILDKIT=1 docker build \
-  --build-arg IMAGE_VERSION=0.1.0 \
-  --build-arg IMAGE_REVISION=$(git rev-parse HEAD) \
-  -t docspec-http:local .
-```
-
-Supply `IMAGE_VERSION` and `IMAGE_REVISION` at build time to populate the OCI labels. Both default to `0.1.0` and `unknown` if omitted.
-
-### Run
-
-```bash
-docker run --rm -p 3000:3000 ghcr.io/docspec/api:0.1.0
-```
-
-The default `CMD` passes `--host 0.0.0.0 --port 3000`. Override it entirely to change the bind address or port:
-
-```bash
-docker run --rm -p 8080:8080 ghcr.io/docspec/api:0.1.0 --host 0.0.0.0 --port 8080
-```
-
-### Healthcheck
-
-The image ships a built-in `HEALTHCHECK` that probes `GET http://127.0.0.1:3000/health` every 30 seconds using busybox `wget --spider`. Docker reports the container status in `docker ps` and Compose surfaces it via `healthcheck:`.
-
-**The probe port is hardcoded to `3000` inside the image.** If you override `CMD` to bind a different `--port`, the built-in healthcheck will keep probing 3000 and report the container as `unhealthy` even though the server is fine. To run on a non-default port, either:
-
-- Keep the in-container port at `3000` and only remap the host port (`-p 8080:3000`), **or**
-- Override the healthcheck at runtime, e.g. `docker run --health-cmd='wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/health || exit 1' …`, **or**
-- Disable it with `docker run --no-healthcheck …` and rely on an external probe.
-
-Kubernetes users should configure a Pod-level `httpGet` liveness probe on `/health` port 3000 instead of relying on the Docker `HEALTHCHECK`.
-
-### Image tags
-
-Images are published to `ghcr.io/docspec/api` by the release workflow (managed by release-please). The following tags are maintained:
-
-| Tag      | Meaning                      |
-| -------- | ---------------------------- |
-| `0.1.0`  | Exact version                |
-| `0.1`    | Latest patch of 0.1          |
-| `0`      | Latest minor of 0            |
-| `latest` | Most recent released version |
-
-`latest` follows the most recent GitHub release, not the `main` branch. The publish workflow is documented contract; it is not implemented in this repository.
-
-### Architecture
-
-The image is built for `linux/amd64` only. No multi-platform manifest is published.
-
-### User
-
-The container runs as non-root UID/GID `10001` (user `docspec`). No capabilities are required.
-
-### Reverse proxy
-
-TLS termination, CORS headers, authentication, and rate limiting are intentionally absent from the binary. Place a reverse proxy (nginx, Caddy, etc.) in front of the container for these concerns. See [Deployment Notes](#deployment-notes) for details.
 
 ## Metrics
 

@@ -9,10 +9,6 @@ description = "HTTP API server for DocSpec document conversion"
 keywords = ["document", "conversion", "streaming", "http", "api"]
 categories = ["network-programming", "web-programming"]
 
-[[bin]]
-name = "docspec-http"
-path = "src/bin/docspec-http.rs"
-
 # Docker (ghcr.io/docspec/api) is the canonical artifact; no prebuilt binary tarballs.
 [package.metadata.dist]
 dist = false
