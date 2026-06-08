@@ -22,7 +22,7 @@ fn run_pipeline<W: Write>(
     output_format: docspec::OutputFormat,
     output: W,
 ) -> Result<()> {
-    let reader = AnyReader::new(input_format, content);
+    let reader = AnyReader::from_str(input_format, content);
     let sink = AnyWriter::new(output_format, output);
     docspec_core::pipe(reader, sink).map_err(Into::into)
 }

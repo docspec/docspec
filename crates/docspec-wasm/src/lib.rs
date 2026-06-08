@@ -13,7 +13,7 @@ use wasm_bindgen::prelude::*;
 /// parse error, invalid event sequence, or JSON serialization error.
 #[wasm_bindgen]
 pub fn convert_markdown_to_blocknote(markdown: &str) -> core::result::Result<String, JsValue> {
-    let reader = docspec::AnyReader::new(docspec::InputFormat::Markdown, markdown);
+    let reader = docspec::AnyReader::from_str(docspec::InputFormat::Markdown, markdown);
     let mut output = Vec::new();
     let sink = docspec::AnyWriter::new(docspec::OutputFormat::Blocknote, &mut output);
     docspec_core::pipe(reader, sink).map_err(|e| JsValue::from_str(&e.to_string()))?;

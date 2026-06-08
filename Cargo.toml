@@ -33,6 +33,7 @@ docspec-blocknote-writer = { path = "crates/docspec-blocknote-writer", version =
 docspec-html-writer = { path = "crates/docspec-html-writer", version = "1.5.1" }
 docspec-oxa-writer = { path = "crates/docspec-oxa-writer", version = "1.5.1" }
 docspec-pandoc-native-writer = { path = "crates/docspec-pandoc-native-writer", version = "1.5.1" }
+self_cell = "1.2"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -213,4 +214,3 @@ publish-prereleases = false
 
 # Announcement settings
 announce-in-tag = true
-

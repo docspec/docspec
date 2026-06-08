@@ -18,9 +18,10 @@
 //! | `html`         | HTML (paragraphs only)                              | `readers::HtmlReader`       |
 //! | `docx`         | DOCX (paragraphs and text only)                     | `readers::DocxReader`       |
 //!
-//! Note: [`readers::DocxReader`] takes a binary file or any `Read + Seek` source rather
-//! than a `&str`, so it is not dispatched through the text-based [`AnyReader`] factory.
+//! Note: [`readers::DocxReader`] takes a binary file or any `Read + Seek` source.
 //! Construct it directly with `DocxReader::from_path` or `DocxReader::from_reader`.
+//! Support for dispatching `DocxReader` through [`AnyReader::from_reader`] is planned
+//! for a future release.
 //!
 //! ## Writers
 //!
@@ -75,7 +76,7 @@
 //! use docspec::{EventSink, EventSource, StackTrackingSink};
 //!
 //! let markdown = "# Hello\n\nWorld";
-//! let mut reader = MarkdownReader::new(markdown);
+//! let mut reader = MarkdownReader::from_str(markdown);
 //! let mut buf = Vec::<u8>::new();
 //! let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 //!
@@ -116,8 +117,9 @@ pub mod readers {
     pub use docspec_html_reader::HtmlReader;
 
     /// Streaming DOCX reader. Available when the `docx` feature is enabled.
-    /// Takes a file path or `Read + Seek` source (not `&str`), so it is not
-    /// dispatched through the text-based [`crate::AnyReader`] factory. Emits
+    /// Takes a file path or `Read + Seek` source. Construct it directly with
+    /// `DocxReader::from_path` or `DocxReader::from_reader`. `AnyReader::from_reader`
+    /// support is planned for a future release. Emits
     /// only paragraphs and text; styles, tables, lists, images, headers/footers,
     /// metadata, and tracked changes are silently dropped.
     #[cfg(feature = "docx")]

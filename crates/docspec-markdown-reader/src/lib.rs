@@ -11,7 +11,7 @@
 //! use docspec_markdown_reader::{MarkdownReader, EventSource};
 //!
 //! let markdown = "# Hello\n\nWorld";
-//! let mut reader = MarkdownReader::new(markdown);
+//! let mut reader = MarkdownReader::from_str(markdown);
 //!
 //! while let Some(event) = reader.next_event()? {
 //!     println!("{event:?}");
@@ -56,14 +56,46 @@
 //! - HTML blocks and inline HTML
 //! - Math blocks and inline math
 //! - Subscript and superscript formatting
+//!
+//! # Memory Model
+//!
+//! `MarkdownReader` owns its source text for the parser's lifetime. While events
+//! are emitted one at a time via [`EventSource::next_event`] (the stream-event
+//! guarantee is preserved), the source `String` is held in memory until the reader
+//! is dropped. This is a constraint of `pulldown-cmark`, which is permanently
+//! borrow-based by design (see [pulldown-cmark issue #463]).
+//!
+//! For contrast, `HtmlReader` (from `docspec-html-reader`) streams its source via a
+//! 16 KB sliding-window buffer and does not hold the full document in memory.
+//!
+//! [pulldown-cmark issue #463]: https://github.com/raphlinus/pulldown-cmark/issues/463
 
 extern crate alloc;
 
+#[cfg_attr(all(), allow(clippy::mem_forget))]
+mod parser_cell {
+    use self_cell::self_cell;
+
+    use super::MarkdownParser;
+
+    self_cell!(
+        pub(super) struct ParserCell {
+            owner: String,
+            #[covariant]
+            dependent: MarkdownParser,
+        }
+    );
+}
+
 use alloc::collections::VecDeque;
+use std::io::{Read, Seek};
 
 pub use docspec_core::EventSource;
 use docspec_core::{Depth, Event, ImageSource, ListStyleType, Result, TableHeaderScope, TextStyle};
+use parser_cell::ParserCell;
 use pulldown_cmark::{CodeBlockKind, CowStr, HeadingLevel, Options, Parser, Tag, TagEnd};
+
+struct MarkdownParser<'a>(Parser<'a>);
 
 /// Whether content is inside a block-level element.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -110,6 +142,45 @@ struct ImageBuffer {
     url: String,
 }
 
+enum MarkdownPulldownEvent {
+    Code(String),
+    End(TagEnd),
+    HardBreak,
+    Ignored,
+    Rule,
+    SoftBreak,
+    Start(MarkdownStartTag),
+    Text(String),
+}
+
+enum MarkdownStartTag {
+    BlockQuote,
+    CodeBlock {
+        syntax: Option<String>,
+    },
+    Emphasis,
+    Heading {
+        level: HeadingLevel,
+    },
+    Image {
+        dest_url: String,
+        title: Option<String>,
+    },
+    Item,
+    Link {
+        dest_url: String,
+        title: Option<String>,
+    },
+    List(Option<u64>),
+    Paragraph,
+    Strikethrough,
+    Strong,
+    Table,
+    TableCell,
+    TableHead,
+    TableRow,
+}
+
 /// Buffered link state during link inline content collection.
 struct LinkBuffer {
     /// Link target URL.
@@ -131,17 +202,19 @@ struct LinkBuffer {
 /// ```
 /// use docspec_markdown_reader::{MarkdownReader, EventSource};
 ///
-/// let mut reader = MarkdownReader::new("**bold** and *italic*");
+/// let mut reader = MarkdownReader::from_str("**bold** and *italic*");
 /// while let Some(event) = reader.next_event()? {
 ///     // Process events...
 /// }
 /// # Ok::<(), docspec_core::Error>(())
 /// ```
-pub struct MarkdownReader<'a> {
+pub struct MarkdownReader {
     /// Current block-level context.
     block_state: BlockState,
     /// Nesting depth for bold (strong) formatting.
     bold_depth: Depth,
+    /// Owned source text and parser borrowing from it.
+    cell: ParserCell,
     /// Buffered code block text (accumulated until `EndCodeBlock` to strip trailing newline).
     code_block_buffer: Option<String>,
     /// Buffered image being processed (alt text accumulation).
@@ -155,8 +228,6 @@ pub struct MarkdownReader<'a> {
     /// LIFO stack of list contexts. `len()` gives the current nesting depth;
     /// `level = list_stack.len().saturating_sub(1)` at item-emit time.
     list_stack: alloc::vec::Vec<ListContext>,
-    /// The pulldown-cmark parser.
-    parser: Parser<'a>,
     /// Document processing phase.
     phase: Phase,
     /// Queue of `DocSpec` events to emit.
@@ -165,7 +236,7 @@ pub struct MarkdownReader<'a> {
     strikethrough_depth: Depth,
 }
 
-impl<'a> MarkdownReader<'a> {
+impl MarkdownReader {
     fn close_current_item_if_open(&mut self) {
         if let Some(ctx) = self.list_stack.last_mut() {
             if ctx.item_open {
@@ -220,6 +291,61 @@ impl<'a> MarkdownReader<'a> {
             });
             self.block_state = BlockState::Explicit;
         }
+    }
+
+    fn from_owned_string(source: String) -> Self {
+        let options = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH;
+        let cell = ParserCell::new(source, |s| MarkdownParser(Parser::new_ext(s, options)));
+        Self {
+            block_state: BlockState::None,
+            bold_depth: Depth::default(),
+            cell,
+            code_block_buffer: None,
+            image: None,
+            in_table_head: false,
+            italic_depth: Depth::default(),
+            link: None,
+            list_stack: Vec::new(),
+            phase: Phase::NotStarted,
+            queue: VecDeque::new(),
+            strikethrough_depth: Depth::default(),
+        }
+    }
+
+    /// Creates a `MarkdownReader` from any `Read + Seek` source.
+    ///
+    /// Reads the entire source into memory (required by `pulldown_cmark`'s
+    /// borrow-based parser).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Io`](docspec_core::Error::Io) if reading fails.
+    #[inline]
+    pub fn from_reader<R: Read + Seek + Send + 'static>(mut reader: R) -> Result<Self> {
+        let mut source = String::new();
+        reader.read_to_string(&mut source)?;
+        Ok(Self::from_owned_string(source))
+    }
+
+    /// Creates a `MarkdownReader` from a string slice.
+    ///
+    /// The input is copied into an owned `String` for the parser's lifetime.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use docspec_markdown_reader::MarkdownReader;
+    ///
+    /// let reader = MarkdownReader::from_str("# Hello World");
+    /// ```
+    #[inline]
+    #[must_use]
+    #[expect(
+        clippy::should_implement_trait,
+        reason = "constructor name is required for reader API consistency"
+    )]
+    pub fn from_str(input: &str) -> Self {
+        Self::from_owned_string(input.to_owned())
     }
 
     fn handle_code(&mut self, content: String) {
@@ -400,11 +526,7 @@ impl<'a> MarkdownReader<'a> {
 
     /// Emits `StartPreformatted` for a code block opening tag, initialising
     /// the internal code-block buffer for content accumulation.
-    fn handle_start_code_block(&mut self, kind: CodeBlockKind<'a>) {
-        let syntax = match kind {
-            CodeBlockKind::Fenced(lang) if !lang.is_empty() => Some(lang.into_string()),
-            CodeBlockKind::Fenced(_) | CodeBlockKind::Indented => None,
-        };
+    fn handle_start_code_block(&mut self, syntax: Option<String>) {
         self.code_block_buffer = Some(String::new());
         self.push_event_start(Event::StartPreformatted { id: None, syntax });
     }
@@ -428,7 +550,7 @@ impl<'a> MarkdownReader<'a> {
     /// Initialises image state for alt-text accumulation when an image opening tag is
     /// encountered. The title is stored as `None` when the pulldown-cmark title string
     /// is empty.
-    fn handle_start_image(&mut self, dest_url: CowStr<'a>, title: CowStr<'a>) {
+    fn handle_start_image(&mut self, dest_url: String, title: Option<String>) {
         // Image-in-link extraction: close the link before processing the image so the
         // image can be emitted as a sibling block (BlockNote and similar schemas do not
         // allow block-level images inside inline links). When `link.started` is true, the
@@ -453,12 +575,8 @@ impl<'a> MarkdownReader<'a> {
 
         self.image = Some(ImageBuffer {
             alt_buf: String::new(),
-            title: if title.is_empty() {
-                None
-            } else {
-                Some(title.into_string())
-            },
-            url: dest_url.into_string(),
+            title,
+            url: dest_url,
         });
     }
 
@@ -466,15 +584,11 @@ impl<'a> MarkdownReader<'a> {
     ///
     /// Emission is deferred until the first inline event arrives (lazy emission).
     /// This allows image-in-link to be detected before any `StartLink` is emitted.
-    fn handle_start_link(&mut self, dest_url: CowStr<'a>, title: CowStr<'a>) {
+    fn handle_start_link(&mut self, dest_url: String, title: Option<String>) {
         self.link = Some(LinkBuffer {
-            href: dest_url.into_string(),
+            href: dest_url,
             started: false,
-            title: if title.is_empty() {
-                None
-            } else {
-                Some(title.into_string())
-            },
+            title,
         });
     }
 
@@ -509,36 +623,25 @@ impl<'a> MarkdownReader<'a> {
     /// Tags in the explicit ignore list below are known-unsupported elements whose
     /// structure is intentionally dropped (text content may still be extracted by
     /// other event handlers).
-    fn handle_start_tag(&mut self, tag: Tag<'a>) {
+    fn handle_start_tag(&mut self, tag: MarkdownStartTag) {
         match tag {
-            Tag::BlockQuote(_) => self.push_event_start(Event::StartBlockQuote { id: None }),
-            Tag::CodeBlock(kind) => self.handle_start_code_block(kind),
-            Tag::Emphasis => self.italic_depth.inc(),
-            Tag::Heading { level, .. } => self.handle_start_heading(level),
-            Tag::Image {
-                dest_url, title, ..
-            } => self.handle_start_image(dest_url, title),
-            Tag::Item => self.handle_item_start(),
-            Tag::Link {
-                dest_url, title, ..
-            } => self.handle_start_link(dest_url, title),
-            Tag::List(start_opt) => self.handle_list_start(start_opt),
-            Tag::Paragraph => self.block_state = BlockState::PendingExplicit,
-            Tag::Strikethrough => self.strikethrough_depth.inc(),
-            Tag::Strong => self.bold_depth.inc(),
-            Tag::Table(_) => self.push_event_start(Event::StartTable { id: None }),
-            Tag::TableCell => self.handle_start_table_cell(),
-            Tag::TableHead => self.handle_start_table_head(),
-            Tag::TableRow => self.push_event_start(Event::StartTableRow { id: None }),
-            // Tags intentionally ignored (structure dropped, text extracted elsewhere):
-            Tag::DefinitionList
-            | Tag::DefinitionListDefinition
-            | Tag::DefinitionListTitle
-            | Tag::FootnoteDefinition(_)
-            | Tag::HtmlBlock
-            | Tag::MetadataBlock(_)
-            | Tag::Subscript
-            | Tag::Superscript => {}
+            MarkdownStartTag::BlockQuote => {
+                self.push_event_start(Event::StartBlockQuote { id: None });
+            }
+            MarkdownStartTag::CodeBlock { syntax } => self.handle_start_code_block(syntax),
+            MarkdownStartTag::Emphasis => self.italic_depth.inc(),
+            MarkdownStartTag::Heading { level } => self.handle_start_heading(level),
+            MarkdownStartTag::Image { dest_url, title } => self.handle_start_image(dest_url, title),
+            MarkdownStartTag::Item => self.handle_item_start(),
+            MarkdownStartTag::Link { dest_url, title } => self.handle_start_link(dest_url, title),
+            MarkdownStartTag::List(start_opt) => self.handle_list_start(start_opt),
+            MarkdownStartTag::Paragraph => self.block_state = BlockState::PendingExplicit,
+            MarkdownStartTag::Strikethrough => self.strikethrough_depth.inc(),
+            MarkdownStartTag::Strong => self.bold_depth.inc(),
+            MarkdownStartTag::Table => self.push_event_start(Event::StartTable { id: None }),
+            MarkdownStartTag::TableCell => self.handle_start_table_cell(),
+            MarkdownStartTag::TableHead => self.handle_start_table_head(),
+            MarkdownStartTag::TableRow => self.push_event_start(Event::StartTableRow { id: None }),
         }
     }
 
@@ -563,41 +666,33 @@ impl<'a> MarkdownReader<'a> {
         }
     }
 
-    /// Creates a new `MarkdownReader` from the given Markdown string.
-    ///
-    /// The reader will emit `StartDocument` as its first event and `EndDocument`
-    /// as its last event, with the parsed content events in between.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use docspec_markdown_reader::MarkdownReader;
-    ///
-    /// let reader = MarkdownReader::new("# Hello World");
-    /// ```
-    #[inline]
-    #[must_use]
-    pub fn new(markdown: &'a str) -> Self {
-        let options = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH;
-        let parser = Parser::new_ext(markdown, options);
-        Self {
-            block_state: BlockState::None,
-            bold_depth: Depth::default(),
-            code_block_buffer: None,
-            image: None,
-            in_table_head: false,
-            italic_depth: Depth::default(),
-            link: None,
-            list_stack: Vec::new(),
-            parser,
-            phase: Phase::NotStarted,
-            queue: VecDeque::new(),
-            strikethrough_depth: Depth::default(),
-        }
+    fn next_pulldown_event(&mut self) -> Option<MarkdownPulldownEvent> {
+        self.cell.with_dependent_mut(|_, dep| {
+            dep.0.next().map(|event| match event {
+                pulldown_cmark::Event::Start(tag) => markdown_start_tag(tag)
+                    .map_or(MarkdownPulldownEvent::Ignored, MarkdownPulldownEvent::Start),
+                pulldown_cmark::Event::End(tag_end) => MarkdownPulldownEvent::End(tag_end),
+                pulldown_cmark::Event::Text(text) => {
+                    MarkdownPulldownEvent::Text(text.into_string())
+                }
+                pulldown_cmark::Event::Code(code) => {
+                    MarkdownPulldownEvent::Code(code.into_string())
+                }
+                pulldown_cmark::Event::HardBreak => MarkdownPulldownEvent::HardBreak,
+                pulldown_cmark::Event::SoftBreak => MarkdownPulldownEvent::SoftBreak,
+                pulldown_cmark::Event::Rule => MarkdownPulldownEvent::Rule,
+                pulldown_cmark::Event::DisplayMath(_)
+                | pulldown_cmark::Event::FootnoteReference(_)
+                | pulldown_cmark::Event::Html(_)
+                | pulldown_cmark::Event::InlineHtml(_)
+                | pulldown_cmark::Event::InlineMath(_)
+                | pulldown_cmark::Event::TaskListMarker(_) => MarkdownPulldownEvent::Ignored,
+            })
+        })
     }
 
     fn process_next_pulldown_event(&mut self) {
-        let Some(pm_event) = self.parser.next() else {
+        let Some(pm_event) = self.next_pulldown_event() else {
             if self.phase != Phase::Finished {
                 self.phase = Phase::Finished;
                 self.queue.push_back(Event::EndDocument);
@@ -606,11 +701,11 @@ impl<'a> MarkdownReader<'a> {
         };
 
         match pm_event {
-            pulldown_cmark::Event::Start(tag) => self.handle_start_tag(tag),
-            pulldown_cmark::Event::End(tag_end) => self.handle_end_tag(tag_end),
-            pulldown_cmark::Event::Text(text) => self.handle_text(text.into_string()),
-            pulldown_cmark::Event::Code(code) => self.handle_code(code.into_string()),
-            pulldown_cmark::Event::HardBreak => {
+            MarkdownPulldownEvent::Start(tag) => self.handle_start_tag(tag),
+            MarkdownPulldownEvent::End(tag_end) => self.handle_end_tag(tag_end),
+            MarkdownPulldownEvent::Text(text) => self.handle_text(text),
+            MarkdownPulldownEvent::Code(code) => self.handle_code(code),
+            MarkdownPulldownEvent::HardBreak => {
                 if let Some(img) = &mut self.image {
                     img.alt_buf.push(' ');
                 } else if self.block_state == BlockState::PendingExplicit {
@@ -620,7 +715,7 @@ impl<'a> MarkdownReader<'a> {
                     self.queue.push_back(Event::LineBreak);
                 }
             }
-            pulldown_cmark::Event::SoftBreak => {
+            MarkdownPulldownEvent::SoftBreak => {
                 if let Some(img) = &mut self.image {
                     img.alt_buf.push(' ');
                 } else if self.block_state == BlockState::PendingExplicit {
@@ -630,15 +725,10 @@ impl<'a> MarkdownReader<'a> {
                     self.queue.push_back(Event::SoftBreak);
                 }
             }
-            pulldown_cmark::Event::Rule => {
+            MarkdownPulldownEvent::Rule => {
                 self.queue.push_back(Event::ThematicBreak { id: None });
             }
-            pulldown_cmark::Event::DisplayMath(_)
-            | pulldown_cmark::Event::FootnoteReference(_)
-            | pulldown_cmark::Event::Html(_)
-            | pulldown_cmark::Event::InlineHtml(_)
-            | pulldown_cmark::Event::InlineMath(_)
-            | pulldown_cmark::Event::TaskListMarker(_) => {}
+            MarkdownPulldownEvent::Ignored => {}
         }
     }
 
@@ -656,7 +746,7 @@ impl<'a> MarkdownReader<'a> {
     }
 }
 
-impl EventSource for MarkdownReader<'_> {
+impl EventSource for MarkdownReader {
     #[inline]
     fn next_event(&mut self) -> Result<Option<Event>> {
         if self.phase == Phase::NotStarted {
@@ -680,13 +770,68 @@ impl EventSource for MarkdownReader<'_> {
     }
 }
 
+fn markdown_start_tag(tag: Tag<'_>) -> Option<MarkdownStartTag> {
+    match tag {
+        Tag::BlockQuote(_) => Some(MarkdownStartTag::BlockQuote),
+        Tag::CodeBlock(kind) => Some(MarkdownStartTag::CodeBlock {
+            syntax: code_block_syntax(kind),
+        }),
+        Tag::Emphasis => Some(MarkdownStartTag::Emphasis),
+        Tag::Heading { level, .. } => Some(MarkdownStartTag::Heading { level }),
+        Tag::Image {
+            dest_url, title, ..
+        } => Some(MarkdownStartTag::Image {
+            dest_url: dest_url.into_string(),
+            title: cow_to_optional_string(title),
+        }),
+        Tag::Item => Some(MarkdownStartTag::Item),
+        Tag::Link {
+            dest_url, title, ..
+        } => Some(MarkdownStartTag::Link {
+            dest_url: dest_url.into_string(),
+            title: cow_to_optional_string(title),
+        }),
+        Tag::List(start_opt) => Some(MarkdownStartTag::List(start_opt)),
+        Tag::Paragraph => Some(MarkdownStartTag::Paragraph),
+        Tag::Strikethrough => Some(MarkdownStartTag::Strikethrough),
+        Tag::Strong => Some(MarkdownStartTag::Strong),
+        Tag::Table(_) => Some(MarkdownStartTag::Table),
+        Tag::TableCell => Some(MarkdownStartTag::TableCell),
+        Tag::TableHead => Some(MarkdownStartTag::TableHead),
+        Tag::TableRow => Some(MarkdownStartTag::TableRow),
+        Tag::DefinitionList
+        | Tag::DefinitionListDefinition
+        | Tag::DefinitionListTitle
+        | Tag::FootnoteDefinition(_)
+        | Tag::HtmlBlock
+        | Tag::MetadataBlock(_)
+        | Tag::Subscript
+        | Tag::Superscript => None,
+    }
+}
+
+fn code_block_syntax(kind: CodeBlockKind<'_>) -> Option<String> {
+    match kind {
+        CodeBlockKind::Fenced(lang) if !lang.is_empty() => Some(lang.into_string()),
+        CodeBlockKind::Fenced(_) | CodeBlockKind::Indented => None,
+    }
+}
+
+fn cow_to_optional_string(value: CowStr<'_>) -> Option<String> {
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.into_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn handle_code_without_open_block_auto_opens_paragraph() {
-        let mut reader = MarkdownReader::new("");
+        let mut reader = MarkdownReader::from_str("");
         reader.handle_code("code".to_string());
 
         assert_eq!(reader.queue.len(), 2);
@@ -708,7 +853,7 @@ mod tests {
 
     #[test]
     fn handle_text_without_open_block_auto_opens_paragraph() {
-        let mut reader = MarkdownReader::new("");
+        let mut reader = MarkdownReader::from_str("");
         reader.handle_text("hello".to_string());
 
         assert_eq!(reader.queue.len(), 2);
@@ -726,5 +871,15 @@ mod tests {
                 style: TextStyle::default(),
             })
         );
+    }
+}
+
+#[cfg(test)]
+mod send_static_assertions {
+    fn assert_send_static<T: Send + 'static>() {}
+
+    #[test]
+    fn markdown_reader_is_send_static() {
+        assert_send_static::<crate::MarkdownReader>();
     }
 }
