@@ -1,6 +1,6 @@
 [package]
 name = "docspec-markdown-reader"
-version = "1.0.2"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -10,7 +10,7 @@ keywords = ["document", "conversion", "streaming", "markdown"]
 categories = ["parsing"]
 
 [dependencies]
-docspec-core = { path = "../docspec-core", version = "1.0.0" }
+docspec-core = { workspace = true }
 pulldown-cmark = "0.13"
 
 [lints]

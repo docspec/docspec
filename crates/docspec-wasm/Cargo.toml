@@ -1,6 +1,6 @@
 [package]
 name = "docspec-wasm"
-version = "1.0.2"
+version.workspace = true
 publish = false
 edition.workspace = true
 license.workspace = true
@@ -15,8 +15,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = "0.2"
-docspec-core = { path = "../docspec-core", version = "1.0.0" }
-docspec = { path = "../docspec", version = "1.0.1", features = ["markdown", "blocknote"] }
+docspec-core = { workspace = true }
+docspec = { workspace = true, features = ["markdown", "blocknote"] }
 
 [lints.rust]
 unsafe_code = "forbid"

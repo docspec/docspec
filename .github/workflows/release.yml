@@ -1,0 +1,225 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+  id-token: write
+  packages: write
+  attestations: write
+
+jobs:
+  # 1. PLAN: Determine what to build (cargo-dist)
+  plan:
+    name: Plan release
+    runs-on: ubuntu-latest
+    outputs:
+      manifest: ${{ steps.plan.outputs.manifest }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-dist
+        run: cargo install cargo-dist --locked --version 0.32.0
+
+      - name: Plan release
+        id: plan
+        run: |
+          cargo dist plan --output-format=json > dist-manifest.json
+          {
+            echo 'manifest<<EOF'
+            cat dist-manifest.json
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-manifest
+          path: dist-manifest.json
+
+  # 2. BUILD: Compile binaries (cargo-dist matrix)
+  build:
+    name: Build ${{ matrix.target }}
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.manifest).build-matrix }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cargo-dist
+        run: cargo install cargo-dist --locked --version 0.32.0
+
+      - name: Build binaries
+        run: cargo dist build --target=${{ matrix.target }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.target }}
+          path: target/dist
+
+  # 3. ATTEST: Generate SLSA L2 provenance (GitHub Artifact Attestations)
+  attest:
+    name: Generate attestations
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate artifact attestations
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: 'artifacts/artifacts-*/*'
+
+  # 4. SIGN: Sign binaries with cosign (keyless)
+  sign:
+    name: Sign binaries
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4.1.2
+        with:
+          cosign-release: "v2.4.0"
+
+      - name: Sign binaries with cosign (keyless)
+        run: |
+          set -euo pipefail
+          for artifact_dir in artifacts/artifacts-*/; do
+            for binary in "${artifact_dir}"*; do
+              if [ -f "${binary}" ] && [ -x "${binary}" ]; then
+                echo "Signing: ${binary}"
+                cosign sign-blob \
+                  --bundle "${binary}.bundle" \
+                  --yes \
+                  "${binary}"
+              fi
+            done
+          done
+
+      - name: Upload signed artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-artifacts
+          path: artifacts
+
+  # 5. DOCKER: Build and push Docker image (docspec-http)
+  docker:
+    name: Build and push Docker image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          # Handle both v1.2.3 and component-v1.2.3 formats
+          VERSION="${TAG##*-v}"
+          VERSION="${VERSION#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/docspec/api
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.version.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.version }}
+            type=semver,pattern={{major}},value=${{ steps.version.outputs.version }}
+            type=raw,value=latest,enable=${{ !contains(steps.version.outputs.version, '-') }}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            IMAGE_VERSION=${{ steps.version.outputs.version }}
+            IMAGE_REVISION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4.1.2
+        with:
+          cosign-release: "v2.4.0"
+
+      - name: Sign Docker image with cosign (keyless)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          cosign sign --yes "ghcr.io/docspec/api@${DIGEST}"
+
+      - name: Generate Docker image attestation
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ghcr.io/docspec/api
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  # 7. RELEASE: Create GitHub Release with all artifacts
+  release:
+    name: Create GitHub Release
+    needs: [plan, build, attest, sign, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-artifacts/artifacts-*/*
+            release-artifacts/signed-artifacts/**/*
+            release-artifacts/dist-manifest/dist-manifest.json
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') }}
+          append_body: false
+          make_latest: 'true'

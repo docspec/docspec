@@ -16,9 +16,21 @@ members = [
 ]
 
 [workspace.package]
+version = "1.5.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/docspec/docspec"
+
+[workspace.dependencies]
+docspec = { path = "crates/docspec", version = "1.5.0" }
+docspec-core = { path = "crates/docspec-core", version = "1.5.0" }
+docspec-json = { path = "crates/docspec-json", version = "1.5.0" }
+docspec-markdown-reader = { path = "crates/docspec-markdown-reader", version = "1.5.0" }
+docspec-html-reader = { path = "crates/docspec-html-reader", version = "1.5.0" }
+docspec-docx-reader = { path = "crates/docspec-docx-reader", version = "1.5.0" }
+docspec-blocknote-writer = { path = "crates/docspec-blocknote-writer", version = "1.5.0" }
+docspec-html-writer = { path = "crates/docspec-html-writer", version = "1.5.0" }
+docspec-oxa-writer = { path = "crates/docspec-oxa-writer", version = "1.5.0" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -148,4 +160,50 @@ unnecessary_wraps = "allow"
 # Reason: AnyReader enum variants (HtmlReader, MarkdownReader) are large but must be stack-allocated for zero heap allocation and zero virtual-dispatch overhead per MANIFESTO.md. Boxing would violate the design constraint.
 large_enum_variant = "allow"
 
+[workspace.metadata.dist]
+# Cargo-dist version
+cargo-dist-version = "0.32.0"
+
+# Allow dirty state (workflow file is auto-generated)
+allow-dirty = ["ci"]
+
+# CI provider
+ci = ["github"]
+
+# Build targets (standard Rust CLI platforms, 2026)
+targets = [
+  # Linux
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-unknown-linux-musl",
+  "aarch64-unknown-linux-musl",
+  
+  # macOS
+  "x86_64-apple-darwin",
+  "aarch64-apple-darwin",
+  
+  # Windows
+  "x86_64-pc-windows-msvc",
+  "aarch64-pc-windows-msvc",
+]
+
+# Installers to generate
+installers = ["shell", "powershell"]
+
+# Archive format
+windows-archive = ".zip"
+unix-archive = ".tar.xz"
+
+# Checksum algorithm
+checksum = "sha256"
+
+# Build settings
+build-local = false
+local-artifacts-archive = ".tar.xz"
+
+# Publish settings
+publish-prereleases = false
+
+# Announcement settings
+announce-in-tag = true
 
