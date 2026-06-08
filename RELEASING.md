@@ -28,8 +28,8 @@ The typical release flows like this:
 2. release-plz detects the new commit and opens a release PR. The PR contains the proposed version bump and an updated `CHANGELOG.md`.
 3. A maintainer reviews the release PR (see the next section for what to check).
 4. The maintainer merges the release PR.
-5. The `release-plz-release.yml` workflow runs release-plz, which tags `vX.Y.Z` and publishes all 11 publishable crates to crates.io in topological order, with a 30-minute retry wrapper to handle index propagation lag.
-6. If release-plz reports that a release was created, the same workflow calls `docker.yml` to build, push, sign, and attest the Docker image. The Docker image tags strip the Git tag's `v` prefix, so `v1.5.0` publishes `ghcr.io/docspec/api:1.5.0` plus `1.5`, `1`, and `latest`.
+5. The `release-plz-release` job inside `ci.yml` runs after every other CI job (`test`, `clippy`, `fmt`, `docker-build`) passes on `main`. It executes release-plz, which tags `vX.Y.Z` and publishes all 11 publishable crates to crates.io in topological order, with a 30-minute retry wrapper to handle index propagation lag.
+6. If release-plz reports that a release was created, the `docker-publish` job (also in `ci.yml`) calls `docker.yml` to build, push, sign, and attest the Docker image. The Docker image tags strip the Git tag's `v` prefix, so `v1.5.0` publishes `ghcr.io/docspec/api:1.5.0` plus `1.5`, `1`, and `latest`.
 
 From merge to fully published artifacts typically takes 30 to 60 minutes, depending on crates.io index propagation.
 
@@ -57,7 +57,7 @@ For each of the 11 publishable crates, add two Trusted Publishing entries:
 4. Fill in the form for the automated release workflow:
    - **Repository owner**: `docspec`
    - **Repository name**: `docspec`
-   - **Workflow filename**: `release-plz-release.yml`
+   - **Workflow filename**: `ci.yml`
    - **Environment**: `release`
 5. Save.
 6. Click **Add a publisher** again.
@@ -72,11 +72,17 @@ The 11 publishable crates are: `docspec-core`, `docspec-json`, `docspec-markdown
 
 `docspec-wasm` is **not** configured for Trusted Publishing. It has `publish = false` and never reaches crates.io.
 
-## Trusted Publishing Migration from publish-crates.yml
+## Trusted Publishing Filename Migrations
 
-If Trusted Publishing was previously configured pointing to the old `publish-crates.yml` workflow filename, you need to update each crate's TP config to trust both current publishing workflows.
+Trusted Publishing identity is `{repo owner, repo name, workflow filename, environment}`. Any change to the workflow filename invalidates existing TP configs on crates.io. DocSpec has gone through two filename migrations:
 
-On crates.io, go to each crate's **Settings** > **Trusted Publishing**, delete the old entry pointing to `publish-crates.yml`, and add entries for `release-plz-release.yml` and `publish-crate-manual.yml` as workflow filenames. The environment name (`release`) stays the same for both entries.
+1. **`publish-crates.yml` → `release-plz-release.yml`** when we adopted release-plz as the primary publishing driver.
+2. **`release-plz-release.yml` → `ci.yml`** when we consolidated the release pipeline as downstream jobs of CI (via `needs:`) so release-plz can never publish from a red commit.
+
+If your crate's TP config still points at any old filename, update it now. On crates.io, go to each crate's **Settings** > **Trusted Publishing**, delete entries pointing to obsolete filenames, and ensure the following two entries exist:
+
+- Workflow filename `ci.yml`, environment `release` (used by the automated release pipeline).
+- Workflow filename `publish-crate-manual.yml`, environment `release` (used by the manual single-crate publish workflow).
 
 Failing to update means the OIDC token exchange will fail silently when the new workflow runs. The publish step will error with an authentication failure. There is no fallback: the legacy `CARGO_REGISTRY_TOKEN` path was removed when we migrated to Trusted Publishing. Fix the TP config on crates.io and re-run the workflow.
 
@@ -107,7 +113,7 @@ To verify the Docker image:
 
 ```bash
 cosign verify \
-  --certificate-identity-regexp "https://github.com/docspec/docspec/.github/workflows/release-plz-release.yml" \
+  --certificate-identity-regexp "https://github.com/docspec/docspec/.github/workflows/ci.yml" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
   ghcr.io/docspec/api:1.5.0
 ```
@@ -132,9 +138,9 @@ If propagation takes longer than the configured timeout, the workflow will fail.
 
 **Single-crate emergency publish.** If you need to publish one crate outside the normal release cycle (for example, to push a security fix to a single crate before the full release machinery runs), use the `publish-crate-manual.yml` workflow. Trigger it from the Actions tab, select the crate name, and confirm. This workflow also uses Trusted Publishing, so no token is needed.
 
-**Re-running a failed release.** release-plz is idempotent: it checks whether each crate is already published at the target version before attempting to publish. Re-running `release-plz-release.yml` after a partial failure is safe. Go to the Actions tab, find the failed run, and click "Re-run all jobs".
+**Re-running a failed release.** release-plz is idempotent: it checks whether each crate is already published at the target version before attempting to publish. Re-running the failed CI workflow run on `main` after a partial failure is safe. Go to the Actions tab, find the failed `CI` run on `main`, and click "Re-run all jobs" (or "Re-run failed jobs"). The CI checks (`test`, `clippy`, `fmt`, `docker-build`) re-execute and the release jobs follow, skipping anything already published.
 
-**Deleting a stuck release PR.** If a release PR is stale or was opened in error, close it without merging. release-plz will open a fresh one the next time it runs (triggered by the next commit to `main`, or manually via workflow dispatch).
+**Deleting a stuck release PR.** If a release PR is stale or was opened in error, close it without merging. release-plz will open a fresh one the next time it runs (triggered by the next commit to `main`).
 
 ## Yank Policy
 
@@ -158,7 +164,7 @@ Announce the yank in the GitHub Release notes and open a tracking issue.
 
 **Tag pushed but workflow failed.** The tag is sticky; pushing it again won't help. Instead, go to the Actions tab and re-run the failed workflow. The workflow is idempotent: it skips already-published crates and already-built artifacts.
 
-**Crate publish failed halfway.** Re-run `release-plz-release.yml`. It will skip the crates already published and retry the ones that failed.
+**Crate publish failed halfway.** Re-run the failed `CI` workflow run on `main`. The `release-plz-release` job will skip the crates already published and retry the ones that failed.
 
 **Wrong tag pushed by mistake.** Delete the release and the tag, then push the correct tag:
 
@@ -173,13 +179,13 @@ git push origin v1.5.0
 
 **release-plz opened a release PR with the wrong version.** Close the PR without merging. Fix the commit messages that caused the wrong version calculation (usually a `BREAKING CHANGE` footer that shouldn't be there, or a missing one). Push a fixup commit to `main` and let release-plz open a fresh PR.
 
-**Trusted Publishing OIDC failure.** Check that the workflow filename in the crates.io TP config matches the failing workflow exactly (`release-plz-release.yml` for automated releases, or `publish-crate-manual.yml` for emergency single-crate publishes), the environment name is `release`, and the repository owner and name are correct. A single character mismatch causes a silent OIDC failure.
+**Trusted Publishing OIDC failure.** Check that the workflow filename in the crates.io TP config matches the failing workflow exactly (`ci.yml` for automated releases, or `publish-crate-manual.yml` for emergency single-crate publishes), the environment name is `release`, and the repository owner and name are correct. A single character mismatch causes a silent OIDC failure.
 
 ## WASM and Future npm Distribution
 
 `docspec-wasm` is `publish = false`. The crate is tagged at the ecosystem version with every release, so it stays in sync with the rest of the workspace, but it never reaches crates.io.
 
-Today, there is no npm distribution. The wasm crate exists as a foundation for future browser and Node.js integration. When npm distribution is added, the team will need to decide whether to ship raw wasm-pack output or introduce a hand-written TypeScript wrapper that provides a more ergonomic API. Either way, the npm publish step will be a separate workflow, not part of `release-plz-release.yml`.
+Today, there is no npm distribution. The wasm crate exists as a foundation for future browser and Node.js integration. When npm distribution is added, the team will need to decide whether to ship raw wasm-pack output or introduce a hand-written TypeScript wrapper that provides a more ergonomic API. Either way, the npm publish step will be a separate workflow, not part of `ci.yml`.
 
 The ecosystem version tag (`vX.Y.Z`) will continue to apply to `docspec-wasm` even after npm distribution is added. The npm package version may or may not track the ecosystem version exactly, depending on how the TypeScript API evolves independently.
 

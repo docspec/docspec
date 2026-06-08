@@ -50,3 +50,117 @@ jobs:
       actions: write
     with:
       push: false
+
+  # ---------------------------------------------------------------------------
+  # Release pipeline (only runs on push to main of the upstream repo).
+  # Gated on CI success via `needs:` so we never publish from a red commit.
+  # PRs and forks short-circuit via the `if:` expressions below.
+  # ---------------------------------------------------------------------------
+
+  release-plz-pr:
+    name: Open / update release PR
+    needs: [test, clippy, fmt, docker-build]
+    if: >-
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && github.repository == 'docspec/docspec'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # push to the release-plz branch
+      pull-requests: write  # open / update the release PR
+    # Prevent concurrent runs from racing each other on the same release PR.
+    concurrency:
+      group: release-plz-pr-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Run release-plz (release-pr)
+        uses: release-plz/action@v0.5
+        with:
+          command: release-pr
+          config: release-plz.toml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-plz-release:
+    name: Tag and publish crates
+    needs: [test, clippy, fmt, docker-build]
+    if: >-
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && github.repository == 'docspec/docspec'
+    runs-on: ubuntu-latest
+    # Bind to the `release` GitHub environment (created by maintainers).
+    # This allows future addition of secrets / branch protection without
+    # changing the workflow. No approval gate is configured (per plan §6).
+    environment: release
+    outputs:
+      releases_created: ${{ steps.release-plz.outputs.releases_created }}
+      release_tag: ${{ steps.release-tag.outputs.tag }}
+    permissions:
+      contents: write       # create git tag + GitHub Release
+      pull-requests: read   # detect merged release PR (release_always = false in release-plz.toml)
+      id-token: write       # OIDC for crates.io Trusted Publishing and cosign
+    # Idempotent if the release PR is merged twice or this workflow is re-run.
+    concurrency:
+      group: release-plz-release-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Trusted Publishing (OIDC) is the only auth path — release-plz
+      # mints a short-lived token from crates.io via the workflow's
+      # id-token: write permission. No long-lived secret is needed.
+      #
+      # IMPORTANT: the Trusted Publisher config on crates.io must pin
+      # the workflow filename to `ci.yml` and the environment to `release`.
+      - name: Run release-plz (release)
+        id: release-plz
+        uses: release-plz/action@v0.5
+        with:
+          command: release
+          config: release-plz.toml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract release tag for Docker publish
+        id: release-tag
+        if: steps.release-plz.outputs.releases_created == 'true'
+        env:
+          RELEASES: ${{ steps.release-plz.outputs.releases }}
+        run: |
+          set -euo pipefail
+          tag=$(jq -r 'map(select(.package_name == "docspec"))[0].tag // .[0].tag // empty' <<<"${RELEASES}")
+          if [ -z "${tag}" ]; then
+            echo "release-plz reported a release but no release tag was found" >&2
+            exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+  docker-publish:
+    name: Publish Docker image
+    needs: release-plz-release
+    if: needs.release-plz-release.outputs.releases_created == 'true'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      actions: write
+    uses: ./.github/workflows/docker.yml
+    with:
+      push: true
+      sign: true
+      ref: ${{ needs.release-plz-release.outputs.release_tag }}
+      tag_name: ${{ needs.release-plz-release.outputs.release_tag }}
