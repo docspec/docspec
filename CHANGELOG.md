@@ -12,6 +12,13 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.7.1](https://github.com/docspec/docspec/compare/v1.7.0...v1.7.1) - 2026-06-09
+
+### Fixed
+
+- *(blocknote-writer)* skip default color props
+- *(blocknote-writer)* skip default text alignment
+
 ## [1.7.0](https://github.com/docspec/docspec/compare/v1.6.0...v1.7.0) - 2026-06-09
 
 ### Added
