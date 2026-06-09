@@ -55,6 +55,7 @@
 
 extern crate alloc;
 
+mod properties;
 mod rels;
 
 use alloc::collections::VecDeque;
@@ -63,8 +64,8 @@ use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 
 pub use docspec_core::EventSource;
-use docspec_core::{Error, Event, Result, TextStyle};
-use quick_xml::events::{BytesCData, BytesRef, BytesText};
+use docspec_core::{Error, Event, Result, TextAlignment, TextStyle};
+use quick_xml::events::{BytesCData, BytesRef, BytesStart, BytesText};
 
 /// Document processing phase.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -94,6 +95,10 @@ enum Phase {
 ///
 /// Returns [`Error::Io`] for I/O failures and [`Error::Parse`] for malformed
 /// archives or XML.
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "DocxReader tracks six independent boolean parser states; grouping them would obscure the streaming state machine"
+)]
 pub struct DocxReader {
     /// Reusable buffer for quick-xml event reading.
     buf: Vec<u8>,
@@ -105,12 +110,26 @@ pub struct DocxReader {
     in_paragraph: bool,
     /// Whether the reader is currently inside a `<w:t>` element.
     in_text: bool,
+    /// Whether currently inside a `<w:pPr>` element that is still legal (first child of paragraph).
+    in_ppr: bool,
+    /// Paragraph alignment captured from `<w:jc>` while inside `<w:pPr>`.
+    pending_paragraph_alignment: Option<TextAlignment>,
+    /// True once `StartParagraph` has been queued for the current paragraph.
+    paragraph_started_emitted: bool,
+    /// Whether currently inside a `<w:rPr>` element that is still legal (first child of run).
+    in_rpr: bool,
+    /// Run style accumulated while inside `<w:rPr>`.
+    pending_run_style: TextStyle,
     /// Text collected for the current `<w:t>` element.
     pending_text: String,
+    /// Run style frozen at `</w:rPr>`, applied to subsequent text emissions in the same run.
+    current_run_style: TextStyle,
     /// Document processing phase.
     phase: Phase,
     /// Queue of `DocSpec` events to emit.
     queue: VecDeque<Event>,
+    /// True once the first content event of the current run has been queued.
+    run_content_emitted: bool,
     /// The quick-xml reader streaming from the document entry.
     xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
 }
@@ -123,9 +142,19 @@ impl fmt::Debug for DocxReader {
             .field("in_ignored_subtree", &self.in_ignored_subtree)
             .field("in_paragraph", &self.in_paragraph)
             .field("in_text", &self.in_text)
+            .field("in_ppr", &self.in_ppr)
+            .field(
+                "pending_paragraph_alignment",
+                &self.pending_paragraph_alignment,
+            )
+            .field("paragraph_started_emitted", &self.paragraph_started_emitted)
+            .field("in_rpr", &self.in_rpr)
+            .field("pending_run_style", &self.pending_run_style)
             .field("pending_text", &self.pending_text)
+            .field("current_run_style", &self.current_run_style)
             .field("phase", &"<phase>")
             .field("queue", &self.queue)
+            .field("run_content_emitted", &self.run_content_emitted)
             .field("xml", &"<quick_xml::Reader>")
             .finish()
     }
@@ -208,9 +237,16 @@ impl DocxReader {
             in_ignored_subtree: 0,
             in_paragraph: false,
             in_text: false,
+            in_ppr: false,
+            pending_paragraph_alignment: None,
+            paragraph_started_emitted: false,
+            in_rpr: false,
+            pending_run_style: TextStyle::default(),
             pending_text: String::new(),
+            current_run_style: TextStyle::default(),
             phase: Phase::NotStarted,
             queue: VecDeque::new(),
+            run_content_emitted: false,
             xml,
         })
     }
@@ -222,12 +258,16 @@ impl DocxReader {
     }
 
     fn emit_line_break(&mut self) {
+        self.ensure_paragraph_started();
         self.flush_pending_text();
+        self.run_content_emitted = true;
         self.queue.push_back(Event::LineBreak);
     }
 
     fn emit_tab(&mut self) {
+        self.ensure_paragraph_started();
         self.flush_pending_text();
+        self.run_content_emitted = true;
         self.queue.push_back(Event::Text {
             content: "\t".to_string(),
             style: TextStyle::default(),
@@ -235,17 +275,21 @@ impl DocxReader {
     }
 
     fn end_paragraph(&mut self) {
+        self.ensure_paragraph_started();
         self.queue.push_back(Event::EndParagraph);
         self.in_paragraph = false;
         self.in_text = false;
         self.pending_text.clear();
+        self.in_ppr = false;
+        self.pending_paragraph_alignment = None;
+        self.paragraph_started_emitted = false;
     }
 
     fn flush_pending_text(&mut self) {
         if !self.pending_text.is_empty() {
             self.queue.push_back(Event::Text {
                 content: core::mem::take(&mut self.pending_text),
-                style: TextStyle::default(),
+                style: self.current_run_style.clone(),
             });
         }
     }
@@ -260,9 +304,51 @@ impl DocxReader {
         Ok(())
     }
 
-    fn handle_empty(&mut self, local: &[u8]) {
+    fn handle_empty(&mut self, tag: &BytesStart<'_>) {
+        let local_name = tag.local_name();
+        let local = local_name.as_ref();
         match local {
             value if self.in_ignored_subtree > 0 || is_ignored_container(value) => {}
+            b"pPr" if self.in_paragraph && !self.paragraph_started_emitted => {
+                self.ensure_paragraph_started();
+            }
+            b"jc" if self.in_ppr => {
+                let val = read_val_attribute(tag);
+                self.pending_paragraph_alignment =
+                    val.as_deref().and_then(properties::parse_alignment);
+            }
+            b"rPr" if self.in_ppr => {}
+            b"rPr" if self.in_paragraph && !self.in_ppr && !self.in_rpr => {}
+            b"b" if self.in_rpr => {
+                self.pending_run_style.bold = parse_on_off_attribute(tag);
+            }
+            b"i" if self.in_rpr => {
+                self.pending_run_style.italic = parse_on_off_attribute(tag);
+            }
+            b"strike" | b"dstrike" if self.in_rpr => {
+                self.pending_run_style.strikethrough = parse_on_off_attribute(tag);
+            }
+            b"u" if self.in_rpr => {
+                let val = read_val_attribute(tag);
+                self.pending_run_style.underline = properties::parse_underline_on(val.as_deref());
+            }
+            b"vertAlign" if self.in_rpr => {
+                let val = read_val_attribute(tag);
+                match properties::parse_vert_align(val.as_deref()) {
+                    properties::VertAlign::Subscript => {
+                        self.pending_run_style.subscript = true;
+                        self.pending_run_style.superscript = false;
+                    }
+                    properties::VertAlign::Superscript => {
+                        self.pending_run_style.superscript = true;
+                        self.pending_run_style.subscript = false;
+                    }
+                    properties::VertAlign::None => {
+                        self.pending_run_style.subscript = false;
+                        self.pending_run_style.superscript = false;
+                    }
+                }
+            }
             b"p" if !self.in_paragraph => {
                 self.queue.push_back(Event::StartParagraph {
                     alignment: None,
@@ -284,6 +370,20 @@ impl DocxReader {
 
         match local {
             b"p" if self.in_paragraph => self.end_paragraph(),
+            b"pPr" if self.in_ppr => {
+                self.ensure_paragraph_started();
+                self.in_ppr = false;
+            }
+            b"rPr" if self.in_rpr => {
+                self.current_run_style = self.pending_run_style.clone();
+                self.in_rpr = false;
+            }
+            b"r" => {
+                self.current_run_style = TextStyle::default();
+                self.pending_run_style = TextStyle::default();
+                self.run_content_emitted = false;
+                self.in_rpr = false;
+            }
             b"t" if self.in_text => {
                 self.flush_pending_text();
                 self.in_text = false;
@@ -319,7 +419,9 @@ impl DocxReader {
         Ok(())
     }
 
-    fn handle_start(&mut self, local: &[u8]) {
+    fn handle_start(&mut self, tag: &BytesStart<'_>) {
+        let local_name = tag.local_name();
+        let local = local_name.as_ref();
         if self.in_ignored_subtree > 0 {
             self.in_ignored_subtree = self.in_ignored_subtree.saturating_add(1);
             return;
@@ -327,10 +429,71 @@ impl DocxReader {
 
         match local {
             value if is_ignored_container(value) => self.in_ignored_subtree = 1,
+            b"pPr" if self.in_paragraph => {
+                if self.paragraph_started_emitted {
+                    // Out-of-order pPr: StartParagraph already emitted; silently consume
+                    self.in_ignored_subtree = 1;
+                } else {
+                    self.in_ppr = true;
+                    self.pending_paragraph_alignment = None;
+                }
+            }
+            b"jc" if self.in_ppr => {
+                let val = read_val_attribute(tag);
+                self.pending_paragraph_alignment =
+                    val.as_deref().and_then(properties::parse_alignment);
+            }
+            b"rPr" if self.in_ppr => {
+                self.in_ignored_subtree = 1;
+            }
+            b"rPr" if self.in_paragraph && !self.in_ppr && !self.in_rpr => {
+                if self.run_content_emitted {
+                    // Out-of-order rPr: content already emitted in this run; silently consume
+                    self.in_ignored_subtree = 1;
+                } else {
+                    self.in_rpr = true;
+                    self.pending_run_style = TextStyle::default();
+                }
+            }
+            b"b" if self.in_rpr => {
+                self.pending_run_style.bold = parse_on_off_attribute(tag);
+            }
+            b"i" if self.in_rpr => {
+                self.pending_run_style.italic = parse_on_off_attribute(tag);
+            }
+            b"strike" | b"dstrike" if self.in_rpr => {
+                self.pending_run_style.strikethrough = parse_on_off_attribute(tag);
+            }
+            b"u" if self.in_rpr => {
+                let val = read_val_attribute(tag);
+                self.pending_run_style.underline = properties::parse_underline_on(val.as_deref());
+            }
+            b"vertAlign" if self.in_rpr => {
+                let val = read_val_attribute(tag);
+                match properties::parse_vert_align(val.as_deref()) {
+                    properties::VertAlign::Subscript => {
+                        self.pending_run_style.subscript = true;
+                        self.pending_run_style.superscript = false;
+                    }
+                    properties::VertAlign::Superscript => {
+                        self.pending_run_style.superscript = true;
+                        self.pending_run_style.subscript = false;
+                    }
+                    properties::VertAlign::None => {
+                        self.pending_run_style.subscript = false;
+                        self.pending_run_style.superscript = false;
+                    }
+                }
+            }
             b"p" if !self.in_paragraph => self.start_paragraph(),
+            b"r" if self.in_paragraph => {
+                self.ensure_paragraph_started();
+            }
             b"t" if self.in_paragraph => {
+                self.ensure_paragraph_started();
                 self.in_text = true;
                 self.pending_text.clear();
+                self.run_content_emitted = true;
             }
             b"br" if self.in_paragraph => self.emit_line_break(),
             b"tab" if self.in_paragraph => self.emit_tab(),
@@ -373,9 +536,9 @@ impl DocxReader {
             .into_owned();
 
         match event {
-            quick_xml::events::Event::Start(tag) => self.handle_start(tag.local_name().as_ref()),
+            quick_xml::events::Event::Start(tag) => self.handle_start(&tag),
             quick_xml::events::Event::End(tag) => self.handle_end(tag.local_name().as_ref()),
-            quick_xml::events::Event::Empty(tag) => self.handle_empty(tag.local_name().as_ref()),
+            quick_xml::events::Event::Empty(tag) => self.handle_empty(&tag),
             quick_xml::events::Event::Text(text) => {
                 self.handle_text(&text)?;
             }
@@ -395,13 +558,22 @@ impl DocxReader {
     }
 
     fn start_paragraph(&mut self) {
-        self.queue.push_back(Event::StartParagraph {
-            alignment: None,
-            id: None,
-        });
         self.in_paragraph = true;
         self.in_text = false;
         self.pending_text.clear();
+        self.paragraph_started_emitted = false;
+        self.pending_paragraph_alignment = None;
+    }
+
+    /// Queues `StartParagraph` once paragraph properties have been parsed.
+    fn ensure_paragraph_started(&mut self) {
+        if self.in_paragraph && !self.paragraph_started_emitted {
+            self.queue.push_back(Event::StartParagraph {
+                alignment: self.pending_paragraph_alignment.clone(),
+                id: None,
+            });
+            self.paragraph_started_emitted = true;
+        }
     }
 }
 
@@ -446,6 +618,18 @@ fn is_ignored_container(local: &[u8]) -> bool {
             | b"tcPr"
             | b"tblGrid"
     )
+}
+
+fn read_val_attribute(tag: &BytesStart<'_>) -> Option<String> {
+    let a = tag.try_get_attribute(b"w:val").ok().flatten()?;
+    core::str::from_utf8(a.value.as_ref())
+        .ok()
+        .map(str::to_owned)
+}
+
+fn parse_on_off_attribute(tag: &BytesStart<'_>) -> bool {
+    let val = read_val_attribute(tag);
+    properties::parse_on_off(val.as_deref())
 }
 
 fn parse_error(message: String) -> Error {

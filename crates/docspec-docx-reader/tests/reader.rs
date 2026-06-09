@@ -499,7 +499,7 @@ mod constructor {
 mod events {
     use std::io::Cursor;
 
-    use docspec_core::{Event, TextStyle};
+    use docspec_core::{Event, TextAlignment, TextStyle};
     use docspec_docx_reader::{DocxReader, EventSource as _};
 
     use crate::fixture;
@@ -534,10 +534,483 @@ mod events {
         }
     }
 
+    fn start_para_with_alignment(alignment: TextAlignment) -> Event {
+        Event::StartParagraph {
+            alignment: Some(alignment),
+            id: None,
+        }
+    }
+
     fn text(content: &str) -> Event {
         Event::Text {
             content: content.to_string(),
             style: TextStyle::default(),
+        }
+    }
+
+    mod rpr {
+        use super::*;
+
+        fn collect_events(content: &str) -> Vec<Event> {
+            let document_xml = format!(
+                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{content}</w:body></w:document>"#,
+            );
+            let mut reader = make_reader(&document_xml);
+            drive(&mut reader)
+        }
+
+        fn styled_text(content: &str, style: TextStyle) -> Event {
+            Event::Text {
+                content: content.to_string(),
+                style,
+            }
+        }
+
+        fn expected_events(text_event: Event) -> Vec<Event> {
+            vec![
+                start_doc(),
+                start_para(),
+                text_event,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        }
+
+        #[test]
+        fn rpr_bold_applied_to_text() {
+            let events = collect_events("<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>x</w:t></w:r></w:p>");
+            assert_eq!(
+                events,
+                expected_events(styled_text(
+                    "x",
+                    TextStyle {
+                        bold: true,
+                        ..TextStyle::default()
+                    },
+                ))
+            );
+        }
+
+        #[test]
+        fn rpr_italic_applied_to_text() {
+            let events = collect_events("<w:p><w:r><w:rPr><w:i/></w:rPr><w:t>x</w:t></w:r></w:p>");
+            assert_eq!(
+                events,
+                expected_events(styled_text(
+                    "x",
+                    TextStyle {
+                        italic: true,
+                        ..TextStyle::default()
+                    },
+                ))
+            );
+        }
+
+        #[test]
+        fn rpr_strike_applied_to_text() {
+            let events =
+                collect_events("<w:p><w:r><w:rPr><w:strike/></w:rPr><w:t>x</w:t></w:r></w:p>");
+            assert_eq!(
+                events,
+                expected_events(styled_text(
+                    "x",
+                    TextStyle {
+                        strikethrough: true,
+                        ..TextStyle::default()
+                    },
+                ))
+            );
+        }
+
+        #[test]
+        fn rpr_dstrike_collapses_to_strikethrough() {
+            let events =
+                collect_events("<w:p><w:r><w:rPr><w:dstrike/></w:rPr><w:t>x</w:t></w:r></w:p>");
+            assert_eq!(
+                events,
+                expected_events(styled_text(
+                    "x",
+                    TextStyle {
+                        strikethrough: true,
+                        ..TextStyle::default()
+                    },
+                ))
+            );
+        }
+
+        #[test]
+        fn rpr_combined_bold_italic_strike() {
+            let events = collect_events(
+                "<w:p><w:r><w:rPr><w:b/><w:i/><w:strike/></w:rPr><w:t>x</w:t></w:r></w:p>",
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text(
+                    "x",
+                    TextStyle {
+                        bold: true,
+                        italic: true,
+                        strikethrough: true,
+                        ..TextStyle::default()
+                    },
+                ))
+            );
+        }
+
+        #[test]
+        fn rpr_bold_val_false_disables() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:b w:val="false"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(text("x")));
+        }
+
+        #[test]
+        fn rpr_bold_val_zero_disables() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:b w:val="0"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(text("x")));
+        }
+
+        #[test]
+        fn rpr_bold_val_on_enables() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:b w:val="on"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text(
+                    "x",
+                    TextStyle {
+                        bold: true,
+                        ..TextStyle::default()
+                    },
+                ))
+            );
+        }
+
+        #[test]
+        fn rpr_duplicate_last_wins() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:b/><w:b w:val="false"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(text("x")));
+        }
+
+        #[test]
+        fn rpr_state_resets_between_runs() {
+            let events = collect_events(
+                "<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>a</w:t></w:r><w:r><w:t>b</w:t></w:r></w:p>",
+            );
+            assert_eq!(
+                events,
+                vec![
+                    start_doc(),
+                    start_para(),
+                    styled_text(
+                        "a",
+                        TextStyle {
+                            bold: true,
+                            ..TextStyle::default()
+                        },
+                    ),
+                    text("b"),
+                    Event::EndParagraph,
+                    Event::EndDocument,
+                ]
+            );
+        }
+
+        #[test]
+        fn rpr_absent_uses_default_style() {
+            let events = collect_events("<w:p><w:r><w:t>x</w:t></w:r></w:p>");
+            assert_eq!(events, expected_events(text("x")));
+        }
+
+        #[test]
+        fn rpr_underline_single_enables() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text(
+                    "x",
+                    TextStyle {
+                        underline: true,
+                        ..TextStyle::default()
+                    },
+                ))
+            );
+        }
+
+        #[test]
+        fn rpr_underline_double_enables() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:u w:val="double"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text(
+                    "x",
+                    TextStyle {
+                        underline: true,
+                        ..TextStyle::default()
+                    },
+                ))
+            );
+        }
+
+        #[test]
+        fn rpr_underline_dotted_enables() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:u w:val="dotted"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text(
+                    "x",
+                    TextStyle {
+                        underline: true,
+                        ..TextStyle::default()
+                    },
+                ))
+            );
+        }
+
+        #[test]
+        fn rpr_underline_val_none_disables() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:u w:val="none"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(text("x")));
+        }
+
+        #[test]
+        fn rpr_underline_no_val_means_no_underline() {
+            let events = collect_events("<w:p><w:r><w:rPr><w:u/></w:rPr><w:t>x</w:t></w:r></w:p>");
+            assert_eq!(events, expected_events(text("x")));
+        }
+
+        #[test]
+        fn rpr_vert_align_subscript() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:vertAlign w:val="subscript"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text(
+                    "x",
+                    TextStyle {
+                        subscript: true,
+                        ..TextStyle::default()
+                    },
+                ))
+            );
+        }
+
+        #[test]
+        fn rpr_vert_align_superscript() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text(
+                    "x",
+                    TextStyle {
+                        superscript: true,
+                        ..TextStyle::default()
+                    },
+                ))
+            );
+        }
+
+        #[test]
+        fn rpr_vert_align_baseline_resets() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:vertAlign w:val="superscript"/><w:vertAlign w:val="baseline"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(text("x")));
+        }
+
+        #[test]
+        fn rpr_vert_align_no_val_treated_lenient() {
+            let events =
+                collect_events("<w:p><w:r><w:rPr><w:vertAlign/></w:rPr><w:t>x</w:t></w:r></w:p>");
+            assert_eq!(events, expected_events(text("x")));
+        }
+
+        #[test]
+        fn rpr_underline_bold_combined() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:b/><w:u w:val="single"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text(
+                    "x",
+                    TextStyle {
+                        bold: true,
+                        underline: true,
+                        ..TextStyle::default()
+                    },
+                ))
+            );
+        }
+    }
+
+    mod ppr {
+        use super::*;
+
+        fn collect_events(content: &str) -> Vec<Event> {
+            let document_xml = format!(
+                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{content}</w:body></w:document>"#,
+            );
+            let mut reader = make_reader(&document_xml);
+            drive(&mut reader)
+        }
+
+        fn expected_paragraph_events(start: Event) -> Vec<Event> {
+            vec![start_doc(), start, Event::EndParagraph, Event::EndDocument]
+        }
+
+        #[test]
+        fn ppr_jc_center_sets_alignment() {
+            let events = collect_events(r#"<w:p><w:pPr><w:jc w:val="center"/></w:pPr></w:p>"#);
+            assert_eq!(
+                events,
+                expected_paragraph_events(start_para_with_alignment(TextAlignment::Center))
+            );
+        }
+
+        #[test]
+        fn ppr_jc_left_sets_left() {
+            let events = collect_events(r#"<w:p><w:pPr><w:jc w:val="left"/></w:pPr></w:p>"#);
+            assert_eq!(
+                events,
+                expected_paragraph_events(start_para_with_alignment(TextAlignment::Left))
+            );
+        }
+
+        #[test]
+        fn ppr_jc_start_maps_to_left() {
+            let events = collect_events(r#"<w:p><w:pPr><w:jc w:val="start"/></w:pPr></w:p>"#);
+            assert_eq!(
+                events,
+                expected_paragraph_events(start_para_with_alignment(TextAlignment::Left))
+            );
+        }
+
+        #[test]
+        fn ppr_jc_right_sets_right() {
+            let events = collect_events(r#"<w:p><w:pPr><w:jc w:val="right"/></w:pPr></w:p>"#);
+            assert_eq!(
+                events,
+                expected_paragraph_events(start_para_with_alignment(TextAlignment::Right))
+            );
+        }
+
+        #[test]
+        fn ppr_jc_end_maps_to_right() {
+            let events = collect_events(r#"<w:p><w:pPr><w:jc w:val="end"/></w:pPr></w:p>"#);
+            assert_eq!(
+                events,
+                expected_paragraph_events(start_para_with_alignment(TextAlignment::Right))
+            );
+        }
+
+        #[test]
+        fn ppr_jc_both_sets_justify() {
+            let events = collect_events(r#"<w:p><w:pPr><w:jc w:val="both"/></w:pPr></w:p>"#);
+            assert_eq!(
+                events,
+                expected_paragraph_events(start_para_with_alignment(TextAlignment::Justify))
+            );
+        }
+
+        #[test]
+        fn ppr_jc_distribute_sets_justify() {
+            let events = collect_events(r#"<w:p><w:pPr><w:jc w:val="distribute"/></w:pPr></w:p>"#);
+            assert_eq!(
+                events,
+                expected_paragraph_events(start_para_with_alignment(TextAlignment::Justify))
+            );
+        }
+
+        #[test]
+        fn ppr_jc_unmapped_leaves_alignment_none() {
+            let events =
+                collect_events(r#"<w:p><w:pPr><w:jc w:val="mediumKashida"/></w:pPr></w:p>"#);
+            assert_eq!(events, expected_paragraph_events(start_para()));
+        }
+
+        #[test]
+        fn ppr_jc_no_val_leaves_alignment_none() {
+            let events = collect_events("<w:p><w:pPr><w:jc/></w:pPr></w:p>");
+            assert_eq!(events, expected_paragraph_events(start_para()));
+        }
+
+        #[test]
+        fn ppr_absent_emits_start_paragraph_at_first_content() {
+            let events = collect_events("<w:p><w:r><w:t>x</w:t></w:r></w:p>");
+            assert_eq!(
+                events,
+                vec![
+                    start_doc(),
+                    start_para(),
+                    text("x"),
+                    Event::EndParagraph,
+                    Event::EndDocument,
+                ]
+            );
+        }
+
+        #[test]
+        fn ppr_empty_emits_default_alignment() {
+            let events = collect_events("<w:p><w:pPr/></w:p>");
+            assert_eq!(events, expected_paragraph_events(start_para()));
+        }
+
+        #[test]
+        fn empty_paragraph_still_emits_start_end() {
+            let events = collect_events("<w:p></w:p>");
+            assert_eq!(events, expected_paragraph_events(start_para()));
+        }
+
+        #[test]
+        fn ppr_jc_followed_by_run_emits_in_order() {
+            let events = collect_events(
+                r#"<w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                vec![
+                    start_doc(),
+                    start_para_with_alignment(TextAlignment::Right),
+                    text("x"),
+                    Event::EndParagraph,
+                    Event::EndDocument,
+                ]
+            );
+        }
+
+        #[test]
+        fn ppr_rpr_inside_ppr_is_ignored() {
+            let events = collect_events(
+                "<w:p><w:pPr><w:rPr><w:b/></w:rPr></w:pPr><w:r><w:t>x</w:t></w:r></w:p>",
+            );
+            assert_eq!(
+                events,
+                vec![
+                    start_doc(),
+                    start_para(),
+                    text("x"),
+                    Event::EndParagraph,
+                    Event::EndDocument,
+                ]
+            );
         }
     }
 
@@ -567,7 +1040,7 @@ mod events {
 
         assert_eq!(
             format!("{reader:?}"),
-            "DocxReader { buf: [], in_ignored_subtree: 0, in_paragraph: false, in_text: false, pending_text: \"\", phase: \"<phase>\", queue: [], xml: \"<quick_xml::Reader>\" }"
+            "DocxReader { buf: [], in_ignored_subtree: 0, in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, paragraph_started_emitted: false, in_rpr: false, pending_run_style: TextStyle { bold: false, code: false, italic: false, mark: None, strikethrough: false, subscript: false, superscript: false, underline: false }, pending_text: \"\", current_run_style: TextStyle { bold: false, code: false, italic: false, mark: None, strikethrough: false, subscript: false, superscript: false, underline: false }, phase: \"<phase>\", queue: [], run_content_emitted: false, xml: \"<quick_xml::Reader>\" }"
         );
     }
 
@@ -1763,6 +2236,245 @@ mod events {
                 start_doc(),
                 start_para(),
                 text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn rpr_after_text_in_same_run_is_ignored() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>foo</w:t><w:rPr><w:b/></w:rPr></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("foo"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn rpr_after_text_with_more_content_does_not_affect_subsequent_text() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>a</w:t><w:rPr><w:b/></w:rPr><w:t>b</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("a"),
+                text("b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn ppr_after_run_in_same_paragraph_is_ignored() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>foo</w:t></w:r><w:pPr><w:jc w:val="center"/></w:pPr></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("foo"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn ppr_then_run_then_ppr_only_first_applies() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>x</w:t></w:r><w:pPr><w:jc w:val="left"/></w:pPr></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para_with_alignment(TextAlignment::Right),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn out_of_order_rpr_does_not_corrupt_next_run() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>a</w:t><w:rPr><w:b/></w:rPr></w:r><w:r><w:rPr><w:i/></w:rPr><w:t>b</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("a"),
+                Event::Text {
+                    content: "b".to_string(),
+                    style: TextStyle {
+                        italic: true,
+                        ..TextStyle::default()
+                    },
+                },
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn empty_rpr_self_closed_emits_default_style() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr/><w:t>x</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn empty_rpr_open_close_emits_default_style() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr></w:rPr><w:t>x</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn empty_ppr_self_closed_emits_default_alignment() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr/><w:r><w:t>x</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn rpr_with_unknown_child_is_no_op() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:color w:val="FF0000"/><w:b/></w:rPr><w:t>x</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::Text {
+                    content: "x".to_string(),
+                    style: TextStyle {
+                        bold: true,
+                        ..TextStyle::default()
+                    },
+                },
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn ppr_with_unknown_child_is_no_op() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:ind w:left="720"/><w:jc w:val="center"/></w:pPr><w:r><w:t>x</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para_with_alignment(TextAlignment::Center),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn rpr_after_line_break_in_same_run_is_ignored() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:br/><w:rPr><w:b/></w:rPr></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::LineBreak,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn multiple_paragraphs_state_resets_between() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>a</w:t></w:r></w:p><w:p><w:r><w:t>b</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para_with_alignment(TextAlignment::Right),
+                Event::Text {
+                    content: "a".to_string(),
+                    style: TextStyle {
+                        bold: true,
+                        ..TextStyle::default()
+                    },
+                },
+                Event::EndParagraph,
+                start_para(),
+                text("b"),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
