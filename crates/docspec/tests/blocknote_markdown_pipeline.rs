@@ -175,7 +175,7 @@ mod tests {
         let actual = run_pipeline(markdown);
         assert_json_eq(
             &actual,
-            r#"[{"type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default","start":5},"content":[{"type":"text","text":"I2","styles":{}}],"children":[]}]"#,
+            r#"[{"type":"numberedListItem","props":{"start":5},"content":[{"type":"text","text":"I2","styles":{}}],"children":[]}]"#,
         );
     }
 

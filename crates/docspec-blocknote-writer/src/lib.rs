@@ -460,15 +460,6 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         close_text_block!(self)
     }
 
-    fn handle_end_preformatted(&mut self) -> Result<()> {
-        drop_block_in_list_end!(self);
-        return_if_table_cell!(self);
-        if !self.context.in_text_block {
-            return Ok(());
-        }
-        close_text_block!(self)
-    }
-
     fn handle_end_table(&mut self) -> Result<()> {
         drop_block_in_list_end!(self);
         if self.table_depth.is_zero() {
@@ -660,17 +651,20 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     ///
     /// Drops `title` and `id` — `BlockNote`'s inline link schema has no slot for these.
     fn handle_start_link(&mut self, href: &str) -> Result<()> {
+        if self.drop_inside_list_depth.is_positive()
+            || self.dropped_list_depth.is_positive()
+            || self.table_depth.get() > 1
+        {
+            return Ok(());
+        }
         if self.list_stack.last().is_some_and(|entry| {
             entry.content_state == ListContentState::Pending && !entry.first_paragraph_consumed
         }) {
             self.initialize_current_list_item_content(None)?;
         }
-        if self.drop_inside_list_depth.is_positive()
-            || self.dropped_list_depth.is_positive()
-            || (!self.context.in_text_block
-                && !self.context.in_table_cell
-                && !self.in_list_item_content())
-            || self.table_depth.get() > 1
+        if !self.context.in_text_block
+            && !self.context.in_table_cell
+            && !self.in_list_item_content()
         {
             return Ok(());
         }
@@ -762,9 +756,6 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.json.open_object()?;
         self.json.key("type").value("table")?;
         self.write_id(id)?;
-        self.json
-            .key("props")
-            .object(|p| p.key("textColor").value("default"))?;
         self.json.key("content").open_object()?;
         self.json.key("type").value("tableContent")?;
         self.json.key("columnWidths").array(|_| Ok(()))?;
@@ -790,10 +781,6 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.json.open_object()?;
         self.json.key("type").value("tableCell")?;
         self.write_id(id)?;
-        self.json.key("props").object(|p| {
-            p.key("backgroundColor").value("default")?;
-            p.key("textColor").value("default")
-        })?;
         self.json.key("content").open_array()?;
         self.context.in_table_cell = true;
         self.context.in_text_block = false;
@@ -838,6 +825,12 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_text_event(&mut self, content: &str, style: &TextStyle) -> Result<()> {
+        if self.drop_inside_list_depth.is_positive()
+            || self.dropped_list_depth.is_positive()
+            || self.table_depth.get() > 1
+        {
+            return Ok(());
+        }
         // Auto-open paragraph for orphan text (e.g., text after image closed paragraph)
         if self.list_stack.last().is_some_and(|entry| {
             entry.content_state == ListContentState::Pending && !entry.first_paragraph_consumed
@@ -906,19 +899,20 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         }
         let kind = current_entry.kind;
         let start = current_entry.start;
-        self.json.key("props").object(|j| {
-            j.key("backgroundColor").value("default")?;
-            j.key("textColor").value("default")?;
-            if let Some(value) = non_default_alignment_value(alignment) {
-                j.key("textAlignment").value(value)?;
-            }
-            if kind == ListKind::Ordered {
-                if let Some(start_prop) = start {
-                    j.key("start").value(start_prop)?;
+        let alignment_value = non_default_alignment_value(alignment);
+        if alignment_value.is_some() || (kind == ListKind::Ordered && start.is_some()) {
+            self.json.key("props").object(|j| {
+                if let Some(value) = alignment_value {
+                    j.key("textAlignment").value(value)?;
                 }
-            }
-            Ok(())
-        })?;
+                if kind == ListKind::Ordered {
+                    if let Some(start_prop) = start {
+                        j.key("start").value(start_prop)?;
+                    }
+                }
+                Ok(())
+            })?;
+        }
         self.json.key("content").open_array()?;
         if let Some(entry) = self.list_stack.last_mut() {
             entry.content_state = ListContentState::Open;
@@ -942,6 +936,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             self.json.close_array()?;
             if let Some(entry) = self.list_stack.last_mut() {
                 entry.content_state = ListContentState::Closed;
+                entry.first_paragraph_consumed = true;
             }
         }
 
@@ -1018,6 +1013,13 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         }
     }
 
+    fn handle_end_document(&mut self) -> Result<()> {
+        while !self.list_stack.is_empty() {
+            self.close_current_list_item_object()?;
+        }
+        self.json.close_array()
+    }
+
     fn write_id(&mut self, id: Option<&String>) -> Result<()> {
         if let Some(id_val) = id {
             self.json.key("id").value(id_val.as_str())?;
@@ -1036,12 +1038,7 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
     fn handle_event(&mut self, event: Event) -> Result<()> {
         match event {
             Event::StartDocument { .. } => self.json.open_array(),
-            Event::EndDocument => {
-                while !self.list_stack.is_empty() {
-                    self.close_current_list_item_object()?;
-                }
-                self.json.close_array()
-            }
+            Event::EndDocument => self.handle_end_document(),
             Event::StartHeading { level, id, .. } => {
                 return_if_table_cell!(self);
                 drop_block_in_list_start!(self);
@@ -1055,7 +1052,14 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 }
                 close_text_block!(self)
             }
-            Event::EndPreformatted => self.handle_end_preformatted(),
+            Event::EndPreformatted => {
+                drop_block_in_list_end!(self);
+                return_if_table_cell!(self);
+                if !self.context.in_text_block {
+                    return Ok(());
+                }
+                close_text_block!(self)
+            }
             Event::StartParagraph { alignment, id } => {
                 self.handle_paragraph(id.as_ref(), alignment.as_ref())
             }

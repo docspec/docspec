@@ -1,9 +1,6 @@
 [
   {
     "type": "table",
-    "props": {
-      "textColor": "default"
-    },
     "content": {
       "type": "tableContent",
       "columnWidths": [],
@@ -12,10 +9,6 @@
           "cells": [
             {
               "type": "tableCell",
-              "props": {
-                "backgroundColor": "default",
-                "textColor": "default"
-              },
               "content": [
                 {
                   "type": "text",
@@ -30,10 +23,6 @@
           "cells": [
             {
               "type": "tableCell",
-              "props": {
-                "backgroundColor": "default",
-                "textColor": "default"
-              },
               "content": [
                 {
                   "type": "text",
