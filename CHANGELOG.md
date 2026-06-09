@@ -12,6 +12,16 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [2.0.0](https://github.com/docspec/docspec/compare/v1.7.1...v2.0.0) - 2026-06-09
+
+### Added
+
+- *(core)* replace TextStyle with wrapper events
+
+### Other
+
+- *(docx-reader)* split DOCX reader modules
+
 ## [1.7.1](https://github.com/docspec/docspec/compare/v1.7.0...v1.7.1) - 2026-06-09
 
 ### Fixed
