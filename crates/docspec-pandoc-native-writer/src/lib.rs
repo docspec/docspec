@@ -108,7 +108,7 @@ impl<W: Write> EventSink for PandocNativeWriter<W> {
                     self.in_paragraph = false;
                 }
             }
-            Event::Text { content, .. } if self.in_paragraph => {
+            Event::Text { content } if self.in_paragraph => {
                 if self.paragraph_has_inline {
                     self.writer.write_all(b",")?;
                 }

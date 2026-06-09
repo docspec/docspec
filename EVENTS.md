@@ -6,7 +6,7 @@ DocSpec documents are streams of typed events. Readers emit events. Writers cons
 
 **SAX-like structure.** Block elements use Start/End pairs.
 
-**Formatting as attributes.** Inline formatting lives on `Text` as attributes, not wrapper events. Links are the exception: they use Start/End because they carry `href`.
+**Formatting as wrappers.** Inline formatting is expressed via `StartTextStyle { kind: TextStyleKind, id: Option<String> }` and `EndTextStyle` wrapper events around `Text` content. This matches the Start/End uniformity of every other inline and block container.
 
 **Semantic fidelity.** Events capture meaning, not appearance. Visual properties (font, color, size) are not represented — except mark color for highlighting.
 
@@ -66,6 +66,11 @@ enum ListStyleType {
 enum TableHeaderScope { Column, Row }  // Column: header describes cells below; Row: header describes cells to the right
 
 enum Color { Rgb { r: u8, g: u8, b: u8 } }
+
+enum TextStyleKind {
+    Bold, Italic, Code, Strikethrough, Underline, Subscript, Superscript,
+    Mark(Color),  // highlight color
+}
 
 enum ImageSource {
     Asset { asset_id: String },   // resolved through AssetProvider
@@ -131,9 +136,10 @@ All events in the `Event` enum, grouped by category.
 
 **Inline containers:**
 
-| Event       | Fields                                  | Pair      |
-| ----------- | --------------------------------------- | --------- |
-| `StartLink` | `href: String`, `title: Option<String>` | `EndLink` |
+| Event             | Fields                                                  | Pair              |
+| ----------------- | ------------------------------------------------------- | ----------------- |
+| `StartLink`       | `href: String`, `title: Option<String>`                 | `EndLink`         |
+| `StartTextStyle`  | `kind: TextStyleKind`, `id: Option<String>`             | `EndTextStyle`    |
 
 **Block (self-contained):**
 
@@ -145,7 +151,7 @@ All events in the `Event` enum, grouped by category.
 
 | Event         | Fields                                                                           |
 | ------------- | -------------------------------------------------------------------------------- |
-| `Text`        | `content: String`, `style: TextStyle`                                            |
+| `Text`        | `content: String`                                                                |
 | `Image`       | `source: ImageSource`, `alt: Option<String>`, `title: Option<String>`, `decorative: bool` |
 | `FootnoteRef` | `id: u32`                                                                        |
 | `LineBreak`   | —                                                                                |
@@ -167,7 +173,7 @@ Every `Start*` has a matching `End*`. They nest but never overlap.
 
 **BlockQuote.** May contain any block element.
 
-**Preformatted.** When `syntax` is present, block has code semantics. Formatting attributes on inner `Text` are ignored. Newlines in content are literal.
+**Preformatted.** Inside `StartPreformatted`/`EndPreformatted`, no `StartTextStyle` events appear (Rule 11). When `syntax` is present, block has code semantics. Newlines in content are literal.
 
 **Definition list.** Terms contain inline content only. Details can contain any block element.
 
@@ -175,7 +181,9 @@ Every `Start*` has a matching `End*`. They nest but never overlap.
 
 **Link.** An inline container (uses Start/End because it carries `href`). Valid inside paragraphs, headings, list items, cells, definition details. Cannot nest.
 
-**Text.** Formatting changes produce new events. Default: `TextStyle::default()` — all formatting flags disabled and `mark` is `None`. Empty content is valid but meaningless. `subscript` and `superscript` may both be true; writers that can't represent both prefer `superscript`. Whitespace is significant. Outside preformatted blocks, newlines in content are collapsed to whitespace; readers emit `LineBreak` for explicit hard breaks (e.g., markdown two-space-newline, HTML `<br>`) and `SoftBreak` for soft breaks (e.g., source line wraps within a paragraph).
+**StartTextStyle / EndTextStyle.** An inline-container pair carrying a single `TextStyleKind`. Valid inside paragraphs, headings, list items, cells, definition details. Style spans nest but never overlap (per Rule 1); readers MUST close-and-reopen to express overlapping source styles. `Subscript` and `Superscript` MAY both be active simultaneously by nesting; writers that cannot represent both prefer `Superscript`. The `Mark(Color)` variant carries the highlight color.
+
+**Text.** Whitespace is significant. Outside preformatted blocks, newlines in content are collapsed to whitespace; readers emit `LineBreak` for explicit hard breaks (e.g., markdown two-space-newline, HTML `<br>`) and `SoftBreak` for soft breaks (e.g., source line wraps within a paragraph). Inline formatting is expressed via surrounding `StartTextStyle`/`EndTextStyle` wrapper events; the `Text` event itself carries content only.
 
 **Image.** Asset bytes resolve lazily via `AssetProvider`. `decorative` means purely visual. May appear inline or directly in block containers.
 
@@ -201,6 +209,11 @@ Readers MUST produce well-formed streams. Writers MAY assume well-formedness.
 6. `StartCaption` appears at most once per table, before any rows.
 7. Each footnote ID appears in exactly one `FootnoteRef` and one `StartFootnote`.
 8. Table structure: `StartTableRow` appears only inside `StartTable`. `StartTableCell`/`StartTableHeader` appear only inside `StartTableRow`.
+9. `StartTextStyle` and `EndTextStyle` nest but never overlap (subsumes Rule 1 but mentioned explicitly because of the close-and-reopen normalization requirement). Readers MUST normalize overlapping source styles into nested spans via close-and-reopen.
+10. All open `StartTextStyle` spans MUST be closed before the enclosing block-end event (`EndParagraph`, `EndHeading`, `EndOrderedListItem`, `EndUnorderedListItem`, `EndTableCell`, `EndTableHeader`, `EndCaption`, `EndDefinitionTerm`, `EndDefinitionDetail`).
+11. `StartTextStyle` MUST NOT appear inside `StartPreformatted`/`EndPreformatted`. Conversely, `StartPreformatted` MUST NOT appear inside `StartTextStyle`/`EndTextStyle` (block elements may not nest inside inline style spans).
+12. When styled text appears inside a link, readers SHOULD emit `StartLink` as the outer container and `StartTextStyle` as the inner. The reverse nesting (style outside link) is well-formed but discouraged.
+13. Readers MUST NOT emit empty style spans. A `StartTextStyle` MUST be followed by at least one `Text` event before its matching `EndTextStyle`. (Defers emission until non-empty content is confirmed.)
 
 ---
 

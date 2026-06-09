@@ -3,61 +3,26 @@
 //! Events represent the atomic units of document structure. Sources emit events
 //! in document order; sinks consume them. This decouples all readers from all writers.
 
-/// Generates boolean builder methods for a struct field.
-///
-/// Each method takes `self`, sets the corresponding field to `true`, and returns `self`.
-/// Doc comments are auto-generated via `concat!` and `stringify!`.
-macro_rules! bool_setters {
-    ($($field:ident),+ $(,)?) => {
-        $(
-            #[inline]
-            #[must_use]
-            #[doc = concat!("Enables ", stringify!($field), " formatting.")]
-            pub fn $field(mut self) -> Self {
-                self.$field = true;
-                self
-            }
-        )+
-    };
-}
-
-/// Text formatting attributes for an [`Event::Text`] event.
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "TextStyle intentionally stores one boolean per formatting attribute for a simple builder API"
-)]
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct TextStyle {
+/// The kind of text formatting carried by a [`Event::StartTextStyle`] event.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum TextStyleKind {
     /// Bold formatting.
-    pub bold: bool,
-    /// Monospace/code formatting.
-    pub code: bool,
+    Bold,
     /// Italic formatting.
-    pub italic: bool,
-    /// Highlight/mark color.
-    pub mark: Option<crate::Color>,
+    Italic,
+    /// Monospace/code formatting.
+    Code,
     /// Strikethrough formatting.
-    pub strikethrough: bool,
-    /// Subscript formatting.
-    pub subscript: bool,
-    /// Superscript formatting.
-    pub superscript: bool,
+    Strikethrough,
     /// Underline formatting.
-    pub underline: bool,
-}
-
-impl TextStyle {
-    bool_setters!(bold, code, italic);
-
-    /// Sets the highlight/mark color.
-    #[inline]
-    #[must_use]
-    pub fn mark(mut self, color: crate::Color) -> Self {
-        self.mark = Some(color);
-        self
-    }
-
-    bool_setters!(strikethrough, subscript, superscript, underline);
+    Underline,
+    /// Subscript formatting.
+    Subscript,
+    /// Superscript formatting.
+    Superscript,
+    /// Highlight/mark color formatting.
+    Mark(crate::Color),
 }
 
 /// A streaming document event.
@@ -119,6 +84,9 @@ pub enum Event {
 
     /// End a table row.
     EndTableRow,
+
+    /// End an inline text style span.
+    EndTextStyle,
 
     /// End an unordered (bulleted) list item.
     EndUnorderedListItem,
@@ -282,6 +250,14 @@ pub enum Event {
         id: Option<String>,
     },
 
+    /// Begin an inline text style span.
+    StartTextStyle {
+        /// The style kind opened by this span.
+        kind: TextStyleKind,
+        /// Optional block identifier for the style span.
+        id: Option<String>,
+    },
+
     /// Begin an unordered (bulleted) list item.
     StartUnorderedListItem {
         /// Optional block identifier.
@@ -292,12 +268,10 @@ pub enum Event {
         style_type: crate::ListStyleType,
     },
 
-    /// A text run with formatting attributes.
+    /// A text run.
     Text {
         /// The text content.
         content: String,
-        /// Text formatting attributes.
-        style: TextStyle,
     },
 
     /// A horizontal rule / thematic break.

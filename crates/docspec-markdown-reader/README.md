@@ -11,7 +11,9 @@ architecture, and the event protocol.
 - Paragraphs
 - Block quotes
 - Code blocks (fenced and indented)
-- Bold, italic, inline code, strikethrough
+- Bold (`StartTextStyle { kind: Bold }`), italic (`StartTextStyle { kind: Italic }`),
+  inline code (`StartTextStyle { kind: Code }`), strikethrough
+  (`StartTextStyle { kind: Strikethrough }`)
 - Images
 - Hard and soft line breaks
 - Thematic breaks

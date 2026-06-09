@@ -3,7 +3,7 @@
 //! Run with: `cargo run -p docspec-pandoc-native-writer --example roundtrip`
 //! Then pipe through pandoc: `cargo run ... | pandoc -f native -t native`.
 
-use docspec_core::{Event, EventSink as _, TextStyle};
+use docspec_core::{Event, EventSink as _};
 use docspec_pandoc_native_writer::PandocNativeWriter;
 use std::io;
 
@@ -23,11 +23,9 @@ fn main() -> io::Result<()> {
         },
         Event::Text {
             content: "Hello".to_string(),
-            style: TextStyle::default(),
         },
         Event::Text {
             content: "\u{2019}".to_string(),
-            style: TextStyle::default(),
         },
         Event::EndParagraph,
         Event::StartParagraph {
@@ -36,15 +34,12 @@ fn main() -> io::Result<()> {
         },
         Event::Text {
             content: "\u{0e}Hello".to_string(),
-            style: TextStyle::default(),
         },
         Event::Text {
             content: "\u{1}5".to_string(),
-            style: TextStyle::default(),
         },
         Event::Text {
             content: "\u{0}".to_string(),
-            style: TextStyle::default(),
         },
         Event::EndParagraph,
         Event::EndDocument,

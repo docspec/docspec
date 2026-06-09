@@ -2,7 +2,7 @@
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-use docspec_core::{Event, TextStyle};
+use docspec_core::Event;
 use docspec_pandoc_native_writer::PandocNativeWriter;
 use std::io::{self, Write};
 
@@ -64,7 +64,6 @@ mod tests {
     fn text(s: &str) -> Event {
         Event::Text {
             content: s.to_string(),
-            style: TextStyle::default(),
         }
     }
 
@@ -136,7 +135,6 @@ mod tests {
     fn text_styles_ignored() {
         let bold_text = Event::Text {
             content: "x".to_string(),
-            style: TextStyle::default().bold().italic(),
         };
         assert_eq!(
             run([
@@ -148,6 +146,50 @@ mod tests {
             ]),
             "[Para [Str \"x\"]]"
         );
+    }
+
+    #[test]
+    fn styled_input_dropped() {
+        let styled_events = vec![
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                id: None,
+                alignment: None,
+            },
+            Event::StartTextStyle {
+                kind: docspec_core::TextStyleKind::Bold,
+                id: None,
+            },
+            Event::Text {
+                content: "x".to_string(),
+            },
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ];
+        let unstyled_events = vec![
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                id: None,
+                alignment: None,
+            },
+            Event::Text {
+                content: "x".to_string(),
+            },
+            Event::EndParagraph,
+            Event::EndDocument,
+        ];
+        let styled_output = run(styled_events);
+        let unstyled_output = run(unstyled_events);
+        assert_eq!(styled_output, unstyled_output);
     }
 
     #[test]

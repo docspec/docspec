@@ -28,13 +28,13 @@ The following DocSpec events are silently ignored:
 - Definition lists — `StartDefinitionList` / `StartDefinitionTerm` / `StartDefinitionDetail`
 - Captions — `StartCaption` / `EndCaption`
 - Line breaks — `LineBreak` / `SoftBreak`
-- Text formatting styles (bold, italic, etc.) — styles are accepted but silently dropped
+- Text formatting styles — `StartTextStyle` / `EndTextStyle` are accepted but silently dropped
 
 ## Usage
 
 ```rust
 use docspec_pandoc_native_writer::PandocNativeWriter;
-use docspec_core::{Event, EventSink, TextStyle};
+use docspec_core::{Event, EventSink};
 
 let mut buf = Vec::<u8>::new();
 let mut writer = PandocNativeWriter::new(&mut buf);
@@ -43,7 +43,6 @@ writer.handle_event(Event::StartDocument { id: None, language: None, metadata: N
 writer.handle_event(Event::StartParagraph { alignment: None, id: None })?;
 writer.handle_event(Event::Text {
     content: "Hello, world".to_string(),
-    style: TextStyle::default(),
 })?;
 writer.handle_event(Event::EndParagraph)?;
 writer.handle_event(Event::EndDocument)?;

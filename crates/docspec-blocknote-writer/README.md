@@ -17,7 +17,7 @@ Converts a DocSpec event stream into [BlockNote](https://www.blocknotejs.org/) J
 | Ordered list item                  | `numberedListItem`                                |
 | Inline link                        | `link` inline type with `href` (title is dropped) |
 
-Inline styles supported within text content: bold, italic, code, strikethrough, underline.
+Inline styles are consumed from `StartTextStyle`/`EndTextStyle` spans around `Text` events. Bold, italic, code, strikethrough, and underline render as BlockNote style flags. Subscript, superscript, and mark/highlight spans are accepted but omitted because BlockNote's default schema has no equivalent representation.
 Inline links (`StartLink`/`EndLink`) emit a `link` inline type with the `href`. The optional `title` field is dropped (BlockNote's default link schema has no title).
 
 List items support arbitrary nesting via BlockNote's native `children: Block[]` arrays. The `start` prop on `numberedListItem` is preserved when the first item in a sequence carries an explicit start number.
@@ -37,7 +37,7 @@ Wrap `BlockNoteWriter` in `StackTrackingSink` before feeding list events. The wr
 
 ```rust
 use docspec_blocknote_writer::BlockNoteWriter;
-use docspec_core::{Event, EventSink, ListStyleType, StackTrackingSink, TextStyle};
+use docspec_core::{Event, EventSink, ListStyleType, StackTrackingSink, TextStyleKind};
 
 let mut buf = Vec::<u8>::new();
 let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
@@ -48,8 +48,16 @@ writer.handle_event(Event::StartDocument { id: None, language: None, metadata: N
 writer.handle_event(Event::StartParagraph { alignment: None, id: None })?;
 writer.handle_event(Event::Text {
     content: "Hello, world".to_string(),
-    style: TextStyle::default(),
 })?;
+writer.handle_event(Event::EndParagraph)?;
+
+// Styled text uses wrapper events.
+writer.handle_event(Event::StartParagraph { alignment: None, id: None })?;
+writer.handle_event(Event::StartTextStyle { kind: TextStyleKind::Bold, id: None })?;
+writer.handle_event(Event::Text {
+    content: "Bold text".to_string(),
+})?;
+writer.handle_event(Event::EndTextStyle)?;
 writer.handle_event(Event::EndParagraph)?;
 
 // Bullet list item
@@ -60,7 +68,6 @@ writer.handle_event(Event::StartUnorderedListItem {
 })?;
 writer.handle_event(Event::Text {
     content: "First bullet".to_string(),
-    style: TextStyle::default(),
 })?;
 writer.handle_event(Event::EndUnorderedListItem)?;
 
@@ -73,7 +80,6 @@ writer.handle_event(Event::StartOrderedListItem {
 })?;
 writer.handle_event(Event::Text {
     content: "Step one".to_string(),
-    style: TextStyle::default(),
 })?;
 writer.handle_event(Event::EndOrderedListItem)?;
 

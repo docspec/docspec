@@ -183,7 +183,6 @@ mod tests {
     fn block_kind_for_end_text_returns_none() {
         let event = Event::Text {
             content: "hello".to_string(),
-            style: TextStyle::default(),
         };
         assert_eq!(block_kind_for_end(&event), None);
     }
@@ -342,9 +341,117 @@ mod tests {
     fn block_kind_for_start_text_returns_none() {
         let event = Event::Text {
             content: "hello".to_string(),
-            style: TextStyle::default(),
         };
         assert_eq!(block_kind_for_start(&event), None);
+    }
+
+    #[test]
+    fn start_text_style_is_forwarded_without_stack_change() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        );
+
+        let result = sink.handle_event(Event::StartTextStyle {
+            kind: TextStyleKind::Bold,
+            id: None,
+        });
+
+        assert!(matches!(result, Ok(())));
+        assert_eq!(sink.stack(), &[BlockKind::Document, BlockKind::Paragraph]);
+    }
+
+    #[test]
+    fn end_text_style_is_forwarded_without_stack_change() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        );
+
+        let result = sink.handle_event(Event::EndTextStyle);
+
+        assert!(matches!(result, Ok(())));
+        assert_eq!(sink.stack(), &[BlockKind::Document, BlockKind::Paragraph]);
+    }
+
+    #[test]
+    fn orphan_end_text_style_does_not_get_paragraph() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+
+        let result = sink.handle_event(Event::EndTextStyle);
+
+        assert!(matches!(result, Ok(())));
+        assert_eq!(sink.stack(), &[BlockKind::Document]);
+    }
+
+    #[test]
+    fn orphan_text_style_span_gets_paragraph() {
+        let mock = MockSink::new();
+        let mut sink = StackTrackingSink::new(mock);
+
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Italic,
+                id: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::Text {
+                content: "styled".to_string(),
+            },
+        );
+        send(&mut sink, Event::EndTextStyle);
+        send(&mut sink, Event::EndDocument);
+
+        assert!(sink.stack().is_empty());
     }
 
     #[test]
@@ -504,12 +611,11 @@ mod tests {
 
         let result = sink.handle_event(Event::Text {
             content: "orphan".to_string(),
-            style: TextStyle::default(),
         });
         assert_invalid_sequence(
             &result,
             "end of stream",
-            "Text { content: \"orphan\", style: TextStyle { bold: false, code: false, italic: false, mark: None, strikethrough: false, subscript: false, superscript: false, underline: false } }",
+            "Text { content: \"orphan\" }",
             "event received after document already finished",
         );
     }

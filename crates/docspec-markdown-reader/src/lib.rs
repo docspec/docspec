@@ -25,10 +25,10 @@
 //! - Paragraphs → `StartParagraph` / `EndParagraph`
 //! - Block quotes → `StartBlockQuote` / `EndBlockQuote`
 //! - Code blocks → `StartPreformatted` / `EndPreformatted`
-//! - Bold text → `Text { style: TextStyle { bold: true, .. }, .. }`
-//! - Italic text → `Text { style: TextStyle { italic: true, .. }, .. }`
-//! - Inline code → `Text { style: TextStyle { code: true, .. }, .. }`
-//! - Strikethrough → `Text { style: TextStyle { strikethrough: true, .. }, .. }`
+//! - Bold text → `StartTextStyle { kind: Bold }` / `EndTextStyle`
+//! - Italic text → `StartTextStyle { kind: Italic }` / `EndTextStyle`
+//! - Inline code → `StartTextStyle { kind: Code }` / `EndTextStyle`
+//! - Strikethrough → `StartTextStyle { kind: Strikethrough }` / `EndTextStyle`
 //! - Images → `Image { source: Uri, alt, title, decorative }`
 //! - Hard line breaks → `LineBreak`
 //! - Soft line breaks → `SoftBreak`
@@ -91,7 +91,7 @@ use alloc::collections::VecDeque;
 use std::io::{Read, Seek};
 
 pub use docspec_core::EventSource;
-use docspec_core::{Depth, Event, ImageSource, ListStyleType, Result, TableHeaderScope, TextStyle};
+use docspec_core::{Event, ImageSource, ListStyleType, Result, TableHeaderScope, TextStyleKind};
 use parser_cell::ParserCell;
 use pulldown_cmark::{CodeBlockKind, CowStr, HeadingLevel, Options, Parser, Tag, TagEnd};
 
@@ -211,58 +211,101 @@ struct LinkBuffer {
 pub struct MarkdownReader {
     /// Current block-level context.
     block_state: BlockState,
-    /// Nesting depth for bold (strong) formatting.
-    bold_depth: Depth,
     /// Owned source text and parser borrowing from it.
     cell: ParserCell,
     /// Buffered code block text (accumulated until `EndCodeBlock` to strip trailing newline).
     code_block_buffer: Option<String>,
     /// Buffered image being processed (alt text accumulation).
     image: Option<ImageBuffer>,
+    /// Whether the parser is currently inside a preformatted code block.
+    in_preformatted: bool,
     /// Whether the parser is currently inside a table header row.
     in_table_head: bool,
-    /// Nesting depth for italic (emphasis) formatting.
-    italic_depth: Depth,
     /// Buffered link being processed (deferred Start emission for image-in-link extraction).
     link: Option<LinkBuffer>,
     /// LIFO stack of list contexts. `len()` gives the current nesting depth;
     /// `level = list_stack.len().saturating_sub(1)` at item-emit time.
     list_stack: alloc::vec::Vec<ListContext>,
+    /// Inline styles already emitted and currently open.
+    open_styles: alloc::vec::Vec<TextStyleKind>,
+    /// Inline styles waiting to be emitted before the next text event.
+    pending_open_styles: alloc::vec::Vec<TextStyleKind>,
     /// Document processing phase.
     phase: Phase,
     /// Queue of `DocSpec` events to emit.
     queue: VecDeque<Event>,
-    /// Nesting depth for strikethrough formatting.
-    strikethrough_depth: Depth,
 }
 
 impl MarkdownReader {
     fn close_current_item_if_open(&mut self) {
-        if let Some(ctx) = self.list_stack.last_mut() {
-            if ctx.item_open {
-                if ctx.ordered {
-                    self.queue.push_back(Event::EndOrderedListItem);
-                } else {
-                    self.queue.push_back(Event::EndUnorderedListItem);
-                }
-                ctx.item_open = false;
-                self.block_state = BlockState::None;
+        let Some(ctx) = self.list_stack.last() else {
+            return;
+        };
+        if !ctx.item_open {
+            return;
+        }
+
+        let ordered = ctx.ordered;
+        self.close_all_open_styles();
+        if ordered {
+            self.queue.push_back(Event::EndOrderedListItem);
+        } else {
+            self.queue.push_back(Event::EndUnorderedListItem);
+        }
+        if let Some(current_ctx) = self.list_stack.last_mut() {
+            current_ctx.item_open = false;
+        }
+        self.block_state = BlockState::None;
+    }
+
+    fn close_all_open_styles(&mut self) {
+        self.pending_open_styles.clear();
+        while self.open_styles.pop().is_some() {
+            self.queue.push_back(Event::EndTextStyle);
+        }
+    }
+
+    fn close_style(&mut self, kind: &TextStyleKind) {
+        if self.in_preformatted {
+            return;
+        }
+
+        if let Some(pos) = self.pending_open_styles.iter().rposition(|k| k == kind) {
+            self.pending_open_styles.remove(pos);
+            return;
+        }
+
+        if let Some(pos) = self.open_styles.iter().rposition(|k| k == kind) {
+            let split_pos = pos
+                .checked_add(1)
+                .map_or(self.open_styles.len(), |value| value);
+            let above: alloc::vec::Vec<TextStyleKind> =
+                self.open_styles.drain(split_pos..).collect();
+            self.open_styles.pop();
+            for _ in above.iter().rev() {
+                self.queue.push_back(Event::EndTextStyle);
+            }
+            self.queue.push_back(Event::EndTextStyle);
+            for reopened in above {
+                self.pending_open_styles.push(reopened);
             }
         }
     }
 
-    fn current_text_style(&self) -> TextStyle {
-        let mut style = TextStyle::default();
-        if self.bold_depth.is_positive() {
-            style = style.bold();
+    fn flush_pending_styles(&mut self) {
+        for kind in self.pending_open_styles.drain(..) {
+            self.queue.push_back(Event::StartTextStyle {
+                kind: kind.clone(),
+                id: None,
+            });
+            self.open_styles.push(kind);
         }
-        if self.italic_depth.is_positive() {
-            style = style.italic();
+    }
+
+    fn open_style(&mut self, kind: TextStyleKind) {
+        if !self.in_preformatted {
+            self.pending_open_styles.push(kind);
         }
-        if self.strikethrough_depth.is_positive() {
-            style = style.strikethrough();
-        }
-        style
     }
 
     /// Emits `StartLink` for the buffered link if it hasn't been emitted yet.
@@ -298,17 +341,17 @@ impl MarkdownReader {
         let cell = ParserCell::new(source, |s| MarkdownParser(Parser::new_ext(s, options)));
         Self {
             block_state: BlockState::None,
-            bold_depth: Depth::default(),
             cell,
             code_block_buffer: None,
             image: None,
+            in_preformatted: false,
             in_table_head: false,
-            italic_depth: Depth::default(),
             link: None,
             list_stack: Vec::new(),
+            open_styles: Vec::new(),
+            pending_open_styles: Vec::new(),
             phase: Phase::NotStarted,
             queue: VecDeque::new(),
-            strikethrough_depth: Depth::default(),
         }
     }
 
@@ -360,10 +403,13 @@ impl MarkdownReader {
                 });
                 self.block_state = BlockState::AutoParagraph;
             }
-            self.queue.push_back(Event::Text {
-                content,
-                style: self.current_text_style().code(),
+            self.flush_pending_styles();
+            self.queue.push_back(Event::StartTextStyle {
+                kind: TextStyleKind::Code,
+                id: None,
             });
+            self.queue.push_back(Event::Text { content });
+            self.queue.push_back(Event::EndTextStyle);
         }
     }
 
@@ -373,12 +419,10 @@ impl MarkdownReader {
         if let Some(buf) = self.code_block_buffer.take() {
             let content = buf.strip_suffix('\n').unwrap_or(&buf).to_owned();
             if !content.is_empty() {
-                self.queue.push_back(Event::Text {
-                    content,
-                    style: TextStyle::default(),
-                });
+                self.queue.push_back(Event::Text { content });
             }
         }
+        self.in_preformatted = false;
         self.push_event_end(Event::EndPreformatted);
     }
 
@@ -408,6 +452,7 @@ impl MarkdownReader {
     /// list item and resets block state.
     fn handle_end_item(&mut self) {
         if self.block_state == BlockState::AutoParagraph {
+            self.close_all_open_styles();
             self.queue.push_back(Event::EndParagraph);
         }
         self.close_current_item_if_open();
@@ -462,7 +507,7 @@ impl MarkdownReader {
         match tag_end {
             TagEnd::BlockQuote(_) => self.push_event_end(Event::EndBlockQuote),
             TagEnd::CodeBlock => self.handle_end_code_block(),
-            TagEnd::Emphasis => self.italic_depth.dec(),
+            TagEnd::Emphasis => self.close_style(&TextStyleKind::Italic),
             TagEnd::Heading(_) => self.push_event_end(Event::EndHeading),
             TagEnd::Image => self.handle_end_image(),
             TagEnd::Item => self.handle_end_item(),
@@ -470,13 +515,14 @@ impl MarkdownReader {
             TagEnd::List(_) => self.handle_end_list(),
             TagEnd::Paragraph => {
                 if self.block_state == BlockState::PendingExplicit {
+                    self.close_all_open_styles();
                     self.block_state = BlockState::None;
                 } else {
                     self.push_event_end(Event::EndParagraph);
                 }
             }
-            TagEnd::Strikethrough => self.strikethrough_depth.dec(),
-            TagEnd::Strong => self.bold_depth.dec(),
+            TagEnd::Strikethrough => self.close_style(&TextStyleKind::Strikethrough),
+            TagEnd::Strong => self.close_style(&TextStyleKind::Bold),
             TagEnd::Table => self.push_event_end(Event::EndTable),
             TagEnd::TableCell => self.handle_end_table_cell(),
             TagEnd::TableHead => self.handle_end_table_head(),
@@ -528,6 +574,7 @@ impl MarkdownReader {
     /// the internal code-block buffer for content accumulation.
     fn handle_start_code_block(&mut self, syntax: Option<String>) {
         self.code_block_buffer = Some(String::new());
+        self.in_preformatted = true;
         self.push_event_start(Event::StartPreformatted { id: None, syntax });
     }
 
@@ -629,15 +676,15 @@ impl MarkdownReader {
                 self.push_event_start(Event::StartBlockQuote { id: None });
             }
             MarkdownStartTag::CodeBlock { syntax } => self.handle_start_code_block(syntax),
-            MarkdownStartTag::Emphasis => self.italic_depth.inc(),
+            MarkdownStartTag::Emphasis => self.open_style(TextStyleKind::Italic),
             MarkdownStartTag::Heading { level } => self.handle_start_heading(level),
             MarkdownStartTag::Image { dest_url, title } => self.handle_start_image(dest_url, title),
             MarkdownStartTag::Item => self.handle_item_start(),
             MarkdownStartTag::Link { dest_url, title } => self.handle_start_link(dest_url, title),
             MarkdownStartTag::List(start_opt) => self.handle_list_start(start_opt),
             MarkdownStartTag::Paragraph => self.block_state = BlockState::PendingExplicit,
-            MarkdownStartTag::Strikethrough => self.strikethrough_depth.inc(),
-            MarkdownStartTag::Strong => self.bold_depth.inc(),
+            MarkdownStartTag::Strikethrough => self.open_style(TextStyleKind::Strikethrough),
+            MarkdownStartTag::Strong => self.open_style(TextStyleKind::Bold),
             MarkdownStartTag::Table => self.push_event_start(Event::StartTable { id: None }),
             MarkdownStartTag::TableCell => self.handle_start_table_cell(),
             MarkdownStartTag::TableHead => self.handle_start_table_head(),
@@ -659,10 +706,8 @@ impl MarkdownReader {
                 });
                 self.block_state = BlockState::AutoParagraph;
             }
-            self.queue.push_back(Event::Text {
-                content,
-                style: self.current_text_style(),
-            });
+            self.flush_pending_styles();
+            self.queue.push_back(Event::Text { content });
         }
     }
 
@@ -738,6 +783,7 @@ impl MarkdownReader {
     }
 
     fn push_event_end(&mut self, event: Event) {
+        self.close_all_open_styles();
         self.push_event(event, BlockState::None);
     }
 
@@ -834,7 +880,7 @@ mod tests {
         let mut reader = MarkdownReader::from_str("");
         reader.handle_code("code".to_string());
 
-        assert_eq!(reader.queue.len(), 2);
+        assert_eq!(reader.queue.len(), 4);
         assert_eq!(
             reader.queue.front(),
             Some(&Event::StartParagraph {
@@ -844,11 +890,18 @@ mod tests {
         );
         assert_eq!(
             reader.queue.get(1),
-            Some(&Event::Text {
-                content: "code".to_string(),
-                style: TextStyle::default().code(),
+            Some(&Event::StartTextStyle {
+                kind: TextStyleKind::Code,
+                id: None,
             })
         );
+        assert_eq!(
+            reader.queue.get(2),
+            Some(&Event::Text {
+                content: "code".to_string(),
+            })
+        );
+        assert_eq!(reader.queue.get(3), Some(&Event::EndTextStyle));
     }
 
     #[test]
@@ -868,7 +921,6 @@ mod tests {
             reader.queue.get(1),
             Some(&Event::Text {
                 content: "hello".to_string(),
-                style: TextStyle::default(),
             })
         );
     }
