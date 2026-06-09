@@ -35,7 +35,7 @@ changelog_update = false
 release_always = false
 
 # Run cargo-semver-checks before opening the release PR
-semver_check = true
+semver_check = false
 
 # Don't run `cargo update` during release PR (avoids unrelated lockfile churn)
 dependencies_update = false

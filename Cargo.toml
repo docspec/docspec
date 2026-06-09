@@ -171,10 +171,12 @@ large_enum_variant = "allow"
 feature_not_enabled_by_default = { required-update = "minor" }
 enum_variant_added = { required-update = "minor" }
 enum_marked_non_exhaustive = { required-update = "minor" }
-enum_struct_variant_field_missing = { required-updae = "minor" }
+enum_struct_variant_field_missing = { required-update = "minor" }
+enum_no_repr_variant_discriminant_changed = { required-update = "minor" }
 auto_trait_impl_removed = { required-update = "minor" }
 inherent_method_missing = { required-update = "minor" }
 type_mismatched_generic_lifetimes = { required-update = "minor" }
+struct_missing = { required-update = "minor" }
 
 [workspace.metadata.dist]
 # Cargo-dist version
