@@ -1,5 +1,10 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Integration tests for the `docspec` CLI binary.
+
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    clippy::expect_used,
+    clippy::unwrap_used
+)]
 
 use std::io::Write as _;
 
@@ -7,6 +12,7 @@ use assert_cmd::Command;
 use predicates::prelude::PredicateBooleanExt as _;
 use predicates::str::contains;
 use tempfile::NamedTempFile;
+use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
 fn docspec_cmd() -> Command {
     let result = Command::cargo_bin("docspec");
@@ -54,6 +60,21 @@ fn read_output(path: &std::path::Path) -> String {
         result.as_ref().err()
     );
     result.unwrap_or_else(|_| std::process::abort())
+}
+
+const SIMPLE_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+
+fn synth_docx(rels_xml: &str, document_xml: &str) -> Vec<u8> {
+    use std::io::Cursor;
+    let buf = Cursor::new(Vec::new());
+    let mut writer = ZipWriter::new(buf);
+    let opts = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+    writer.start_file("_rels/.rels", opts).unwrap();
+    writer.write_all(rels_xml.as_bytes()).unwrap();
+    let opts_doc = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+    writer.start_file("word/document.xml", opts_doc).unwrap();
+    writer.write_all(document_xml.as_bytes()).unwrap();
+    writer.finish().unwrap().into_inner()
 }
 
 #[cfg(test)]
@@ -559,5 +580,83 @@ mod tests {
             .assert()
             .failure()
             .stderr(predicates::str::contains("subcommand").or(predicates::str::contains("Usage")));
+    }
+
+    #[test]
+    fn convert_docx_file_to_blocknote_stdout() {
+        let doc_xml = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>hello</w:t></w:r></w:p></w:body></w:document>"#;
+        let bytes = synth_docx(SIMPLE_RELS, doc_xml);
+        let input = markdown_tempfile(&bytes, ".docx");
+
+        docspec_cmd()
+            .arg("convert")
+            .arg(input.path())
+            .args(["--to", "blocknote"])
+            .assert()
+            .success()
+            .stdout(contains("paragraph"));
+    }
+
+    #[test]
+    fn convert_docx_stdin_to_blocknote_stdout() {
+        let doc_xml = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>hello</w:t></w:r></w:p></w:body></w:document>"#;
+        let bytes = synth_docx(SIMPLE_RELS, doc_xml);
+
+        docspec_cmd()
+            .args(["convert", "--from", "docx", "--to", "blocknote"])
+            .write_stdin(bytes)
+            .assert()
+            .success()
+            .stdout(contains("paragraph"));
+    }
+
+    #[test]
+    fn docx_stdin_without_from_flag_errors() {
+        let doc_xml = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>hello</w:t></w:r></w:p></w:body></w:document>"#;
+        let bytes = synth_docx(SIMPLE_RELS, doc_xml);
+
+        docspec_cmd()
+            .args(["convert", "--to", "blocknote"])
+            .write_stdin(bytes)
+            .assert()
+            .failure()
+            .stderr(contains("cannot detect input format"));
+    }
+
+    #[test]
+    fn bom_prefixed_markdown_file_strips_bom() {
+        let content = b"\xef\xbb\xbf# Hello";
+        let input = markdown_tempfile(content, ".md");
+
+        docspec_cmd()
+            .arg("convert")
+            .arg(input.path())
+            .args(["--to", "blocknote"])
+            .assert()
+            .success()
+            .stdout(contains("Hello"))
+            .stdout(predicates::str::contains("\u{FEFF}Hello").not());
+    }
+
+    #[test]
+    fn bom_prefixed_markdown_stdin_strips_bom() {
+        let content = b"\xef\xbb\xbf# Hello";
+
+        docspec_cmd()
+            .args(["convert", "--from", "markdown", "--to", "blocknote"])
+            .write_stdin(content.as_ref())
+            .assert()
+            .success()
+            .stdout(contains("Hello"))
+            .stdout(predicates::str::contains("\u{FEFF}Hello").not());
+    }
+
+    #[test]
+    fn clap_rejects_unknown_input_format() {
+        docspec_cmd()
+            .args(["convert", "--from", "pdf", "--to", "blocknote"])
+            .assert()
+            .failure()
+            .stderr(contains("pdf"));
     }
 }

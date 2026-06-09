@@ -4,6 +4,9 @@ use std::path::Path;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum InputFormat {
+    /// DOCX format (paragraphs and text only). Available when the `docx` feature is enabled.
+    #[cfg(feature = "docx")]
+    Docx,
     /// HTML (paragraph-only; `<p>` elements and text within them only).
     /// Available when the `html` feature is enabled.
     #[cfg(feature = "html")]
@@ -41,10 +44,12 @@ pub enum OutputFormat {
 pub fn detect_input_format(path: &Path) -> Option<InputFormat> {
     let ext = path.extension()?.to_str()?.to_ascii_lowercase();
     match ext.as_str() {
-        #[cfg(feature = "markdown")]
-        "md" | "markdown" => Some(InputFormat::Markdown),
+        #[cfg(feature = "docx")]
+        "docx" => Some(InputFormat::Docx),
         #[cfg(feature = "html")]
         "html" | "htm" => Some(InputFormat::Html),
+        #[cfg(feature = "markdown")]
+        "md" | "markdown" => Some(InputFormat::Markdown),
         _ => None,
     }
 }
@@ -62,12 +67,65 @@ pub fn detect_input_format(path: &Path) -> Option<InputFormat> {
 pub fn detect_output_format(path: &Path) -> Option<OutputFormat> {
     let ext = path.extension()?.to_str()?.to_ascii_lowercase();
     match ext.as_str() {
-        #[cfg(feature = "blocknote-writer")]
-        "json" => Some(OutputFormat::Blocknote),
         #[cfg(feature = "html-writer")]
         "html" | "htm" => Some(OutputFormat::Html),
+        #[cfg(feature = "blocknote-writer")]
+        "json" => Some(OutputFormat::Blocknote),
         #[cfg(feature = "pandoc-native-writer")]
         "native" => Some(OutputFormat::PandocNative),
         _ => None,
+    }
+}
+
+/// Strip a UTF-8 byte-order mark (U+FEFF) from the start of `input`, if present.
+///
+/// Returns a subslice of `input` with the leading BOM removed, or `input`
+/// unchanged if no BOM is present.
+#[inline]
+#[must_use]
+pub fn strip_bom(input: &str) -> &str {
+    input.strip_prefix('\u{FEFF}').unwrap_or(input)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strip_bom_empty_string() {
+        assert_eq!(strip_bom(""), "");
+    }
+
+    #[test]
+    fn strip_bom_no_bom() {
+        assert_eq!(strip_bom("hello"), "hello");
+    }
+
+    #[test]
+    fn strip_bom_with_bom() {
+        assert_eq!(strip_bom("\u{FEFF}hello"), "hello");
+    }
+
+    #[test]
+    fn strip_bom_bom_only() {
+        assert_eq!(strip_bom("\u{FEFF}"), "");
+    }
+
+    #[cfg(feature = "docx")]
+    #[test]
+    fn detect_input_format_recognizes_docx() {
+        use std::path::Path;
+        assert_eq!(
+            detect_input_format(Path::new("a.docx")),
+            Some(InputFormat::Docx)
+        );
+        assert_eq!(
+            detect_input_format(Path::new("a.DOCX")),
+            Some(InputFormat::Docx)
+        );
+        assert_eq!(
+            detect_input_format(Path::new("a.DocX")),
+            Some(InputFormat::Docx)
+        );
     }
 }

@@ -8,14 +8,20 @@
 //! blocking work must record metrics in the async context (this matches
 //! the production pattern established in the conversion handler).
 #![allow(
+    clippy::arbitrary_source_item_ordering,
+    clippy::expect_used,
+    clippy::impl_trait_in_params,
+    clippy::shadow_unrelated,
     clippy::tests_outside_test_module,
     clippy::unwrap_used,
-    clippy::expect_used,
     dead_code
 )]
 
+use std::io::Write as _;
+
 use axum::{body::Body, http::Request, Router};
 use metrics_exporter_prometheus::PrometheusHandle;
+use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
 /// Builds a single-threaded Tokio runtime for synchronous integration tests.
 ///
@@ -106,4 +112,42 @@ where
     let (recorder, handle) = docspec_http::metrics::build_recorder().expect("test recorder builds");
     let result = metrics::with_local_recorder(&recorder, body);
     (handle, result)
+}
+
+/// Minimal `_rels/.rels` XML for a DOCX archive pointing at `word/document.xml`.
+pub const SIMPLE_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+
+/// Builds a minimal 2-entry DOCX ZIP archive (Deflated) from raw XML strings.
+///
+/// # Panics
+///
+/// Panics if the ZIP writer fails (should never happen in tests).
+pub fn synth_docx(rels_xml: &str, document_xml: &str) -> Vec<u8> {
+    use std::io::Cursor;
+    let buf = Cursor::new(Vec::new());
+    let mut writer = ZipWriter::new(buf);
+    let opts = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+    writer.start_file("_rels/.rels", opts).unwrap();
+    writer.write_all(rels_xml.as_bytes()).unwrap();
+    let opts_doc = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+    writer.start_file("word/document.xml", opts_doc).unwrap();
+    writer.write_all(document_xml.as_bytes()).unwrap();
+    writer.finish().unwrap().into_inner()
+}
+
+/// Builds a valid DOCX conversion request.
+///
+/// # Panics
+///
+/// Panics if the request builder rejects the supplied body.
+pub fn docx_request(body: impl Into<Body>) -> Request<Body> {
+    request(
+        "POST",
+        "/conversion",
+        &[(
+            "content-type",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )],
+        body,
+    )
 }

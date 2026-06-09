@@ -32,7 +32,7 @@ pub enum Commands {
 #[derive(clap::Args, Debug)]
 #[command(
     about = "Convert documents between formats using streaming event pipeline",
-    long_about = "Convert documents between formats using streaming event pipeline.\n\nSupports converting Markdown or HTML input to BlockNote JSON, HTML, oxa.dev JSON, or Pandoc native output.\n\nNote: HTML input and output currently preserve only paragraph text. Other HTML input\nelements and non-paragraph output events (headings, lists, tables, formatting, etc.)\nare silently dropped. Use BlockNote JSON output for fuller feature coverage."
+    long_about = "Convert documents between formats using streaming event pipeline.\n\nSupports converting Markdown, HTML, or DOCX input to BlockNote JSON, HTML, oxa.dev JSON, or Pandoc native output.\n\nNote: HTML and DOCX input currently preserve only paragraph text. Other HTML input\nelements and non-paragraph output events (headings, lists, tables, formatting, etc.)\nare silently dropped. DOCX input preserves only paragraphs and text; styles, tables,\nlists, images, headers/footers, and tracked changes are silently dropped. Use BlockNote\nJSON output for fuller feature coverage."
 )]
 pub struct ConvertArgs {
     /// When to use colors.
@@ -90,6 +90,9 @@ pub enum ColorChoice {
 #[derive(Clone, Copy, Debug, ValueEnum)]
 #[non_exhaustive]
 pub enum CliInputFormat {
+    /// DOCX format (paragraphs and text only).
+    #[value(name = "docx")]
+    Docx,
     /// HTML format (paragraph-only; `<p>` elements and text within them only).
     #[value(name = "html")]
     Html,

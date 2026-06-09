@@ -5,10 +5,16 @@ use axum::{
     http::{header, HeaderMap, HeaderValue, Response, StatusCode},
     response::IntoResponse,
 };
-use docspec::OutputFormat;
+use docspec::{InputFormat, OutputFormat};
 use docspec_core::{EventSink as _, EventSource as _};
 
 use crate::{error::HttpError, mime_parser};
+
+enum Utf8Prevalidation {
+    Required,
+    SkippedBinary,
+    SkippedFutureFormat,
+}
 
 /// Handle `OPTIONS /conversion` — returns allowed methods.
 #[allow(clippy::unused_async)]
@@ -169,14 +175,36 @@ async fn do_conversion(
     )
     .record(body_len_bytes);
 
-    let input_text = String::from_utf8(body.into()).map_err(|error| {
-        tracing::debug!(error = %error, "request body is not valid UTF-8");
-        HttpError::BodyNotUtf8
-    })?;
+    let utf8_prevalidation = match input_format {
+        InputFormat::Markdown | InputFormat::Html => Utf8Prevalidation::Required,
+        InputFormat::Docx => {
+            // Binary format; UTF-8 prevalidation does not apply.
+            Utf8Prevalidation::SkippedBinary
+        }
+        _ => {
+            // Future InputFormat variants. Conservative policy: skip UTF-8
+            // prevalidation and let the reader surface its own error.
+            // Update this arm deliberately when a new format is added.
+            Utf8Prevalidation::SkippedFutureFormat
+        }
+    };
+
+    if matches!(utf8_prevalidation, Utf8Prevalidation::Required) {
+        core::str::from_utf8(&body).map_err(|_error| {
+            tracing::debug!("request body is not valid UTF-8");
+            HttpError::BodyNotUtf8
+        })?;
+    }
 
     let join_result = tokio::task::spawn_blocking(move || -> Result<(Vec<u8>, u64), HttpError> {
         let mut output_buffer = Vec::new();
-        let mut reader = docspec::AnyReader::from_str(input_format, &input_text);
+        let mut reader = docspec::AnyReader::from_reader(input_format, std::io::Cursor::new(body))
+            .map_err(|error| {
+                tracing::debug!(error = %error, "reader construction failed");
+                HttpError::Unprocessable {
+                    detail: error.to_string(),
+                }
+            })?;
         let mut sink = docspec::AnyWriter::new(output_format, &mut output_buffer);
 
         loop {

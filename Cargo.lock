@@ -478,6 +478,8 @@ dependencies = [
  "docspec-oxa-writer",
  "docspec-pandoc-native-writer",
  "serde_json",
+ "tempfile",
+ "zip",
 ]
 
 [[package]]
@@ -506,6 +508,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror",
+ "zip",
 ]
 
 [[package]]
@@ -564,6 +567,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "zip",
 ]
 
 [[package]]

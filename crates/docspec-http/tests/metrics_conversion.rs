@@ -473,3 +473,54 @@ fn pandoc_native_success_records_pandoc_native_output_mime() {
         r#"docspec_conversions_total{result="success",error_class="none",input_mime_type="text/markdown",output_mime_type="application/vnd.pandoc.native"} 1"#,
     );
 }
+
+// ─── Test 17: DOCX success increments conversions_total ──────────────────────
+
+/// A successful DOCX conversion increments `docspec_conversions_total` with
+/// the full DOCX MIME as `input_mime_type` and `result="success"`.
+#[test]
+fn docx_success_increments_conversions_total() {
+    let doc_xml = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Hello</w:t></w:r></w:p></w:body></w:document>"#;
+    let bytes = common::synth_docx(common::SIMPLE_RELS, doc_xml);
+
+    let rt = common::runtime();
+    let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
+    let router = docspec_http::router::router_with_metrics(handle.clone());
+
+    metrics::with_local_recorder(&recorder, || {
+        rt.block_on(router.oneshot(common::docx_request(bytes)))
+    })
+    .expect("oneshot succeeds");
+
+    let rendered = handle.render();
+    assert_metric_line(
+        &rendered,
+        r#"docspec_conversions_total{result="success",error_class="none",input_mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",output_mime_type="application/vnd.docspec.blocknote+json"} 1"#,
+    );
+}
+
+// ─── Test 18: DOCX input records DOCX input_mime_type ────────────────────────
+
+/// A successful DOCX conversion records the full DOCX MIME as `input_mime_type`
+/// in the rendered Prometheus metrics.
+#[test]
+fn metrics_label_for_docx_input() {
+    let doc_xml = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Hello</w:t></w:r></w:p></w:body></w:document>"#;
+    let bytes = common::synth_docx(common::SIMPLE_RELS, doc_xml);
+
+    let rt = common::runtime();
+    let (recorder, handle) = docspec_http::metrics::build_recorder().expect("builds");
+    let router = docspec_http::router::router_with_metrics(handle.clone());
+
+    metrics::with_local_recorder(&recorder, || {
+        rt.block_on(router.oneshot(common::docx_request(bytes)))
+    })
+    .expect("oneshot succeeds");
+
+    let rendered = handle.render();
+    assert!(
+        rendered
+            .contains("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        "DOCX MIME should appear in metrics: {rendered}"
+    );
+}

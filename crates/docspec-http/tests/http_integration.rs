@@ -2,9 +2,10 @@
 
 // Reason: integration tests use standard test patterns with expect/unwrap.
 #![allow(
+    clippy::arbitrary_source_item_ordering,
+    clippy::expect_used,
     clippy::tests_outside_test_module,
-    clippy::unwrap_used,
-    clippy::expect_used
+    clippy::unwrap_used
 )]
 
 mod common;
@@ -208,9 +209,79 @@ async fn post_conversion_missing_content_type() {
             "type": "about:blank",
             "title": "Unsupported Media Type",
             "status": 415,
-            "detail": "Content-Type must be text/markdown or text/html",
+            "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         })
     );
+}
+
+const DOCX_MIME: &str = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+fn hello_docx_bytes() -> Vec<u8> {
+    let doc_xml = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Hello</w:t></w:r></w:p></w:body></w:document>"#;
+    common::synth_docx(common::SIMPLE_RELS, doc_xml)
+}
+
+#[tokio::test]
+async fn post_conversion_docx_happy_path() {
+    let response = app()
+        .oneshot(common::docx_request(hello_docx_bytes()))
+        .await
+        .expect("request succeeds");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_body_json(response.into_body()).await;
+    let body_str = body.to_string();
+    assert!(
+        body_str.contains("paragraph"),
+        "expected paragraph in: {body_str}"
+    );
+}
+
+#[tokio::test]
+async fn post_conversion_docx_with_charset_param_rejected_415() {
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", &format!("{DOCX_MIME}; charset=utf-8"))],
+        hello_docx_bytes(),
+    );
+    let response = app().oneshot(request).await.expect("request succeeds");
+    assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+}
+
+#[tokio::test]
+async fn post_conversion_docx_with_arbitrary_param_rejected_415() {
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", &format!("{DOCX_MIME}; foo=bar"))],
+        hello_docx_bytes(),
+    );
+    let response = app().oneshot(request).await.expect("request succeeds");
+    assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+}
+
+#[tokio::test]
+async fn post_conversion_docx_invalid_zip_returns_422() {
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", DOCX_MIME)],
+        b"not a zip".to_vec(),
+    );
+    let response = app().oneshot(request).await.expect("request succeeds");
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn post_conversion_docx_empty_body_returns_400() {
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", DOCX_MIME)],
+        b"".to_vec(),
+    );
+    let response = app().oneshot(request).await.expect("request succeeds");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
@@ -233,7 +304,7 @@ async fn post_conversion_wrong_content_type() {
             "type": "about:blank",
             "title": "Unsupported Media Type",
             "status": 415,
-            "detail": "Content-Type must be text/markdown or text/html, got application/json",
+            "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document, got application/json",
         })
     );
 }
@@ -258,7 +329,7 @@ async fn post_conversion_multipart_content_type() {
             "type": "about:blank",
             "title": "Unsupported Media Type",
             "status": 415,
-            "detail": "Content-Type must be text/markdown or text/html, got multipart/form-data; boundary=x",
+            "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document, got multipart/form-data; boundary=x",
         })
     );
 }
