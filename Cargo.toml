@@ -99,6 +99,10 @@ allow_attributes_without_reason = "allow"
 # listing every known variant explicitly creates maintenance burden and defeats the
 # purpose of #[non_exhaustive].
 wildcard_enum_match_arm = "allow"
+# Reason: New public enum variants are appended (not inserted alphabetically) to keep
+# the discriminants of existing variants stable across SemVer minor releases. Strict
+# source-item ordering would force discriminant churn on every variant addition.
+arbitrary_source_item_ordering = "allow"
 # Reason: let x = x.trim() is idiomatic Rust transformation via shadowing
 shadow_same = "allow"
 # Reason: Too noisy; numeric types clear from context
@@ -188,11 +192,11 @@ targets = [
   "aarch64-unknown-linux-gnu",
   "x86_64-unknown-linux-musl",
   "aarch64-unknown-linux-musl",
-  
+
   # macOS
   "x86_64-apple-darwin",
   "aarch64-apple-darwin",
-  
+
   # Windows
   "x86_64-pc-windows-msvc",
   "aarch64-pc-windows-msvc",
