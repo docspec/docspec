@@ -9,13 +9,13 @@ architecture, and the event protocol.
 
 - Paragraphs (`<w:p>`) and direct text (`<w:t>` inside `<w:r>`)
 - Line breaks (`<w:br>`, including `w:type="page"` and `w:type="column"` — all emit `LineBreak`)
+- Tabs (`<w:tab>` — emitted as a `Text` event containing the single character `"\t"`)
 - Emits exactly: `StartDocument`, `StartParagraph`, `Text`, `LineBreak`, `EndParagraph`, `EndDocument`
 - Compression: `Stored` and `Deflated` only
 
 ## Out of Scope (silently dropped)
 
 - Run styling (`<w:rPr>`, bold, italic, underline, etc.)
-- Tabs (`<w:tab>`)
 - Headings (any `<w:pStyle>` value — every paragraph is `StartParagraph`)
 - Tables (`<w:tbl>`, `<w:tr>`, `<w:tc>`)
 - Lists

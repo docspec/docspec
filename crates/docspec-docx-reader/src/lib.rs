@@ -8,15 +8,15 @@
 //!
 //! # Scope
 //!
-//! **In scope**: Paragraphs (`<w:p>`), direct text (`<w:t>` inside `<w:r>`), and
+//! **In scope**: Paragraphs (`<w:p>`), direct text (`<w:t>` inside `<w:r>`),
 //! line breaks (`<w:br>` — including `w:type="page"` and `w:type="column"`, all
-//! emitted as `LineBreak`).
+//! emitted as `LineBreak`), and tabs (`<w:tab>`, emitted as a `Text` event
+//! whose content is the single character `"\t"`).
 //! Emits exactly: `StartDocument`, `StartParagraph`, `Text`, `LineBreak`,
 //! `EndParagraph`, `EndDocument`.
 //!
 //! **Out of scope (silently dropped)**:
 //! - Run styling (`<w:rPr>`, bold, italic, etc.)
-//! - Tabs (`<w:tab>`)
 //! - Headings (any `<w:pStyle>` value — every paragraph is `StartParagraph`)
 //! - Tables (`<w:tbl>`, `<w:tr>`, `<w:tc>`)
 //! - Lists
@@ -72,8 +72,9 @@ enum Phase {
 /// A streaming DOCX reader that implements [`EventSource`].
 ///
 /// `DocxReader` parses a DOCX archive and emits `DocSpec` events one at a time.
-/// Only `<w:p>` paragraph elements, `<w:t>` text elements, and `<w:br>` line
-/// breaks are recognized; all other elements are silently ignored.
+/// Only `<w:p>` paragraph elements, `<w:t>` text elements, `<w:br>` line
+/// breaks, and `<w:tab>` tabs are recognized; all other elements are silently
+/// ignored.
 ///
 /// # Streaming
 ///
@@ -216,6 +217,14 @@ impl DocxReader {
         self.queue.push_back(Event::LineBreak);
     }
 
+    fn emit_tab(&mut self) {
+        self.flush_pending_text();
+        self.queue.push_back(Event::Text {
+            content: "\t".to_string(),
+            style: TextStyle::default(),
+        });
+    }
+
     fn end_paragraph(&mut self) {
         self.queue.push_back(Event::EndParagraph);
         self.in_paragraph = false;
@@ -253,6 +262,7 @@ impl DocxReader {
                 self.queue.push_back(Event::EndParagraph);
             }
             b"br" if self.in_paragraph => self.emit_line_break(),
+            b"tab" if self.in_paragraph => self.emit_tab(),
             _ => {}
         }
     }
@@ -311,6 +321,7 @@ impl DocxReader {
                 self.pending_text.clear();
             }
             b"br" if self.in_paragraph => self.emit_line_break(),
+            b"tab" if self.in_paragraph => self.emit_tab(),
             _ => {}
         }
     }
