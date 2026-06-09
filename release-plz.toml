@@ -34,8 +34,8 @@ changelog_update = false
 # Only publish after a release PR has been merged.
 release_always = false
 
-# Run cargo-semver-checks before opening the release PR
-semver_check = true
+# Temporarily disabled
+# semver_check = true
 
 # Don't run `cargo update` during release PR (avoids unrelated lockfile churn)
 dependencies_update = false

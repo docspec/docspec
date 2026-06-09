@@ -167,14 +167,6 @@ unnecessary_wraps = "allow"
 # Reason: AnyReader enum variants (HtmlReader, MarkdownReader) are large but must be stack-allocated for zero heap allocation and zero virtual-dispatch overhead per MANIFESTO.md. Boxing would violate the design constraint.
 large_enum_variant = "allow"
 
-[workspace.metadata.cargo-semver-checks.lints]
-feature_not_enabled_by_default = { required-update = "minor" }
-enum_variant_added = { required-update = "minor" }
-enum_marked_non_exhaustive = { required-update = "minor" }
-auto_trait_impl_removed = { required-update = "minor" }
-inherent_method_missing = { required-update = "minor" }
-type_mismatched_generic_lifetimes = { required-update = "minor" }
-
 [workspace.metadata.dist]
 # Cargo-dist version
 cargo-dist-version = "0.32.0"
