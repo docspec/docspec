@@ -10,15 +10,23 @@
 //!
 //! **In scope**: Paragraphs (`<w:p>`), direct text (`<w:t>` inside `<w:r>`),
 //! line breaks (`<w:br>` — including `w:type="page"` and `w:type="column"`, all
-//! emitted as `LineBreak`), and tabs (`<w:tab>`, emitted as a `Text` event
-//! whose content is the single character `"\t"`).
+//! emitted as `LineBreak`), tabs (`<w:tab>`, emitted as a `Text` event whose
+//! content is the single character `"\t"`), and tables (`<w:tbl>`, `<w:tr>`,
+//! `<w:tc>` — emitted as structural events only; cell merging, header rows, and
+//! table styles are not represented).
 //! Emits exactly: `StartDocument`, `StartParagraph`, `Text`, `LineBreak`,
-//! `EndParagraph`, `EndDocument`.
+//! `EndParagraph`, `StartTable`, `StartTableRow`, `StartTableCell`,
+//! `EndTableCell`, `EndTableRow`, `EndTable`, `EndDocument`.
 //!
 //! **Out of scope (silently dropped)**:
 //! - Run styling (`<w:rPr>`, bold, italic, etc.)
 //! - Headings (any `<w:pStyle>` value — every paragraph is `StartParagraph`)
-//! - Tables (`<w:tbl>`, `<w:tr>`, `<w:tc>`)
+//! - Cell merging (`<w:gridSpan>`, `<w:vMerge>`) — every cell emits with
+//!   `colspan: None` and `rowspan: None`
+//! - Header rows (`<w:tblHeader>`) — every cell emits as `StartTableCell`,
+//!   never `StartTableHeader`
+//! - Table, row, and cell properties (`<w:tblPr>`, `<w:trPr>`, `<w:tcPr>`,
+//!   `<w:tblGrid>`)
 //! - Lists
 //! - Hyperlinks (`<w:hyperlink>`)
 //! - Drawings and images (`<w:drawing>`, `<w:pict>`)
@@ -72,9 +80,9 @@ enum Phase {
 /// A streaming DOCX reader that implements [`EventSource`].
 ///
 /// `DocxReader` parses a DOCX archive and emits `DocSpec` events one at a time.
-/// Only `<w:p>` paragraph elements, `<w:t>` text elements, `<w:br>` line
-/// breaks, and `<w:tab>` tabs are recognized; all other elements are silently
-/// ignored.
+/// `<w:p>` paragraphs, `<w:t>` text, `<w:br>` line breaks, `<w:tab>` tabs, and
+/// table elements (`<w:tbl>`, `<w:tr>`, `<w:tc>`) are recognized; all other
+/// elements are silently ignored.
 ///
 /// # Streaming
 ///
@@ -89,7 +97,8 @@ enum Phase {
 pub struct DocxReader {
     /// Reusable buffer for quick-xml event reading.
     buf: Vec<u8>,
-    /// Depth counter for ignored subtrees (tables, tracked changes, etc.).
+    /// Depth counter for ignored subtrees (tracked changes, hyperlinks,
+    /// drawings, table/row/cell property containers, etc.).
     /// Incremented on Start of an ignored container, decremented on End.
     in_ignored_subtree: u32,
     /// Whether the reader is currently inside a `<w:p>` element.
@@ -279,6 +288,9 @@ impl DocxReader {
                 self.flush_pending_text();
                 self.in_text = false;
             }
+            b"tbl" => self.queue.push_back(Event::EndTable),
+            b"tr" => self.queue.push_back(Event::EndTableRow),
+            b"tc" => self.queue.push_back(Event::EndTableCell),
             _ => {}
         }
     }
@@ -322,6 +334,13 @@ impl DocxReader {
             }
             b"br" if self.in_paragraph => self.emit_line_break(),
             b"tab" if self.in_paragraph => self.emit_tab(),
+            b"tbl" => self.queue.push_back(Event::StartTable { id: None }),
+            b"tr" => self.queue.push_back(Event::StartTableRow { id: None }),
+            b"tc" => self.queue.push_back(Event::StartTableCell {
+                colspan: None,
+                id: None,
+                rowspan: None,
+            }),
             _ => {}
         }
     }
@@ -413,10 +432,7 @@ impl EventSource for DocxReader {
 fn is_ignored_container(local: &[u8]) -> bool {
     matches!(
         local,
-        b"tbl"
-            | b"tr"
-            | b"tc"
-            | b"sdt"
+        b"sdt"
             | b"hyperlink"
             | b"drawing"
             | b"pict"
@@ -425,6 +441,10 @@ fn is_ignored_container(local: &[u8]) -> bool {
             | b"del"
             | b"moveFrom"
             | b"moveTo"
+            | b"tblPr"
+            | b"trPr"
+            | b"tcPr"
+            | b"tblGrid"
     )
 }
 

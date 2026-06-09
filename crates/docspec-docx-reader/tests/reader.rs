@@ -627,9 +627,9 @@ mod events {
     }
 
     #[test]
-    fn ignored_empty_container_does_not_emit_paragraph() {
+    fn self_closing_ignored_container_emits_no_events() {
         let mut reader = make_reader(
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl/></w:body></w:document>"#,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:hyperlink/></w:body></w:document>"#,
         );
         let events = drive(&mut reader);
         assert_eq!(events, vec![start_doc(), Event::EndDocument]);
@@ -667,15 +667,6 @@ mod events {
     fn wt_outside_wp_is_silently_dropped() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:t>orphan</w:t></w:body></w:document>"#,
-        );
-        let events = drive(&mut reader);
-        assert_eq!(events, vec![start_doc(), Event::EndDocument]);
-    }
-
-    #[test]
-    fn table_cells_do_not_emit_paragraphs() {
-        let mut reader = make_reader(
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
         );
         let events = drive(&mut reader);
         assert_eq!(events, vec![start_doc(), Event::EndDocument]);
@@ -1215,12 +1206,33 @@ mod events {
     }
 
     #[test]
-    fn w_tab_inside_table_is_silently_dropped() {
+    fn w_tab_inside_table_cell_emits_text_tab() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>a</w:t><w:tab/><w:t>b</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
         );
         let events = drive(&mut reader);
-        assert_eq!(events, vec![start_doc(), Event::EndDocument]);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartTable { id: None },
+                Event::StartTableRow { id: None },
+                Event::StartTableCell {
+                    colspan: None,
+                    id: None,
+                    rowspan: None,
+                },
+                start_para(),
+                text("a"),
+                text("\t"),
+                text("b"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -1436,12 +1448,33 @@ mod events {
     }
 
     #[test]
-    fn w_br_inside_table_is_silently_dropped() {
+    fn w_br_inside_table_cell_emits_line_break() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>a</w:t><w:br/><w:t>b</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
         );
         let events = drive(&mut reader);
-        assert_eq!(events, vec![start_doc(), Event::EndDocument]);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartTable { id: None },
+                Event::StartTableRow { id: None },
+                Event::StartTableCell {
+                    colspan: None,
+                    id: None,
+                    rowspan: None,
+                },
+                start_para(),
+                text("a"),
+                Event::LineBreak,
+                text("b"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -1459,6 +1492,260 @@ mod events {
                 Event::LineBreak,
                 Event::LineBreak,
                 Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    fn start_table() -> Event {
+        Event::StartTable { id: None }
+    }
+
+    fn start_row() -> Event {
+        Event::StartTableRow { id: None }
+    }
+
+    fn start_cell() -> Event {
+        Event::StartTableCell {
+            colspan: None,
+            id: None,
+            rowspan: None,
+        }
+    }
+
+    #[test]
+    fn simple_table_emits_full_structure() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("cell"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn multi_row_multi_cell_table_emits_full_structure() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>a</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>b</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>c</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>d</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("a"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                start_cell(),
+                start_para(),
+                text("b"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("c"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                start_cell(),
+                start_para(),
+                text("d"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn empty_cell_emits_paragraph_pair() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn multiple_paragraphs_in_cell_emit_multiple_paragraphs() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>first</w:t></w:r></w:p><w:p><w:r><w:t>second</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("first"),
+                Event::EndParagraph,
+                start_para(),
+                text("second"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn nested_table_emits_nested_events() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:tbl><w:tr><w:tc><w:p><w:r><w:t>inner</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("inner"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn table_inside_ignored_subtree_is_dropped() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>before</w:t></w:r></w:p><w:ins><w:tbl><w:tr><w:tc><w:p><w:r><w:t>inserted</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:ins><w:p><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("before"),
+                Event::EndParagraph,
+                start_para(),
+                text("after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn table_row_and_cell_properties_emit_no_events() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="5000" w:type="pct"/></w:tblPr><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2500" w:type="pct"/><w:gridSpan w:val="2"/><w:vMerge w:val="restart"/></w:tcPr><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("cell"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn table_grid_emits_no_events() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblGrid><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/></w:tblGrid><w:tr><w:tc><w:p><w:r><w:t>a</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("a"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_inside_cell_is_still_dropped() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>keep</w:t></w:r><w:hyperlink><w:r><w:t>link</w:t></w:r></w:hyperlink></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("keep"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
                 Event::EndDocument,
             ]
         );
