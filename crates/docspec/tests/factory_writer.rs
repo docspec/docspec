@@ -10,7 +10,14 @@ mod tests {
         feature = "html-writer",
         feature = "pandoc-native-writer"
     ))]
-    use docspec::{AnyWriter, OutputFormat, TextStyle};
+    use docspec::AnyWriter;
+    #[cfg(any(
+        feature = "blocknote-writer",
+        feature = "oxa-writer",
+        feature = "html-writer",
+        feature = "pandoc-native-writer"
+    ))]
+    use docspec::OutputFormat;
     #[cfg(any(
         feature = "blocknote-writer",
         feature = "oxa-writer",
@@ -55,7 +62,6 @@ mod tests {
     fn text(content: &str) -> Event {
         Event::Text {
             content: content.to_string(),
-            style: TextStyle::default(),
         }
     }
 
@@ -305,5 +311,30 @@ mod tests {
         fn check<K: EventSink>(_: K) {}
         let output = Vec::new();
         check(AnyWriter::new(OutputFormat::Html, output));
+    }
+
+    #[cfg(all(feature = "markdown", feature = "blocknote-writer"))]
+    #[test]
+    fn markdown_bold_to_blocknote() {
+        use docspec::readers::MarkdownReader;
+        use docspec::EventSource as _;
+
+        let markdown = "**bold**";
+        let mut reader = MarkdownReader::from_str(markdown);
+        let mut output = Vec::new();
+        let mut writer = AnyWriter::new(OutputFormat::Blocknote, &mut output);
+
+        while let Some(event) = reader.next_event().expect("reader failed") {
+            writer
+                .handle_event(event)
+                .expect("writer handle_event failed");
+        }
+        writer.finish().expect("writer finish failed");
+
+        let json = String::from_utf8(output).expect("not utf8");
+        assert!(
+            json.contains("\"bold\":true") || json.contains("\"bold\": true"),
+            "Expected bold flag in output: {json}"
+        );
     }
 }

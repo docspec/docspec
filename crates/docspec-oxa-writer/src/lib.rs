@@ -18,7 +18,7 @@
 //! # Example
 //!
 //! ```
-//! use docspec_core::{Event, EventSink, Result, TextStyle};
+//! use docspec_core::{Event, EventSink, Result};
 //! use docspec_oxa_writer::OxaWriter;
 //!
 //! let mut buf = Vec::<u8>::new();
@@ -27,7 +27,6 @@
 //! writer.handle_event(Event::StartParagraph { alignment: None, id: None })?;
 //! writer.handle_event(Event::Text {
 //!     content: "Hello".to_string(),
-//!     style: TextStyle::default(),
 //! })?;
 //! writer.handle_event(Event::EndParagraph)?;
 //! writer.handle_event(Event::EndDocument)?;
@@ -126,7 +125,7 @@ impl<W: Write> EventSink for OxaWriter<W> {
                 Ok(())
             }
             Event::EndParagraph => self.close_paragraph(),
-            Event::Text { content, .. } => {
+            Event::Text { content } => {
                 if !self.in_paragraph {
                     return Ok(());
                 }
@@ -149,6 +148,7 @@ impl<W: Write> EventSink for OxaWriter<W> {
             | Event::EndTableCell
             | Event::EndTableHeader
             | Event::EndTableRow
+            | Event::EndTextStyle
             | Event::EndUnorderedListItem
             | Event::FootnoteRef { .. }
             | Event::Image { .. }
@@ -168,6 +168,7 @@ impl<W: Write> EventSink for OxaWriter<W> {
             | Event::StartTableCell { .. }
             | Event::StartTableHeader { .. }
             | Event::StartTableRow { .. }
+            | Event::StartTextStyle { .. }
             | Event::StartUnorderedListItem { .. }
             | Event::ThematicBreak { .. }
             | _ => Ok(()),

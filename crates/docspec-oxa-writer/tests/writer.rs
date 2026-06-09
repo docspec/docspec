@@ -4,7 +4,7 @@
 
 #[cfg(test)]
 mod tests {
-    use docspec_core::{Error, Event, EventSink as _, ImageSource, TextStyle};
+    use docspec_core::{Error, Event, EventSink as _, ImageSource, TextStyleKind};
     use docspec_oxa_writer::OxaWriter;
     use serde_json::{json, Value};
 
@@ -61,7 +61,6 @@ mod tests {
     fn text(s: &str) -> Event {
         Event::Text {
             content: s.to_string(),
-            style: TextStyle::default(),
         }
     }
 
@@ -349,5 +348,25 @@ mod tests {
                 }]
             })
         );
+    }
+
+    #[test]
+    fn styled_input_dropped() {
+        let styled_events = vec![
+            start_doc(),
+            start_para(),
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+                id: None,
+            },
+            text("x"),
+            Event::EndTextStyle,
+            end_para(),
+            end_doc(),
+        ];
+        let unstyled_events = vec![start_doc(), start_para(), text("x"), end_para(), end_doc()];
+        let styled_output = run_raw(styled_events);
+        let unstyled_output = run_raw(unstyled_events);
+        assert_eq!(styled_output, unstyled_output);
     }
 }

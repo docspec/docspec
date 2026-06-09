@@ -499,7 +499,7 @@ mod constructor {
 mod events {
     use std::io::Cursor;
 
-    use docspec_core::{Event, TextAlignment, TextStyle};
+    use docspec_core::{Event, TextAlignment, TextStyleKind};
     use docspec_docx_reader::{DocxReader, EventSource as _};
 
     use crate::fixture;
@@ -544,8 +544,24 @@ mod events {
     fn text(content: &str) -> Event {
         Event::Text {
             content: content.to_string(),
-            style: TextStyle::default(),
         }
+    }
+
+    fn styled_text_events(kinds: &[TextStyleKind], content: &str) -> Vec<Event> {
+        let mut events = Vec::new();
+        for kind in kinds {
+            events.push(Event::StartTextStyle {
+                kind: kind.clone(),
+                id: None,
+            });
+        }
+        events.push(Event::Text {
+            content: content.to_string(),
+        });
+        for _kind in kinds.iter().rev() {
+            events.push(Event::EndTextStyle);
+        }
+        events
     }
 
     mod rpr {
@@ -559,21 +575,12 @@ mod events {
             drive(&mut reader)
         }
 
-        fn styled_text(content: &str, style: TextStyle) -> Event {
-            Event::Text {
-                content: content.to_string(),
-                style,
-            }
-        }
-
-        fn expected_events(text_event: Event) -> Vec<Event> {
-            vec![
-                start_doc(),
-                start_para(),
-                text_event,
-                Event::EndParagraph,
-                Event::EndDocument,
-            ]
+        fn expected_events(mut content_events: Vec<Event>) -> Vec<Event> {
+            let mut events = vec![start_doc(), start_para()];
+            events.append(&mut content_events);
+            events.push(Event::EndParagraph);
+            events.push(Event::EndDocument);
+            events
         }
 
         #[test]
@@ -581,13 +588,7 @@ mod events {
             let events = collect_events("<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>x</w:t></w:r></w:p>");
             assert_eq!(
                 events,
-                expected_events(styled_text(
-                    "x",
-                    TextStyle {
-                        bold: true,
-                        ..TextStyle::default()
-                    },
-                ))
+                expected_events(styled_text_events(&[TextStyleKind::Bold], "x"))
             );
         }
 
@@ -596,13 +597,7 @@ mod events {
             let events = collect_events("<w:p><w:r><w:rPr><w:i/></w:rPr><w:t>x</w:t></w:r></w:p>");
             assert_eq!(
                 events,
-                expected_events(styled_text(
-                    "x",
-                    TextStyle {
-                        italic: true,
-                        ..TextStyle::default()
-                    },
-                ))
+                expected_events(styled_text_events(&[TextStyleKind::Italic], "x"))
             );
         }
 
@@ -612,13 +607,7 @@ mod events {
                 collect_events("<w:p><w:r><w:rPr><w:strike/></w:rPr><w:t>x</w:t></w:r></w:p>");
             assert_eq!(
                 events,
-                expected_events(styled_text(
-                    "x",
-                    TextStyle {
-                        strikethrough: true,
-                        ..TextStyle::default()
-                    },
-                ))
+                expected_events(styled_text_events(&[TextStyleKind::Strikethrough], "x"))
             );
         }
 
@@ -628,13 +617,7 @@ mod events {
                 collect_events("<w:p><w:r><w:rPr><w:dstrike/></w:rPr><w:t>x</w:t></w:r></w:p>");
             assert_eq!(
                 events,
-                expected_events(styled_text(
-                    "x",
-                    TextStyle {
-                        strikethrough: true,
-                        ..TextStyle::default()
-                    },
-                ))
+                expected_events(styled_text_events(&[TextStyleKind::Strikethrough], "x"))
             );
         }
 
@@ -645,14 +628,13 @@ mod events {
             );
             assert_eq!(
                 events,
-                expected_events(styled_text(
+                expected_events(styled_text_events(
+                    &[
+                        TextStyleKind::Bold,
+                        TextStyleKind::Italic,
+                        TextStyleKind::Strikethrough,
+                    ],
                     "x",
-                    TextStyle {
-                        bold: true,
-                        italic: true,
-                        strikethrough: true,
-                        ..TextStyle::default()
-                    },
                 ))
             );
         }
@@ -662,7 +644,7 @@ mod events {
             let events = collect_events(
                 r#"<w:p><w:r><w:rPr><w:b w:val="false"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
             );
-            assert_eq!(events, expected_events(text("x")));
+            assert_eq!(events, expected_events(vec![text("x")]));
         }
 
         #[test]
@@ -670,7 +652,7 @@ mod events {
             let events = collect_events(
                 r#"<w:p><w:r><w:rPr><w:b w:val="0"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
             );
-            assert_eq!(events, expected_events(text("x")));
+            assert_eq!(events, expected_events(vec![text("x")]));
         }
 
         #[test]
@@ -680,13 +662,7 @@ mod events {
             );
             assert_eq!(
                 events,
-                expected_events(styled_text(
-                    "x",
-                    TextStyle {
-                        bold: true,
-                        ..TextStyle::default()
-                    },
-                ))
+                expected_events(styled_text_events(&[TextStyleKind::Bold], "x"))
             );
         }
 
@@ -695,7 +671,7 @@ mod events {
             let events = collect_events(
                 r#"<w:p><w:r><w:rPr><w:b/><w:b w:val="false"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
             );
-            assert_eq!(events, expected_events(text("x")));
+            assert_eq!(events, expected_events(vec![text("x")]));
         }
 
         #[test]
@@ -708,13 +684,12 @@ mod events {
                 vec![
                     start_doc(),
                     start_para(),
-                    styled_text(
-                        "a",
-                        TextStyle {
-                            bold: true,
-                            ..TextStyle::default()
-                        },
-                    ),
+                    Event::StartTextStyle {
+                        kind: TextStyleKind::Bold,
+                        id: None,
+                    },
+                    text("a"),
+                    Event::EndTextStyle,
                     text("b"),
                     Event::EndParagraph,
                     Event::EndDocument,
@@ -725,7 +700,7 @@ mod events {
         #[test]
         fn rpr_absent_uses_default_style() {
             let events = collect_events("<w:p><w:r><w:t>x</w:t></w:r></w:p>");
-            assert_eq!(events, expected_events(text("x")));
+            assert_eq!(events, expected_events(vec![text("x")]));
         }
 
         #[test]
@@ -735,13 +710,7 @@ mod events {
             );
             assert_eq!(
                 events,
-                expected_events(styled_text(
-                    "x",
-                    TextStyle {
-                        underline: true,
-                        ..TextStyle::default()
-                    },
-                ))
+                expected_events(styled_text_events(&[TextStyleKind::Underline], "x"))
             );
         }
 
@@ -752,13 +721,7 @@ mod events {
             );
             assert_eq!(
                 events,
-                expected_events(styled_text(
-                    "x",
-                    TextStyle {
-                        underline: true,
-                        ..TextStyle::default()
-                    },
-                ))
+                expected_events(styled_text_events(&[TextStyleKind::Underline], "x"))
             );
         }
 
@@ -769,13 +732,7 @@ mod events {
             );
             assert_eq!(
                 events,
-                expected_events(styled_text(
-                    "x",
-                    TextStyle {
-                        underline: true,
-                        ..TextStyle::default()
-                    },
-                ))
+                expected_events(styled_text_events(&[TextStyleKind::Underline], "x"))
             );
         }
 
@@ -784,13 +741,13 @@ mod events {
             let events = collect_events(
                 r#"<w:p><w:r><w:rPr><w:u w:val="none"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
             );
-            assert_eq!(events, expected_events(text("x")));
+            assert_eq!(events, expected_events(vec![text("x")]));
         }
 
         #[test]
         fn rpr_underline_no_val_means_no_underline() {
             let events = collect_events("<w:p><w:r><w:rPr><w:u/></w:rPr><w:t>x</w:t></w:r></w:p>");
-            assert_eq!(events, expected_events(text("x")));
+            assert_eq!(events, expected_events(vec![text("x")]));
         }
 
         #[test]
@@ -800,13 +757,7 @@ mod events {
             );
             assert_eq!(
                 events,
-                expected_events(styled_text(
-                    "x",
-                    TextStyle {
-                        subscript: true,
-                        ..TextStyle::default()
-                    },
-                ))
+                expected_events(styled_text_events(&[TextStyleKind::Subscript], "x"))
             );
         }
 
@@ -817,13 +768,7 @@ mod events {
             );
             assert_eq!(
                 events,
-                expected_events(styled_text(
-                    "x",
-                    TextStyle {
-                        superscript: true,
-                        ..TextStyle::default()
-                    },
-                ))
+                expected_events(styled_text_events(&[TextStyleKind::Superscript], "x"))
             );
         }
 
@@ -832,14 +777,14 @@ mod events {
             let events = collect_events(
                 r#"<w:p><w:r><w:rPr><w:vertAlign w:val="superscript"/><w:vertAlign w:val="baseline"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
             );
-            assert_eq!(events, expected_events(text("x")));
+            assert_eq!(events, expected_events(vec![text("x")]));
         }
 
         #[test]
         fn rpr_vert_align_no_val_treated_lenient() {
             let events =
                 collect_events("<w:p><w:r><w:rPr><w:vertAlign/></w:rPr><w:t>x</w:t></w:r></w:p>");
-            assert_eq!(events, expected_events(text("x")));
+            assert_eq!(events, expected_events(vec![text("x")]));
         }
 
         #[test]
@@ -849,14 +794,85 @@ mod events {
             );
             assert_eq!(
                 events,
-                expected_events(styled_text(
+                expected_events(styled_text_events(
+                    &[TextStyleKind::Bold, TextStyleKind::Underline],
                     "x",
-                    TextStyle {
-                        bold: true,
-                        underline: true,
-                        ..TextStyle::default()
-                    },
                 ))
+            );
+        }
+
+        #[test]
+        fn tab_inside_styled_run_inherits_style() {
+            let events = collect_events("<w:p><w:r><w:rPr><w:b/></w:rPr><w:tab/></w:r></w:p>");
+            assert_eq!(
+                events,
+                expected_events(styled_text_events(&[TextStyleKind::Bold], "\t"))
+            );
+        }
+
+        #[test]
+        fn empty_styled_run_emits_no_style_events() {
+            let events = collect_events("<w:p><w:r><w:rPr><w:b/></w:rPr></w:r></w:p>");
+            assert_eq!(
+                events,
+                vec![
+                    start_doc(),
+                    start_para(),
+                    Event::EndParagraph,
+                    Event::EndDocument
+                ]
+            );
+        }
+
+        #[test]
+        fn multi_wt_run_shares_single_start_end() {
+            let events = collect_events(
+                "<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>foo</w:t><w:t>bar</w:t></w:r></w:p>",
+            );
+            assert_eq!(
+                events,
+                vec![
+                    start_doc(),
+                    start_para(),
+                    Event::StartTextStyle {
+                        kind: TextStyleKind::Bold,
+                        id: None,
+                    },
+                    text("foo"),
+                    text("bar"),
+                    Event::EndTextStyle,
+                    Event::EndParagraph,
+                    Event::EndDocument,
+                ]
+            );
+        }
+
+        #[test]
+        fn adjacent_styled_and_unstyled_runs() {
+            let events = collect_events(
+                "<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>a</w:t></w:r><w:r><w:t>b</w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>c</w:t></w:r></w:p>",
+            );
+            assert_eq!(
+                events,
+                vec![
+                    start_doc(),
+                    start_para(),
+                    Event::StartTextStyle {
+                        kind: TextStyleKind::Bold,
+                        id: None,
+                    },
+                    text("a"),
+                    Event::EndTextStyle,
+                    text("b"),
+                    Event::StartTextStyle {
+                        kind: TextStyleKind::Bold,
+                        id: None,
+                    },
+                    text("c"),
+                    Event::EndTextStyle,
+                    Event::EndParagraph,
+                    Event::EndDocument,
+                ]
             );
         }
     }
@@ -1040,7 +1056,7 @@ mod events {
 
         assert_eq!(
             format!("{reader:?}"),
-            "DocxReader { buf: [], in_ignored_subtree: 0, in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, paragraph_started_emitted: false, in_rpr: false, pending_run_style: TextStyle { bold: false, code: false, italic: false, mark: None, strikethrough: false, subscript: false, superscript: false, underline: false }, pending_text: \"\", current_run_style: TextStyle { bold: false, code: false, italic: false, mark: None, strikethrough: false, subscript: false, superscript: false, underline: false }, phase: \"<phase>\", queue: [], run_content_emitted: false, xml: \"<quick_xml::Reader>\" }"
+            "DocxReader { buf: [], in_ignored_subtree: 0, in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_text: \"\", frozen_run_kinds: [], open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, xml: \"<quick_xml::Reader>\" }"
         );
     }
 
@@ -2327,13 +2343,12 @@ mod events {
                 start_doc(),
                 start_para(),
                 text("a"),
-                Event::Text {
-                    content: "b".to_string(),
-                    style: TextStyle {
-                        italic: true,
-                        ..TextStyle::default()
-                    },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Italic,
+                    id: None,
                 },
+                text("b"),
+                Event::EndTextStyle,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -2405,13 +2420,12 @@ mod events {
             vec![
                 start_doc(),
                 start_para(),
-                Event::Text {
-                    content: "x".to_string(),
-                    style: TextStyle {
-                        bold: true,
-                        ..TextStyle::default()
-                    },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
                 },
+                text("x"),
+                Event::EndTextStyle,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -2465,13 +2479,12 @@ mod events {
             vec![
                 start_doc(),
                 start_para_with_alignment(TextAlignment::Right),
-                Event::Text {
-                    content: "a".to_string(),
-                    style: TextStyle {
-                        bold: true,
-                        ..TextStyle::default()
-                    },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
                 },
+                text("a"),
+                Event::EndTextStyle,
                 Event::EndParagraph,
                 start_para(),
                 text("b"),

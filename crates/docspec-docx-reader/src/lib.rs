@@ -14,12 +14,12 @@
 //! content is the single character `"\t"`), and tables (`<w:tbl>`, `<w:tr>`,
 //! `<w:tc>` — emitted as structural events only; cell merging, header rows, and
 //! table styles are not represented).
-//! Emits exactly: `StartDocument`, `StartParagraph`, `Text`, `LineBreak`,
-//! `EndParagraph`, `StartTable`, `StartTableRow`, `StartTableCell`,
-//! `EndTableCell`, `EndTableRow`, `EndTable`, `EndDocument`.
+//! Emits exactly: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`,
+//! `EndTextStyle`, `LineBreak`, `EndParagraph`, `StartTable`, `StartTableRow`,
+//! `StartTableCell`, `EndTableCell`, `EndTableRow`, `EndTable`, `EndDocument`.
 //!
 //! **Out of scope (silently dropped)**:
-//! - Run styling (`<w:rPr>`, bold, italic, etc.)
+//! - Run styling not listed in the crate README
 //! - Headings (any `<w:pStyle>` value — every paragraph is `StartParagraph`)
 //! - Cell merging (`<w:gridSpan>`, `<w:vMerge>`) — every cell emits with
 //!   `colspan: None` and `rowspan: None`
@@ -64,7 +64,7 @@ use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 
 pub use docspec_core::EventSource;
-use docspec_core::{Error, Event, Result, TextAlignment, TextStyle};
+use docspec_core::{Error, Event, Result, TextAlignment, TextStyleKind};
 use quick_xml::events::{BytesCData, BytesRef, BytesStart, BytesText};
 
 /// Document processing phase.
@@ -118,12 +118,14 @@ pub struct DocxReader {
     paragraph_started_emitted: bool,
     /// Whether currently inside a `<w:rPr>` element that is still legal (first child of run).
     in_rpr: bool,
-    /// Run style accumulated while inside `<w:rPr>`.
-    pending_run_style: TextStyle,
+    /// Run style kinds accumulated while inside `<w:rPr>`.
+    pending_run_kinds: Vec<TextStyleKind>,
     /// Text collected for the current `<w:t>` element.
     pending_text: String,
-    /// Run style frozen at `</w:rPr>`, applied to subsequent text emissions in the same run.
-    current_run_style: TextStyle,
+    /// Run style kinds frozen at `</w:rPr>`, applied to subsequent emissions in the same run.
+    frozen_run_kinds: Vec<TextStyleKind>,
+    /// Style kinds currently opened for the active run.
+    open_styles: Vec<TextStyleKind>,
     /// Document processing phase.
     phase: Phase,
     /// Queue of `DocSpec` events to emit.
@@ -149,9 +151,10 @@ impl fmt::Debug for DocxReader {
             )
             .field("paragraph_started_emitted", &self.paragraph_started_emitted)
             .field("in_rpr", &self.in_rpr)
-            .field("pending_run_style", &self.pending_run_style)
+            .field("pending_run_kinds", &self.pending_run_kinds)
             .field("pending_text", &self.pending_text)
-            .field("current_run_style", &self.current_run_style)
+            .field("frozen_run_kinds", &self.frozen_run_kinds)
+            .field("open_styles", &self.open_styles)
             .field("phase", &"<phase>")
             .field("queue", &self.queue)
             .field("run_content_emitted", &self.run_content_emitted)
@@ -241,9 +244,10 @@ impl DocxReader {
             pending_paragraph_alignment: None,
             paragraph_started_emitted: false,
             in_rpr: false,
-            pending_run_style: TextStyle::default(),
+            pending_run_kinds: Vec::new(),
             pending_text: String::new(),
-            current_run_style: TextStyle::default(),
+            frozen_run_kinds: Vec::new(),
+            open_styles: Vec::new(),
             phase: Phase::NotStarted,
             queue: VecDeque::new(),
             run_content_emitted: false,
@@ -260,6 +264,7 @@ impl DocxReader {
     fn emit_line_break(&mut self) {
         self.ensure_paragraph_started();
         self.flush_pending_text();
+        self.emit_deferred_starts();
         self.run_content_emitted = true;
         self.queue.push_back(Event::LineBreak);
     }
@@ -267,15 +272,20 @@ impl DocxReader {
     fn emit_tab(&mut self) {
         self.ensure_paragraph_started();
         self.flush_pending_text();
+        self.emit_deferred_starts();
         self.run_content_emitted = true;
         self.queue.push_back(Event::Text {
             content: "\t".to_string(),
-            style: TextStyle::default(),
         });
     }
 
     fn end_paragraph(&mut self) {
         self.ensure_paragraph_started();
+        while self.open_styles.pop().is_some() {
+            self.queue.push_back(Event::EndTextStyle);
+        }
+        self.frozen_run_kinds.clear();
+        self.pending_run_kinds.clear();
         self.queue.push_back(Event::EndParagraph);
         self.in_paragraph = false;
         self.in_text = false;
@@ -287,10 +297,44 @@ impl DocxReader {
 
     fn flush_pending_text(&mut self) {
         if !self.pending_text.is_empty() {
+            self.emit_deferred_starts();
             self.queue.push_back(Event::Text {
                 content: core::mem::take(&mut self.pending_text),
-                style: self.current_run_style.clone(),
             });
+        }
+    }
+
+    fn emit_deferred_starts(&mut self) {
+        for kind in &self.frozen_run_kinds {
+            if !self.open_styles.contains(kind) {
+                self.queue.push_back(Event::StartTextStyle {
+                    kind: kind.clone(),
+                    id: None,
+                });
+                self.open_styles.push(kind.clone());
+            }
+        }
+    }
+
+    fn set_pending_run_kind(&mut self, kind: TextStyleKind, enabled: bool) {
+        self.pending_run_kinds.retain(|current| current != &kind);
+        if enabled {
+            self.pending_run_kinds.push(kind);
+        }
+    }
+
+    fn set_pending_vertical_alignment(&mut self, align: properties::VertAlign) {
+        self.pending_run_kinds.retain(|kind| {
+            kind != &TextStyleKind::Subscript && kind != &TextStyleKind::Superscript
+        });
+        match align {
+            properties::VertAlign::Subscript => {
+                self.pending_run_kinds.push(TextStyleKind::Subscript);
+            }
+            properties::VertAlign::Superscript => {
+                self.pending_run_kinds.push(TextStyleKind::Superscript);
+            }
+            properties::VertAlign::None => {}
         }
     }
 
@@ -320,34 +364,27 @@ impl DocxReader {
             b"rPr" if self.in_ppr => {}
             b"rPr" if self.in_paragraph && !self.in_ppr && !self.in_rpr => {}
             b"b" if self.in_rpr => {
-                self.pending_run_style.bold = parse_on_off_attribute(tag);
+                self.set_pending_run_kind(TextStyleKind::Bold, parse_on_off_attribute(tag));
             }
             b"i" if self.in_rpr => {
-                self.pending_run_style.italic = parse_on_off_attribute(tag);
+                self.set_pending_run_kind(TextStyleKind::Italic, parse_on_off_attribute(tag));
             }
             b"strike" | b"dstrike" if self.in_rpr => {
-                self.pending_run_style.strikethrough = parse_on_off_attribute(tag);
+                self.set_pending_run_kind(
+                    TextStyleKind::Strikethrough,
+                    parse_on_off_attribute(tag),
+                );
             }
             b"u" if self.in_rpr => {
                 let val = read_val_attribute(tag);
-                self.pending_run_style.underline = properties::parse_underline_on(val.as_deref());
+                self.set_pending_run_kind(
+                    TextStyleKind::Underline,
+                    properties::parse_underline_on(val.as_deref()),
+                );
             }
             b"vertAlign" if self.in_rpr => {
                 let val = read_val_attribute(tag);
-                match properties::parse_vert_align(val.as_deref()) {
-                    properties::VertAlign::Subscript => {
-                        self.pending_run_style.subscript = true;
-                        self.pending_run_style.superscript = false;
-                    }
-                    properties::VertAlign::Superscript => {
-                        self.pending_run_style.superscript = true;
-                        self.pending_run_style.subscript = false;
-                    }
-                    properties::VertAlign::None => {
-                        self.pending_run_style.subscript = false;
-                        self.pending_run_style.superscript = false;
-                    }
-                }
+                self.set_pending_vertical_alignment(properties::parse_vert_align(val.as_deref()));
             }
             b"p" if !self.in_paragraph => {
                 self.queue.push_back(Event::StartParagraph {
@@ -375,12 +412,15 @@ impl DocxReader {
                 self.in_ppr = false;
             }
             b"rPr" if self.in_rpr => {
-                self.current_run_style = self.pending_run_style.clone();
+                self.frozen_run_kinds = core::mem::take(&mut self.pending_run_kinds);
                 self.in_rpr = false;
             }
             b"r" => {
-                self.current_run_style = TextStyle::default();
-                self.pending_run_style = TextStyle::default();
+                while self.open_styles.pop().is_some() {
+                    self.queue.push_back(Event::EndTextStyle);
+                }
+                self.frozen_run_kinds.clear();
+                self.pending_run_kinds.clear();
                 self.run_content_emitted = false;
                 self.in_rpr = false;
             }
@@ -452,38 +492,31 @@ impl DocxReader {
                     self.in_ignored_subtree = 1;
                 } else {
                     self.in_rpr = true;
-                    self.pending_run_style = TextStyle::default();
+                    self.pending_run_kinds.clear();
                 }
             }
             b"b" if self.in_rpr => {
-                self.pending_run_style.bold = parse_on_off_attribute(tag);
+                self.set_pending_run_kind(TextStyleKind::Bold, parse_on_off_attribute(tag));
             }
             b"i" if self.in_rpr => {
-                self.pending_run_style.italic = parse_on_off_attribute(tag);
+                self.set_pending_run_kind(TextStyleKind::Italic, parse_on_off_attribute(tag));
             }
             b"strike" | b"dstrike" if self.in_rpr => {
-                self.pending_run_style.strikethrough = parse_on_off_attribute(tag);
+                self.set_pending_run_kind(
+                    TextStyleKind::Strikethrough,
+                    parse_on_off_attribute(tag),
+                );
             }
             b"u" if self.in_rpr => {
                 let val = read_val_attribute(tag);
-                self.pending_run_style.underline = properties::parse_underline_on(val.as_deref());
+                self.set_pending_run_kind(
+                    TextStyleKind::Underline,
+                    properties::parse_underline_on(val.as_deref()),
+                );
             }
             b"vertAlign" if self.in_rpr => {
                 let val = read_val_attribute(tag);
-                match properties::parse_vert_align(val.as_deref()) {
-                    properties::VertAlign::Subscript => {
-                        self.pending_run_style.subscript = true;
-                        self.pending_run_style.superscript = false;
-                    }
-                    properties::VertAlign::Superscript => {
-                        self.pending_run_style.superscript = true;
-                        self.pending_run_style.subscript = false;
-                    }
-                    properties::VertAlign::None => {
-                        self.pending_run_style.subscript = false;
-                        self.pending_run_style.superscript = false;
-                    }
-                }
+                self.set_pending_vertical_alignment(properties::parse_vert_align(val.as_deref()));
             }
             b"p" if !self.in_paragraph => self.start_paragraph(),
             b"r" if self.in_paragraph => {
@@ -681,7 +714,8 @@ mod tests {
     }
 
     #[test]
-    fn queue_length_never_exceeds_three() -> core::result::Result<(), Box<dyn core::error::Error>> {
+    fn queue_length_never_exceeds_sixteen() -> core::result::Result<(), Box<dyn core::error::Error>>
+    {
         let doc = {
             let mut content = String::from(
                 r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>"#,
@@ -694,7 +728,7 @@ mod tests {
         };
         let mut reader = make_reader(&doc)?;
         loop {
-            if reader.queue.len() > 3 {
+            if reader.queue.len() > 16 {
                 return Err(Box::new(Error::Other {
                     message: format!("queue grew to {}", reader.queue.len()),
                 }));

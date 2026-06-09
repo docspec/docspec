@@ -4,7 +4,7 @@
 
 #[cfg(test)]
 mod tests {
-    use docspec_core::{Error, Event, Result, TextStyle};
+    use docspec_core::{Error, Event, Result};
     use docspec_html_reader::{EventSource as _, HtmlReader};
 
     fn collect_events(input: &str) -> Vec<Event> {
@@ -44,7 +44,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "hello".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -90,7 +89,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "one".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::StartParagraph {
@@ -99,7 +97,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "two".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -125,7 +122,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "x".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -151,15 +147,12 @@ mod tests {
                 },
                 Event::Text {
                     content: "hello ".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::Text {
                     content: "bold".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::Text {
                     content: " world".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -184,7 +177,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "caf\u{e9} \u{65e5}\u{672c}\u{8a9e} \u{f1}".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -210,7 +202,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "a & b < c".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -236,7 +227,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "unclosed".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -279,11 +269,9 @@ mod tests {
                 },
                 Event::Text {
                     content: "outer ".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::Text {
                     content: "inner".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -325,11 +313,9 @@ mod tests {
                 },
                 Event::Text {
                     content: "before".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::Text {
                     content: "after".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -354,7 +340,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "hi".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -380,7 +365,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "x".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -441,7 +425,6 @@ mod tests {
                 },
                 Event::Text {
                     content: "hi".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -490,11 +473,9 @@ mod tests {
                 },
                 Event::Text {
                     content: "first".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::Text {
                     content: "second".to_string(),
-                    style: TextStyle::default(),
                 },
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -548,5 +529,17 @@ mod tests {
             }
         }
         assert!(found_error, "expected Error::Parse for invalid UTF-8");
+    }
+
+    #[test]
+    fn styled_input_emits_no_start_text_style() {
+        let events = collect_events("<b>bold</b>");
+        let has_style = events
+            .iter()
+            .any(|e| matches!(e, Event::StartTextStyle { .. }));
+        assert!(
+            !has_style,
+            "HTML reader must not emit StartTextStyle events"
+        );
     }
 }

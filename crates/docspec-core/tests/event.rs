@@ -127,6 +127,13 @@ mod tests {
     }
 
     #[test]
+    fn end_text_style() {
+        let event = Event::EndTextStyle;
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
+    }
+
+    #[test]
     fn footnote_ref() {
         let event = Event::FootnoteRef { id: 42 };
         let cloned = event.clone();
@@ -524,40 +531,18 @@ mod tests {
     }
 
     #[test]
-    fn text_with_all_textstyle_fields() {
-        let event = Event::Text {
-            content: "Formatted text".to_string(),
-            style: TextStyle::default()
-                .bold()
-                .italic()
-                .code()
-                .strikethrough()
-                .underline()
-                .subscript()
-                .superscript()
-                .mark(Color::Rgb {
-                    r: 255,
-                    g: 255,
-                    b: 0,
-                }),
+    fn start_text_style_with_id() {
+        let event = Event::StartTextStyle {
+            kind: TextStyleKind::Bold,
+            id: Some("strong-1".to_string()),
         };
+        let cloned = event.clone();
+        assert_eq!(event, cloned);
         assert_eq!(
             event,
-            Event::Text {
-                content: "Formatted text".to_string(),
-                style: TextStyle::default()
-                    .bold()
-                    .italic()
-                    .code()
-                    .strikethrough()
-                    .underline()
-                    .subscript()
-                    .superscript()
-                    .mark(Color::Rgb {
-                        r: 255,
-                        g: 255,
-                        b: 0,
-                    }),
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+                id: Some("strong-1".to_string()),
             }
         );
     }
@@ -566,46 +551,132 @@ mod tests {
     fn text_plain() {
         let event = Event::Text {
             content: "Hello, world!".to_string(),
-            style: TextStyle::default(),
         };
         let cloned = event.clone();
         assert_eq!(event, cloned);
     }
 
     #[test]
-    fn text_with_bold_only() {
-        let event = Event::Text {
-            content: "Bold text".to_string(),
-            style: TextStyle::default().bold(),
+    fn text_style_kind_bold() {
+        let event = Event::StartTextStyle {
+            kind: TextStyleKind::Bold,
+            id: None,
         };
         assert_eq!(
             event,
-            Event::Text {
-                content: "Bold text".to_string(),
-                style: TextStyle::default().bold(),
+            Event::StartTextStyle {
+                kind: TextStyleKind::Bold,
+                id: None,
             }
         );
     }
 
     #[test]
-    fn text_with_mark_color() {
-        let event = Event::Text {
-            content: "Highlighted".to_string(),
-            style: TextStyle::default().mark(Color::Rgb {
-                r: 255,
-                g: 255,
-                b: 0,
-            }),
+    fn text_style_kind_italic() {
+        let event = Event::StartTextStyle {
+            kind: TextStyleKind::Italic,
+            id: None,
         };
         assert_eq!(
             event,
-            Event::Text {
-                content: "Highlighted".to_string(),
-                style: TextStyle::default().mark(Color::Rgb {
-                    r: 255,
-                    g: 255,
-                    b: 0,
-                }),
+            Event::StartTextStyle {
+                kind: TextStyleKind::Italic,
+                id: None,
+            }
+        );
+    }
+
+    #[test]
+    fn text_style_kind_code() {
+        let event = Event::StartTextStyle {
+            kind: TextStyleKind::Code,
+            id: None,
+        };
+        assert_eq!(
+            event,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Code,
+                id: None,
+            }
+        );
+    }
+
+    #[test]
+    fn text_style_kind_strikethrough() {
+        let event = Event::StartTextStyle {
+            kind: TextStyleKind::Strikethrough,
+            id: None,
+        };
+        assert_eq!(
+            event,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Strikethrough,
+                id: None,
+            }
+        );
+    }
+
+    #[test]
+    fn text_style_kind_underline() {
+        let event = Event::StartTextStyle {
+            kind: TextStyleKind::Underline,
+            id: None,
+        };
+        assert_eq!(
+            event,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Underline,
+                id: None,
+            }
+        );
+    }
+
+    #[test]
+    fn text_style_kind_subscript() {
+        let event = Event::StartTextStyle {
+            kind: TextStyleKind::Subscript,
+            id: None,
+        };
+        assert_eq!(
+            event,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Subscript,
+                id: None,
+            }
+        );
+    }
+
+    #[test]
+    fn text_style_kind_superscript() {
+        let event = Event::StartTextStyle {
+            kind: TextStyleKind::Superscript,
+            id: None,
+        };
+        assert_eq!(
+            event,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Superscript,
+                id: None,
+            }
+        );
+    }
+
+    #[test]
+    fn text_style_kind_mark() {
+        let color = Color::Rgb {
+            r: 255,
+            g: 255,
+            b: 0,
+        };
+        let event = Event::StartTextStyle {
+            kind: TextStyleKind::Mark(color.clone()),
+            id: None,
+        };
+        assert_eq!(
+            event,
+            Event::StartTextStyle {
+                kind: TextStyleKind::Mark(color),
+                id: None,
             }
         );
     }

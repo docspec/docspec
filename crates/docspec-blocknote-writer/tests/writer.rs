@@ -13,8 +13,8 @@ mod tests {
 
     use docspec_blocknote_writer::BlockNoteWriter;
     use docspec_core::{
-        AssetProvider, Event, EventSink as _, ImageSource, StackTrackingSink, TextAlignment,
-        TextStyle,
+        AssetProvider, Color, Event, EventSink as _, ImageSource, StackTrackingSink, TextAlignment,
+        TextStyleKind,
     };
 
     struct FailingWriter {
@@ -125,6 +125,18 @@ mod tests {
         String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8")
     }
 
+    fn run_events_result(events: &[Event]) -> docspec_core::Result<String> {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+        for event in events {
+            writer.handle_event(event.clone())?;
+        }
+        writer.finish()?;
+        String::from_utf8(buf).map_err(|err| docspec_core::Error::Other {
+            message: format!("BlockNoteWriter output should be valid UTF-8: {err}"),
+        })
+    }
+
     fn run_direct_writer_events(events: &[Event]) -> String {
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
@@ -162,8 +174,11 @@ mod tests {
     fn text(content: &str) -> Event {
         Event::Text {
             content: content.to_string(),
-            style: TextStyle::default(),
         }
+    }
+
+    fn start_text_style(kind: TextStyleKind) -> Event {
+        Event::StartTextStyle { kind, id: None }
     }
 
     fn start_heading(level: u8) -> Event {
@@ -283,10 +298,9 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
-            Event::Text {
-                content: "Bold".to_string(),
-                style: TextStyle::default().bold(),
-            },
+            start_text_style(TextStyleKind::Bold),
+            text("Bold"),
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -419,23 +433,19 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
-            Event::Text {
-                content: "Bold line one".to_string(),
-                style: TextStyle::default().bold(),
-            },
+            start_text_style(TextStyleKind::Bold),
+            text("Bold line one"),
             Event::SoftBreak,
-            Event::Text {
-                content: "Bold line two".to_string(),
-                style: TextStyle::default().bold(),
-            },
+            text("Bold line two"),
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        // Three text nodes: bold "Bold line one", default-style "\n", bold "Bold line two"
-        // The "\n" node has empty styles because handle_line_break calls handle_text with TextStyle::default()
+        // Three text nodes: bold "Bold line one", bold "\n", bold "Bold line two" because
+        // SoftBreak reads the currently open style stack just like any other text event.
         assert_eq!(
             json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"Bold line one","styles":{"bold":true}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Bold line two","styles":{"bold":true}}],"children":[]}]"#
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"Bold line one","styles":{"bold":true}},{"type":"text","text":"\n","styles":{"bold":true}},{"type":"text","text":"Bold line two","styles":{"bold":true}}],"children":[]}]"#
         );
     }
 
@@ -444,10 +454,9 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
-            Event::Text {
-                content: "Italic".to_string(),
-                style: TextStyle::default().italic(),
-            },
+            start_text_style(TextStyleKind::Italic),
+            text("Italic"),
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -462,10 +471,11 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
-            Event::Text {
-                content: "Both".to_string(),
-                style: TextStyle::default().bold().italic(),
-            },
+            start_text_style(TextStyleKind::Bold),
+            start_text_style(TextStyleKind::Italic),
+            text("Both"),
+            Event::EndTextStyle,
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -654,10 +664,9 @@ mod tests {
             start_document(),
             start_blockquote(),
             start_paragraph(),
-            Event::Text {
-                content: "bold quote".to_string(),
-                style: TextStyle::default().bold(),
-            },
+            start_text_style(TextStyleKind::Bold),
+            text("bold quote"),
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndBlockQuote,
             Event::EndDocument,
@@ -1020,10 +1029,9 @@ mod tests {
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
             },
-            Event::Text {
-                content: "Bold bullet".to_string(),
-                style: TextStyle::default().bold(),
-            },
+            start_text_style(TextStyleKind::Bold),
+            text("Bold bullet"),
+            Event::EndTextStyle,
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
@@ -1169,6 +1177,22 @@ mod tests {
     }
 
     #[test]
+    fn orphan_end_blockquote_is_silent_ok() {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = BlockNoteWriter::new(&mut buf);
+        assert!(writer.handle_event(start_document()).is_ok());
+        let result = writer.handle_event(Event::EndBlockQuote);
+        assert!(
+            result.is_ok(),
+            "orphan EndBlockQuote must be silently absorbed"
+        );
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+        let output = String::from_utf8_lossy(&buf);
+        assert_eq!(output, "[]");
+    }
+
+    #[test]
     fn text_outside_block_auto_opens_paragraph() {
         let json = run_events(&[start_document(), text("Orphan"), Event::EndDocument]);
         assert_eq!(
@@ -1183,10 +1207,9 @@ mod tests {
             start_document(),
             start_paragraph(),
             text("Hello "),
-            Event::Text {
-                content: "World".to_string(),
-                style: TextStyle::default().bold(),
-            },
+            start_text_style(TextStyleKind::Bold),
+            text("World"),
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -1983,10 +2006,9 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
-            Event::Text {
-                content: "code".to_string(),
-                style: TextStyle::default().code(),
-            },
+            start_text_style(TextStyleKind::Code),
+            text("code"),
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -2001,10 +2023,9 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
-            Event::Text {
-                content: "struck".to_string(),
-                style: TextStyle::default().strikethrough(),
-            },
+            start_text_style(TextStyleKind::Strikethrough),
+            text("struck"),
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -2019,10 +2040,9 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
-            Event::Text {
-                content: "underlined".to_string(),
-                style: TextStyle::default().underline(),
-            },
+            start_text_style(TextStyleKind::Underline),
+            text("underlined"),
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
@@ -2037,16 +2057,195 @@ mod tests {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
-            Event::Text {
-                content: "combined".to_string(),
-                style: TextStyle::default().bold().code().strikethrough(),
-            },
+            start_text_style(TextStyleKind::Bold),
+            start_text_style(TextStyleKind::Code),
+            start_text_style(TextStyleKind::Strikethrough),
+            text("combined"),
+            Event::EndTextStyle,
+            Event::EndTextStyle,
+            Event::EndTextStyle,
             Event::EndParagraph,
             Event::EndDocument,
         ]);
         assert_eq!(
             json,
             r#"[{"type":"paragraph","content":[{"type":"text","text":"combined","styles":{"bold":true,"code":true,"strike":true}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn bold_style_flag_text_produces_bold_flag() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::Bold),
+            text("hello"),
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{"bold":true}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn italic_style_flag_text_produces_italic_flag() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::Italic),
+            text("hello"),
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{"italic":true}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn code_style_flag_text_produces_code_flag() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::Code),
+            text("hello"),
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{"code":true}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn strikethrough_style_flag_text_produces_strike_flag() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::Strikethrough),
+            text("hello"),
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{"strike":true}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn underline_style_flag_text_produces_underline_flag() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::Underline),
+            text("hello"),
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{"underline":true}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn subscript_dropped_style_text_preserves_content_without_flag() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::Subscript),
+            text("x"),
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn superscript_dropped_style_text_preserves_content_without_flag() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::Superscript),
+            text("x"),
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn mark_dropped_style_text_preserves_content_without_flag() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::Mark(Color::Rgb {
+                r: 255,
+                g: 255,
+                b: 0,
+            })),
+            text("x"),
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn nested_bold_italic_text_styles_produce_both_flags() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::Bold),
+            start_text_style(TextStyleKind::Italic),
+            text("x"),
+            Event::EndTextStyle,
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{"bold":true,"italic":true}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn unbalanced_end_text_style_returns_error() {
+        let result = run_events_result(&[
+            start_document(),
+            start_paragraph(),
+            Event::EndTextStyle,
+            text("x"),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        let err = result.expect_err("unbalanced EndTextStyle must fail");
+        assert_eq!(
+            err.to_string(),
+            "invalid event sequence: expected StartTextStyle, found EndTextStyle: cannot close text style because no text style is open"
         );
     }
 
@@ -2127,10 +2326,9 @@ mod tests {
             start_table(),
             start_table_row(),
             start_table_cell(),
-            Event::Text {
-                content: "bold".to_string(),
-                style: TextStyle::default().bold(),
-            },
+            start_text_style(TextStyleKind::Bold),
+            text("bold"),
+            Event::EndTextStyle,
             Event::EndTableCell,
             Event::EndTableRow,
             Event::EndTable,
@@ -4293,14 +4491,12 @@ mod tests {
                 title: None,
                 id: None,
             },
-            Event::Text {
-                content: "bold".to_string(),
-                style: TextStyle::default().bold(),
-            },
-            Event::Text {
-                content: "italic".to_string(),
-                style: TextStyle::default().italic(),
-            },
+            start_text_style(TextStyleKind::Bold),
+            text("bold"),
+            Event::EndTextStyle,
+            start_text_style(TextStyleKind::Italic),
+            text("italic"),
+            Event::EndTextStyle,
             text("plain"),
             Event::EndLink,
             Event::EndParagraph,

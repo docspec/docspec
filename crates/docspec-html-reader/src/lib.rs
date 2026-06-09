@@ -42,7 +42,7 @@ use alloc::collections::VecDeque;
 use std::io::{Cursor, Read, Seek};
 
 pub use docspec_core::EventSource;
-use docspec_core::{Event, Result, TextStyle};
+use docspec_core::{Event, Result};
 use html5gum::{IoReader, Tokenizer};
 
 /// Document processing phase.
@@ -185,7 +185,6 @@ impl HtmlReader {
                 })?;
             self.queue.push_back(Event::Text {
                 content: text.to_string(),
-                style: TextStyle::default(),
             });
         }
         Ok(())
