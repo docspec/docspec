@@ -8,12 +8,14 @@
 //!
 //! # Scope
 //!
-//! **In scope**: Paragraphs (`<w:p>`) and direct text (`<w:t>` inside `<w:r>`).
-//! Emits exactly: `StartDocument`, `StartParagraph`, `Text`, `EndParagraph`, `EndDocument`.
+//! **In scope**: Paragraphs (`<w:p>`), direct text (`<w:t>` inside `<w:r>`), and
+//! line breaks (`<w:br>` — including `w:type="page"` and `w:type="column"`, all
+//! emitted as `LineBreak`).
+//! Emits exactly: `StartDocument`, `StartParagraph`, `Text`, `LineBreak`,
+//! `EndParagraph`, `EndDocument`.
 //!
 //! **Out of scope (silently dropped)**:
 //! - Run styling (`<w:rPr>`, bold, italic, etc.)
-//! - Line and page breaks (`<w:br>`)
 //! - Tabs (`<w:tab>`)
 //! - Headings (any `<w:pStyle>` value — every paragraph is `StartParagraph`)
 //! - Tables (`<w:tbl>`, `<w:tr>`, `<w:tc>`)
@@ -70,8 +72,8 @@ enum Phase {
 /// A streaming DOCX reader that implements [`EventSource`].
 ///
 /// `DocxReader` parses a DOCX archive and emits `DocSpec` events one at a time.
-/// Only `<w:p>` paragraph elements and `<w:t>` text elements are recognized;
-/// all other elements are silently ignored.
+/// Only `<w:p>` paragraph elements, `<w:t>` text elements, and `<w:br>` line
+/// breaks are recognized; all other elements are silently ignored.
 ///
 /// # Streaming
 ///
@@ -209,6 +211,11 @@ impl DocxReader {
         self.in_ignored_subtree == 0 && self.in_paragraph && self.in_text
     }
 
+    fn emit_line_break(&mut self) {
+        self.flush_pending_text();
+        self.queue.push_back(Event::LineBreak);
+    }
+
     fn end_paragraph(&mut self) {
         self.queue.push_back(Event::EndParagraph);
         self.in_paragraph = false;
@@ -245,6 +252,7 @@ impl DocxReader {
                 });
                 self.queue.push_back(Event::EndParagraph);
             }
+            b"br" if self.in_paragraph => self.emit_line_break(),
             _ => {}
         }
     }
@@ -302,6 +310,7 @@ impl DocxReader {
                 self.in_text = true;
                 self.pending_text.clear();
             }
+            b"br" if self.in_paragraph => self.emit_line_break(),
             _ => {}
         }
     }

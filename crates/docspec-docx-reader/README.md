@@ -8,13 +8,13 @@ architecture, and the event protocol.
 ## Supported
 
 - Paragraphs (`<w:p>`) and direct text (`<w:t>` inside `<w:r>`)
-- Emits exactly: `StartDocument`, `StartParagraph`, `Text`, `EndParagraph`, `EndDocument`
+- Line breaks (`<w:br>`, including `w:type="page"` and `w:type="column"` — all emit `LineBreak`)
+- Emits exactly: `StartDocument`, `StartParagraph`, `Text`, `LineBreak`, `EndParagraph`, `EndDocument`
 - Compression: `Stored` and `Deflated` only
 
 ## Out of Scope (silently dropped)
 
 - Run styling (`<w:rPr>`, bold, italic, underline, etc.)
-- Line and page breaks (`<w:br>`)
 - Tabs (`<w:tab>`)
 - Headings (any `<w:pStyle>` value — every paragraph is `StartParagraph`)
 - Tables (`<w:tbl>`, `<w:tr>`, `<w:tc>`)
