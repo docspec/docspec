@@ -1,12 +1,13 @@
 use std::path::Path;
 
 /// Input format for document conversion.
+///
+/// New variants are appended (not inserted) so the discriminants of existing
+/// variants stay stable across releases — see
+/// [Cargo SemVer: discriminant changes](https://doc.rust-lang.org/cargo/reference/semver.html).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum InputFormat {
-    /// DOCX format (paragraphs and text only). Available when the `docx` feature is enabled.
-    #[cfg(feature = "docx")]
-    Docx,
     /// HTML (paragraph-only; `<p>` elements and text within them only).
     /// Available when the `html` feature is enabled.
     #[cfg(feature = "html")]
@@ -14,6 +15,9 @@ pub enum InputFormat {
     /// Markdown (`CommonMark` + GFM). Available when the `markdown` feature is enabled.
     #[cfg(feature = "markdown")]
     Markdown,
+    /// DOCX format (paragraphs and text only). Available when the `docx` feature is enabled.
+    #[cfg(feature = "docx")]
+    Docx,
 }
 
 /// Output format for document conversion.

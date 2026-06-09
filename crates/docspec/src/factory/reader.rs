@@ -26,15 +26,15 @@ use crate::format::InputFormat;
 /// `tokio::task::spawn_blocking` boundaries.
 #[non_exhaustive]
 pub enum AnyReader {
-    /// DOCX reader from [`docspec_docx_reader`].
-    #[cfg(feature = "docx")]
-    Docx(DocxReader),
     /// HTML reader from [`docspec_html_reader`] (paragraph-only; see crate docs).
     #[cfg(feature = "html")]
     Html(HtmlReader),
     /// Markdown reader from [`docspec_markdown_reader`].
     #[cfg(feature = "markdown")]
     Markdown(MarkdownReader),
+    /// DOCX reader from [`docspec_docx_reader`].
+    #[cfg(feature = "docx")]
+    Docx(DocxReader),
 }
 
 impl AnyReader {
@@ -101,8 +101,6 @@ impl AnyReader {
         }
         #[cfg(any(feature = "markdown", feature = "html", feature = "docx"))]
         match format {
-            #[cfg(feature = "docx")]
-            InputFormat::Docx => Ok(Self::Docx(DocxReader::from_reader(reader)?)),
             #[cfg(feature = "html")]
             InputFormat::Html => {
                 let stripped =
@@ -115,6 +113,8 @@ impl AnyReader {
                     crate::factory::bom_stripping_reader::BomStrippingReader::new(reader)?;
                 Ok(Self::Markdown(MarkdownReader::from_reader(stripped)?))
             }
+            #[cfg(feature = "docx")]
+            InputFormat::Docx => Ok(Self::Docx(DocxReader::from_reader(reader)?)),
         }
     }
 
@@ -150,11 +150,6 @@ impl AnyReader {
         }
         #[cfg(any(feature = "markdown", feature = "html", feature = "docx"))]
         match format {
-            #[cfg(feature = "docx")]
-            InputFormat::Docx => {
-                // DOCX is a binary format; dispatch via from_reader with the raw bytes.
-                Self::from_reader(format, Cursor::new(input.as_bytes().to_vec()))
-            }
             #[cfg(feature = "html")]
             InputFormat::Html => {
                 let stripped = crate::format::strip_bom(input);
@@ -164,6 +159,11 @@ impl AnyReader {
             InputFormat::Markdown => {
                 let stripped = crate::format::strip_bom(input);
                 Ok(Self::Markdown(MarkdownReader::from_str(stripped)))
+            }
+            #[cfg(feature = "docx")]
+            InputFormat::Docx => {
+                // DOCX is a binary format; dispatch via from_reader with the raw bytes.
+                Self::from_reader(format, Cursor::new(input.as_bytes().to_vec()))
             }
         }
     }
@@ -178,12 +178,12 @@ impl EventSource for AnyReader {
         }
         #[cfg(any(feature = "markdown", feature = "html", feature = "docx"))]
         match self {
-            #[cfg(feature = "docx")]
-            Self::Docx(r) => r.next_event(),
             #[cfg(feature = "html")]
             Self::Html(r) => r.next_event(),
             #[cfg(feature = "markdown")]
             Self::Markdown(r) => r.next_event(),
+            #[cfg(feature = "docx")]
+            Self::Docx(r) => r.next_event(),
         }
     }
 }
