@@ -1,1 +1,23 @@
-[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Line two","styles":{}}],"children":[]}]
+[
+  {
+    "type": "paragraph",
+    "content": [
+      {
+        "type": "text",
+        "text": "Line one",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "\n",
+        "styles": {}
+      },
+      {
+        "type": "text",
+        "text": "Line two",
+        "styles": {}
+      }
+    ],
+    "children": []
+  }
+]

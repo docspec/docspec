@@ -58,7 +58,7 @@ async fn response_body_json(body: axum::body::Body) -> Value {
 fn hello_blocknote_json() -> Value {
     serde_json::json!([{
         "type": "heading",
-        "props": { "level": 1, "textAlignment": "left" },
+        "props": { "level": 1 },
         "content": [{ "type": "text", "text": "Hello", "styles": {} }],
         "children": [],
     }])
@@ -810,7 +810,6 @@ async fn post_conversion_html_happy_path() {
         body,
         serde_json::json!([{
             "type": "paragraph",
-            "props": { "textAlignment": "left" },
             "content": [{ "type": "text", "text": "Hello", "styles": {} }],
             "children": [],
         }])
@@ -835,7 +834,6 @@ async fn post_conversion_html_with_utf8_charset_happy_path() {
         body,
         serde_json::json!([{
             "type": "paragraph",
-            "props": { "textAlignment": "left" },
             "content": [{ "type": "text", "text": "Hello", "styles": {} }],
             "children": [],
         }])

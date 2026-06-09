@@ -2,8 +2,7 @@
   {
     "type": "heading",
     "props": {
-      "level": 1,
-      "textAlignment": "left"
+      "level": 1
     },
     "content": [
       {
@@ -17,8 +16,7 @@
   {
     "type": "heading",
     "props": {
-      "level": 2,
-      "textAlignment": "left"
+      "level": 2
     },
     "content": [
       {
@@ -32,8 +30,7 @@
   {
     "type": "heading",
     "props": {
-      "level": 3,
-      "textAlignment": "left"
+      "level": 3
     },
     "content": [
       {
@@ -47,8 +44,7 @@
   {
     "type": "heading",
     "props": {
-      "level": 4,
-      "textAlignment": "left"
+      "level": 4
     },
     "content": [
       {
@@ -62,8 +58,7 @@
   {
     "type": "heading",
     "props": {
-      "level": 5,
-      "textAlignment": "left"
+      "level": 5
     },
     "content": [
       {
@@ -77,8 +72,7 @@
   {
     "type": "heading",
     "props": {
-      "level": 6,
-      "textAlignment": "left"
+      "level": 6
     },
     "content": [
       {

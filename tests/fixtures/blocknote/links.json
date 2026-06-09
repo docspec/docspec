@@ -2,7 +2,6 @@
   {
     "type": "heading",
     "props": {
-      "textAlignment": "left",
       "level": 1
     },
     "content": [
@@ -27,9 +26,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",
@@ -57,9 +53,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",
@@ -99,9 +92,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",
@@ -129,9 +119,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",
@@ -159,9 +146,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",
@@ -189,9 +173,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",
@@ -221,9 +202,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",
@@ -255,9 +233,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",
@@ -269,9 +244,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",

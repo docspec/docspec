@@ -97,7 +97,7 @@ mod tests {
         assert_eq!(
             read_output(&output_path),
             concat!(
-                r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Auto Detected","styles":{}}],"children":[]}]"#,
+                r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Auto Detected","styles":{}}],"children":[]}]"#,
                 "\n"
             )
         );
@@ -151,7 +151,7 @@ mod tests {
         assert_eq!(
             read_output(&output_path),
             concat!(
-                r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Hello World","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Some paragraph text.","styles":{}}],"children":[]}]"#,
+                r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Hello World","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Some paragraph text.","styles":{}}],"children":[]}]"#,
                 "\n"
             )
         );
@@ -165,7 +165,7 @@ mod tests {
             .assert()
             .success()
             .stdout(concat!(
-                r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#,
+                r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#,
                 "\n"
             ));
     }
@@ -178,7 +178,7 @@ mod tests {
             .assert()
             .success()
             .stdout(concat!(
-                r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Dash Input","styles":{}}],"children":[]}]"#,
+                r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Dash Input","styles":{}}],"children":[]}]"#,
                 "\n"
             ));
     }
@@ -222,7 +222,7 @@ mod tests {
         assert_eq!(
             read_output(&output_path),
             concat!(
-                r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Explicit","styles":{}}],"children":[]}]"#,
+                r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Explicit","styles":{}}],"children":[]}]"#,
                 "\n"
             )
         );
@@ -240,7 +240,7 @@ mod tests {
             .assert()
             .success()
             .stdout(concat!(
-                r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 1","styles":{}}],"children":[]},{"type":"heading","props":{"level":2,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 2","styles":{}}],"children":[]},{"type":"heading","props":{"level":3,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 3","styles":{}}],"children":[]},{"type":"heading","props":{"level":4,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 4","styles":{}}],"children":[]},{"type":"heading","props":{"level":5,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 5","styles":{}}],"children":[]},{"type":"heading","props":{"level":6,"textAlignment":"left"},"content":[{"type":"text","text":"Heading Level 6","styles":{}}],"children":[]}]"#,
+                r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Heading Level 1","styles":{}}],"children":[]},{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"Heading Level 2","styles":{}}],"children":[]},{"type":"heading","props":{"level":3},"content":[{"type":"text","text":"Heading Level 3","styles":{}}],"children":[]},{"type":"heading","props":{"level":4},"content":[{"type":"text","text":"Heading Level 4","styles":{}}],"children":[]},{"type":"heading","props":{"level":5},"content":[{"type":"text","text":"Heading Level 5","styles":{}}],"children":[]},{"type":"heading","props":{"level":6},"content":[{"type":"text","text":"Heading Level 6","styles":{}}],"children":[]}]"#,
                 "\n"
             ));
     }
@@ -316,7 +316,7 @@ mod tests {
             .assert()
             .success()
             .stdout(concat!(
-                r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Single paragraph with plain text.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Multiple paragraphs. This is the second paragraph.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"bold text","styles":{"bold":true}},{"type":"text","text":" in the middle.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"italic text","styles":{"italic":true}},{"type":"text","text":" in the middle.","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"bold and italic text","styles":{"bold":true,"italic":true}},{"type":"text","text":" combined.","styles":{}}],"children":[]}]"#,
+                r#"[{"type":"paragraph","content":[{"type":"text","text":"Single paragraph with plain text.","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Multiple paragraphs. This is the second paragraph.","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"bold text","styles":{"bold":true}},{"type":"text","text":" in the middle.","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"italic text","styles":{"italic":true}},{"type":"text","text":" in the middle.","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"bold and italic text","styles":{"bold":true,"italic":true}},{"type":"text","text":" combined.","styles":{}}],"children":[]}]"#,
                 "\n"
             ));
     }
@@ -424,7 +424,7 @@ mod tests {
             .assert()
             .success()
             .stdout(concat!(
-                r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"hello world","styles":{}}],"children":[]}]"#,
+                r#"[{"type":"paragraph","content":[{"type":"text","text":"hello world","styles":{}}],"children":[]}]"#,
                 "\n"
             ));
     }
@@ -550,7 +550,7 @@ mod tests {
         assert_eq!(
             read_output(&output_path),
             concat!(
-                r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#,
+                r#"[{"type":"paragraph","content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#,
                 "\n"
             )
         );

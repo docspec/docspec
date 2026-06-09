@@ -2,8 +2,7 @@
   {
     "type": "heading",
     "props": {
-      "level": 1,
-      "textAlignment": "left"
+      "level": 1
     },
     "content": [
       {
@@ -16,9 +15,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",
@@ -55,8 +51,7 @@
   {
     "type": "heading",
     "props": {
-      "level": 2,
-      "textAlignment": "left"
+      "level": 2
     },
     "content": [
       {
@@ -69,9 +64,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",
@@ -83,9 +75,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [],
     "children": []
   },
@@ -100,9 +89,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",
