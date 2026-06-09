@@ -171,6 +171,7 @@ large_enum_variant = "allow"
 feature_not_enabled_by_default = { required-update = "minor" }
 enum_variant_added = { required-update = "minor" }
 enum_marked_non_exhaustive = { required-update = "minor" }
+enum_struct_variant_field_missing = { required-updae = "minor" }
 auto_trait_impl_removed = { required-update = "minor" }
 inherent_method_missing = { required-update = "minor" }
 type_mismatched_generic_lifetimes = { required-update = "minor" }
