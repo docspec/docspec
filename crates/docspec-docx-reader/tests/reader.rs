@@ -1063,7 +1063,7 @@ mod events {
     }
 
     #[test]
-    fn w_tab_silently_ignored() {
+    fn w_tab_self_closing_emits_text_tab_between_text_runs() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>a</w:t><w:tab/><w:t>b</w:t></w:r></w:p></w:body></w:document>"#,
         );
@@ -1074,7 +1074,169 @@ mod events {
                 start_doc(),
                 start_para(),
                 text("a"),
+                text("\t"),
                 text("b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn w_tab_between_separate_runs_emits_text_tab() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>foo</w:t></w:r><w:r><w:tab/></w:r><w:r><w:t>bar</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("foo"),
+                text("\t"),
+                text("bar"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn w_tab_at_paragraph_start_emits_text_tab() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:tab/><w:t>after</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("\t"),
+                text("after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn w_tab_at_paragraph_end_emits_text_tab() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>before</w:t><w:tab/></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("before"),
+                text("\t"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn w_tab_only_paragraph_emits_text_tab() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:tab/></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("\t"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn w_tab_with_end_tag_emits_single_text_tab() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>a</w:t><w:tab></w:tab><w:t>b</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("a"),
+                text("\t"),
+                text("b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn w_tab_outside_paragraph_is_silently_dropped() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tab/><w:p><w:r><w:t>x</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn w_tab_inside_ignored_subtree_is_silently_dropped() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>kept</w:t></w:r><w:ins><w:r><w:tab/></w:r></w:ins></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("kept"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn w_tab_inside_table_is_silently_dropped() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>a</w:t><w:tab/><w:t>b</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(events, vec![start_doc(), Event::EndDocument]);
+    }
+
+    #[test]
+    fn multiple_w_tab_in_sequence_emit_multiple_text_tabs() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:tab/><w:tab/><w:tab/></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("\t"),
+                text("\t"),
+                text("\t"),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
