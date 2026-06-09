@@ -17,10 +17,41 @@ Converts a DocSpec event stream into [BlockNote](https://www.blocknotejs.org/) J
 | Ordered list item                  | `numberedListItem`                                |
 | Inline link                        | `link` inline type with `href` (title is dropped) |
 
-Inline styles are consumed from `StartTextStyle`/`EndTextStyle` spans around `Text` events. Bold, italic, code, strikethrough, and underline render as BlockNote style flags. Subscript, superscript, and mark/highlight spans are accepted but omitted because BlockNote's default schema has no equivalent representation.
+Inline styles are consumed from `StartTextStyle`/`EndTextStyle` spans around `Text` events. Bold, italic, code, strikethrough, and underline render as BlockNote style flags. Subscript and superscript are accepted but omitted because BlockNote's default schema has no equivalent representation.
 Inline links (`StartLink`/`EndLink`) emit a `link` inline type with the `href`. The optional `title` field is dropped (BlockNote's default link schema has no title).
 
 List items support arbitrary nesting via BlockNote's native `children: Block[]` arrays. The `start` prop on `numberedListItem` is preserved when the first item in a sequence carries an explicit start number.
+
+### Color Styles
+
+Two color-bearing style kinds emit JSON keys in the inline `styles` object:
+
+- **`textColor`** — emitted when the reader sends `StartTextStyle { kind: TextColor(Color) }`. The RGB value is snapped to the nearest BlockNote palette color and written as a string, e.g. `"textColor":"red"`.
+- **`backgroundColor`** — emitted when the reader sends `StartTextStyle { kind: Mark(Color) }`. Same palette snap, written as e.g. `"backgroundColor":"blue"`.
+
+Pure black `(0, 0, 0)` is treated as BlockNote's default and produces no key for either style. Non-RGB colors are also omitted. Any other RGB color is snapped to one of the 9 named palette entries.
+
+#### Palette
+
+Each style type has its own 9-entry palette of named colors. The names are the same for both, but the RGB values differ because BlockNote uses distinct pastel shades for backgrounds versus richer tones for text:
+
+| Name     |
+| -------- |
+| `gray`   |
+| `brown`  |
+| `red`    |
+| `orange` |
+| `yellow` |
+| `green`  |
+| `blue`   |
+| `purple` |
+| `pink`   |
+
+#### Palette snap algorithm
+
+The palette snap uses squared Euclidean distance in 8-bit sRGB space. No perceptual weighting, no gamma correction. Ties are broken by iteration order. This mirrors the reference Elixir implementation.
+
+The two palettes use different RGB values, so the same input color can snap to different names depending on whether it's a text color or a background color. For instance, the saturated red `(224, 62, 62)` snaps to background palette `"orange"` (not `"red"`) because the background palette uses pastel colors and the Euclidean distance to pastel orange is shorter than to pastel red. This is intentional and matches the reference implementation.
 
 ## Not Yet Supported
 

@@ -4,6 +4,7 @@
     clippy::expect_used,
     clippy::indexing_slicing,
     clippy::panic,
+    clippy::redundant_test_prefix,
     clippy::std_instead_of_core,
     clippy::tests_outside_test_module,
     clippy::unwrap_used
@@ -499,7 +500,7 @@ mod constructor {
 mod events {
     use std::io::Cursor;
 
-    use docspec_core::{Event, TextAlignment, TextStyleKind};
+    use docspec_core::{Color, Event, TextAlignment, TextStyleKind};
     use docspec_docx_reader::{DocxReader, EventSource as _};
 
     use crate::fixture;
@@ -875,6 +876,227 @@ mod events {
                 ]
             );
         }
+
+        #[test]
+        fn text_color_red_emits_start_text_style_textcolor_red() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text_events(
+                    &[TextStyleKind::TextColor(Color::Rgb { r: 255, g: 0, b: 0 })],
+                    "x",
+                ))
+            );
+        }
+
+        #[test]
+        fn test_w_color_auto_emits_no_event() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:color w:val="auto"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("x")]));
+        }
+
+        #[test]
+        fn test_w_color_black_emitted_unchanged() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:color w:val="000000"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text_events(
+                    &[TextStyleKind::TextColor(Color::Rgb { r: 0, g: 0, b: 0 })],
+                    "x",
+                ))
+            );
+        }
+
+        #[test]
+        fn highlight_yellow_emits_mark_yellow() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:highlight w:val="yellow"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text_events(
+                    &[TextStyleKind::Mark(Color::Rgb {
+                        r: 255,
+                        g: 255,
+                        b: 0
+                    })],
+                    "x",
+                ))
+            );
+        }
+
+        #[test]
+        fn test_w_highlight_none_emits_no_event() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:highlight w:val="none"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("x")]));
+        }
+
+        #[test]
+        fn highlight_unknown_emits_no_event() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:highlight w:val="orangeMaize"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("x")]));
+        }
+
+        #[test]
+        fn shd_fill_yellow_emits_mark_yellow() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:shd w:val="clear" w:fill="FFFF00"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text_events(
+                    &[TextStyleKind::Mark(Color::Rgb {
+                        r: 255,
+                        g: 255,
+                        b: 0
+                    })],
+                    "x",
+                ))
+            );
+        }
+
+        #[test]
+        fn test_w_shd_fill_auto_emits_no_event() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:shd w:val="clear" w:fill="auto"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("x")]));
+        }
+
+        #[test]
+        fn shd_with_no_fill_attribute_emits_no_event() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:shd w:val="clear"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("x")]));
+        }
+
+        #[test]
+        fn test_highlight_wins_over_shd() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:highlight w:val="yellow"/><w:shd w:val="clear" w:fill="FF0000"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text_events(
+                    &[TextStyleKind::Mark(Color::Rgb {
+                        r: 255,
+                        g: 255,
+                        b: 0
+                    })],
+                    "x",
+                ))
+            );
+        }
+
+        #[test]
+        fn test_shd_used_when_highlight_none() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:highlight w:val="none"/><w:shd w:val="clear" w:fill="FF0000"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text_events(
+                    &[TextStyleKind::Mark(Color::Rgb { r: 255, g: 0, b: 0 })],
+                    "x",
+                ))
+            );
+        }
+
+        #[test]
+        fn test_consecutive_runs_different_text_color() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>a</w:t></w:r><w:r><w:rPr><w:color w:val="0000FF"/></w:rPr><w:t>b</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                vec![
+                    start_doc(),
+                    start_para(),
+                    Event::StartTextStyle {
+                        kind: TextStyleKind::TextColor(Color::Rgb { r: 255, g: 0, b: 0 }),
+                        id: None,
+                    },
+                    text("a"),
+                    Event::EndTextStyle,
+                    Event::StartTextStyle {
+                        kind: TextStyleKind::TextColor(Color::Rgb { r: 0, g: 0, b: 255 }),
+                        id: None,
+                    },
+                    text("b"),
+                    Event::EndTextStyle,
+                    Event::EndParagraph,
+                    Event::EndDocument,
+                ]
+            );
+        }
+
+        #[test]
+        fn bold_plus_text_color_plus_mark_combined() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:b/><w:color w:val="FF0000"/><w:highlight w:val="yellow"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text_events(
+                    &[
+                        TextStyleKind::Bold,
+                        TextStyleKind::TextColor(Color::Rgb { r: 255, g: 0, b: 0 }),
+                        TextStyleKind::Mark(Color::Rgb {
+                            r: 255,
+                            g: 255,
+                            b: 0
+                        }),
+                    ],
+                    "x",
+                ))
+            );
+        }
+
+        #[test]
+        fn consecutive_runs_with_same_color_emit_close_and_reopen() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>a</w:t></w:r><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>b</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                vec![
+                    start_doc(),
+                    start_para(),
+                    Event::StartTextStyle {
+                        kind: TextStyleKind::TextColor(Color::Rgb { r: 255, g: 0, b: 0 }),
+                        id: None,
+                    },
+                    text("a"),
+                    Event::EndTextStyle,
+                    Event::StartTextStyle {
+                        kind: TextStyleKind::TextColor(Color::Rgb { r: 255, g: 0, b: 0 }),
+                        id: None,
+                    },
+                    text("b"),
+                    Event::EndTextStyle,
+                    Event::EndParagraph,
+                    Event::EndDocument,
+                ]
+            );
+        }
+
+        #[test]
+        fn text_color_emits_no_event_when_in_rpr_is_false() {
+            let events =
+                collect_events(r#"<w:p><w:r><w:color w:val="FF0000"/><w:t>x</w:t></w:r></w:p>"#);
+            assert_eq!(events, expected_events(vec![text("x")]));
+        }
     }
 
     mod ppr {
@@ -1056,7 +1278,7 @@ mod events {
 
         assert_eq!(
             format!("{reader:?}"),
-            "DocxReader { inner: DocumentReader { buf: [], in_ignored_subtree: 0, in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_text: \"\", frozen_run_kinds: [], open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, xml: \"<quick_xml::Reader>\" } }"
+            "DocxReader { inner: DocumentReader { buf: [], in_ignored_subtree: 0, in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, xml: \"<quick_xml::Reader>\" } }"
         );
     }
 
@@ -2410,9 +2632,10 @@ mod events {
     }
 
     #[test]
+    // Uses <w:lang> as a known-but-unhandled rPr child to exercise the default-ignore path.
     fn rpr_with_unknown_child_is_no_op() {
         let mut reader = make_reader(
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:color w:val="FF0000"/><w:b/></w:rPr><w:t>x</w:t></w:r></w:p></w:body></w:document>"#,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:lang w:val="en-US"/><w:b/></w:rPr><w:t>x</w:t></w:r></w:p></w:body></w:document>"#,
         );
         let events = drive(&mut reader);
         assert_eq!(

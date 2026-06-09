@@ -8,7 +8,7 @@ DocSpec documents are streams of typed events. Readers emit events. Writers cons
 
 **Formatting as wrappers.** Inline formatting is expressed via `StartTextStyle { kind: TextStyleKind, id: Option<String> }` and `EndTextStyle` wrapper events around `Text` content. This matches the Start/End uniformity of every other inline and block container.
 
-**Semantic fidelity.** Events capture meaning, not appearance. Visual properties (font, color, size) are not represented — except mark color for highlighting.
+**Semantic fidelity.** Events capture meaning, not appearance. Visual properties (font, size) are not represented. Color is represented in two places: `TextStyleKind::Mark(Color)` for highlight/background, and `TextStyleKind::TextColor(Color)` for foreground text color.
 
 **Lazy asset references.** Images carry references, not bytes. Writers resolve via `AssetProvider`.
 
@@ -70,6 +70,7 @@ enum Color { Rgb { r: u8, g: u8, b: u8 } }
 enum TextStyleKind {
     Bold, Italic, Code, Strikethrough, Underline, Subscript, Superscript,
     Mark(Color),  // highlight color
+    TextColor(Color),  // foreground text color
 }
 
 enum ImageSource {
@@ -181,7 +182,7 @@ Every `Start*` has a matching `End*`. They nest but never overlap.
 
 **Link.** An inline container (uses Start/End because it carries `href`). Valid inside paragraphs, headings, list items, cells, definition details. Cannot nest.
 
-**StartTextStyle / EndTextStyle.** An inline-container pair carrying a single `TextStyleKind`. Valid inside paragraphs, headings, list items, cells, definition details. Style spans nest but never overlap (per Rule 1); readers MUST close-and-reopen to express overlapping source styles. `Subscript` and `Superscript` MAY both be active simultaneously by nesting; writers that cannot represent both prefer `Superscript`. The `Mark(Color)` variant carries the highlight color.
+**StartTextStyle / EndTextStyle.** An inline-container pair carrying a single `TextStyleKind`. Valid inside paragraphs, headings, list items, cells, definition details. Style spans nest but never overlap (per Rule 1); readers MUST close-and-reopen to express overlapping source styles. `Subscript` and `Superscript` MAY both be active simultaneously by nesting; writers that cannot represent both prefer `Superscript`. The `Mark(Color)` variant carries the highlight/background color; the `TextColor(Color)` variant carries the foreground text color.
 
 **Text.** Whitespace is significant. Outside preformatted blocks, newlines in content are collapsed to whitespace; readers emit `LineBreak` for explicit hard breaks (e.g., markdown two-space-newline, HTML `<br>`) and `SoftBreak` for soft breaks (e.g., source line wraps within a paragraph). Inline formatting is expressed via surrounding `StartTextStyle`/`EndTextStyle` wrapper events; the `Text` event itself carries content only.
 

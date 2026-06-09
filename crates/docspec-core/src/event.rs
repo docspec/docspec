@@ -23,6 +23,8 @@ pub enum TextStyleKind {
     Superscript,
     /// Highlight/mark color formatting.
     Mark(crate::Color),
+    /// Foreground (text) color. Carries an explicit RGB color.
+    TextColor(crate::Color),
 }
 
 /// A streaming document event.

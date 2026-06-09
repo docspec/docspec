@@ -4,7 +4,7 @@ use alloc::collections::VecDeque;
 use core::fmt;
 use std::io::{BufReader, Read};
 
-use docspec_core::{Error, Event, Result, TextAlignment, TextStyleKind};
+use docspec_core::{Color, Error, Event, Result, TextAlignment, TextStyleKind};
 use quick_xml::events::{BytesCData, BytesRef, BytesStart, BytesText};
 
 use crate::properties;
@@ -46,10 +46,20 @@ pub struct DocumentReader {
     in_rpr: bool,
     /// Run style kinds accumulated while inside `<w:rPr>`.
     pending_run_kinds: Vec<TextStyleKind>,
+    /// Text color accumulated while inside `<w:rPr>`.
+    pending_run_text_color: Option<Color>,
+    /// Highlight color accumulated while inside `<w:rPr>`.
+    pending_run_mark: Option<Color>,
+    /// Shading fill color accumulated while inside `<w:rPr>`.
+    pending_run_shade: Option<Color>,
     /// Text collected for the current `<w:t>` element.
     pending_text: String,
     /// Run style kinds frozen at `</w:rPr>`, applied to subsequent emissions in the same run.
     frozen_run_kinds: Vec<TextStyleKind>,
+    /// Text color frozen at `</w:rPr>`, applied to subsequent emissions in the same run.
+    frozen_run_text_color: Option<Color>,
+    /// Highlight/background color frozen at `</w:rPr>`, applied to subsequent emissions in the same run.
+    frozen_run_mark: Option<Color>,
     /// Style kinds currently opened for the active run.
     open_styles: Vec<TextStyleKind>,
     /// Document processing phase.
@@ -78,8 +88,13 @@ impl fmt::Debug for DocumentReader {
             .field("paragraph_started_emitted", &self.paragraph_started_emitted)
             .field("in_rpr", &self.in_rpr)
             .field("pending_run_kinds", &self.pending_run_kinds)
+            .field("pending_run_text_color", &self.pending_run_text_color)
+            .field("pending_run_mark", &self.pending_run_mark)
+            .field("pending_run_shade", &self.pending_run_shade)
             .field("pending_text", &self.pending_text)
             .field("frozen_run_kinds", &self.frozen_run_kinds)
+            .field("frozen_run_text_color", &self.frozen_run_text_color)
+            .field("frozen_run_mark", &self.frozen_run_mark)
             .field("open_styles", &self.open_styles)
             .field("phase", &"<phase>")
             .field("queue", &self.queue)
@@ -101,8 +116,13 @@ impl DocumentReader {
             paragraph_started_emitted: false,
             in_rpr: false,
             pending_run_kinds: Vec::new(),
+            pending_run_text_color: None,
+            pending_run_mark: None,
+            pending_run_shade: None,
             pending_text: String::new(),
             frozen_run_kinds: Vec::new(),
+            frozen_run_text_color: None,
+            frozen_run_mark: None,
             open_styles: Vec::new(),
             phase: Phase::NotStarted,
             queue: VecDeque::new(),
@@ -142,6 +162,11 @@ impl DocumentReader {
         }
         self.frozen_run_kinds.clear();
         self.pending_run_kinds.clear();
+        self.frozen_run_text_color = None;
+        self.frozen_run_mark = None;
+        self.pending_run_text_color = None;
+        self.pending_run_mark = None;
+        self.pending_run_shade = None;
         self.queue.push_back(Event::EndParagraph);
         self.in_paragraph = false;
         self.in_text = false;
@@ -168,6 +193,26 @@ impl DocumentReader {
                     id: None,
                 });
                 self.open_styles.push(kind.clone());
+            }
+        }
+        if let Some(color) = self.frozen_run_text_color.clone() {
+            let kind = TextStyleKind::TextColor(color);
+            if !self.open_styles.contains(&kind) {
+                self.queue.push_back(Event::StartTextStyle {
+                    kind: kind.clone(),
+                    id: None,
+                });
+                self.open_styles.push(kind);
+            }
+        }
+        if let Some(color) = self.frozen_run_mark.clone() {
+            let kind = TextStyleKind::Mark(color);
+            if !self.open_styles.contains(&kind) {
+                self.queue.push_back(Event::StartTextStyle {
+                    kind: kind.clone(),
+                    id: None,
+                });
+                self.open_styles.push(kind);
             }
         }
     }
@@ -242,6 +287,18 @@ impl DocumentReader {
                 let val = read_val_attribute(tag);
                 self.set_pending_vertical_alignment(properties::parse_vert_align(val.as_deref()));
             }
+            b"color" if self.in_rpr => {
+                let val = read_val_attribute(tag);
+                self.pending_run_text_color = properties::parse_color_val(val.as_deref());
+            }
+            b"highlight" if self.in_rpr => {
+                let val = read_val_attribute(tag);
+                self.pending_run_mark = properties::parse_highlight_val(val.as_deref());
+            }
+            b"shd" if self.in_rpr => {
+                let fill = read_attribute(tag, b"w:fill");
+                self.pending_run_shade = properties::parse_shd_fill(fill.as_deref());
+            }
             b"p" if !self.in_paragraph => {
                 self.queue.push_back(Event::StartParagraph {
                     alignment: None,
@@ -269,6 +326,12 @@ impl DocumentReader {
             }
             b"rPr" if self.in_rpr => {
                 self.frozen_run_kinds = core::mem::take(&mut self.pending_run_kinds);
+                self.frozen_run_text_color = self.pending_run_text_color.take();
+                self.frozen_run_mark = self
+                    .pending_run_mark
+                    .take()
+                    .or_else(|| self.pending_run_shade.take());
+                self.pending_run_shade = None;
                 self.in_rpr = false;
             }
             b"r" => {
@@ -277,6 +340,11 @@ impl DocumentReader {
                 }
                 self.frozen_run_kinds.clear();
                 self.pending_run_kinds.clear();
+                self.frozen_run_text_color = None;
+                self.frozen_run_mark = None;
+                self.pending_run_text_color = None;
+                self.pending_run_mark = None;
+                self.pending_run_shade = None;
                 self.run_content_emitted = false;
                 self.in_rpr = false;
             }
@@ -349,6 +417,9 @@ impl DocumentReader {
                 } else {
                     self.in_rpr = true;
                     self.pending_run_kinds.clear();
+                    self.pending_run_text_color = None;
+                    self.pending_run_mark = None;
+                    self.pending_run_shade = None;
                 }
             }
             b"b" if self.in_rpr => {
@@ -373,6 +444,18 @@ impl DocumentReader {
             b"vertAlign" if self.in_rpr => {
                 let val = read_val_attribute(tag);
                 self.set_pending_vertical_alignment(properties::parse_vert_align(val.as_deref()));
+            }
+            b"color" if self.in_rpr => {
+                let val = read_val_attribute(tag);
+                self.pending_run_text_color = properties::parse_color_val(val.as_deref());
+            }
+            b"highlight" if self.in_rpr => {
+                let val = read_val_attribute(tag);
+                self.pending_run_mark = properties::parse_highlight_val(val.as_deref());
+            }
+            b"shd" if self.in_rpr => {
+                let fill = read_attribute(tag, b"w:fill");
+                self.pending_run_shade = properties::parse_shd_fill(fill.as_deref());
             }
             b"p" if !self.in_paragraph => self.start_paragraph(),
             b"r" if self.in_paragraph => {
@@ -514,6 +597,13 @@ fn read_val_attribute(tag: &BytesStart<'_>) -> Option<String> {
         .map(str::to_owned)
 }
 
+fn read_attribute(tag: &BytesStart<'_>, name: &[u8]) -> Option<String> {
+    let a = tag.try_get_attribute(name).ok().flatten()?;
+    core::str::from_utf8(a.value.as_ref())
+        .ok()
+        .map(str::to_owned)
+}
+
 fn parse_on_off_attribute(tag: &BytesStart<'_>) -> bool {
     let val = read_val_attribute(tag);
     properties::parse_on_off(val.as_deref())
@@ -555,6 +645,35 @@ mod tests {
         let mut reader = make_reader(&doc);
         loop {
             if reader.queue.len() > 16 {
+                return Err(Box::new(Error::Other {
+                    message: format!("queue grew to {}", reader.queue.len()),
+                }));
+            }
+            if reader.next_event()?.is_none() {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn queue_length_remains_bounded_with_colors(
+    ) -> core::result::Result<(), Box<dyn core::error::Error>> {
+        let doc = {
+            let mut content = String::from(
+                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>"#,
+            );
+            for _ in 0..1000 {
+                content.push_str(
+                    r#"<w:p><w:r><w:rPr><w:b/><w:color w:val="FF0000"/><w:highlight w:val="yellow"/><w:shd w:val="clear" w:fill="0000FF"/></w:rPr><w:t>hello</w:t></w:r></w:p>"#,
+                );
+            }
+            content.push_str("</w:body></w:document>");
+            content
+        };
+        let mut reader = make_reader(&doc);
+        loop {
+            if reader.queue.len() > 32 {
                 return Err(Box::new(Error::Other {
                     message: format!("queue grew to {}", reader.queue.len()),
                 }));

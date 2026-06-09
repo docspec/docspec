@@ -142,6 +142,8 @@
 //!
 //! [`EventSink`]: docspec_core::EventSink
 
+pub mod palette;
+
 use std::io::Write;
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -838,6 +840,8 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         let mut code = false;
         let mut strike = false;
         let mut underline = false;
+        let mut text_color: Option<docspec_core::Color> = None;
+        let mut background_color: Option<docspec_core::Color> = None;
 
         for kind in &self.open_styles {
             match kind {
@@ -854,10 +858,8 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
                     // Intentionally not rendered: BlockNote's default schema has no superscript representation.
                     Self::omit_unsupported_text_style("superscript");
                 }
-                TextStyleKind::Mark(_) => {
-                    // Intentionally not rendered: BlockNote's default schema has no mark/highlight representation.
-                    Self::omit_unsupported_text_style("mark");
-                }
+                TextStyleKind::TextColor(color) => text_color = Some(color.clone()),
+                TextStyleKind::Mark(color) => background_color = Some(color.clone()),
                 future_kind => {
                     // Future text styles are accepted and omitted until BlockNote has a mapped representation.
                     Self::omit_future_text_style(future_kind);
@@ -878,6 +880,16 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
                 ] {
                     if enabled {
                         s.key(key).value(true)?;
+                    }
+                }
+                if let Some(c) = text_color {
+                    if let Some(name) = palette::nearest_text_color(&c) {
+                        s.key("textColor").value(name)?;
+                    }
+                }
+                if let Some(c) = background_color {
+                    if let Some(name) = palette::nearest_background_color(&c) {
+                        s.key("backgroundColor").value(name)?;
                     }
                 }
                 Ok(())
