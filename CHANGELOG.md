@@ -12,6 +12,16 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.7.0](https://github.com/docspec/docspec/compare/v1.6.0...v1.7.0) - 2026-06-09
+
+### Added
+
+- *(docx-reader)* honour w:rPr and w:pPr properties
+
+### Other
+
+- update Cargo.lock dependencies
+
 ## [1.6.0](https://github.com/docspec/docspec/compare/v1.5.1...v1.6.0) - 2026-06-09
 
 ### Added
