@@ -83,7 +83,7 @@ mod tests {
         let json = String::from_utf8(output).expect("not utf8");
         assert_eq!(
             json,
-            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"hello","styles":{}}],"children":[]}]"#
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -105,7 +105,7 @@ mod tests {
         let json = String::from_utf8(output).expect("not utf8");
         assert_eq!(
             json,
-            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"bare text","styles":{}}],"children":[]}]"#
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"bare text","styles":{}}],"children":[]}]"#
         );
     }
 

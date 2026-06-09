@@ -1,9 +1,6 @@
 [
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [],
     "children": []
   },
@@ -18,9 +15,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [],
     "children": []
   },
@@ -35,9 +29,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [],
     "children": []
   },

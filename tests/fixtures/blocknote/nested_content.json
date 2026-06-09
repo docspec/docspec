@@ -1,1 +1,51 @@
-[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"Header","styles":{}}]}]},{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"This paragraph is inside a table cell.","styles":{}}]}]}]},"children":[]}]
+[
+  {
+    "type": "table",
+    "props": {
+      "textColor": "default"
+    },
+    "content": {
+      "type": "tableContent",
+      "columnWidths": [],
+      "rows": [
+        {
+          "cells": [
+            {
+              "type": "tableCell",
+              "props": {
+                "backgroundColor": "default",
+                "textColor": "default"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Header",
+                  "styles": {}
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cells": [
+            {
+              "type": "tableCell",
+              "props": {
+                "backgroundColor": "default",
+                "textColor": "default"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "This paragraph is inside a table cell.",
+                  "styles": {}
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "children": []
+  }
+]

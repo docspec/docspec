@@ -1,9 +1,6 @@
 [
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",
@@ -15,9 +12,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",
@@ -29,9 +23,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",
@@ -55,9 +46,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",
@@ -81,9 +69,6 @@
   },
   {
     "type": "paragraph",
-    "props": {
-      "textAlignment": "left"
-    },
     "content": [
       {
         "type": "text",

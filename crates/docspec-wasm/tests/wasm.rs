@@ -10,7 +10,7 @@ mod tests {
         assert!(result.is_ok(), "conversion failed: {result:?}");
         assert_eq!(
             result.unwrap_or_default(),
-            r#"[{"type":"heading","props":{"level":1,"textAlignment":"left"},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"World","styles":{}}],"children":[]}]"#
+            r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"World","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -27,7 +27,7 @@ mod tests {
         assert!(result.is_ok(), "conversion failed: {result:?}");
         assert_eq!(
             result.unwrap_or_default(),
-            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"Just a paragraph","styles":{}}],"children":[]}]"#
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"Just a paragraph","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -37,7 +37,7 @@ mod tests {
         assert!(result.is_ok(), "conversion failed: {result:?}");
         assert_eq!(
             result.unwrap_or_default(),
-            r#"[{"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"bold","styles":{"bold":true}},{"type":"text","text":" and ","styles":{}},{"type":"text","text":"italic","styles":{"italic":true}}],"children":[]}]"#
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"bold","styles":{"bold":true}},{"type":"text","text":" and ","styles":{}},{"type":"text","text":"italic","styles":{"italic":true}}],"children":[]}]"#
         );
     }
 }

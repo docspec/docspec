@@ -1,6 +1,44 @@
 [
-  {"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"first para","styles":{}}],"children":[
-    {"type":"paragraph","props":{"textAlignment":"left"},"content":[{"type":"text","text":"second para","styles":{}}],"children":[]}
-  ]},
-  {"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"left"},"content":[{"type":"text","text":"next item","styles":{}}],"children":[]}
+  {
+    "type": "bulletListItem",
+    "props": {
+      "backgroundColor": "default",
+      "textColor": "default"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "first para",
+        "styles": {}
+      }
+    ],
+    "children": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "second para",
+            "styles": {}
+          }
+        ],
+        "children": []
+      }
+    ]
+  },
+  {
+    "type": "bulletListItem",
+    "props": {
+      "backgroundColor": "default",
+      "textColor": "default"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "next item",
+        "styles": {}
+      }
+    ],
+    "children": []
+  }
 ]

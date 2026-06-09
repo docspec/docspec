@@ -148,7 +148,9 @@ use std::io::Write;
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::write::EncoderWriter as Base64Encoder;
-use docspec_core::{AssetProvider, Depth, Error, Event, EventSink, ImageSource, Result, TextStyle};
+use docspec_core::{
+    AssetProvider, Depth, Error, Event, EventSink, ImageSource, Result, TextAlignment, TextStyle,
+};
 use docspec_json::{JsonEmitter, Null, StrusonBackend};
 
 macro_rules! close_text_block {
@@ -195,19 +197,28 @@ enum ListKind {
     Unordered,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ListContentState {
+    Pending,
+    Open,
+    Closed,
+}
+
 /// Represents a single entry in the list stack, tracking list nesting state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ListStackEntry {
     /// Whether the children array for this list has been opened.
     children_array_open: bool,
-    /// Whether the content array for this list has been opened.
-    content_array_open: bool,
+    /// Current state of this list item's content array.
+    content_state: ListContentState,
     /// Whether the first paragraph in this list item has been consumed.
     first_paragraph_consumed: bool,
     /// The kind of list (ordered or unordered).
     kind: ListKind,
     /// The nesting level of this list (0-based).
     level: u32,
+    /// Starting number for ordered list items.
+    start: Option<u32>,
 }
 
 #[derive(Default)]
@@ -215,6 +226,15 @@ struct BlockContext {
     blockquote_has_content: bool,
     in_table_cell: bool,
     in_text_block: bool,
+}
+
+fn non_default_alignment_value(alignment: Option<&TextAlignment>) -> Option<&'static str> {
+    match alignment {
+        Some(TextAlignment::Center) => Some("center"),
+        Some(TextAlignment::Right) => Some("right"),
+        Some(TextAlignment::Justify) => Some("justify"),
+        _ => None,
+    }
 }
 
 /// A streaming `BlockNote` JSON writer.
@@ -261,9 +281,16 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn close_current_list_item_object(&mut self) -> Result<()> {
+        if self
+            .list_stack
+            .last()
+            .is_some_and(|entry| entry.content_state == ListContentState::Pending)
+        {
+            self.initialize_current_list_item_content(None)?;
+        }
         let popped_entry = self.list_stack.pop();
         if let Some(list_entry) = popped_entry {
-            if list_entry.content_array_open {
+            if list_entry.content_state == ListContentState::Open {
                 self.close_open_link_if_any()?;
                 self.json.close_array()?;
             }
@@ -433,6 +460,15 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         close_text_block!(self)
     }
 
+    fn handle_end_preformatted(&mut self) -> Result<()> {
+        drop_block_in_list_end!(self);
+        return_if_table_cell!(self);
+        if !self.context.in_text_block {
+            return Ok(());
+        }
+        close_text_block!(self)
+    }
+
     fn handle_end_table(&mut self) -> Result<()> {
         drop_block_in_list_end!(self);
         if self.table_depth.is_zero() {
@@ -473,10 +509,9 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.json.open_object()?;
         self.json.key("type").value("heading")?;
         self.write_id(id)?;
-        self.json.key("props").object(|j| {
-            j.key("level").value(level)?;
-            j.key("textAlignment").value("left")
-        })?;
+        self.json
+            .key("props")
+            .object(|j| j.key("level").value(level))?;
         self.json.key("content").open_array()?;
         self.context.in_text_block = true;
         Ok(())
@@ -529,7 +564,11 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         }
     }
 
-    fn handle_paragraph(&mut self, id: Option<&String>) -> Result<()> {
+    fn handle_paragraph(
+        &mut self,
+        id: Option<&String>,
+        alignment: Option<&TextAlignment>,
+    ) -> Result<()> {
         // Inside a table cell, BlockNote's content type is InlineContent[] — block-level events are dropped.
         if self.context.in_table_cell {
             return Ok(());
@@ -541,17 +580,21 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         }
         // Second and subsequent paragraphs inside a list item dispatch as child paragraph blocks
         // in the item's children[] array (T11). Must be checked before in_list_item_content()
-        // because content_array_open may still be true when first_paragraph_consumed is set.
+        // because content may still be open when first_paragraph_consumed is set.
         if !self.list_stack.is_empty()
             && self
                 .list_stack
                 .last()
                 .is_some_and(|e| e.first_paragraph_consumed)
         {
-            if self.list_stack.last().is_some_and(|e| e.content_array_open) {
+            if self
+                .list_stack
+                .last()
+                .is_some_and(|e| e.content_state == ListContentState::Open)
+            {
                 self.json.close_array()?;
                 if let Some(e) = self.list_stack.last_mut() {
-                    e.content_array_open = false;
+                    e.content_state = ListContentState::Closed;
                 }
             }
             if !self
@@ -566,18 +609,14 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             }
             self.json.open_object()?;
             self.json.key("type").value("paragraph")?;
-            self.json
-                .key("props")
-                .object(|j| j.key("textAlignment").value("left"))?;
+            self.write_paragraph_props(alignment)?;
             self.json.key("content").open_array()?;
             self.context.in_text_block = true;
             return Ok(());
         }
-        if self.in_list_item_content() {
-            return Ok(());
-        }
         if !self.list_stack.is_empty() {
-            self.close_open_list_items()?;
+            self.initialize_current_list_item_content(alignment)?;
+            return Ok(());
         }
         if self.blockquote_depth.is_positive() {
             if self.context.blockquote_has_content {
@@ -588,11 +627,18 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.json.open_object()?;
         self.write_id(id)?;
         self.json.key("type").value("paragraph")?;
-        self.json
-            .key("props")
-            .object(|j| j.key("textAlignment").value("left"))?;
+        self.write_paragraph_props(alignment)?;
         self.json.key("content").open_array()?;
         self.context.in_text_block = true;
+        Ok(())
+    }
+
+    fn write_paragraph_props(&mut self, alignment: Option<&TextAlignment>) -> Result<()> {
+        if let Some(value) = non_default_alignment_value(alignment) {
+            self.json
+                .key("props")
+                .object(|j| j.key("textAlignment").value(value))?;
+        }
         Ok(())
     }
 
@@ -614,6 +660,11 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     ///
     /// Drops `title` and `id` — `BlockNote`'s inline link schema has no slot for these.
     fn handle_start_link(&mut self, href: &str) -> Result<()> {
+        if self.list_stack.last().is_some_and(|entry| {
+            entry.content_state == ListContentState::Pending && !entry.first_paragraph_consumed
+        }) {
+            self.initialize_current_list_item_content(None)?;
+        }
         if self.drop_inside_list_depth.is_positive()
             || self.dropped_list_depth.is_positive()
             || (!self.context.in_text_block
@@ -741,8 +792,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         self.write_id(id)?;
         self.json.key("props").object(|p| {
             p.key("backgroundColor").value("default")?;
-            p.key("textColor").value("default")?;
-            p.key("textAlignment").value("left")
+            p.key("textColor").value("default")
         })?;
         self.json.key("content").open_array()?;
         self.context.in_table_cell = true;
@@ -789,12 +839,17 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
 
     fn handle_text_event(&mut self, content: &str, style: &TextStyle) -> Result<()> {
         // Auto-open paragraph for orphan text (e.g., text after image closed paragraph)
+        if self.list_stack.last().is_some_and(|entry| {
+            entry.content_state == ListContentState::Pending && !entry.first_paragraph_consumed
+        }) {
+            self.initialize_current_list_item_content(None)?;
+        }
         if !self.context.in_text_block
             && self.blockquote_depth.is_zero()
             && !self.context.in_table_cell
             && !self.in_list_item_content()
         {
-            self.handle_paragraph(None)?;
+            self.handle_paragraph(None, None)?;
         }
         self.handle_text(content, style)
     }
@@ -813,7 +868,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     fn in_list_item_content(&self) -> bool {
         self.list_stack
             .last()
-            .is_some_and(|entry| entry.content_array_open)
+            .is_some_and(|entry| entry.content_state == ListContentState::Open)
     }
 
     /// Creates a new `BlockNoteWriter` that writes to the given writer.
@@ -839,15 +894,54 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         }
     }
 
+    fn initialize_current_list_item_content(
+        &mut self,
+        alignment: Option<&TextAlignment>,
+    ) -> Result<()> {
+        let Some(current_entry) = self.list_stack.last() else {
+            return Ok(());
+        };
+        if current_entry.content_state != ListContentState::Pending {
+            return Ok(());
+        }
+        let kind = current_entry.kind;
+        let start = current_entry.start;
+        self.json.key("props").object(|j| {
+            j.key("backgroundColor").value("default")?;
+            j.key("textColor").value("default")?;
+            if let Some(value) = non_default_alignment_value(alignment) {
+                j.key("textAlignment").value(value)?;
+            }
+            if kind == ListKind::Ordered {
+                if let Some(start_prop) = start {
+                    j.key("start").value(start_prop)?;
+                }
+            }
+            Ok(())
+        })?;
+        self.json.key("content").open_array()?;
+        if let Some(entry) = self.list_stack.last_mut() {
+            entry.content_state = ListContentState::Open;
+        }
+        Ok(())
+    }
+
     fn open_current_list_item_children(&mut self) -> Result<()> {
+        if self
+            .list_stack
+            .last()
+            .is_some_and(|entry| entry.content_state == ListContentState::Pending)
+        {
+            self.initialize_current_list_item_content(None)?;
+        }
         let content_array_open = self
             .list_stack
             .last()
-            .is_some_and(|entry| entry.content_array_open);
+            .is_some_and(|entry| entry.content_state == ListContentState::Open);
         if content_array_open {
             self.json.close_array()?;
             if let Some(entry) = self.list_stack.last_mut() {
-                entry.content_array_open = false;
+                entry.content_state = ListContentState::Closed;
             }
         }
 
@@ -878,29 +972,20 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             ListKind::Unordered => "bulletListItem",
         };
         self.json.key("type").value(type_name)?;
-        self.json.key("props").object(|j| {
-            j.key("backgroundColor").value("default")?;
-            j.key("textColor").value("default")?;
-            j.key("textAlignment").value("left")?;
-            if kind == ListKind::Ordered {
-                if let Some(start_value) = start {
-                    let start_prop = u32::try_from(start_value).map_err(|err| Error::Other {
-                        message: format!(
-                            "ordered list start value out of range: {start_value}: {err}"
-                        ),
-                    })?;
-                    j.key("start").value(start_prop)?;
-                }
-            }
-            Ok(())
-        })?;
-        self.json.key("content").open_array()?;
+        let checked_start = start
+            .map(|start_value| {
+                u32::try_from(start_value).map_err(|err| Error::Other {
+                    message: format!("ordered list start value out of range: {start_value}: {err}"),
+                })
+            })
+            .transpose()?;
         self.list_stack.push(ListStackEntry {
             children_array_open: false,
-            content_array_open: true,
+            content_state: ListContentState::Pending,
             first_paragraph_consumed: false,
             kind,
             level,
+            start: checked_start,
         });
         Ok(())
     }
@@ -970,15 +1055,10 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
                 }
                 close_text_block!(self)
             }
-            Event::EndPreformatted => {
-                drop_block_in_list_end!(self);
-                return_if_table_cell!(self);
-                if !self.context.in_text_block {
-                    return Ok(());
-                }
-                close_text_block!(self)
+            Event::EndPreformatted => self.handle_end_preformatted(),
+            Event::StartParagraph { alignment, id } => {
+                self.handle_paragraph(id.as_ref(), alignment.as_ref())
             }
-            Event::StartParagraph { id, .. } => self.handle_paragraph(id.as_ref()),
             Event::EndParagraph => self.handle_end_paragraph(),
             Event::StartBlockQuote { id, .. } => {
                 return_if_table_cell!(self);
