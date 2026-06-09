@@ -1,6 +1,6 @@
 //! OOXML value parsers for run and paragraph properties.
 
-use docspec_core::TextAlignment;
+use docspec_core::{Color, TextAlignment};
 
 /// Parses an `ST_OnOff` value (ECMA-376 §22.9.2.7).
 ///
@@ -47,6 +47,98 @@ pub fn parse_alignment(val: &str) -> Option<TextAlignment> {
         "both" | "distribute" => Some(TextAlignment::Justify),
         _ => None,
     }
+}
+
+/// Parses a hex color string (with or without leading `#`, 3 or 6 hex digits) into a `Color`.
+///
+/// Returns `None` for `"auto"`, empty strings, non-hex input, or lengths other than 3 or 6.
+pub fn parse_hex_color(val: &str) -> Option<Color> {
+    let s = val.strip_prefix('#').unwrap_or(val);
+    match s.len() {
+        3 => {
+            let mut chars = s.chars();
+            let r_char = chars.next()?;
+            let g_char = chars.next()?;
+            let b_char = chars.next()?;
+            let r_str = format!("{r_char}{r_char}");
+            let g_str = format!("{g_char}{g_char}");
+            let b_str = format!("{b_char}{b_char}");
+            let r = u8::from_str_radix(&r_str, 16).ok()?;
+            let g = u8::from_str_radix(&g_str, 16).ok()?;
+            let b = u8::from_str_radix(&b_str, 16).ok()?;
+            Some(Color::Rgb { r, g, b })
+        }
+        6 => {
+            let mut chars = s.chars();
+            let r1 = chars.next()?;
+            let r2 = chars.next()?;
+            let g1 = chars.next()?;
+            let g2 = chars.next()?;
+            let b1 = chars.next()?;
+            let b2 = chars.next()?;
+            let r_str = format!("{r1}{r2}");
+            let g_str = format!("{g1}{g2}");
+            let b_str = format!("{b1}{b2}");
+            let r = u8::from_str_radix(&r_str, 16).ok()?;
+            let g = u8::from_str_radix(&g_str, 16).ok()?;
+            let b = u8::from_str_radix(&b_str, 16).ok()?;
+            Some(Color::Rgb { r, g, b })
+        }
+        _ => None,
+    }
+}
+
+/// Parses the `w:val` attribute of a `<w:color>` element.
+///
+/// Returns `None` for absent attribute, `"auto"`, or non-hex values.
+pub fn parse_color_val(val: Option<&str>) -> Option<Color> {
+    parse_hex_color(val?)
+}
+
+/// Highlight color palette (OOXML standard 16 colors, excluding "none").
+const HIGHLIGHT_PALETTE: &[(&str, u8, u8, u8)] = &[
+    ("black", 0, 0, 0),
+    ("blue", 0, 0, 255),
+    ("cyan", 0, 255, 255),
+    ("green", 0, 255, 0),
+    ("magenta", 255, 0, 255),
+    ("red", 255, 0, 0),
+    ("yellow", 255, 255, 0),
+    ("white", 255, 255, 255),
+    ("darkBlue", 0, 0, 128),
+    ("darkCyan", 0, 128, 128),
+    ("darkGreen", 0, 128, 0),
+    ("darkMagenta", 128, 0, 128),
+    ("darkRed", 128, 0, 0),
+    ("darkYellow", 128, 128, 0),
+    ("darkGray", 128, 128, 128),
+    ("lightGray", 192, 192, 192),
+];
+
+/// Parses the `w:val` attribute of a `<w:highlight>` element.
+///
+/// Returns `None` for absent attribute, `"none"`, or unknown names.
+pub fn parse_highlight_val(val: Option<&str>) -> Option<Color> {
+    let s = val?;
+    if s == "none" {
+        return None;
+    }
+    HIGHLIGHT_PALETTE
+        .iter()
+        .find(|(name, _, _, _)| *name == s)
+        .map(|(_, r, g, b)| Color::Rgb {
+            r: *r,
+            g: *g,
+            b: *b,
+        })
+}
+
+/// Parses the `w:fill` attribute of a `<w:shd>` element.
+///
+/// Returns `None` for absent attribute, `"auto"`, or non-hex values.
+/// The `w:val` pattern attribute is intentionally ignored.
+pub fn parse_shd_fill(fill: Option<&str>) -> Option<Color> {
+    parse_hex_color(fill?)
 }
 
 #[cfg(test)]
@@ -195,5 +287,331 @@ mod tests {
     #[test]
     fn parse_alignment_unknown_returns_none() {
         assert_eq!(parse_alignment("mediumKashida"), None);
+    }
+
+    // ============================================================================
+    // parse_hex_color tests (11 cases)
+    // ============================================================================
+
+    #[test]
+    fn parse_hex_color_six_char_uppercase() {
+        assert_eq!(
+            parse_hex_color("FF0000"),
+            Some(Color::Rgb { r: 255, g: 0, b: 0 })
+        );
+    }
+
+    #[test]
+    fn parse_hex_color_six_char_lowercase() {
+        assert_eq!(
+            parse_hex_color("ff0000"),
+            Some(Color::Rgb { r: 255, g: 0, b: 0 })
+        );
+    }
+
+    #[test]
+    fn parse_hex_color_six_char_mixed_case() {
+        assert_eq!(
+            parse_hex_color("Ff00aA"),
+            Some(Color::Rgb {
+                r: 255,
+                g: 0,
+                b: 170
+            })
+        );
+    }
+
+    #[test]
+    fn parse_hex_color_three_char_expanded() {
+        assert_eq!(
+            parse_hex_color("f0f"),
+            Some(Color::Rgb {
+                r: 255,
+                g: 0,
+                b: 255
+            })
+        );
+    }
+
+    #[test]
+    fn parse_hex_color_three_char_uppercase() {
+        assert_eq!(
+            parse_hex_color("ABC"),
+            Some(Color::Rgb {
+                r: 170,
+                g: 187,
+                b: 204
+            })
+        );
+    }
+
+    #[test]
+    fn parse_hex_color_strips_leading_hash() {
+        assert_eq!(
+            parse_hex_color("#FF0000"),
+            Some(Color::Rgb { r: 255, g: 0, b: 0 })
+        );
+    }
+
+    #[test]
+    fn parse_hex_color_auto_returns_none() {
+        assert_eq!(parse_hex_color("auto"), None);
+    }
+
+    #[test]
+    fn parse_hex_color_empty_returns_none() {
+        assert_eq!(parse_hex_color(""), None);
+    }
+
+    #[test]
+    fn parse_hex_color_invalid_length_returns_none() {
+        assert_eq!(parse_hex_color("FFFF"), None);
+        assert_eq!(parse_hex_color("FFFFF"), None);
+        assert_eq!(parse_hex_color("FFFFFFF"), None);
+    }
+
+    #[test]
+    fn parse_hex_color_non_hex_returns_none() {
+        assert_eq!(parse_hex_color("GG0000"), None);
+    }
+
+    #[test]
+    fn parse_hex_color_black_returns_some() {
+        assert_eq!(
+            parse_hex_color("000000"),
+            Some(Color::Rgb { r: 0, g: 0, b: 0 })
+        );
+    }
+
+    // ============================================================================
+    // parse_color_val tests (6 cases)
+    // ============================================================================
+
+    #[test]
+    fn parse_color_val_none_input_returns_none() {
+        assert_eq!(parse_color_val(None), None);
+    }
+
+    #[test]
+    fn parse_color_val_auto_returns_none() {
+        assert_eq!(parse_color_val(Some("auto")), None);
+    }
+
+    #[test]
+    fn parse_color_val_valid_hex_returns_color() {
+        assert_eq!(
+            parse_color_val(Some("FF0000")),
+            Some(Color::Rgb { r: 255, g: 0, b: 0 })
+        );
+    }
+
+    #[test]
+    fn parse_color_val_invalid_hex_returns_none() {
+        assert_eq!(parse_color_val(Some("xyz")), None);
+    }
+
+    #[test]
+    fn parse_color_val_black_returns_some() {
+        assert_eq!(
+            parse_color_val(Some("000000")),
+            Some(Color::Rgb { r: 0, g: 0, b: 0 })
+        );
+    }
+
+    #[test]
+    fn parse_color_val_with_leading_hash() {
+        assert_eq!(
+            parse_color_val(Some("#FF0000")),
+            Some(Color::Rgb { r: 255, g: 0, b: 0 })
+        );
+    }
+
+    // ============================================================================
+    // parse_highlight_val tests (8 cases)
+    // ============================================================================
+
+    #[test]
+    fn parse_highlight_val_none_input_returns_none() {
+        assert_eq!(parse_highlight_val(None), None);
+    }
+
+    #[test]
+    fn parse_highlight_val_explicit_none_returns_none() {
+        assert_eq!(parse_highlight_val(Some("none")), None);
+    }
+
+    #[test]
+    fn parse_highlight_val_yellow_returns_yellow() {
+        assert_eq!(
+            parse_highlight_val(Some("yellow")),
+            Some(Color::Rgb {
+                r: 255,
+                g: 255,
+                b: 0
+            })
+        );
+    }
+
+    #[test]
+    fn parse_highlight_val_dark_blue_returns_dark_blue() {
+        assert_eq!(
+            parse_highlight_val(Some("darkBlue")),
+            Some(Color::Rgb { r: 0, g: 0, b: 128 })
+        );
+    }
+
+    #[test]
+    fn parse_highlight_val_light_gray_returns_light_gray() {
+        assert_eq!(
+            parse_highlight_val(Some("lightGray")),
+            Some(Color::Rgb {
+                r: 192,
+                g: 192,
+                b: 192
+            })
+        );
+    }
+
+    #[test]
+    fn parse_highlight_val_unknown_returns_none() {
+        assert_eq!(parse_highlight_val(Some("orangeMaize")), None);
+    }
+
+    #[test]
+    fn parse_highlight_val_case_sensitive() {
+        assert_eq!(parse_highlight_val(Some("YELLOW")), None);
+    }
+
+    #[test]
+    fn parse_highlight_val_all_palette_entries() {
+        // Test all 16 named entries + "none"
+        let test_cases = vec![
+            ("black", Some(Color::Rgb { r: 0, g: 0, b: 0 })),
+            ("blue", Some(Color::Rgb { r: 0, g: 0, b: 255 })),
+            (
+                "cyan",
+                Some(Color::Rgb {
+                    r: 0,
+                    g: 255,
+                    b: 255,
+                }),
+            ),
+            ("green", Some(Color::Rgb { r: 0, g: 255, b: 0 })),
+            (
+                "magenta",
+                Some(Color::Rgb {
+                    r: 255,
+                    g: 0,
+                    b: 255,
+                }),
+            ),
+            ("red", Some(Color::Rgb { r: 255, g: 0, b: 0 })),
+            (
+                "yellow",
+                Some(Color::Rgb {
+                    r: 255,
+                    g: 255,
+                    b: 0,
+                }),
+            ),
+            (
+                "white",
+                Some(Color::Rgb {
+                    r: 255,
+                    g: 255,
+                    b: 255,
+                }),
+            ),
+            ("darkBlue", Some(Color::Rgb { r: 0, g: 0, b: 128 })),
+            (
+                "darkCyan",
+                Some(Color::Rgb {
+                    r: 0,
+                    g: 128,
+                    b: 128,
+                }),
+            ),
+            ("darkGreen", Some(Color::Rgb { r: 0, g: 128, b: 0 })),
+            (
+                "darkMagenta",
+                Some(Color::Rgb {
+                    r: 128,
+                    g: 0,
+                    b: 128,
+                }),
+            ),
+            ("darkRed", Some(Color::Rgb { r: 128, g: 0, b: 0 })),
+            (
+                "darkYellow",
+                Some(Color::Rgb {
+                    r: 128,
+                    g: 128,
+                    b: 0,
+                }),
+            ),
+            (
+                "darkGray",
+                Some(Color::Rgb {
+                    r: 128,
+                    g: 128,
+                    b: 128,
+                }),
+            ),
+            (
+                "lightGray",
+                Some(Color::Rgb {
+                    r: 192,
+                    g: 192,
+                    b: 192,
+                }),
+            ),
+            ("none", None),
+        ];
+        for (name, expected) in test_cases {
+            assert_eq!(
+                parse_highlight_val(Some(name)),
+                expected,
+                "Failed for: {name}"
+            );
+        }
+    }
+
+    // ============================================================================
+    // parse_shd_fill tests (5 cases)
+    // ============================================================================
+
+    #[test]
+    fn parse_shd_fill_none_input_returns_none() {
+        assert_eq!(parse_shd_fill(None), None);
+    }
+
+    #[test]
+    fn parse_shd_fill_auto_returns_none() {
+        assert_eq!(parse_shd_fill(Some("auto")), None);
+    }
+
+    #[test]
+    fn parse_shd_fill_valid_hex_returns_color() {
+        assert_eq!(
+            parse_shd_fill(Some("FFFF00")),
+            Some(Color::Rgb {
+                r: 255,
+                g: 255,
+                b: 0
+            })
+        );
+    }
+
+    #[test]
+    fn parse_shd_fill_invalid_hex_returns_none() {
+        assert_eq!(parse_shd_fill(Some("xyz")), None);
+    }
+
+    #[test]
+    fn parse_shd_fill_black_returns_some() {
+        assert_eq!(
+            parse_shd_fill(Some("000000")),
+            Some(Color::Rgb { r: 0, g: 0, b: 0 })
+        );
     }
 }

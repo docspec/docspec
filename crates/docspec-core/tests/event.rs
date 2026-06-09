@@ -682,6 +682,24 @@ mod tests {
     }
 
     #[test]
+    fn text_color_variant_round_trips() {
+        let color = Color::Rgb {
+            r: 17,
+            g: 34,
+            b: 51,
+        };
+        let kind = TextStyleKind::TextColor(color.clone());
+        let cloned = kind.clone();
+        assert_eq!(kind, cloned);
+        let event = Event::StartTextStyle {
+            kind: TextStyleKind::TextColor(color),
+            id: None,
+        };
+        let cloned_event = event.clone();
+        assert_eq!(event, cloned_event);
+    }
+
+    #[test]
     fn thematic_break() {
         let event = Event::ThematicBreak { id: None };
         let cloned = event.clone();

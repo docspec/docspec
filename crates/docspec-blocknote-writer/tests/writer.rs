@@ -1,6 +1,6 @@
 //! Integration tests for `BlockNoteWriter`.
 
-#![allow(clippy::expect_used)]
+#![allow(clippy::expect_used, clippy::redundant_test_prefix)]
 
 extern crate alloc;
 
@@ -2193,14 +2193,14 @@ mod tests {
     }
 
     #[test]
-    fn mark_dropped_style_text_preserves_content_without_flag() {
+    fn mark_style_emits_background_color_palette_snap() {
         let json = run_events(&[
             start_document(),
             start_paragraph(),
             start_text_style(TextStyleKind::Mark(Color::Rgb {
-                r: 255,
-                g: 255,
-                b: 0,
+                r: 251,
+                g: 243,
+                b: 219,
             })),
             text("x"),
             Event::EndTextStyle,
@@ -2209,7 +2209,154 @@ mod tests {
         ]);
         assert_eq!(
             json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{"backgroundColor":"yellow"}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn test_blocknote_text_color_orange_exact_match() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::TextColor(Color::Rgb {
+                r: 217,
+                g: 115,
+                b: 13,
+            })),
+            text("x"),
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{"textColor":"orange"}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn test_blocknote_saturated_red_snaps_to_background_orange() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::Mark(Color::Rgb {
+                r: 224,
+                g: 62,
+                b: 62,
+            })),
+            text("x"),
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{"backgroundColor":"orange"}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn test_blocknote_pure_black_text_color_filtered() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::TextColor(Color::Rgb { r: 0, g: 0, b: 0 })),
+            text("x"),
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
             r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn test_blocknote_pure_black_mark_filtered() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::Mark(Color::Rgb { r: 0, g: 0, b: 0 })),
+            text("x"),
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn bold_plus_text_color_emits_both_keys() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::Bold),
+            start_text_style(TextStyleKind::TextColor(Color::Rgb {
+                r: 224,
+                g: 62,
+                b: 62,
+            })),
+            text("x"),
+            Event::EndTextStyle,
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{"bold":true,"textColor":"red"}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn text_color_and_mark_combined_emits_both() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::TextColor(Color::Rgb {
+                r: 224,
+                g: 62,
+                b: 62,
+            })),
+            start_text_style(TextStyleKind::Mark(Color::Rgb {
+                r: 251,
+                g: 243,
+                b: 219,
+            })),
+            text("x"),
+            Event::EndTextStyle,
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{"textColor":"red","backgroundColor":"yellow"}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn text_color_arbitrary_rgb_snaps_to_palette() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            start_text_style(TextStyleKind::TextColor(Color::Rgb {
+                r: 200,
+                g: 200,
+                b: 200,
+            })),
+            text("x"),
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{"textColor":"gray"}}],"children":[]}]"#
         );
     }
 

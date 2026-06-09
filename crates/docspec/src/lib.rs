@@ -16,7 +16,7 @@
 //! |----------------|-----------------------------------------------------|-----------------------------|
 //! | `markdown`     | Markdown (`CommonMark` + GFM tables/strikethrough)  | [`readers::MarkdownReader`] |
 //! | `html`         | HTML (paragraphs only)                              | `readers::HtmlReader`       |
-//! | `docx`         | DOCX (paragraphs and text only)                     | `readers::DocxReader`       |
+//! | `docx`         | DOCX (paragraphs, text, color, highlight, shading)  | `readers::DocxReader`       |
 //!
 //! [`readers::DocxReader`] is dispatched through [`AnyReader::from_reader`] and
 //! [`AnyReader::from_path`]. Use `AnyReader::from_path(InputFormat::Docx, path)` to
@@ -118,9 +118,10 @@ pub mod readers {
 
     /// Streaming DOCX reader. Available when the `docx` feature is enabled.
     /// Dispatched through [`crate::AnyReader::from_reader`] and
-    /// [`crate::AnyReader::from_path`]. Emits only paragraphs and text; styles,
-    /// tables, lists, images, headers/footers, metadata, and tracked changes are
-    /// silently dropped.
+    /// [`crate::AnyReader::from_path`]. Emits paragraphs, text, and inline
+    /// formatting including text color, highlight color, and run/text shading
+    /// (via `TextColor` and `Mark` events). Tables, lists, images,
+    /// headers/footers, metadata, and tracked changes are silently dropped.
     #[cfg(feature = "docx")]
     #[cfg_attr(docsrs, doc(cfg(feature = "docx")))]
     pub use docspec_docx_reader::DocxReader;

@@ -38,7 +38,7 @@ writer.finish()?;
 | ---------- | ------------------------------------------------ | ------------------------- |
 | `markdown` | Markdown (CommonMark + GFM tables/strikethrough) | `docspec-markdown-reader` |
 | `html`     | HTML (paragraphs only)                           | `docspec-html-reader`     |
-| `docx`     | DOCX (paragraphs and text only)                  | `docspec-docx-reader`     |
+| `docx`     | DOCX (paragraphs, text, color, highlight, shading) | `docspec-docx-reader`   |
 
 `DocxReader` is dispatched through `AnyReader::from_reader` and `AnyReader::from_path`.
 Use `AnyReader::from_path(InputFormat::Docx, path)` to open a DOCX file, or
