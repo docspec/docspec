@@ -25,17 +25,6 @@ pub enum CliError {
         message: String,
     },
 
-    /// Format reader or writer is not yet implemented.
-    #[deprecated(
-        since = "1.0.3",
-        note = "use `ReaderNotImplemented` or `WriterNotImplemented` for direction-correct error messages"
-    )]
-    #[error("{format} reader not yet implemented")]
-    FormatNotSupported {
-        /// The format that is not supported.
-        format: String,
-    },
-
     /// HTTP server error.
     #[cfg(feature = "http")]
     #[error("HTTP server error: {0}")]
@@ -45,23 +34,9 @@ pub enum CliError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
-    /// Reader for the requested input format is not yet implemented.
-    #[error("{format} reader not yet implemented")]
-    ReaderNotImplemented {
-        /// The input format that has no registered reader.
-        format: String,
-    },
-
     /// Input and output paths are the same file.
     #[error("input and output paths refer to the same file")]
     SameInputOutput,
-
-    /// Writer for the requested output format is not yet implemented.
-    #[error("{format} writer not yet implemented")]
-    WriterNotImplemented {
-        /// The output format that has no registered writer.
-        format: String,
-    },
 }
 
 #[cfg(test)]
@@ -83,31 +58,6 @@ mod tests {
             message: "cannot detect format".to_string(),
         };
         assert_eq!(err.to_string(), "cannot detect format");
-    }
-
-    #[allow(deprecated)]
-    #[test]
-    fn display_format_not_supported_error() {
-        let err = CliError::FormatNotSupported {
-            format: "blocknote".to_string(),
-        };
-        assert_eq!(err.to_string(), "blocknote reader not yet implemented");
-    }
-
-    #[test]
-    fn display_reader_not_implemented_error() {
-        let err = CliError::ReaderNotImplemented {
-            format: "blocknote".to_string(),
-        };
-        assert_eq!(err.to_string(), "blocknote reader not yet implemented");
-    }
-
-    #[test]
-    fn display_writer_not_implemented_error() {
-        let err = CliError::WriterNotImplemented {
-            format: "markdown".to_string(),
-        };
-        assert_eq!(err.to_string(), "markdown writer not yet implemented");
     }
 
     #[test]

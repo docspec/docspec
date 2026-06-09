@@ -39,8 +39,7 @@ self_cell = "1.2"
 [workspace.lints.rust]
 unsafe_code = "forbid"
 missing_docs = "deny"
-# Reason: Public functions in docspec-cli format module are intentionally exposed for use by future tasks (e.g., T9 uses resolve_input_format and resolve_output_format)
-dead_code = "allow"
+dead_code = "deny"
 
 [workspace.lints.clippy]
 # Verified against clippy 0.1.92 (2025-12-08)
