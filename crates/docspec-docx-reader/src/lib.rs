@@ -100,7 +100,7 @@ pub struct DocxReader {
     /// Queue of `DocSpec` events to emit.
     queue: VecDeque<Event>,
     /// The quick-xml reader streaming from the document entry.
-    xml: quick_xml::Reader<BufReader<Box<dyn Read>>>,
+    xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
 }
 
 impl fmt::Debug for DocxReader {
@@ -142,7 +142,7 @@ impl DocxReader {
     /// `_rels/.rels` is missing or malformed, or if the document target entry
     /// cannot be opened. Returns [`Error::Io`] for I/O failures.
     #[inline]
-    pub fn from_reader<R: Read + Seek + 'static>(mut reader: R) -> Result<Self> {
+    pub fn from_reader<R: Read + Seek + Send + 'static>(mut reader: R) -> Result<Self> {
         let mut archive = zip::ZipArchive::new(&mut reader).map_err(|err| match err {
             zip::result::ZipError::InvalidArchive(_)
             | zip::result::ZipError::UnsupportedArchive(_) => Error::Parse {
@@ -178,7 +178,7 @@ impl DocxReader {
 
         let limited = reader.take(compressed_size);
 
-        let stream: Box<dyn Read> = if method == zip::CompressionMethod::Stored {
+        let stream: Box<dyn Read + Send> = if method == zip::CompressionMethod::Stored {
             Box::new(limited)
         } else if method == zip::CompressionMethod::Deflated {
             Box::new(flate2::read::DeflateDecoder::new(limited))
@@ -425,6 +425,12 @@ mod tests {
     use super::*;
 
     const SIMPLE_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+
+    #[test]
+    fn docx_reader_is_send_static() {
+        fn assert_send_static<T: Send + 'static>() {}
+        assert_send_static::<DocxReader>();
+    }
 
     fn synth_docx_for_unit_test(
         rels_xml: &str,

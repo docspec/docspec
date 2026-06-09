@@ -40,9 +40,18 @@ writer.finish()?;
 | `html`     | HTML (paragraphs only)                           | `docspec-html-reader`     |
 | `docx`     | DOCX (paragraphs and text only)                  | `docspec-docx-reader`     |
 
-`DocxReader` takes a file path or `Read + Seek` source. Construct it directly with
-`DocxReader::from_path` or `DocxReader::from_reader`. Support for dispatching
-`DocxReader` through `AnyReader::from_reader` is planned for a future release.
+`DocxReader` is dispatched through `AnyReader::from_reader` and `AnyReader::from_path`.
+Use `AnyReader::from_path(InputFormat::Docx, path)` to open a DOCX file, or
+`AnyReader::from_reader(InputFormat::Docx, cursor)` to read from an in-memory buffer.
+
+```rust
+use docspec::{AnyReader, InputFormat};
+
+# fn main() -> docspec::Result<()> {
+let reader = AnyReader::from_path(InputFormat::Docx, "document.docx")?;
+# Ok(())
+# }
+```
 
 ### Writers
 

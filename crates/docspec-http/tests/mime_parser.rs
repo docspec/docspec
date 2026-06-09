@@ -270,3 +270,60 @@ fn accept_application_wildcard_returns_blocknote() {
         OutputFormat::Blocknote
     );
 }
+
+// ─── validate_content_type: DOCX ─────────────────────────────────────────────
+
+#[test]
+fn content_type_docx_returns_docx_format() {
+    let header = HeaderValue::from_static(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+    assert_eq!(
+        validate_content_type(Some(&header)).unwrap(),
+        InputFormat::Docx
+    );
+}
+
+#[test]
+fn content_type_docx_with_charset_rejects() {
+    let header = HeaderValue::from_static(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document; charset=utf-8",
+    );
+    assert!(matches!(
+        validate_content_type(Some(&header)),
+        Err(HttpError::UnsupportedMediaType { received: Some(_) })
+    ));
+}
+
+#[test]
+fn content_type_docx_with_arbitrary_param_rejects() {
+    let header = HeaderValue::from_static(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document; foo=bar",
+    );
+    assert!(matches!(
+        validate_content_type(Some(&header)),
+        Err(HttpError::UnsupportedMediaType { received: Some(_) })
+    ));
+}
+
+#[test]
+fn bucket_input_mime_docx_returns_docx_label() {
+    let header = HeaderValue::from_static(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+    assert_eq!(
+        docspec_http::mime_parser::bucket_input_mime(Some(&header)),
+        docspec_http::metrics::INPUT_MIME_DOCX
+    );
+}
+
+#[test]
+fn bucket_input_mime_docx_with_params_returns_docx_label() {
+    let header = HeaderValue::from_static(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document; charset=utf-8",
+    );
+    assert_eq!(
+        docspec_http::mime_parser::bucket_input_mime(Some(&header)),
+        docspec_http::metrics::INPUT_MIME_DOCX
+    );
+}

@@ -2,7 +2,7 @@
 
 Library providing an Axum-based HTTP server that wraps a DocSpec conversion pipeline. Designed for embedding in custom binaries or running via the unified `docspec http` subcommand.
 
-Send markdown (`Content-Type: text/markdown`) or HTML (`Content-Type: text/html`), receive BlockNote JSON (default), HTML (`Accept: text/html`), oxa.dev JSON (`Accept: application/vnd.oxa+json`), or Pandoc native (`Accept: application/vnd.pandoc.native`). The underlying DocSpec pipeline is streaming, but this v1 HTTP wrapper **buffers the request body and the conversion output in memory** before responding. End-to-end streaming over HTTP is planned for a future version. For now, request size scales with available memory.
+Send markdown (`Content-Type: text/markdown`), HTML (`Content-Type: text/html`), or DOCX (`Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document`), receive BlockNote JSON (default), HTML (`Accept: text/html`), oxa.dev JSON (`Accept: application/vnd.oxa+json`), or Pandoc native (`Accept: application/vnd.pandoc.native`). The underlying DocSpec pipeline is streaming, but this v1 HTTP wrapper **buffers the request body and the conversion output in memory** before responding. End-to-end streaming over HTTP is planned for a future version. For now, request size scales with available memory.
 
 > **HTML is paragraph-only.** The HTML reader currently parses `<p>` elements only, and the HTML writer currently emits only paragraph events. Other HTML input elements and non-paragraph output events (headings, lists, tables, formatting, etc.) are silently dropped. See [docspec-html-reader](../docspec-html-reader/README.md) and [docspec-html-writer](../docspec-html-writer/README.md).
 
@@ -31,6 +31,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+Once the server is running, send documents with curl:
+
+```bash
+# Convert Markdown to BlockNote JSON
+curl -X POST \
+     -H 'Content-Type: text/markdown' \
+     -d '# Hello' \
+     http://localhost:3000/conversion
+
+# Convert HTML to BlockNote JSON
+curl -X POST \
+     -H 'Content-Type: text/html' \
+     -d '<p>Hello</p>' \
+     http://localhost:3000/conversion
+
+# Convert DOCX to BlockNote JSON
+curl -X POST \
+     -H 'Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document' \
+     --data-binary @document.docx \
+     http://localhost:3000/conversion
+```
+
 ## Public API
 
 | Item | Kind | Description |
@@ -46,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 | Method  | Path        | Description                                                      |
 | ------- | ----------- | ---------------------------------------------------------------- |
-| POST    | /conversion | Convert markdown or HTML to BlockNote (default), HTML, oxa.dev JSON, or Pandoc native |
+| POST    | /conversion | Convert markdown, HTML, or DOCX to BlockNote (default), HTML, oxa.dev JSON, or Pandoc native |
 | OPTIONS | /conversion | Preflight / allowed methods                                      |
 | GET     | /health     | Liveness check                                                   |
 | HEAD    | /health     | Liveness check (no body)                                         |
@@ -71,8 +93,8 @@ All errors use RFC 7807 Problem Details JSON (`application/problem+json; charset
 | 404  | Unknown path                                             |
 | 405  | Wrong method (response includes `Allow` header)          |
 | 406  | `Accept` header excludes all supported output types      |
-| 415  | `Content-Type` must be `text/markdown` or `text/html`    |
-| 422  | Input parse error (malformed markdown or HTML)           |
+| 415  | `Content-Type` must be `text/markdown`, `text/html`, or `application/vnd.openxmlformats-officedocument.wordprocessingml.document` |
+| 422  | Input parse error (malformed markdown, HTML, or DOCX)    |
 | 500  | Internal conversion error                                |
 
 Accepted `Accept` values for `/conversion`: `text/html` (HTML), `application/vnd.oxa+json` (oxa.dev), `application/vnd.pandoc.native` (Pandoc native), `application/vnd.docspec.blocknote+json`, `application/vnd.blocknote+json` (BlockNote alias), `application/*`, or `*/*`. Wildcards and missing `Accept` default to BlockNote for back-compat. Anything else returns 406.
@@ -135,7 +157,7 @@ These follow Sentry's standard conventions:
 
 `docspec-http` does NOT send the following to Sentry:
 
-- Request bodies (markdown or HTML documents)
+- Request bodies (markdown, HTML, or DOCX documents)
 - Response bodies (BlockNote JSON, HTML, oxa.dev JSON, or Pandoc native)
 - PII (Sentry default: `send_default_pii = false`)
 - DSN values (never logged or echoed)
@@ -180,7 +202,7 @@ The server handles SIGINT and SIGTERM. In-flight requests complete before the pr
 
 **`error_class`**: `body_not_utf8`, `empty_body`, `internal`, `method_not_allowed`, `not_acceptable`, `not_found`, `unprocessable`, `unsupported_media_type`, `none` (only when `result=success`)
 
-**`input_mime_type`**: `text/markdown` (the request's Content-Type matched the markdown reader), `text/html` (the request's Content-Type matched the HTML reader), `unsupported` (Content-Type header present but not a supported input format), `none` (Content-Type header absent).
+**`input_mime_type`**: `text/markdown` (the request's Content-Type matched the markdown reader), `text/html` (the request's Content-Type matched the HTML reader), `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (the request's Content-Type matched the DOCX reader), `unsupported` (Content-Type header present but not a supported input format), `none` (Content-Type header absent).
 
 **`output_mime_type`**: `application/vnd.docspec.blocknote+json` (conversion succeeded; output produced by the BlockNote writer), `text/html` (conversion succeeded; output produced by the HTML writer), `application/vnd.oxa+json` (conversion succeeded; output produced by the oxa.dev writer), `application/vnd.pandoc.native` (conversion succeeded; output produced by the Pandoc native writer), `none` (no output produced — any error path).
 
@@ -192,7 +214,7 @@ The server handles SIGINT and SIGTERM. In-flight requests complete before the pr
 
 ### Cardinality Guarantees
 
-`path` is bounded to `{"/conversion", "/health", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 4 values (`text/markdown`, `text/html`, `unsupported`, `none`). `output_mime_type` is bounded to 5 values (`application/vnd.docspec.blocknote+json`, `text/html`, `application/vnd.oxa+json`, `application/vnd.pandoc.native`, `none`). Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
+`path` is bounded to `{"/conversion", "/health", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 5 values (`text/markdown`, `text/html`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `unsupported`, `none`). `output_mime_type` is bounded to 5 values (`application/vnd.docspec.blocknote+json`, `text/html`, `application/vnd.oxa+json`, `application/vnd.pandoc.native`, `none`). Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
 
 ### Scrape Model
 

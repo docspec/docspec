@@ -9,6 +9,13 @@ pub const HEALTH_BODY: &str = "Healthy.";
 /// The MIME type accepted as request body.
 pub const INPUT_MIME_MARKDOWN: &str = "text/markdown";
 
+/// The MIME type accepted as request body for HTML input.
+pub const INPUT_MIME_HTML: &str = "text/html";
+
+/// MIME type for DOCX documents. Strict — must be sent verbatim with no parameters.
+pub const INPUT_MIME_DOCX_PRIMARY: &str =
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
 /// Accepted alias for the output MIME type (input-only; server always returns primary).
 pub const OUTPUT_MIME_ALIAS: &str = "application/vnd.blocknote+json";
 

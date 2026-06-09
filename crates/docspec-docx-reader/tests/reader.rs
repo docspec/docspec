@@ -4,6 +4,7 @@
     clippy::expect_used,
     clippy::indexing_slicing,
     clippy::panic,
+    clippy::std_instead_of_core,
     clippy::tests_outside_test_module,
     clippy::unwrap_used
 )]
@@ -35,10 +36,10 @@ fn synth_docx_roundtrips_through_zip_archive() {
 }
 
 mod constructor {
-    use core::cell::Cell;
     use std::io::Cursor;
     use std::io::{Read, Seek};
-    use std::rc::Rc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
 
     use docspec_core::{Error, Event, EventSource as _};
     use docspec_docx_reader::DocxReader;
@@ -258,11 +259,12 @@ mod constructor {
                 b"<?xml version=\"1.0\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body></w:body></w:document>",
             ),
         ]);
+
         let fail_at = document_data_start(&bytes);
-        let fail_enabled = Rc::new(Cell::new(false));
-        let failing_reader = FailingReader::new(bytes, fail_at, Rc::clone(&fail_enabled));
+        let fail_enabled = Arc::new(AtomicBool::new(false));
+        let failing_reader = FailingReader::new(bytes, fail_at, Arc::clone(&fail_enabled));
         let mut reader = DocxReader::from_reader(failing_reader).expect("from_reader");
-        fail_enabled.set(true);
+        fail_enabled.store(true, Ordering::SeqCst);
 
         assert_eq!(
             reader.next_event().expect("start document"),
@@ -294,12 +296,12 @@ mod constructor {
 
     struct FailingReader {
         cursor: Cursor<Vec<u8>>,
-        fail_enabled: Rc<Cell<bool>>,
+        fail_enabled: Arc<AtomicBool>,
         fail_at: u64,
     }
 
     impl FailingReader {
-        fn new(bytes: Vec<u8>, fail_at: u64, fail_enabled: Rc<Cell<bool>>) -> Self {
+        fn new(bytes: Vec<u8>, fail_at: u64, fail_enabled: Arc<AtomicBool>) -> Self {
             Self {
                 cursor: Cursor::new(bytes),
                 fail_enabled,
@@ -310,7 +312,7 @@ mod constructor {
 
     impl Read for FailingReader {
         fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-            if self.fail_enabled.get() && self.cursor.position() >= self.fail_at {
+            if self.fail_enabled.load(Ordering::SeqCst) && self.cursor.position() >= self.fail_at {
                 return Err(std::io::Error::other("forced read failure"));
             }
             self.cursor.read(buf)

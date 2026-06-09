@@ -18,10 +18,10 @@
 //! | `html`         | HTML (paragraphs only)                              | `readers::HtmlReader`       |
 //! | `docx`         | DOCX (paragraphs and text only)                     | `readers::DocxReader`       |
 //!
-//! Note: [`readers::DocxReader`] takes a binary file or any `Read + Seek` source.
-//! Construct it directly with `DocxReader::from_path` or `DocxReader::from_reader`.
-//! Support for dispatching `DocxReader` through [`AnyReader::from_reader`] is planned
-//! for a future release.
+//! [`readers::DocxReader`] is dispatched through [`AnyReader::from_reader`] and
+//! [`AnyReader::from_path`]. Use `AnyReader::from_path(InputFormat::Docx, path)` to
+//! open a DOCX file, or `AnyReader::from_reader(InputFormat::Docx, cursor)` to read
+//! from an in-memory buffer.
 //!
 //! ## Writers
 //!
@@ -117,11 +117,10 @@ pub mod readers {
     pub use docspec_html_reader::HtmlReader;
 
     /// Streaming DOCX reader. Available when the `docx` feature is enabled.
-    /// Takes a file path or `Read + Seek` source. Construct it directly with
-    /// `DocxReader::from_path` or `DocxReader::from_reader`. `AnyReader::from_reader`
-    /// support is planned for a future release. Emits
-    /// only paragraphs and text; styles, tables, lists, images, headers/footers,
-    /// metadata, and tracked changes are silently dropped.
+    /// Dispatched through [`crate::AnyReader::from_reader`] and
+    /// [`crate::AnyReader::from_path`]. Emits only paragraphs and text; styles,
+    /// tables, lists, images, headers/footers, metadata, and tracked changes are
+    /// silently dropped.
     #[cfg(feature = "docx")]
     #[cfg_attr(docsrs, doc(cfg(feature = "docx")))]
     pub use docspec_docx_reader::DocxReader;

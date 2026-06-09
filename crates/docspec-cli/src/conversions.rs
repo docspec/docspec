@@ -10,6 +10,7 @@ impl From<CliInputFormat> for InputFormat {
         match f {
             CliInputFormat::Markdown => Self::Markdown,
             CliInputFormat::Html => Self::Html,
+            CliInputFormat::Docx => Self::Docx,
         }
     }
 }
@@ -41,6 +42,11 @@ mod tests {
     #[test]
     fn from_html_converts_to_facade_html() {
         assert_eq!(InputFormat::from(CliInputFormat::Html), InputFormat::Html);
+    }
+
+    #[test]
+    fn from_docx_converts_to_facade_docx() {
+        assert_eq!(InputFormat::from(CliInputFormat::Docx), InputFormat::Docx);
     }
 
     #[test]
