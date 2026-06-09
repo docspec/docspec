@@ -1,18 +1,35 @@
 # release-plz configuration for unified ecosystem versioning.
-# All crates share a single version via [workspace.package].version.
-# release-plz maintains the root CHANGELOG.md from Conventional Commits.
+#
+# All 12 publishable crates share a single version via [workspace.package].version,
+# release as ONE workspace tag (vX.Y.Z), and feed into ONE root CHANGELOG.md.
+#
+# Architecture: the facade crate `docspec` owns:
+#   - the workspace git tag and GitHub Release
+#   - the root CHANGELOG.md
+#   - `changelog_include` for every other publishable crate, so their
+#     path-filtered commits land in the single workspace changelog
+#
+# Why this shape (NOT shared `changelog_path` at workspace level):
+# release-plz writes per-crate changelogs sequentially in a loop. When multiple
+# crates target the same file, each write truncates the file and clobbers
+# previous crates' entries — only the last crate processed survives. See
+# upstream bug https://github.com/release-plz/release-plz/issues/2428.
+#
+# Setting `changelog_update = false` at workspace level disables the per-crate
+# writes; only the facade crate (where it is re-enabled) writes the file, and
+# `changelog_include` pulls in commits from every other crate first.
 
 [workspace]
-# Single combined release PR is release-plz's default behaviour.
 # Tags and GitHub releases are disabled at workspace level, then enabled for
 # the facade crate below so the workspace gets one `vX.Y.Z` tag instead of
 # every publishable crate racing to create the same tag.
 git_tag_enable = false
 git_release_enable = false
 
-# Keep the canonical root CHANGELOG.md synchronized with the release PR.
-changelog_path = "./CHANGELOG.md"
-changelog_update = true
+# Disable per-crate changelog writes globally. Only the facade crate re-enables
+# this and owns the root CHANGELOG.md. This avoids the shared-path overwrite
+# bug (release-plz#2428).
+changelog_update = false
 
 # Only publish after a release PR has been merged.
 release_always = false
@@ -26,12 +43,29 @@ dependencies_update = false
 # Absorb crates.io index propagation lag between dependent crate publishes
 publish_timeout = "30m"
 
-# The facade crate owns the single workspace tag and GitHub Release.
+# The facade crate owns the single workspace tag, the GitHub Release, and the
+# root CHANGELOG.md. `changelog_include` pulls in commits from every other
+# publishable crate so nothing is dropped.
 [[package]]
 name = "docspec"
 git_tag_name = "v{{ version }}"
 git_tag_enable = true
 git_release_enable = true
+changelog_update = true
+changelog_path = "./CHANGELOG.md"
+changelog_include = [
+  "docspec-core",
+  "docspec-json",
+  "docspec-blocknote-writer",
+  "docspec-docx-reader",
+  "docspec-html-reader",
+  "docspec-html-writer",
+  "docspec-markdown-reader",
+  "docspec-oxa-writer",
+  "docspec-pandoc-native-writer",
+  "docspec-http",
+  "docspec-cli",
+]
 
 # Override default: docspec-wasm must never publish, even if Cargo.toml
 # is edited later. Belt-and-suspenders with Cargo.toml's publish = false.
