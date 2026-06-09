@@ -12,6 +12,24 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.6.0](https://github.com/docspec/docspec/compare/v1.5.1...v1.6.0) - 2026-06-09
+
+### Added
+
+- add DOCX input support across facade, CLI, and HTTP
+- unify reader constructors
+- make public enums non-exhaustive
+- *(pandoc-native-writer)* Pandoc native writer
+- *(docx-reader)* emit table events
+- *(docx-reader)* emit Text("\t") for <w:tab>
+- *(docx-reader)* emit LineBreak for <w:br>
+- *(cli)* unify docspec-http into docspec as http subcommand
+
+### Other
+
+- *(docspec)* append InputFormat::Docx to preserve discriminants
+- enforce dead_code lint and drop unused CliError variants
+
 ## [1.5.1](https://github.com/docspec/docspec/compare/v1.5.0...v1.5.1) - 2026-06-08
 
 ### Fixed
