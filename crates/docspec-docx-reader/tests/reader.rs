@@ -1056,7 +1056,7 @@ mod events {
 
         assert_eq!(
             format!("{reader:?}"),
-            "DocxReader { buf: [], in_ignored_subtree: 0, in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_text: \"\", frozen_run_kinds: [], open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, xml: \"<quick_xml::Reader>\" }"
+            "DocxReader { inner: DocumentReader { buf: [], in_ignored_subtree: 0, in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_text: \"\", frozen_run_kinds: [], open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, xml: \"<quick_xml::Reader>\" } }"
         );
     }
 
