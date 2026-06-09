@@ -33,7 +33,7 @@ List items support arbitrary nesting via BlockNote's native `children: Block[]` 
 
 ## Usage
 
-Wrap `BlockNoteWriter` in `StackTrackingSink` before feeding list events. The writer opens the list item's `content[]` array directly at `Start*ListItem`, and `StartParagraph` for the first paragraph of an item is a no-op. `StackTrackingSink` is still required because it normalizes paragraph boundaries (especially from sources that don't always emit an explicit `StartParagraph` inside list items), which is what lets the writer detect multi-paragraph items and transition emission into `children[]` for subsequent paragraphs.
+Wrap `BlockNoteWriter` in `StackTrackingSink` before feeding list events. The writer lazily opens the list item's `content[]` array when the first paragraph or inline content arrives, which lets it preserve non-default first-paragraph alignment on the list item while omitting BlockNote's default props. `StackTrackingSink` is still required because it normalizes paragraph boundaries (especially from sources that don't always emit an explicit `StartParagraph` inside list items), which is what lets the writer detect multi-paragraph items and transition emission into `children[]` for subsequent paragraphs.
 
 ```rust
 use docspec_blocknote_writer::BlockNoteWriter;

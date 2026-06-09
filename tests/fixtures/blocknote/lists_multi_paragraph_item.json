@@ -1,10 +1,6 @@
 [
   {
     "type": "bulletListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -28,10 +24,6 @@
   },
   {
     "type": "bulletListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",

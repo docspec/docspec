@@ -2,8 +2,6 @@
   {
     "type": "numberedListItem",
     "props": {
-      "backgroundColor": "default",
-      "textColor": "default",
       "start": 1
     },
     "content": [
@@ -17,10 +15,6 @@
   },
   {
     "type": "numberedListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -32,10 +26,6 @@
   },
   {
     "type": "numberedListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",

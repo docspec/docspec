@@ -347,7 +347,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Cell line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Cell line two","styles":{}}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Cell line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Cell line two","styles":{}}]}]}]},"children":[]}]"#
         );
     }
 
@@ -368,7 +368,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Bullet line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Bullet line two","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Bullet line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Bullet line two","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -783,7 +783,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -804,7 +804,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -825,7 +825,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"center"},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","props":{"textAlignment":"center"},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -847,7 +847,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default","textAlignment":"right","start":3},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+            r#"[{"type":"numberedListItem","props":{"textAlignment":"right","start":3},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -866,7 +866,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"First bullet","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"First bullet","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -886,7 +886,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default","start":1},"content":[{"type":"text","text":"First item","styles":{}}],"children":[]}]"#
+            r#"[{"type":"numberedListItem","props":{"start":1},"content":[{"type":"text","text":"First item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -912,7 +912,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"First","styles":{}}],"children":[]},{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Second","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"First","styles":{}}],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"Second","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -930,7 +930,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"x","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"x","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -949,7 +949,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"x","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"x","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -973,7 +973,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"a","styles":{}}],"children":[]},{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"b","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -1007,7 +1007,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Bullet one","styles":{}}],"children":[]},{"type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default","start":1},"content":[{"type":"text","text":"Number one","styles":{}}],"children":[]},{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Bullet two","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Bullet one","styles":{}}],"children":[]},{"type":"numberedListItem","props":{"start":1},"content":[{"type":"text","text":"Number one","styles":{}}],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"Bullet two","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -1029,7 +1029,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Bold bullet","styles":{"bold":true}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Bold bullet","styles":{"bold":true}}],"children":[]}]"#
         );
     }
 
@@ -1055,7 +1055,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"b","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -1088,7 +1088,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"c","styles":{}}],"children":[]}]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]}]}]"#
         );
     }
 
@@ -1115,7 +1115,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"bullet","styles":{}}],"children":[{"type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default","start":1},"content":[{"type":"text","text":"one","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"bullet","styles":{}}],"children":[{"type":"numberedListItem","props":{"start":1},"content":[{"type":"text","text":"one","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -1148,7 +1148,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"b","styles":{}}],"children":[]},{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"c","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -2060,7 +2060,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[]},"children":[]}]"#
         );
     }
 
@@ -2082,7 +2082,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Cell1","styles":{}}]},{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Cell2","styles":{}}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Cell1","styles":{}}]},{"type":"tableCell","content":[{"type":"text","text":"Cell2","styles":{}}]}]}]},"children":[]}]"#
         );
     }
 
@@ -2116,7 +2116,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"H1","styles":{}}]},{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"H2","styles":{}}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"H1","styles":{}}]},{"type":"tableCell","content":[{"type":"text","text":"H2","styles":{}}]}]}]},"children":[]}]"#
         );
     }
 
@@ -2138,7 +2138,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"bold","styles":{"bold":true}}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"bold","styles":{"bold":true}}]}]}]},"children":[]}]"#
         );
     }
 
@@ -2155,7 +2155,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"before","styles":{}}],"children":[]},{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[]},"children":[]}]"#
+            r#"[{"type":"paragraph","content":[{"type":"text","text":"before","styles":{}}],"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[]},"children":[]}]"#
         );
     }
 
@@ -2172,7 +2172,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[]},"children":[]},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[]},"children":[]},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -2224,7 +2224,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"outer","styles":{}}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"outer","styles":{}}]}]}]},"children":[]}]"#
         );
     }
 
@@ -2307,7 +2307,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
         );
     }
 
@@ -2327,7 +2327,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default","start":5},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+            r#"[{"type":"numberedListItem","props":{"start":5},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -2347,7 +2347,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+            r#"[{"type":"numberedListItem","content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -2366,7 +2366,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -2385,7 +2385,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"id":"item-1","type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+            r#"[{"id":"item-1","type":"bulletListItem","content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -2404,7 +2404,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -2433,7 +2433,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
         );
     }
 
@@ -2454,7 +2454,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"quote","content":[],"children":[]},{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"quoted bullet","styles":{}}],"children":[]}]"#
+            r#"[{"type":"quote","content":[],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"quoted bullet","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -2486,7 +2486,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"outer","styles":{}}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"outer","styles":{}}]}]}]},"children":[]}]"#
         );
     }
 
@@ -2527,7 +2527,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"c","styles":{}}],"children":[]}]}]},{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"d","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]}]},{"type":"bulletListItem","content":[{"type":"text","text":"d","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -2564,7 +2564,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"c","styles":{}}],"children":[]}]},{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"d","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]},{"type":"bulletListItem","content":[{"type":"text","text":"d","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -2589,7 +2589,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"b","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -2620,7 +2620,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"b","styles":{}}],"children":[]}]},{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"c","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[]}]},{"type":"bulletListItem","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -2650,7 +2650,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"c","styles":{}}],"children":[]}]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]}]}]"#
         );
     }
 
@@ -2673,7 +2673,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -2695,7 +2695,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Para one","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"Para two","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Para one","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"Para two","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -2724,7 +2724,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"b1","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"b2","styles":{}}],"children":[]}]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b1","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"b2","styles":{}}],"children":[]}]}]}]"#
         );
     }
 
@@ -2749,7 +2749,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"Para one","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"Para two","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Para three","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Para one","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"Para two","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Para three","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -2771,7 +2771,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"Quote","styles":{}}],"children":[]},{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"after quote","styles":{}}],"children":[]}]"#
+            r#"[{"type":"quote","content":[{"type":"text","text":"Quote","styles":{}}],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"after quote","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -2793,7 +2793,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"item","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -2820,7 +2820,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
         );
     }
 
@@ -2841,7 +2841,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
         );
     }
 
@@ -2862,7 +2862,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
         );
     }
 
@@ -2881,7 +2881,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
         );
     }
 
@@ -2906,7 +2906,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
         );
     }
 
@@ -2929,7 +2929,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"before","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"before","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -2957,7 +2957,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[],"children":[]},{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"second","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -2987,7 +2987,7 @@ mod tests {
         // Text is flattened into cell inline content (BlockNote cell flattening policy).
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"h","styles":{}}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"h","styles":{}}]}]}]},"children":[]}]"#
         );
     }
 
@@ -3011,7 +3011,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"q","styles":{}}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"q","styles":{}}]}]}]},"children":[]}]"#
         );
     }
 
@@ -3035,7 +3035,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"code","styles":{}}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"code","styles":{}}]}]}]},"children":[]}]"#
         );
     }
 
@@ -3063,7 +3063,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"item","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -3110,7 +3110,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -3235,7 +3235,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
         );
     }
 
@@ -3260,7 +3260,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
         );
     }
 
@@ -3303,7 +3303,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
         );
     }
 
@@ -3325,7 +3325,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
         );
     }
 
@@ -3367,7 +3367,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
         );
     }
 
@@ -3392,7 +3392,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
         );
     }
 
@@ -3414,7 +3414,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
         );
     }
 
@@ -3436,7 +3436,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
         );
     }
 
@@ -3460,7 +3460,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
         );
     }
 
@@ -3485,7 +3485,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
         );
     }
 
@@ -3561,7 +3561,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"c","styles":{}}],"children":[]}]},{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"d","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]},{"type":"bulletListItem","content":[{"type":"text","text":"d","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -3590,7 +3590,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -3622,7 +3622,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"parent","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"child","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"parent","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"child","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -3647,7 +3647,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default","start":42},"content":[{"type":"text","text":"item 42","styles":{}}],"children":[]}]"#
+            r#"[{"type":"numberedListItem","props":{"start":42},"content":[{"type":"text","text":"item 42","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -3699,7 +3699,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"id":"li-1","type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default","start":5},"content":[{"type":"text","text":"five","styles":{}}],"children":[]}]"#
+            r#"[{"id":"li-1","type":"numberedListItem","props":{"start":5},"content":[{"type":"text","text":"five","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -3768,7 +3768,7 @@ mod tests {
         // Only "before" and "after" should appear; all block content dropped
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"before","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"before","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -3806,7 +3806,7 @@ mod tests {
         }]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -3815,7 +3815,7 @@ mod tests {
         let json = list_item_with_children_transition_then(vec![Event::ThematicBreak { id: None }]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -3828,7 +3828,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -3841,7 +3841,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -3854,7 +3854,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -3871,7 +3871,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -3892,7 +3892,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"numberedListItem","props":{"backgroundColor":"default","textColor":"default","start":3},"content":[{"type":"text","text":"item","styles":{}}],"children":[]}]"#
+            r#"[{"type":"numberedListItem","props":{"start":3},"content":[{"type":"text","text":"item","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -3923,7 +3923,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -3952,7 +3952,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"item","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/foo.png","caption":"Foo"},"content":null,"children":[]},{"type":"divider"}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"item","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/foo.png","caption":"Foo"},"content":null,"children":[]},{"type":"divider"}]"#
         );
     }
 
@@ -3974,7 +3974,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"item","styles":{}}],"children":[]},{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"After list","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"item","styles":{}}],"children":[]},{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"After list","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -4002,7 +4002,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"outer","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"outer","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -4028,7 +4028,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"real","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"real","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -4061,7 +4061,89 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"outer","styles":{}}],"children":[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"text","text":"nested","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"continuation","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"outer","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"nested","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"continuation","styles":{}}],"children":[]}]}]"#
+        );
+    }
+
+    #[test]
+    fn parent_paragraph_after_nested_list_without_initial_text_is_preserved_as_child() {
+        let json = run_events(&[
+            start_document(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 1,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            text("nested"),
+            Event::EndUnorderedListItem,
+            start_paragraph(),
+            text("after"),
+            Event::EndParagraph,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"nested","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
+        );
+    }
+
+    #[test]
+    fn dropped_heading_before_first_aligned_list_paragraph_does_not_steal_alignment() {
+        let json = run_events(&[
+            start_document(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            start_heading(1),
+            text("dropped"),
+            Event::EndHeading,
+            start_paragraph_with_alignment(TextAlignment::Center),
+            text("real"),
+            Event::EndParagraph,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"textAlignment":"center"},"content":[{"type":"text","text":"real","styles":{}}],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn dropped_link_before_first_aligned_list_paragraph_does_not_steal_alignment() {
+        let json = run_events(&[
+            start_document(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            start_heading(1),
+            Event::StartLink {
+                href: "https://dropped.example".to_string(),
+                title: None,
+                id: None,
+            },
+            text("dropped"),
+            Event::EndLink,
+            Event::EndHeading,
+            start_paragraph_with_alignment(TextAlignment::Right),
+            text("real"),
+            Event::EndParagraph,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","props":{"textAlignment":"right"},"content":[{"type":"text","text":"real","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -4156,7 +4238,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"link","href":"https://cell.example","content":[{"type":"text","text":"cell","styles":{}}]}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"link","href":"https://cell.example","content":[{"type":"text","text":"cell","styles":{}}]}]}]}]},"children":[]}]"#
         );
     }
 
@@ -4295,7 +4377,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"link","styles":{}}]}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"link","styles":{}}]}],"children":[]}]"#
         );
     }
 
@@ -4365,7 +4447,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","props":{"textColor":"default"},"content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"backgroundColor":"default","textColor":"default"},"content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"link","styles":{}}]}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"link","styles":{}}]}]}]}]},"children":[]}]"#
         );
     }
 
@@ -4392,7 +4474,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"backgroundColor":"default","textColor":"default"},"content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
         );
     }
 }

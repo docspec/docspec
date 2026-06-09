@@ -1,10 +1,6 @@
 [
   {
     "type": "bulletListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -16,10 +12,6 @@
   },
   {
     "type": "bulletListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -31,10 +23,6 @@
   },
   {
     "type": "bulletListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -47,8 +35,6 @@
   {
     "type": "numberedListItem",
     "props": {
-      "backgroundColor": "default",
-      "textColor": "default",
       "start": 1
     },
     "content": [
@@ -62,10 +48,6 @@
   },
   {
     "type": "numberedListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -77,10 +59,6 @@
   },
   {
     "type": "numberedListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -93,8 +71,6 @@
   {
     "type": "numberedListItem",
     "props": {
-      "backgroundColor": "default",
-      "textColor": "default",
       "start": 5
     },
     "content": [
@@ -108,10 +84,6 @@
   },
   {
     "type": "numberedListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -123,10 +95,6 @@
   },
   {
     "type": "numberedListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -138,10 +106,6 @@
   },
   {
     "type": "bulletListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -152,10 +116,6 @@
     "children": [
       {
         "type": "bulletListItem",
-        "props": {
-          "backgroundColor": "default",
-          "textColor": "default"
-        },
         "content": [
           {
             "type": "text",
@@ -167,10 +127,6 @@
       },
       {
         "type": "bulletListItem",
-        "props": {
-          "backgroundColor": "default",
-          "textColor": "default"
-        },
         "content": [
           {
             "type": "text",
@@ -184,10 +140,6 @@
   },
   {
     "type": "bulletListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -199,10 +151,6 @@
   },
   {
     "type": "bulletListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -214,8 +162,6 @@
       {
         "type": "numberedListItem",
         "props": {
-          "backgroundColor": "default",
-          "textColor": "default",
           "start": 1
         },
         "content": [
@@ -229,10 +175,6 @@
       },
       {
         "type": "numberedListItem",
-        "props": {
-          "backgroundColor": "default",
-          "textColor": "default"
-        },
         "content": [
           {
             "type": "text",
@@ -246,10 +188,6 @@
   },
   {
     "type": "bulletListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -261,10 +199,6 @@
   },
   {
     "type": "bulletListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -283,10 +217,6 @@
   },
   {
     "type": "bulletListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -305,10 +235,6 @@
   },
   {
     "type": "bulletListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -327,10 +253,6 @@
   },
   {
     "type": "bulletListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
@@ -341,10 +263,6 @@
     "children": [
       {
         "type": "bulletListItem",
-        "props": {
-          "backgroundColor": "default",
-          "textColor": "default"
-        },
         "content": [
           {
             "type": "text",
@@ -369,10 +287,6 @@
   },
   {
     "type": "bulletListItem",
-    "props": {
-      "backgroundColor": "default",
-      "textColor": "default"
-    },
     "content": [
       {
         "type": "text",
