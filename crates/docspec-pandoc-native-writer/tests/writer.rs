@@ -206,11 +206,6 @@ mod tests {
         assert_eq!(
             run([
                 start_doc(),
-                Event::StartPreformatted {
-                    syntax: None,
-                    id: None
-                },
-                Event::EndPreformatted,
                 start_para(),
                 text("x"),
                 Event::EndParagraph,
@@ -940,7 +935,7 @@ mod tests {
     }
 
     #[test]
-    fn code_style_text_flattens_into_paragraph() {
+    fn code_style_emits_code_construct_inside_paragraph() {
         assert_eq!(
             run([
                 start_doc(),
@@ -953,12 +948,12 @@ mod tests {
                 Event::EndParagraph,
                 Event::EndDocument,
             ]),
-            "[Para [Str \"a \",Str \"code\",Str \" b\"]]"
+            "[Para [Str \"a \",Code (\"\",[],[]) \"code\",Str \" b\"]]"
         );
     }
 
     #[test]
-    fn flattened_style_inside_bold_keeps_bold_open() {
+    fn code_style_inside_bold_emits_code_inside_strong() {
         assert_eq!(
             run([
                 start_doc(),
@@ -972,12 +967,12 @@ mod tests {
                 Event::EndParagraph,
                 Event::EndDocument,
             ]),
-            "[Para [Strong [Str \"a\",Str \"b\"]]]"
+            "[Para [Strong [Code (\"\",[],[]) \"a\",Str \"b\"]]]"
         );
     }
 
     #[test]
-    fn bold_inside_flattened_style_closes_before_following_text() {
+    fn nested_styles_inside_code_are_absorbed_into_buffer() {
         assert_eq!(
             run([
                 start_doc(),
@@ -991,7 +986,7 @@ mod tests {
                 Event::EndParagraph,
                 Event::EndDocument,
             ]),
-            "[Para [Strong [Str \"a\"],Str \"b\"]]"
+            "[Para [Code (\"\",[],[]) \"ab\"]]"
         );
     }
 
@@ -1116,6 +1111,405 @@ mod tests {
                 Event::EndDocument,
             ]),
             "[Para [Strong [Str \"a\"]]]"
+        );
+    }
+
+    fn start_pre(id: Option<&str>, syntax: Option<&str>) -> Event {
+        Event::StartPreformatted {
+            id: id.map(String::from),
+            syntax: syntax.map(String::from),
+        }
+    }
+
+    #[test]
+    fn preformatted_with_no_id_no_syntax_emits_empty_attr() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_pre(None, None),
+                text("hello"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"\",[],[]) \"hello\"]"
+        );
+    }
+
+    #[test]
+    fn preformatted_with_syntax_emits_language_class() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_pre(None, Some("rust")),
+                text("fn main() {}"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"\",[\"rust\"],[]) \"fn main() {}\"]"
+        );
+    }
+
+    #[test]
+    fn preformatted_with_id_and_syntax_emits_both() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_pre(Some("ex1"), Some("python")),
+                text("print('hi')"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"ex1\",[\"python\"],[]) \"print('hi')\"]"
+        );
+    }
+
+    #[test]
+    fn preformatted_concatenates_multiple_text_events() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_pre(None, None),
+                text("line1\n"),
+                text("line2\n"),
+                text("line3"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"\",[],[]) \"line1\\nline2\\nline3\"]"
+        );
+    }
+
+    #[test]
+    fn preformatted_preserves_literal_newlines_in_text() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_pre(None, None),
+                text("a\nb\nc"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"\",[],[]) \"a\\nb\\nc\"]"
+        );
+    }
+
+    #[test]
+    fn preformatted_with_empty_content_emits_empty_string() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_pre(None, None),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"\",[],[]) \"\"]"
+        );
+    }
+
+    #[test]
+    fn preformatted_escapes_quotes_and_backslashes_in_content() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_pre(None, Some("c")),
+                text("printf(\"hello\\n\");"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"\",[\"c\"],[]) \"printf(\\\"hello\\\\n\\\");\"]"
+        );
+    }
+
+    #[test]
+    fn preformatted_escapes_id_attribute() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_pre(Some("a\"b"), None),
+                text("x"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"a\\\"b\",[],[]) \"x\"]"
+        );
+    }
+
+    #[test]
+    fn preformatted_between_paragraphs_emits_block_separators() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("before"),
+                Event::EndParagraph,
+                start_pre(None, Some("sh")),
+                text("ls -la"),
+                Event::EndPreformatted,
+                start_para(),
+                text("after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Str \"before\"],CodeBlock (\"\",[\"sh\"],[]) \"ls -la\",Para [Str \"after\"]]"
+        );
+    }
+
+    #[test]
+    fn start_preformatted_inside_paragraph_is_dropped_but_text_passes_through() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("a"),
+                start_pre(None, Some("rust")),
+                text("nope"),
+                Event::EndPreformatted,
+                text("b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Str \"a\",Str \"nope\",Str \"b\"]]"
+        );
+    }
+
+    #[test]
+    fn stray_end_preformatted_is_noop() {
+        assert_eq!(
+            run([start_doc(), Event::EndPreformatted, Event::EndDocument]),
+            "[]"
+        );
+    }
+
+    #[test]
+    fn inline_code_with_no_id_emits_empty_attr() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("let x = 1;"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Code (\"\",[],[]) \"let x = 1;\"]]"
+        );
+    }
+
+    #[test]
+    fn inline_code_with_id_emits_id() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: docspec_core::TextStyleKind::Code,
+                    id: Some("ref1".to_string()),
+                },
+                text("ref"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Code (\"ref1\",[],[]) \"ref\"]]"
+        );
+    }
+
+    #[test]
+    fn inline_code_between_plain_text_emits_separators() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("before "),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("x"),
+                Event::EndTextStyle,
+                text(" after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Str \"before \",Code (\"\",[],[]) \"x\",Str \" after\"]]"
+        );
+    }
+
+    #[test]
+    fn inline_code_inside_heading() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(1, Some("h")),
+                text("Use "),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("foo()"),
+                Event::EndTextStyle,
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 1 (\"h\",[],[]) [Str \"Use \",Code (\"\",[],[]) \"foo()\"]]"
+        );
+    }
+
+    #[test]
+    fn inline_code_inside_wrapper_style() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Bold),
+                text("bold "),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("code"),
+                Event::EndTextStyle,
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Strong [Str \"bold \",Code (\"\",[],[]) \"code\"]]]"
+        );
+    }
+
+    #[test]
+    fn inline_code_concatenates_multiple_text_events() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("a"),
+                text("b"),
+                text("c"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Code (\"\",[],[]) \"abc\"]]"
+        );
+    }
+
+    #[test]
+    fn inline_code_escapes_quotes_in_content() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("say \"hi\""),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Code (\"\",[],[]) \"say \\\"hi\\\"\"]]"
+        );
+    }
+
+    #[test]
+    fn inline_code_outside_inline_block_is_dropped() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("x"),
+                Event::EndTextStyle,
+                Event::EndDocument,
+            ]),
+            "[]"
+        );
+    }
+
+    #[test]
+    fn unclosed_inline_code_at_end_of_paragraph_does_not_swallow_following_block() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("x"),
+                Event::EndParagraph,
+                start_para(),
+                text("y"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Code (\"\",[],[]) \"x\"],Para [Str \"y\"]]"
+        );
+    }
+
+    #[test]
+    fn unclosed_inline_code_at_end_of_heading_does_not_swallow_following_block() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(1, None),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("x"),
+                Event::EndHeading,
+                start_para(),
+                text("y"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Header 1 (\"\",[],[]) [Code (\"\",[],[]) \"x\"],Para [Str \"y\"]]"
+        );
+    }
+
+    #[test]
+    fn unclosed_inline_code_at_end_of_paragraph_is_flushed_defensively() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Code (\"\",[],[]) \"x\"]]"
+        );
+    }
+
+    #[test]
+    fn unclosed_inline_code_at_end_of_heading_is_flushed_defensively() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(1, None),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("x"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 1 (\"\",[],[]) [Code (\"\",[],[]) \"x\"]]"
+        );
+    }
+
+    #[test]
+    fn unclosed_preformatted_at_end_of_document_is_flushed_defensively() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_pre(None, Some("rust")),
+                text("fn main"),
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"\",[\"rust\"],[]) \"fn main\"]"
+        );
+    }
+
+    #[test]
+    fn nested_inline_events_inside_preformatted_are_ignored() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_pre(None, None),
+                text("a"),
+                Event::LineBreak,
+                Event::SoftBreak,
+                text("b"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"\",[],[]) \"ab\"]"
         );
     }
 }
