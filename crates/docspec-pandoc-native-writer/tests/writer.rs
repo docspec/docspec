@@ -775,4 +775,36 @@ mod tests {
             "[Para [Str \"a\",Str \"b\"]]"
         );
     }
+
+    #[test]
+    fn stray_end_heading_inside_paragraph_does_not_close_paragraph() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("a"),
+                Event::EndHeading,
+                text("b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Str \"a\",Str \"b\"]]"
+        );
+    }
+
+    #[test]
+    fn stray_end_paragraph_inside_heading_does_not_close_heading() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(1, None),
+                text("a"),
+                Event::EndParagraph,
+                text("b"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 1 (\"\",[],[]) [Str \"a\",Str \"b\"]]"
+        );
+    }
 }
