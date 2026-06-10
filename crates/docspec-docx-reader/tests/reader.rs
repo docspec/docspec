@@ -1097,6 +1097,336 @@ mod events {
                 collect_events(r#"<w:p><w:r><w:color w:val="FF0000"/><w:t>x</w:t></w:r></w:p>"#);
             assert_eq!(events, expected_events(vec![text("x")]));
         }
+
+        #[test]
+        fn task9_smoke_sym_wingdings_skull() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:sym w:font="Wingdings" w:char="F04E"/></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn task9_smoke_wt_wingdings_pua() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#xF04E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn task9_smoke_wt_wingdings_raw() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn task9_smoke_reset_between_paragraphs() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p><w:p><w:r><w:rPr><w:rFonts w:ascii="Arial"/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                vec![
+                    start_doc(),
+                    start_para(),
+                    text("\u{2620}"),
+                    Event::EndParagraph,
+                    start_para(),
+                    text("N"),
+                    Event::EndParagraph,
+                    Event::EndDocument,
+                ]
+            );
+        }
+    }
+
+    mod sym_element {
+        use super::*;
+
+        fn collect_events(content: &str) -> Vec<Event> {
+            let document_xml = format!(
+                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{content}</w:body></w:document>"#,
+            );
+            let mut reader = make_reader(&document_xml);
+            drive(&mut reader)
+        }
+
+        fn expected_events(mut content_events: Vec<Event>) -> Vec<Event> {
+            let mut events = vec![start_doc(), start_para()];
+            events.append(&mut content_events);
+            events.push(Event::EndParagraph);
+            events.push(Event::EndDocument);
+            events
+        }
+
+        #[test]
+        fn sym_wingdings_skull_via_sym_element() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:sym w:font="Wingdings" w:char="F04E"/></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn sym_webdings_via_sym_element() {
+            let events =
+                collect_events(r#"<w:p><w:r><w:sym w:font="Webdings" w:char="0021"/></w:r></w:p>"#);
+            assert_eq!(events, expected_events(vec![text("\u{1F577}")]));
+        }
+
+        #[test]
+        fn sym_pua_codepoint_stripped() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:sym w:font="Wingdings" w:char="F021"/></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{1F589}")]));
+        }
+
+        #[test]
+        fn sym_raw_codepoint_below_pua() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:sym w:font="Wingdings" w:char="0021"/></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{1F589}")]));
+        }
+
+        #[test]
+        fn sym_unknown_font_drops() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:sym w:font="ComicSans" w:char="F04E"/></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![]));
+        }
+
+        #[test]
+        fn sym_missing_font_attr_drops() {
+            let events = collect_events(r#"<w:p><w:r><w:sym w:char="F04E"/></w:r></w:p>"#);
+            assert_eq!(events, expected_events(vec![]));
+        }
+
+        #[test]
+        fn sym_missing_char_attr_drops() {
+            let events = collect_events(r#"<w:p><w:r><w:sym w:font="Wingdings"/></w:r></w:p>"#);
+            assert_eq!(events, expected_events(vec![]));
+        }
+
+        #[test]
+        fn sym_unmapped_codepoint_drops() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:sym w:font="Wingdings" w:char="0001"/></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![]));
+        }
+
+        #[test]
+        fn sym_malformed_char_hex_drops() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:sym w:font="Wingdings" w:char="ZZZZ"/></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![]));
+        }
+
+        #[test]
+        fn sym_inside_rpr_ignored() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:sym w:font="Wingdings" w:char="F04E"/></w:rPr><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("x")]));
+        }
+
+        #[test]
+        fn sym_outside_paragraph_ignored() {
+            let events = collect_events(
+                r#"<w:sym w:font="Wingdings" w:char="F04E"/><w:p><w:r><w:t>x</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("x")]));
+        }
+
+        #[test]
+        fn sym_overrides_run_font() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:sym w:font="Webdings" w:char="0021"/></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{1F577}")]));
+        }
+
+        #[test]
+        fn sym_with_run_styling_applies_styles() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:b/></w:rPr><w:sym w:font="Wingdings" w:char="F04E"/></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text_events(&[TextStyleKind::Bold], "\u{2620}")),
+            );
+        }
+
+        #[test]
+        fn sym_after_wt_in_same_run() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:t>OK </w:t><w:sym w:font="Wingdings" w:char="F04E"/></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("OK "), text("\u{2620}")]));
+        }
+
+        #[test]
+        fn sym_case_insensitive_font_name() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:sym w:font="WINGDINGS" w:char="F04E"/></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+    }
+
+    mod wt_symbol_transform {
+        use super::*;
+
+        fn collect_events(content: &str) -> Vec<Event> {
+            let document_xml = format!(
+                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{content}</w:body></w:document>"#,
+            );
+            let mut reader = make_reader(&document_xml);
+            drive(&mut reader)
+        }
+
+        fn expected_events(mut content_events: Vec<Event>) -> Vec<Event> {
+            let mut events = vec![start_doc(), start_para()];
+            events.append(&mut content_events);
+            events.push(Event::EndParagraph);
+            events.push(Event::EndDocument);
+            events
+        }
+
+        #[test]
+        fn wt_wingdings_pua_codepoint_transforms() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#xF04E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn wt_wingdings_raw_codepoint_transforms() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn wt_wingdings_dual_codepoints_mixed() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#xF04E;&#x4C;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}\u{2639}")]));
+        }
+
+        #[test]
+        fn wt_unmapped_codepoint_dropped() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#xF001;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![]));
+        }
+
+        #[test]
+        fn wt_all_unmapped_drops_entire_text_event() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#xF001;&#xF002;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![]));
+        }
+
+        #[test]
+        fn wt_out_of_range_codepoint_dropped() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#x1F600;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![]));
+        }
+
+        #[test]
+        fn wt_wingdings_then_arial_only_first_transforms() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#x4E;</w:t></w:r><w:r><w:t>N</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}"), text("N")]));
+        }
+
+        #[test]
+        fn wt_no_font_set_passes_through() {
+            let events = collect_events("<w:p><w:r><w:t>hello</w:t></w:r></w:p>");
+            assert_eq!(events, expected_events(vec![text("hello")]));
+        }
+
+        #[test]
+        fn wt_non_symbol_font_passes_through() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Arial"/></w:rPr><w:t>hello</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("hello")]));
+        }
+
+        #[test]
+        fn wt_symbol_font_alongside_styling() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/><w:b/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(styled_text_events(&[TextStyleKind::Bold], "\u{2620}"))
+            );
+        }
+
+        #[test]
+        fn wt_multiple_wt_in_one_run_each_transforms() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#xF04E;</w:t><w:t>&#x4C;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(vec![text("\u{2620}"), text("\u{2639}")])
+            );
+        }
+
+        #[test]
+        fn wt_symbol_text_emits_no_empty_text_event() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t></w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![]));
+        }
+
+        #[test]
+        fn wt_reset_between_paragraphs() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p><w:p><w:r><w:t>N</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                vec![
+                    start_doc(),
+                    start_para(),
+                    text("\u{2620}"),
+                    Event::EndParagraph,
+                    start_para(),
+                    text("N"),
+                    Event::EndParagraph,
+                    Event::EndDocument,
+                ]
+            );
+        }
+
+        #[test]
+        fn wt_reset_between_runs() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#x4E;</w:t></w:r><w:r><w:t>N</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}"), text("N")]));
+        }
     }
 
     mod ppr {
@@ -1252,6 +1582,148 @@ mod events {
         }
     }
 
+    mod rfonts_resolution {
+        use super::*;
+
+        fn collect_events(content: &str) -> Vec<Event> {
+            let document_xml = format!(
+                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{content}</w:body></w:document>"#,
+            );
+            let mut reader = make_reader(&document_xml);
+            drive(&mut reader)
+        }
+
+        fn expected_events(mut content_events: Vec<Event>) -> Vec<Event> {
+            let mut events = vec![start_doc(), start_para()];
+            events.append(&mut content_events);
+            events.push(Event::EndParagraph);
+            events.push(Event::EndDocument);
+            events
+        }
+
+        #[test]
+        fn rfonts_ascii_only_resolves() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn rfonts_h_ansi_only_resolves() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:hAnsi="Wingdings"/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn rfonts_cs_only_resolves() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:cs="Wingdings"/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn rfonts_ascii_takes_precedence_over_h_ansi() {
+            // Wingdings 0x4E → U+2620 (skull); Webdings 0x4E → U+1F441 (eye)
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings" w:hAnsi="Webdings"/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn rfonts_h_ansi_takes_precedence_over_cs() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:hAnsi="Wingdings" w:cs="Webdings"/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn rfonts_east_asia_ignored() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:eastAsia="Wingdings"/></w:rPr><w:t>N</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("N")]));
+        }
+
+        #[test]
+        fn rfonts_unknown_in_ascii_falls_through_to_h_ansi() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Wingdings"/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn rfonts_unknown_in_ascii_and_h_ansi_uses_cs() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Helvetica" w:cs="Wingdings"/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn rfonts_all_unknown_no_transform() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Helvetica" w:cs="Times"/></w:rPr><w:t>N</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("N")]));
+        }
+
+        #[test]
+        fn rfonts_case_insensitive_all_caps() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="WINGDINGS"/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn rfonts_case_insensitive_lowercase() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="wingdings"/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn rfonts_case_insensitive_mixed() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="WiNgDiNgS"/></w:rPr><w:t>&#x4E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn rfonts_wingdings_2_with_space() {
+            // Wingdings 2 0x21 → U+270A (raised fist ✊)
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings 2"/></w:rPr><w:t>&#x21;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{270a}")]));
+        }
+
+        #[test]
+        fn rfonts_wingdings2_no_space_does_not_resolve() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings2"/></w:rPr><w:t>&#x21;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("!")]));
+        }
+
+        #[test]
+        fn rfonts_non_self_closing_form_handled() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"></w:rFonts></w:rPr><w:t>&#x4E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+    }
+
     #[test]
     fn single_paragraph_emits_text() {
         let mut reader = make_reader(
@@ -1278,7 +1750,7 @@ mod events {
 
         assert_eq!(
             format!("{reader:?}"),
-            "DocxReader { inner: DocumentReader { buf: [], in_ignored_subtree: 0, in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, pending_paragraph_classification: None, current_paragraph_block: Paragraph, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, data: \"<DocxData>\", xml: \"<quick_xml::Reader>\" } }"
+            "DocxReader { inner: DocumentReader { buf: [], in_ignored_subtree: 0, in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, pending_paragraph_classification: None, current_paragraph_block: Paragraph, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, pending_run_font: None, frozen_run_font: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, data: \"<DocxData>\", xml: \"<quick_xml::Reader>\" } }"
         );
     }
 
@@ -2715,5 +3187,264 @@ mod events {
                 Event::EndDocument,
             ]
         );
+    }
+
+    mod per_font_smoke {
+        use super::*;
+
+        fn collect_events(content: &str) -> Vec<Event> {
+            let document_xml = format!(
+                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{content}</w:body></w:document>"#,
+            );
+            let mut reader = make_reader(&document_xml);
+            drive(&mut reader)
+        }
+
+        fn expected_events(mut content_events: Vec<Event>) -> Vec<Event> {
+            let mut events = vec![start_doc(), start_para()];
+            events.append(&mut content_events);
+            events.push(Event::EndParagraph);
+            events.push(Event::EndDocument);
+            events
+        }
+
+        #[test]
+        fn font_wingdings_skull_via_sym() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:sym w:font="Wingdings" w:char="F04E"/></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn font_wingdings_skull_via_wt() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#xF04E;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}")]));
+        }
+
+        #[test]
+        fn font_wingdings2_via_sym() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:sym w:font="Wingdings 2" w:char="0021"/></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{270a}")]));
+        }
+
+        #[test]
+        fn font_wingdings2_via_wt() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings 2"/></w:rPr><w:t>&#x21;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{270a}")]));
+        }
+
+        #[test]
+        fn font_wingdings3_via_sym() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:sym w:font="Wingdings 3" w:char="0021"/></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2B60}")]));
+        }
+
+        #[test]
+        fn font_wingdings3_via_wt() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings 3"/></w:rPr><w:t>&#x21;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2B60}")]));
+        }
+
+        #[test]
+        fn font_webdings_via_sym() {
+            let events =
+                collect_events(r#"<w:p><w:r><w:sym w:font="Webdings" w:char="0021"/></w:r></w:p>"#);
+            assert_eq!(events, expected_events(vec![text("\u{1F577}")]));
+        }
+
+        #[test]
+        fn font_webdings_via_wt() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Webdings"/></w:rPr><w:t>&#x21;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{1F577}")]));
+        }
+
+        #[test]
+        fn font_symbol_alpha_via_sym() {
+            let events =
+                collect_events(r#"<w:p><w:r><w:sym w:font="Symbol" w:char="0061"/></w:r></w:p>"#);
+            assert_eq!(events, expected_events(vec![text("\u{3b1}")]));
+        }
+
+        #[test]
+        fn font_symbol_alpha_via_wt() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Symbol"/></w:rPr><w:t>&#x61;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{3b1}")]));
+        }
+    }
+
+    mod edge_cases {
+        use super::*;
+
+        fn collect_events(content: &str) -> Vec<Event> {
+            let document_xml = format!(
+                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{content}</w:body></w:document>"#,
+            );
+            let mut reader = make_reader(&document_xml);
+            drive(&mut reader)
+        }
+
+        fn expected_events(mut content_events: Vec<Event>) -> Vec<Event> {
+            let mut events = vec![start_doc(), start_para()];
+            events.append(&mut content_events);
+            events.push(Event::EndParagraph);
+            events.push(Event::EndDocument);
+            events
+        }
+
+        #[test]
+        fn edge_queue_length_bounded_under_symbol_heavy_run() {
+            let sym_xml = r#"<w:sym w:font="Wingdings" w:char="F04E"/>"#.repeat(50);
+            let xml = format!("<w:p><w:r>{sym_xml}</w:r></w:p>");
+            let events = collect_events(&xml);
+            let expected_texts: Vec<Event> = std::iter::repeat_with(|| text("\u{2620}"))
+                .take(50)
+                .collect();
+            assert_eq!(events, expected_events(expected_texts));
+        }
+
+        #[test]
+        fn edge_sym_with_paragraph_styling_preserves_alignment() {
+            let events = collect_events(
+                r#"<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:sym w:font="Wingdings" w:char="F04E"/></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                vec![
+                    start_doc(),
+                    start_para_with_alignment(TextAlignment::Center),
+                    text("\u{2620}"),
+                    Event::EndParagraph,
+                    Event::EndDocument,
+                ]
+            );
+        }
+
+        #[test]
+        fn edge_consecutive_sym_elements_in_run() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:sym w:font="Wingdings" w:char="F04E"/><w:sym w:font="Wingdings" w:char="F04E"/><w:sym w:font="Wingdings" w:char="F04E"/></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(vec![text("\u{2620}"), text("\u{2620}"), text("\u{2620}")])
+            );
+        }
+
+        #[test]
+        fn edge_sym_and_wt_alternating() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:sym w:font="Wingdings" w:char="F04E"/><w:t>a</w:t><w:sym w:font="Wingdings" w:char="F04E"/><w:t>b</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(
+                events,
+                expected_events(vec![
+                    text("\u{2620}"),
+                    text("a"),
+                    text("\u{2620}"),
+                    text("b")
+                ])
+            );
+        }
+
+        #[test]
+        fn edge_sym_inside_table_cell() {
+            let events = collect_events(
+                r#"<w:tbl><w:tr><w:tc><w:p><w:r><w:sym w:font="Wingdings" w:char="F04E"/></w:r></w:p></w:tc></w:tr></w:tbl>"#,
+            );
+            assert_eq!(
+                events,
+                vec![
+                    start_doc(),
+                    start_table(),
+                    start_row(),
+                    start_cell(),
+                    start_para(),
+                    text("\u{2620}"),
+                    Event::EndParagraph,
+                    Event::EndTableCell,
+                    Event::EndTableRow,
+                    Event::EndTable,
+                    Event::EndDocument,
+                ]
+            );
+        }
+
+        #[test]
+        fn edge_unmapped_partial_text_emits_partial() {
+            let events = collect_events(
+                r#"<w:p><w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#xF04E;&#xF001;&#xF04C;</w:t></w:r></w:p>"#,
+            );
+            assert_eq!(events, expected_events(vec![text("\u{2620}\u{2639}")]));
+        }
+
+        #[test]
+        fn edge_table_existing_test_still_passes() {
+            let events = collect_events(
+                "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl>",
+            );
+            assert_eq!(
+                events,
+                vec![
+                    start_doc(),
+                    start_table(),
+                    start_row(),
+                    start_cell(),
+                    start_para(),
+                    text("cell"),
+                    Event::EndParagraph,
+                    Event::EndTableCell,
+                    Event::EndTableRow,
+                    Event::EndTable,
+                    Event::EndDocument,
+                ]
+            );
+        }
+
+        #[test]
+        fn edge_bold_text_existing_test_still_passes() {
+            let events = collect_events("<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>x</w:t></w:r></w:p>");
+            assert_eq!(
+                events,
+                expected_events(styled_text_events(&[TextStyleKind::Bold], "x"))
+            );
+        }
+
+        #[test]
+        fn edge_cross_task_wingdings_wt_webdings_sym_arial_passthrough() {
+            let events = collect_events(concat!(
+                r#"<w:p>"#,
+                r#"<w:r><w:rPr><w:rFonts w:ascii="Wingdings"/></w:rPr><w:t>&#x4E;</w:t></w:r>"#,
+                r#"<w:r><w:sym w:font="Webdings" w:char="0021"/></w:r>"#,
+                r#"<w:r><w:rPr><w:rFonts w:ascii="Arial"/></w:rPr><w:t>hello</w:t></w:r>"#,
+                r#"</w:p>"#,
+            ));
+            assert_eq!(
+                events,
+                vec![
+                    start_doc(),
+                    start_para(),
+                    text("\u{2620}"),
+                    text("\u{1F577}"),
+                    text("hello"),
+                    Event::EndParagraph,
+                    Event::EndDocument,
+                ]
+            );
+        }
     }
 }

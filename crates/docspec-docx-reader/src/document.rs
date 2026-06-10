@@ -49,7 +49,7 @@ pub struct DocxData {
 /// Streaming parser for the DOCX main document XML part.
 #[expect(
     clippy::struct_excessive_bools,
-    reason = "DocumentReader tracks six independent boolean parser states; grouping them would obscure the streaming state machine"
+    reason = "DocumentReader tracks independent boolean parser states; grouping them would obscure the streaming state machine"
 )]
 pub struct DocumentReader {
     /// Reusable buffer for quick-xml event reading.
@@ -92,6 +92,10 @@ pub struct DocumentReader {
     frozen_run_text_color: Option<Color>,
     /// Highlight/background color frozen at `</w:rPr>`, applied to subsequent emissions in the same run.
     frozen_run_mark: Option<Color>,
+    /// Symbol font accumulated while inside `<w:rPr>`.
+    pending_run_font: Option<crate::symbol_fonts::SymbolFont>,
+    /// Symbol font frozen at `</w:rPr>`, applied to subsequent text in the same run.
+    frozen_run_font: Option<crate::symbol_fonts::SymbolFont>,
     /// Style kinds currently opened for the active run.
     open_styles: Vec<TextStyleKind>,
     /// Document processing phase.
@@ -134,6 +138,8 @@ impl fmt::Debug for DocumentReader {
             .field("frozen_run_kinds", &self.frozen_run_kinds)
             .field("frozen_run_text_color", &self.frozen_run_text_color)
             .field("frozen_run_mark", &self.frozen_run_mark)
+            .field("pending_run_font", &self.pending_run_font)
+            .field("frozen_run_font", &self.frozen_run_font)
             .field("open_styles", &self.open_styles)
             .field("phase", &"<phase>")
             .field("queue", &self.queue)
@@ -168,6 +174,8 @@ impl DocumentReader {
             frozen_run_kinds: Vec::new(),
             frozen_run_text_color: None,
             frozen_run_mark: None,
+            pending_run_font: None,
+            frozen_run_font: None,
             open_styles: Vec::new(),
             phase: Phase::NotStarted,
             queue: VecDeque::new(),
@@ -210,6 +218,8 @@ impl DocumentReader {
         self.pending_run_kinds.clear();
         self.frozen_run_text_color = None;
         self.frozen_run_mark = None;
+        self.pending_run_font = None;
+        self.frozen_run_font = None;
         self.pending_run_text_color = None;
         self.pending_run_mark = None;
         self.pending_run_shade = None;
@@ -231,11 +241,35 @@ impl DocumentReader {
     }
 
     fn flush_pending_text(&mut self) {
-        if !self.pending_text.is_empty() {
+        if self.pending_text.is_empty() {
+            return;
+        }
+
+        let content = if let Some(font) = self.frozen_run_font {
+            let mut out = String::with_capacity(self.pending_text.len());
+            for ch in self.pending_text.chars() {
+                let key = match u32::from(ch) {
+                    cp @ 0xF020..=0xF0FF => cp
+                        .checked_sub(0xF000)
+                        .and_then(|stripped| u8::try_from(stripped).ok()),
+                    cp @ 0x0020..=0x00FF => u8::try_from(cp).ok(),
+                    _ => None,
+                };
+                if let Some(k) = key {
+                    if let Some(mapped) = font.convert(k) {
+                        out.push(mapped);
+                    }
+                }
+            }
+            self.pending_text.clear();
+            out
+        } else {
+            core::mem::take(&mut self.pending_text)
+        };
+
+        if !content.is_empty() {
             self.emit_deferred_starts();
-            self.queue.push_back(Event::Text {
-                content: core::mem::take(&mut self.pending_text),
-            });
+            self.queue.push_back(Event::Text { content });
         }
     }
 
@@ -304,6 +338,55 @@ impl DocumentReader {
         }
     }
 
+    fn handle_rpr_property(&mut self, local: &[u8], tag: &BytesStart<'_>) -> bool {
+        if !self.in_rpr {
+            return false;
+        }
+        match local {
+            b"b" => {
+                self.set_pending_run_kind(TextStyleKind::Bold, parse_on_off_attribute(tag));
+            }
+            b"i" => {
+                self.set_pending_run_kind(TextStyleKind::Italic, parse_on_off_attribute(tag));
+            }
+            b"strike" | b"dstrike" => {
+                self.set_pending_run_kind(
+                    TextStyleKind::Strikethrough,
+                    parse_on_off_attribute(tag),
+                );
+            }
+            b"u" => {
+                let val = read_val_attribute(tag);
+                self.set_pending_run_kind(
+                    TextStyleKind::Underline,
+                    properties::parse_underline_on(val.as_deref()),
+                );
+            }
+            b"vertAlign" => {
+                let val = read_val_attribute(tag);
+                self.set_pending_vertical_alignment(properties::parse_vert_align(val.as_deref()));
+            }
+            b"color" => {
+                let val = read_val_attribute(tag);
+                self.pending_run_text_color = properties::parse_color_val(val.as_deref());
+            }
+            b"highlight" => {
+                let val = read_val_attribute(tag);
+                self.pending_run_mark = properties::parse_highlight_val(val.as_deref());
+            }
+            b"shd" => {
+                let fill = read_attribute(tag, b"w:fill");
+                self.pending_run_shade = properties::parse_shd_fill(fill.as_deref());
+            }
+            b"rFonts" => {
+                self.pending_run_font = read_rfonts_symbol(tag);
+            }
+            b"rStyle" => self.handle_rpr_rstyle(tag),
+            _ => return false,
+        }
+        true
+    }
+
     fn handle_cdata(&mut self, cdata: BytesCData<'_>) -> Result<()> {
         if self.can_collect_text() {
             let bytes = cdata.into_inner();
@@ -317,8 +400,13 @@ impl DocumentReader {
     fn handle_empty(&mut self, tag: &BytesStart<'_>) {
         let local_name = tag.local_name();
         let local = local_name.as_ref();
+        if self.in_ignored_subtree > 0 || is_ignored_container(local) {
+            return;
+        }
+        if self.handle_rpr_property(local, tag) {
+            return;
+        }
         match local {
-            value if self.in_ignored_subtree > 0 || is_ignored_container(value) => {}
             b"pPr" if self.in_paragraph && !self.paragraph_started_emitted => {
                 self.ensure_paragraph_started();
             }
@@ -334,42 +422,26 @@ impl DocumentReader {
             }
             b"rPr" if self.in_ppr => {}
             b"rPr" if self.in_paragraph && !self.in_ppr && !self.in_rpr => {}
-            b"b" if self.in_rpr => {
-                self.set_pending_run_kind(TextStyleKind::Bold, parse_on_off_attribute(tag));
+            b"sym" if self.in_paragraph && !self.in_rpr => {
+                let font_name = read_attribute(tag, b"w:font");
+                let char_hex = read_attribute(tag, b"w:char");
+                if let (Some(name), Some(hex)) = (font_name, char_hex) {
+                    if let (Some(font), Some(key)) = (
+                        crate::symbol_fonts::SymbolFont::from_name(&name),
+                        crate::properties::parse_sym_char(&hex),
+                    ) {
+                        if let Some(ch) = font.convert(key) {
+                            self.flush_pending_text();
+                            self.ensure_paragraph_started();
+                            self.emit_deferred_starts();
+                            self.queue.push_back(Event::Text {
+                                content: String::from(ch),
+                            });
+                            self.run_content_emitted = true;
+                        }
+                    }
+                }
             }
-            b"i" if self.in_rpr => {
-                self.set_pending_run_kind(TextStyleKind::Italic, parse_on_off_attribute(tag));
-            }
-            b"strike" | b"dstrike" if self.in_rpr => {
-                self.set_pending_run_kind(
-                    TextStyleKind::Strikethrough,
-                    parse_on_off_attribute(tag),
-                );
-            }
-            b"u" if self.in_rpr => {
-                let val = read_val_attribute(tag);
-                self.set_pending_run_kind(
-                    TextStyleKind::Underline,
-                    properties::parse_underline_on(val.as_deref()),
-                );
-            }
-            b"vertAlign" if self.in_rpr => {
-                let val = read_val_attribute(tag);
-                self.set_pending_vertical_alignment(properties::parse_vert_align(val.as_deref()));
-            }
-            b"color" if self.in_rpr => {
-                let val = read_val_attribute(tag);
-                self.pending_run_text_color = properties::parse_color_val(val.as_deref());
-            }
-            b"highlight" if self.in_rpr => {
-                let val = read_val_attribute(tag);
-                self.pending_run_mark = properties::parse_highlight_val(val.as_deref());
-            }
-            b"shd" if self.in_rpr => {
-                let fill = read_attribute(tag, b"w:fill");
-                self.pending_run_shade = properties::parse_shd_fill(fill.as_deref());
-            }
-            b"rStyle" if self.in_rpr => self.handle_rpr_rstyle(tag),
             b"p" if !self.in_paragraph => {
                 self.start_paragraph();
                 self.end_paragraph();
@@ -399,6 +471,7 @@ impl DocumentReader {
                     .pending_run_mark
                     .take()
                     .or_else(|| self.pending_run_shade.take());
+                self.frozen_run_font = self.pending_run_font.take();
                 self.pending_run_shade = None;
                 self.in_rpr = false;
             }
@@ -410,6 +483,8 @@ impl DocumentReader {
                 self.pending_run_kinds.clear();
                 self.frozen_run_text_color = None;
                 self.frozen_run_mark = None;
+                self.pending_run_font = None;
+                self.frozen_run_font = None;
                 self.pending_run_text_color = None;
                 self.pending_run_mark = None;
                 self.pending_run_shade = None;
@@ -458,6 +533,9 @@ impl DocumentReader {
             self.in_ignored_subtree = self.in_ignored_subtree.saturating_add(1);
             return;
         }
+        if self.handle_rpr_property(local, tag) {
+            return;
+        }
 
         match local {
             value if is_ignored_container(value) => self.in_ignored_subtree = 1,
@@ -493,44 +571,9 @@ impl DocumentReader {
                     self.pending_run_text_color = None;
                     self.pending_run_mark = None;
                     self.pending_run_shade = None;
+                    self.pending_run_font = None;
                 }
             }
-            b"b" if self.in_rpr => {
-                self.set_pending_run_kind(TextStyleKind::Bold, parse_on_off_attribute(tag));
-            }
-            b"i" if self.in_rpr => {
-                self.set_pending_run_kind(TextStyleKind::Italic, parse_on_off_attribute(tag));
-            }
-            b"strike" | b"dstrike" if self.in_rpr => {
-                self.set_pending_run_kind(
-                    TextStyleKind::Strikethrough,
-                    parse_on_off_attribute(tag),
-                );
-            }
-            b"u" if self.in_rpr => {
-                let val = read_val_attribute(tag);
-                self.set_pending_run_kind(
-                    TextStyleKind::Underline,
-                    properties::parse_underline_on(val.as_deref()),
-                );
-            }
-            b"vertAlign" if self.in_rpr => {
-                let val = read_val_attribute(tag);
-                self.set_pending_vertical_alignment(properties::parse_vert_align(val.as_deref()));
-            }
-            b"color" if self.in_rpr => {
-                let val = read_val_attribute(tag);
-                self.pending_run_text_color = properties::parse_color_val(val.as_deref());
-            }
-            b"highlight" if self.in_rpr => {
-                let val = read_val_attribute(tag);
-                self.pending_run_mark = properties::parse_highlight_val(val.as_deref());
-            }
-            b"shd" if self.in_rpr => {
-                let fill = read_attribute(tag, b"w:fill");
-                self.pending_run_shade = properties::parse_shd_fill(fill.as_deref());
-            }
-            b"rStyle" if self.in_rpr => self.handle_rpr_rstyle(tag),
             b"p" if !self.in_paragraph => self.start_paragraph(),
             b"r" if self.in_paragraph => {
                 self.ensure_paragraph_started();
@@ -698,6 +741,17 @@ fn read_attribute(tag: &BytesStart<'_>, name: &[u8]) -> Option<String> {
     core::str::from_utf8(a.value.as_ref())
         .ok()
         .map(str::to_owned)
+}
+
+fn read_rfonts_symbol(tag: &BytesStart<'_>) -> Option<crate::symbol_fonts::SymbolFont> {
+    for attr_name in [b"w:ascii".as_ref(), b"w:hAnsi".as_ref(), b"w:cs".as_ref()] {
+        if let Some(name) = read_attribute(tag, attr_name) {
+            if let Some(font) = crate::symbol_fonts::SymbolFont::from_name(&name) {
+                return Some(font);
+            }
+        }
+    }
+    None
 }
 
 fn parse_on_off_attribute(tag: &BytesStart<'_>) -> bool {

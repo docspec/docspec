@@ -60,6 +60,7 @@ mod package;
 mod properties;
 mod rels;
 mod styles;
+mod symbol_fonts;
 
 use std::io::{BufReader, Read, Seek};
 use std::path::Path;

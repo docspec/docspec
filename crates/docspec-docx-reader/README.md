@@ -20,6 +20,7 @@ architecture, and the event protocol.
 - Empty `<w:rPr/>` and `<w:pPr/>` are treated as no properties (default style / alignment None)
 - A `<w:rPr>` or `<w:pPr>` that appears after content in the same parent is silently ignored (per the OOXML spec, both must be the first child element)
 - Emits: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`, `EndTextStyle`, `LineBreak`, `EndParagraph`, `StartTable`, `StartTableRow`, `StartTableCell`, `EndTableCell`, `EndTableRow`, `EndTable`, `EndDocument`
+- Symbol font character normalization for Wingdings, Wingdings 2, Wingdings 3, Webdings, and Symbol fonts — codepoints are mapped to their Unicode equivalents; unmapped codepoints are dropped
 - Compression: `Stored` and `Deflated` only
 
 ### Color and Highlight Precedence
@@ -34,7 +35,8 @@ Adjacent runs with the same color emit separate `StartTextStyle`/`EndTextStyle` 
 
 - Headings (any `<w:pStyle>` value — every paragraph is `StartParagraph`)
 - Style references (`<w:rStyle>`, `<w:pStyle>`)
-- Run formatting not listed above: `<w:sz>`, `<w:szCs>`, `<w:rFonts>`, `<w:caps>`, `<w:smallCaps>`, `<w:position>`, `<w:spacing>`, `<w:kern>`, `<w:lang>`, `<w:noProof>`
+- Run formatting not listed above: `<w:sz>`, `<w:szCs>`, `<w:caps>`, `<w:smallCaps>`, `<w:position>`, `<w:spacing>`, `<w:kern>`, `<w:lang>`, `<w:noProof>`
+- `<w:rFonts>` (general font tracking is not exposed as events, *except for symbol font resolution (Wingdings, Wingdings 2, Wingdings 3, Webdings, Symbol) which is used internally to normalize codepoints to Unicode*)
 - `themeColor` / `themeTint` / `themeShade` attributes on `<w:color>` and `<w:shd>` — silently dropped. The reader does not parse `styles.xml` or `theme1.xml`, so theme-referenced colors cannot be resolved. Future work.
 - Revision tracking (`<w:rPrChange>`, `<w:pPrChange>`)
 - Advanced paragraph layout beyond alignment: `<w:numPr>`, `<w:ind>`, `<w:tabs>`, `<w:framePr>`, `<w:sectPr>`

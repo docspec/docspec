@@ -141,6 +141,17 @@ pub fn parse_shd_fill(fill: Option<&str>) -> Option<Color> {
     parse_hex_color(fill?)
 }
 
+/// Parse a `w:char` attribute value (hex string, typically 4 digits, u16 range)
+/// into a u8 table-lookup key, applying Word's PUA stripping convention.
+///
+/// Returns `None` for unparseable input or for codepoints that fall outside
+/// the 0x00-0xFF lookup range after PUA stripping.
+pub(crate) fn parse_sym_char(hex: &str) -> Option<u8> {
+    let raw = u16::from_str_radix(hex, 16).ok()?;
+    let stripped = raw.checked_sub(0xF000).unwrap_or(raw);
+    u8::try_from(stripped).ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -613,5 +624,58 @@ mod tests {
             parse_shd_fill(Some("000000")),
             Some(Color::Rgb { r: 0, g: 0, b: 0 })
         );
+    }
+
+    // ============================================================================
+    // parse_sym_char tests (9 cases)
+    // ============================================================================
+
+    #[test]
+    fn parse_sym_char_raw_two_digits() {
+        assert_eq!(parse_sym_char("4E"), Some(0x4E));
+    }
+
+    #[test]
+    fn parse_sym_char_raw_four_digits() {
+        assert_eq!(parse_sym_char("004E"), Some(0x4E));
+    }
+
+    #[test]
+    fn parse_sym_char_pua_stripped() {
+        assert_eq!(parse_sym_char("F04E"), Some(0x4E));
+    }
+
+    #[test]
+    fn parse_sym_char_pua_boundary() {
+        assert_eq!(parse_sym_char("F000"), Some(0x00));
+        assert_eq!(parse_sym_char("F0FF"), Some(0xFF));
+    }
+
+    #[test]
+    fn parse_sym_char_above_pua_range() {
+        assert_eq!(parse_sym_char("F100"), None); // 0xF100 - 0xF000 = 0x100, > u8::MAX
+        assert_eq!(parse_sym_char("F1FF"), None);
+    }
+
+    #[test]
+    fn parse_sym_char_below_pua_above_u8() {
+        assert_eq!(parse_sym_char("0100"), None); // raw 0x100, doesn't fit u8
+    }
+
+    #[test]
+    fn parse_sym_char_invalid_hex() {
+        assert_eq!(parse_sym_char("ZZZZ"), None);
+        assert_eq!(parse_sym_char(""), None);
+        assert_eq!(parse_sym_char("GH"), None);
+    }
+
+    #[test]
+    fn parse_sym_char_empty() {
+        assert_eq!(parse_sym_char(""), None);
+    }
+
+    #[test]
+    fn parse_sym_char_with_leading_zeros() {
+        assert_eq!(parse_sym_char("00F0"), Some(0xF0));
     }
 }
