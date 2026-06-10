@@ -21,13 +21,14 @@ Converts a DocSpec event stream into compact Pandoc native block-list syntax, su
 | `StartTextStyle { kind: Underline }` / `EndTextStyle` | `Underline [` / `]` |
 | `StartTextStyle { kind: Subscript }` / `EndTextStyle` | `Subscript [` / `]` |
 | `StartTextStyle { kind: Superscript }` / `EndTextStyle` | `Superscript [` / `]` |
+| `StartTextStyle { kind: Code, id }` / `EndTextStyle` | `Code ("id",[],[]) "..."` (Text payload buffered between Start and End) |
+| `StartPreformatted { id, syntax }` / `EndPreformatted` | `CodeBlock ("id",["syntax"],[]) "..."` (Text payload buffered; literal newlines preserved) |
 
 ## Not Supported
 
 The following DocSpec events are silently ignored:
 
 - Block quotes — `StartBlockQuote` / `EndBlockQuote`
-- Preformatted / code blocks — `StartPreformatted` / `EndPreformatted`
 - Images — `Image`
 - Tables — `StartTable` / `EndTable` and related events
 - List items — `StartOrderedListItem` / `StartUnorderedListItem` and related events
@@ -35,7 +36,7 @@ The following DocSpec events are silently ignored:
 - Footnotes — `StartFootnote` / `EndFootnote` / `FootnoteRef`
 - Definition lists — `StartDefinitionList` / `StartDefinitionTerm` / `StartDefinitionDetail`
 - Captions — `StartCaption` / `EndCaption`
-- Text formatting styles — `StartTextStyle { kind: Code | Mark | TextColor }` are accepted but silently flattened (text inside is preserved without a wrapper)
+- Text formatting styles — `StartTextStyle { kind: Mark | TextColor }` are accepted but silently flattened (text inside is preserved without a wrapper)
 
 ## Usage
 
