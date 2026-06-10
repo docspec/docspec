@@ -88,6 +88,24 @@ pub fn parse_hex_color(val: &str) -> Option<Color> {
     }
 }
 
+/// Parses `w:gridSpan` column span value (ECMA-376 §17.4.17).
+///
+/// The `w:gridSpan` attribute specifies the number of grid columns spanned by a table cell.
+/// Per OOXML, the default is 1 (when the element is omitted). This function returns:
+/// - `None` if the element is omitted (input is `None`)
+/// - `None` if the value is "1" (explicit default, semantically equivalent to omitted)
+/// - `Some(n)` if the value parses as a u32 and n > 1
+/// - `None` for invalid, zero, or negative values (lenient; matches existing parser philosophy)
+///
+/// This mapping aligns with the `colspan: Option<u32>` field semantics: `None` means "use default (1)".
+pub fn parse_grid_span_value(val: Option<&str>) -> Option<u32> {
+    let s = val?;
+    match s.parse::<u32>() {
+        Ok(n) if n > 1 => Some(n),
+        _ => None,
+    }
+}
+
 /// Parses the `w:val` attribute of a `<w:color>` element.
 ///
 /// Returns `None` for absent attribute, `"auto"`, or non-hex values.
@@ -677,5 +695,49 @@ mod tests {
     #[test]
     fn parse_sym_char_with_leading_zeros() {
         assert_eq!(parse_sym_char("00F0"), Some(0xF0));
+    }
+
+    // ============================================================================
+    // parse_grid_span_value tests (8 cases)
+    // ============================================================================
+
+    #[test]
+    fn parse_grid_span_value_none_returns_none() {
+        assert_eq!(parse_grid_span_value(None), None);
+    }
+
+    #[test]
+    fn parse_grid_span_value_explicit_one_returns_none() {
+        assert_eq!(parse_grid_span_value(Some("1")), None);
+    }
+
+    #[test]
+    fn parse_grid_span_value_two_returns_some_two() {
+        assert_eq!(parse_grid_span_value(Some("2")), Some(2));
+    }
+
+    #[test]
+    fn parse_grid_span_value_zero_returns_none() {
+        assert_eq!(parse_grid_span_value(Some("0")), None);
+    }
+
+    #[test]
+    fn parse_grid_span_value_non_numeric_returns_none() {
+        assert_eq!(parse_grid_span_value(Some("abc")), None);
+    }
+
+    #[test]
+    fn parse_grid_span_value_empty_string_returns_none() {
+        assert_eq!(parse_grid_span_value(Some("")), None);
+    }
+
+    #[test]
+    fn parse_grid_span_value_large_value_returns_some() {
+        assert_eq!(parse_grid_span_value(Some("100")), Some(100));
+    }
+
+    #[test]
+    fn parse_grid_span_value_negative_returns_none() {
+        assert_eq!(parse_grid_span_value(Some("-1")), None);
     }
 }
