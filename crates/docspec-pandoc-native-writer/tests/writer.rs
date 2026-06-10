@@ -244,10 +244,179 @@ mod tests {
                 start_para(),
                 text("x"),
                 Event::EndParagraph,
-                Event::ThematicBreak { id: None },
+                Event::StartBlockQuote { id: None },
+                Event::EndBlockQuote,
                 Event::EndDocument
             ]),
             "[Para [Str \"x\"]]"
+        );
+    }
+
+    #[test]
+    fn thematic_break_standalone() {
+        assert_eq!(
+            run([
+                start_doc(),
+                Event::ThematicBreak { id: None },
+                Event::EndDocument
+            ]),
+            "[HorizontalRule]"
+        );
+    }
+
+    #[test]
+    fn thematic_break_between_paragraphs() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("a"),
+                Event::EndParagraph,
+                Event::ThematicBreak { id: None },
+                start_para(),
+                text("b"),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]),
+            "[Para [Str \"a\"],HorizontalRule,Para [Str \"b\"]]"
+        );
+    }
+
+    #[test]
+    fn thematic_break_with_id_ignored() {
+        assert_eq!(
+            run([
+                start_doc(),
+                Event::ThematicBreak {
+                    id: Some("hr1".to_string()),
+                },
+                Event::EndDocument
+            ]),
+            "[HorizontalRule]"
+        );
+    }
+
+    #[test]
+    fn thematic_break_outside_document_ignored() {
+        assert_eq!(
+            run([
+                Event::ThematicBreak { id: None },
+                start_doc(),
+                Event::EndDocument
+            ]),
+            "[]"
+        );
+    }
+
+    #[test]
+    fn thematic_break_inside_paragraph_ignored() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("a"),
+                Event::ThematicBreak { id: None },
+                text("b"),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]),
+            "[Para [Str \"a\",Str \"b\"]]"
+        );
+    }
+
+    #[test]
+    fn line_break_inside_paragraph() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("a"),
+                Event::LineBreak,
+                text("b"),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]),
+            "[Para [Str \"a\",LineBreak,Str \"b\"]]"
+        );
+    }
+
+    #[test]
+    fn line_break_at_start_of_paragraph_no_leading_comma() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                Event::LineBreak,
+                text("a"),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]),
+            "[Para [LineBreak,Str \"a\"]]"
+        );
+    }
+
+    #[test]
+    fn line_break_outside_paragraph_ignored() {
+        assert_eq!(
+            run([start_doc(), Event::LineBreak, Event::EndDocument]),
+            "[]"
+        );
+    }
+
+    #[test]
+    fn soft_break_inside_paragraph() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("a"),
+                Event::SoftBreak,
+                text("b"),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]),
+            "[Para [Str \"a\",SoftBreak,Str \"b\"]]"
+        );
+    }
+
+    #[test]
+    fn soft_break_at_start_of_paragraph_no_leading_comma() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                Event::SoftBreak,
+                text("a"),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]),
+            "[Para [SoftBreak,Str \"a\"]]"
+        );
+    }
+
+    #[test]
+    fn soft_break_outside_paragraph_ignored() {
+        assert_eq!(
+            run([start_doc(), Event::SoftBreak, Event::EndDocument]),
+            "[]"
+        );
+    }
+
+    #[test]
+    fn mixed_breaks_and_text_in_paragraph() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("a"),
+                Event::SoftBreak,
+                text("b"),
+                Event::LineBreak,
+                text("c"),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]),
+            "[Para [Str \"a\",SoftBreak,Str \"b\",LineBreak,Str \"c\"]]"
         );
     }
 

@@ -48,6 +48,30 @@ impl<W: Write> PandocNativeWriter<W> {
             writer,
         }
     }
+
+    #[inline]
+    fn write_block_literal(&mut self, token: &[u8]) -> Result<()> {
+        if self.started && !self.finished && !self.in_paragraph {
+            if !self.first_block {
+                self.writer.write_all(b",")?;
+            }
+            self.writer.write_all(token)?;
+            self.first_block = false;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn write_inline_literal(&mut self, token: &[u8]) -> Result<()> {
+        if self.in_paragraph {
+            if self.paragraph_has_inline {
+                self.writer.write_all(b",")?;
+            }
+            self.writer.write_all(token)?;
+            self.paragraph_has_inline = true;
+        }
+        Ok(())
+    }
 }
 
 impl<W: Write> EventSink for PandocNativeWriter<W> {
@@ -70,8 +94,15 @@ impl<W: Write> EventSink for PandocNativeWriter<W> {
 
     /// Handles a single `DocSpec` event.
     ///
-    /// Only `StartDocument`, `EndDocument`, `StartParagraph`, `EndParagraph`,
-    /// and `Text` events produce output. All other events are silently ignored.
+    /// The following events produce output:
+    /// - `StartDocument` / `EndDocument` — block-list framing
+    /// - `StartParagraph` / `EndParagraph` — `Para [...]`
+    /// - `Text` — `Str "..."`
+    /// - `ThematicBreak` — `HorizontalRule`
+    /// - `LineBreak` — `LineBreak`
+    /// - `SoftBreak` — `SoftBreak`
+    ///
+    /// All other events are silently ignored.
     #[inline]
     fn handle_event(&mut self, event: Event) -> Result<()> {
         match event {
@@ -116,6 +147,9 @@ impl<W: Write> EventSink for PandocNativeWriter<W> {
                 escape::write_haskell_string(&mut self.writer, &content)?;
                 self.paragraph_has_inline = true;
             }
+            Event::ThematicBreak { .. } => self.write_block_literal(b"HorizontalRule")?,
+            Event::LineBreak => self.write_inline_literal(b"LineBreak")?,
+            Event::SoftBreak => self.write_inline_literal(b"SoftBreak")?,
             _ => {}
         }
         Ok(())
