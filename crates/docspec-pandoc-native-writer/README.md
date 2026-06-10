@@ -10,6 +10,7 @@ Converts a DocSpec event stream into compact Pandoc native block-list syntax, su
 | --- | --- |
 | `StartDocument` / `EndDocument` | `[` / `]` (block list framing) |
 | `StartParagraph` / `EndParagraph` | `Para [` / `]` |
+| `StartHeading { level, id }` / `EndHeading` | `Header N ("id",[],[]) [` / `]` (level passed through raw; classes and key-value attrs always empty) |
 | `Text` (styles dropped) | `Str "..."` |
 | `ThematicBreak` (id dropped) | `HorizontalRule` |
 | `LineBreak` | `LineBreak` |
@@ -19,7 +20,6 @@ Converts a DocSpec event stream into compact Pandoc native block-list syntax, su
 
 The following DocSpec events are silently ignored:
 
-- Headings — `StartHeading` / `EndHeading`
 - Block quotes — `StartBlockQuote` / `EndBlockQuote`
 - Preformatted / code blocks — `StartPreformatted` / `EndPreformatted`
 - Images — `Image`
