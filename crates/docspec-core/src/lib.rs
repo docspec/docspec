@@ -12,14 +12,15 @@
 //!
 //! # Event Types
 //!
-//! The [`Event`] enum covers all document structures defined in the `DocSpec`
-//! specification. See `EVENTS.md` for the authoritative variant list and semantics.
+//! The [`Event`] enum covers all document structures supported by `DocSpec`. See
+//! the [`event`] module for the full event reference, well-formedness rules, and
+//! per-variant semantics.
 
 extern crate alloc;
 
 mod depth;
 mod error;
-mod event;
+pub mod event;
 mod pipeline;
 mod stack;
 mod traits;

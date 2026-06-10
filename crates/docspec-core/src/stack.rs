@@ -215,7 +215,7 @@ impl<S: EventSink> StackTrackingSink<S> {
                 });
             }
         }
-        // Links cannot nest per EVENTS.md
+        // Links cannot nest (Rule 4 in `crate::event`).
         if kind == BlockKind::Link && self.stack.contains(&BlockKind::Link) {
             return Err(Error::InvalidSequence {
                 expected: "no nested links".to_string(),
@@ -242,8 +242,9 @@ impl<S: EventSink> StackTrackingSink<S> {
     ///
     /// Note: [`BlockKind::OrderedListItem`], [`BlockKind::UnorderedListItem`], [`BlockKind::TableCell`], [`BlockKind::TableHeader`],
     /// and [`BlockKind::DefinitionDetail`] are NOT content-bearing despite being able to
-    /// contain inline content per `EVENTS.md`. This is because downstream writers like
-    /// `BlockNoteWriter` rely on auto-paragraph insertion for these container types.
+    /// contain inline content per the well-formedness rules in [`crate::event`]. This is because
+    /// downstream writers like `BlockNoteWriter` rely on auto-paragraph insertion for these
+    /// container types.
     #[inline]
     pub fn has_open_content(&self) -> bool {
         self.stack.iter().any(|kind| {

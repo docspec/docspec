@@ -5,12 +5,13 @@ DocSpec is a streaming document conversion library in Rust. Documents are stream
 ## Read These First
 
 - [MANIFESTO.md](MANIFESTO.md) — philosophy and values
-- [ARCHITECTURE.md](ARCHITECTURE.md) — streaming pipeline and design
-- [EVENTS.md](EVENTS.md) — event types and well-formedness rules
+- [ARCHITECTURE.md](ARCHITECTURE.md) — streaming pipeline, event model design decisions, and pointers to the in-code event reference
 - [CODING_STANDARDS.md](CODING_STANDARDS.md) — code quality rules
 - [TESTING.md](TESTING.md) — 98% new-work coverage requirement and test types
 - [CONTRIBUTING.md](CONTRIBUTING.md) — branching, commits, PRs, semver
 - [SECURITY.md](SECURITY.md) — error handling by context, resource limits
+
+Event types, fields, and well-formedness rules are documented in code under `crates/docspec-core/src/event.rs` and on [docs.rs](https://docs.rs/docspec-core). See the "Reading Event Documentation" section of ARCHITECTURE.md for the navigation guide.
 
 ## Hard Rules
 
@@ -45,4 +46,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for commit format and PR process.
 
 Sources emit events in document order. Sinks consume them. Adapters transform between them. Events flow one at a time. Never accumulate. Never buffer.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the streaming pipeline design and [EVENTS.md](EVENTS.md) for event types.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the streaming pipeline design, event model design decisions, and pointers to the in-code event reference.

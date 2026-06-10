@@ -46,8 +46,7 @@ The Docker image (`ghcr.io/docspec/api`) runs `docspec http` internally.
 ## Documentation
 
 - **[Manifesto](MANIFESTO.md)** — Philosophy and values: memory extremism, streaming design, quality standards
-- **[Architecture](ARCHITECTURE.md)** — Streaming pipeline design, reader/writer contracts
-- **[Events](EVENTS.md)** — Streaming event types, well-formedness rules
+- **[Architecture](ARCHITECTURE.md)** — Streaming pipeline design, reader/writer contracts, event model decisions, and how to read the in-code event reference
 - **[Coding Standards](CODING_STANDARDS.md)** — Code style rules, formatting conventions, review checklist
 - **[Contributing](CONTRIBUTING.md)** — How to contribute, PR process, development workflow
 - **[Testing](TESTING.md)** — Test philosophy, coverage requirements, testing patterns
