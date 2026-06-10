@@ -74,6 +74,10 @@ mod tests {
         }
     }
 
+    fn start_style(kind: docspec_core::TextStyleKind) -> Event {
+        Event::StartTextStyle { kind, id: None }
+    }
+
     #[test]
     fn empty_document_emits_empty_list() {
         assert_eq!(run([start_doc(), Event::EndDocument]), "[]");
@@ -153,50 +157,6 @@ mod tests {
             ]),
             "[Para [Str \"x\"]]"
         );
-    }
-
-    #[test]
-    fn styled_input_dropped() {
-        let styled_events = vec![
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                id: None,
-                alignment: None,
-            },
-            Event::StartTextStyle {
-                kind: docspec_core::TextStyleKind::Bold,
-                id: None,
-            },
-            Event::Text {
-                content: "x".to_string(),
-            },
-            Event::EndTextStyle,
-            Event::EndParagraph,
-            Event::EndDocument,
-        ];
-        let unstyled_events = vec![
-            Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            },
-            Event::StartParagraph {
-                id: None,
-                alignment: None,
-            },
-            Event::Text {
-                content: "x".to_string(),
-            },
-            Event::EndParagraph,
-            Event::EndDocument,
-        ];
-        let styled_output = run(styled_events);
-        let unstyled_output = run(unstyled_events);
-        assert_eq!(styled_output, unstyled_output);
     }
 
     #[test]
@@ -805,6 +765,357 @@ mod tests {
                 Event::EndDocument,
             ]),
             "[Header 1 (\"\",[],[]) [Str \"a\",Str \"b\"]]"
+        );
+    }
+
+    #[test]
+    fn bold_wraps_text_inside_paragraph() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("a"),
+                start_style(docspec_core::TextStyleKind::Bold),
+                text("b"),
+                Event::EndTextStyle,
+                text("c"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Str \"a\",Strong [Str \"b\"],Str \"c\"]]"
+        );
+    }
+
+    #[test]
+    fn italic_wraps_text_inside_paragraph() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Italic),
+                text("hello"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Emph [Str \"hello\"]]]"
+        );
+    }
+
+    #[test]
+    fn strikethrough_wraps_text_inside_paragraph() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Strikethrough),
+                text("gone"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Strikeout [Str \"gone\"]]]"
+        );
+    }
+
+    #[test]
+    fn underline_wraps_text_inside_paragraph() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Underline),
+                text("under"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Underline [Str \"under\"]]]"
+        );
+    }
+
+    #[test]
+    fn subscript_wraps_text_inside_paragraph() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Subscript),
+                text("2"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Subscript [Str \"2\"]]]"
+        );
+    }
+
+    #[test]
+    fn superscript_wraps_text_inside_paragraph() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Superscript),
+                text("th"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Superscript [Str \"th\"]]]"
+        );
+    }
+
+    #[test]
+    fn adjacent_styles_each_emit_their_wrapper() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Bold),
+                text("b"),
+                Event::EndTextStyle,
+                start_style(docspec_core::TextStyleKind::Italic),
+                text("i"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Strong [Str \"b\"],Emph [Str \"i\"]]]"
+        );
+    }
+
+    #[test]
+    fn nested_styles_emit_nested_wrappers() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Bold),
+                start_style(docspec_core::TextStyleKind::Italic),
+                text("bi"),
+                Event::EndTextStyle,
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Strong [Emph [Str \"bi\"]]]]"
+        );
+    }
+
+    #[test]
+    fn style_inside_heading_emits_wrapper() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(2, Some("h")),
+                text("a "),
+                start_style(docspec_core::TextStyleKind::Bold),
+                text("bold"),
+                Event::EndTextStyle,
+                text(" b"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 2 (\"h\",[],[]) [Str \"a \",Strong [Str \"bold\"],Str \" b\"]]"
+        );
+    }
+
+    #[test]
+    fn style_with_multiple_inlines_inside_wrapper() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Bold),
+                text("a"),
+                Event::SoftBreak,
+                text("b"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Strong [Str \"a\",SoftBreak,Str \"b\"]]]"
+        );
+    }
+
+    #[test]
+    fn code_style_text_flattens_into_paragraph() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("a "),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("code"),
+                Event::EndTextStyle,
+                text(" b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Str \"a \",Str \"code\",Str \" b\"]]"
+        );
+    }
+
+    #[test]
+    fn flattened_style_inside_bold_keeps_bold_open() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Bold),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("a"),
+                Event::EndTextStyle,
+                text("b"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Strong [Str \"a\",Str \"b\"]]]"
+        );
+    }
+
+    #[test]
+    fn bold_inside_flattened_style_closes_before_following_text() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Code),
+                start_style(docspec_core::TextStyleKind::Bold),
+                text("a"),
+                Event::EndTextStyle,
+                text("b"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Strong [Str \"a\"],Str \"b\"]]"
+        );
+    }
+
+    #[test]
+    fn mark_style_text_flattens_into_paragraph() {
+        let color = docspec_core::Color::Rgb {
+            r: 255,
+            g: 255,
+            b: 0,
+        };
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("a "),
+                start_style(docspec_core::TextStyleKind::Mark(color)),
+                text("mark"),
+                Event::EndTextStyle,
+                text(" b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Str \"a \",Str \"mark\",Str \" b\"]]"
+        );
+    }
+
+    #[test]
+    fn text_color_style_text_flattens_into_paragraph() {
+        let color = docspec_core::Color::Rgb { r: 255, g: 0, b: 0 };
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("a "),
+                start_style(docspec_core::TextStyleKind::TextColor(color)),
+                text("red"),
+                Event::EndTextStyle,
+                text(" b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Str \"a \",Str \"red\",Str \" b\"]]"
+        );
+    }
+
+    #[test]
+    fn start_text_style_outside_inline_block_is_dropped() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_style(docspec_core::TextStyleKind::Bold),
+                text("b"),
+                Event::EndTextStyle,
+                Event::EndDocument,
+            ]),
+            "[]"
+        );
+    }
+
+    #[test]
+    fn stray_end_text_style_outside_inline_block_is_noop() {
+        assert_eq!(
+            run([start_doc(), Event::EndTextStyle, Event::EndDocument]),
+            "[]"
+        );
+    }
+
+    #[test]
+    fn stray_end_text_style_inside_paragraph_does_not_close_paragraph() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("a"),
+                Event::EndTextStyle,
+                text("b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Str \"a\",Str \"b\"]]"
+        );
+    }
+
+    #[test]
+    fn unclosed_style_at_end_of_paragraph_is_closed_defensively() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Bold),
+                text("a"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Strong [Str \"a\"]]]"
+        );
+    }
+
+    #[test]
+    fn unclosed_style_at_end_of_heading_is_closed_defensively() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(1, None),
+                start_style(docspec_core::TextStyleKind::Italic),
+                text("x"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 1 (\"\",[],[]) [Emph [Str \"x\"]]]"
+        );
+    }
+
+    #[test]
+    fn unclosed_style_at_end_of_document_is_closed_defensively() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                start_style(docspec_core::TextStyleKind::Bold),
+                text("a"),
+                Event::EndDocument,
+            ]),
+            "[Para [Strong [Str \"a\"]]]"
         );
     }
 }
