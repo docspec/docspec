@@ -144,6 +144,55 @@ pub(crate) fn collect_hyperlink_map<R: Read>(reader: R) -> Result<HyperlinkMap, 
     }
 }
 
+/// Finds the numbering part target from a part relationships file.
+///
+/// Returns `Ok(None)` if no `/numbering` relationship is present (legal per ECMA-376 §17.9).
+/// Returns `Err` if the target contains a path-traversal (`..`) segment.
+/// Ignores relationships with `TargetMode="External"`.
+pub fn find_numbering_target<R: Read>(reader: R) -> docspec_core::Result<Option<String>> {
+    let mut xml_reader = quick_xml::Reader::from_reader(std::io::BufReader::new(reader));
+    let mut buf = Vec::new();
+    let mut element_depth: usize = 0;
+
+    loop {
+        match xml_reader.read_event_into(&mut buf) {
+            Ok(Event::Start(element)) => {
+                element_depth = element_depth.saturating_add(1);
+                if element.local_name().as_ref() == b"Relationship" {
+                    if let Some(target) = numbering_target(&xml_reader, &element)? {
+                        let numbering_path =
+                            target.strip_prefix('/').unwrap_or(&target).to_string();
+                        return validate_document_path(&numbering_path).map(Some);
+                    }
+                }
+            }
+            Ok(Event::Empty(element)) if element.local_name().as_ref() == b"Relationship" => {
+                if let Some(target) = numbering_target(&xml_reader, &element)? {
+                    let numbering_path = target.strip_prefix('/').unwrap_or(&target).to_string();
+                    return validate_document_path(&numbering_path).map(Some);
+                }
+            }
+            Ok(Event::End(_)) => {
+                let Some(next_depth) = element_depth.checked_sub(1) else {
+                    return Err(parse_error("malformed _rels/.rels".to_string()));
+                };
+                element_depth = next_depth;
+            }
+            Ok(Event::Eof) => {
+                if element_depth != 0 {
+                    return Err(parse_error("malformed _rels/.rels".to_string()));
+                }
+                return Ok(None);
+            }
+            Err(_err) => {
+                return Err(parse_error("malformed _rels/.rels".to_string()));
+            }
+            Ok(_) => {}
+        }
+        buf.clear();
+    }
+}
+
 fn parse_error(message: String) -> Error {
     Error::Parse {
         message,
@@ -273,6 +322,48 @@ fn hyperlink_entry<R: Read>(
             if found_type.ends_with("/hyperlink") =>
         {
             Some((found_id, found_target))
+        }
+        _ => None,
+    })
+}
+
+fn numbering_target<R: Read>(
+    reader: &quick_xml::Reader<R>,
+    element: &quick_xml::events::BytesStart<'_>,
+) -> docspec_core::Result<Option<String>> {
+    let mut rel_type = None;
+    let mut target = None;
+    let mut target_mode = None;
+
+    for attribute_result in element.attributes() {
+        let attribute = attribute_result.map_err(|err| Error::Parse {
+            message: format!("malformed _rels/.rels: {err}"),
+            position: None,
+        })?;
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|err| Error::Parse {
+                message: format!("malformed _rels/.rels: {err}"),
+                position: None,
+            })?
+            .into_owned();
+
+        match attribute.key.local_name().as_ref() {
+            b"Type" => rel_type = Some(value),
+            b"Target" => target = Some(value),
+            b"TargetMode" => target_mode = Some(value),
+            _ => {}
+        }
+    }
+
+    Ok(match (rel_type, target, target_mode) {
+        (Some(found_type), Some(_), Some(mode))
+            if found_type.ends_with("/numbering") && mode == "External" =>
+        {
+            None
+        }
+        (Some(found_type), Some(found_target), _) if found_type.ends_with("/numbering") => {
+            Some(found_target)
         }
         _ => None,
     })
@@ -738,8 +829,8 @@ mod tests {
     fn find_styles_returns_first_styles_match() {
         let rels_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="word/styles.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="word/styles2.xml"/>
+   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="word/styles.xml"/>
+   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="word/styles2.xml"/>
 </Relationships>"#;
 
         let result = find_styles_target(Cursor::new(rels_xml.as_bytes()));
@@ -748,6 +839,76 @@ mod tests {
             Ok(Some(path)) => assert_eq!(path, "word/styles.xml"),
             other => assert_eq!(format!("{other:?}"), "expected first match"),
         }
+    }
+
+    fn minimal_numbering_rels(target: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="{target}"/>
+</Relationships>"#
+        )
+    }
+
+    #[test]
+    fn find_numbering_target_returns_target_when_present() {
+        let rels_xml = minimal_numbering_rels("word/numbering.xml");
+
+        let result = find_numbering_target(Cursor::new(rels_xml.as_bytes()));
+
+        assert_eq!(result.ok(), Some(Some("word/numbering.xml".to_string())));
+    }
+
+    #[test]
+    fn find_numbering_target_returns_none_when_absent() {
+        let rels_xml = minimal_rels("word/document.xml");
+
+        let result = find_numbering_target(Cursor::new(rels_xml.as_bytes()));
+
+        assert_eq!(result.ok(), Some(None));
+    }
+
+    #[test]
+    fn find_numbering_target_picks_numbering_among_multiple_relationships() {
+        let rels_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="word/styles.xml"/>
+   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="word/numbering.xml"/>
+   <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="word/fontTable.xml"/>
+</Relationships>"#;
+
+        let result = find_numbering_target(Cursor::new(rels_xml.as_bytes()));
+
+        assert_eq!(result.ok(), Some(Some("word/numbering.xml".to_string())));
+    }
+
+    #[test]
+    fn find_numbering_target_rejects_target_with_dotdot_segment() {
+        let rels_xml = minimal_numbering_rels("../etc/passwd");
+
+        let result = find_numbering_target(Cursor::new(rels_xml.as_bytes()));
+
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "rels target contains parent reference: ../etc/passwd"
+                );
+                assert_eq!(position, None);
+            }
+            other => assert_eq!(format!("{other:?}"), "expected dotdot parse error"),
+        }
+    }
+
+    #[test]
+    fn find_numbering_target_returns_none_on_empty_rels() {
+        let rels_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>"#;
+
+        let result = find_numbering_target(Cursor::new(rels_xml.as_bytes()));
+
+        assert_eq!(result.ok(), Some(None));
     }
 
     #[test]

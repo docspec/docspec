@@ -1880,7 +1880,7 @@ mod events {
 
         assert_eq!(
             format!("{reader:?}"),
-            "DocxReader { inner: DocumentReader { buf: [], denied_stack: [], in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, pending_paragraph_classification: None, current_paragraph_block: Paragraph, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, pending_run_font: None, frozen_run_font: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, data: \"<DocxData>\", hyperlink_map: {}, hyperlink_depth: 0, pending_link: None, xml: \"<quick_xml::Reader>\" } }"
+            "DocxReader { inner: DocumentReader { buf: [], denied_stack: [], in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, pending_paragraph_classification: None, current_paragraph_block: Paragraph, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, pending_run_font: None, frozen_run_font: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, data: \"<DocxData>\", hyperlink_map: {}, hyperlink_depth: 0, pending_link: None, list_stack: [], seen_lists: {}, pending_paragraph_list: None, in_numpr: false, pending_num_pr_id: None, pending_num_pr_ilvl: None, xml: \"<quick_xml::Reader>\" } }"
         );
     }
 
@@ -5834,6 +5834,1806 @@ mod events {
                 start_para_with_alignment(TextAlignment::Right),
                 text("text"),
                 Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+}
+
+mod happy_path_lists {
+    use docspec_core::{Event, ListStyleType};
+
+    use crate::fixture;
+
+    fn root_rels() -> &'static str {
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"#
+    }
+
+    fn doc_rels_with_numbering() -> &'static str {
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
+</Relationships>"#
+    }
+
+    fn collect_events(bytes: Vec<u8>) -> Vec<Event> {
+        use docspec_core::EventSource as _;
+        let mut reader =
+            docspec_docx_reader::DocxReader::from_reader(std::io::Cursor::new(bytes)).unwrap();
+        let mut events = Vec::new();
+        loop {
+            match reader.next_event() {
+                Ok(Some(event)) => events.push(event),
+                Ok(None) => break,
+                Err(err) => panic!("unexpected error: {err:?}"),
+            }
+        }
+        events
+    }
+
+    fn build_docx(document_xml: &str, numbering_xml: &str) -> Vec<u8> {
+        fixture::synth_docx_with_entries(&[
+            (
+                "_rels/.rels",
+                zip::CompressionMethod::Deflated,
+                root_rels().as_bytes(),
+            ),
+            (
+                "word/_rels/document.xml.rels",
+                zip::CompressionMethod::Deflated,
+                doc_rels_with_numbering().as_bytes(),
+            ),
+            (
+                "word/document.xml",
+                zip::CompressionMethod::Deflated,
+                document_xml.as_bytes(),
+            ),
+            (
+                "word/numbering.xml",
+                zip::CompressionMethod::Deflated,
+                numbering_xml.as_bytes(),
+            ),
+        ])
+    }
+
+    fn start_doc() -> Event {
+        Event::StartDocument {
+            id: None,
+            language: None,
+            metadata: None,
+        }
+    }
+
+    fn start_para() -> Event {
+        Event::StartParagraph {
+            alignment: None,
+            id: None,
+        }
+    }
+
+    fn text(content: &str) -> Event {
+        Event::Text {
+            content: content.to_string(),
+        }
+    }
+
+    #[test]
+    fn flat_ordered_two_items_emits_correct_sequence() {
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>
+    <w:lvl w:ilvl="1"><w:numFmt w:val="decimal"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#;
+
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>First item</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>Second item</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                start_para(),
+                text("First item"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                start_para(),
+                text("Second item"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn flat_unordered_two_items_emits_correct_sequence() {
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="2">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="2"><w:abstractNumId w:val="2"/></w:num>
+</w:numbering>"#;
+
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="2"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>First item</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="2"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>Second item</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartUnorderedListItem {
+                    id: Some("2".to_string()),
+                    level: 0,
+                    style_type: ListStyleType::Disc,
+                },
+                start_para(),
+                text("First item"),
+                Event::EndParagraph,
+                Event::EndUnorderedListItem,
+                Event::StartUnorderedListItem {
+                    id: Some("2".to_string()),
+                    level: 0,
+                    style_type: ListStyleType::Disc,
+                },
+                start_para(),
+                text("Second item"),
+                Event::EndParagraph,
+                Event::EndUnorderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn nested_ordered_parent_child_emits_correct_sequence() {
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>
+    <w:lvl w:ilvl="1"><w:numFmt w:val="decimal"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#;
+
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>Parent</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>Child</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                start_para(),
+                text("Parent"),
+                Event::EndParagraph,
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 1,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                start_para(),
+                text("Child"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn mixed_format_ordered_then_unordered_same_num_id_per_level() {
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="3">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>
+    <w:lvl w:ilvl="1"><w:numFmt w:val="bullet"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="3"><w:abstractNumId w:val="3"/></w:num>
+</w:numbering>"#;
+
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="3"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>Ordered parent</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="3"/><w:ilvl w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>Unordered child</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartOrderedListItem {
+                    id: Some("3".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                start_para(),
+                text("Ordered parent"),
+                Event::EndParagraph,
+                Event::StartUnorderedListItem {
+                    id: Some("3".to_string()),
+                    level: 1,
+                    style_type: ListStyleType::Disc,
+                },
+                start_para(),
+                text("Unordered child"),
+                Event::EndParagraph,
+                Event::EndUnorderedListItem,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn lower_letter_emits_lower_alpha_style_type() {
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="5">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="lowerLetter"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="5"/></w:num>
+</w:numbering>"#;
+
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>Item</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::LowerAlpha,
+                },
+                start_para(),
+                text("Item"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn lower_roman_emits_lower_roman_style_type() {
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="6">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="lowerRoman"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="6"/></w:num>
+</w:numbering>"#;
+
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>Item</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::LowerRoman,
+                },
+                start_para(),
+                text("Item"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn upper_letter_emits_upper_alpha_style_type() {
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="7">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="upperLetter"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="7"/></w:num>
+</w:numbering>"#;
+
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>Item</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::UpperAlpha,
+                },
+                start_para(),
+                text("Item"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn upper_roman_emits_upper_roman_style_type() {
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="8">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="upperRoman"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="8"/></w:num>
+</w:numbering>"#;
+
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>Item</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::UpperRoman,
+                },
+                start_para(),
+                text("Item"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+}
+
+mod spec_edge_cases {
+    use docspec_core::{Event, ListStyleType};
+
+    use crate::fixture;
+
+    fn root_rels() -> &'static str {
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"#
+    }
+
+    fn doc_rels_with_numbering() -> &'static str {
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
+</Relationships>"#
+    }
+
+    fn collect_events(bytes: Vec<u8>) -> Vec<Event> {
+        use docspec_core::EventSource as _;
+        let mut reader =
+            docspec_docx_reader::DocxReader::from_reader(std::io::Cursor::new(bytes)).unwrap();
+        let mut events = Vec::new();
+        loop {
+            match reader.next_event() {
+                Ok(Some(event)) => events.push(event),
+                Ok(None) => break,
+                Err(err) => panic!("unexpected error: {err:?}"),
+            }
+        }
+        events
+    }
+
+    fn build_docx(document_xml: &str, numbering_xml: &str) -> Vec<u8> {
+        fixture::synth_docx_with_entries(&[
+            (
+                "_rels/.rels",
+                zip::CompressionMethod::Deflated,
+                root_rels().as_bytes(),
+            ),
+            (
+                "word/_rels/document.xml.rels",
+                zip::CompressionMethod::Deflated,
+                doc_rels_with_numbering().as_bytes(),
+            ),
+            (
+                "word/document.xml",
+                zip::CompressionMethod::Deflated,
+                document_xml.as_bytes(),
+            ),
+            (
+                "word/numbering.xml",
+                zip::CompressionMethod::Deflated,
+                numbering_xml.as_bytes(),
+            ),
+        ])
+    }
+
+    fn start_doc() -> Event {
+        Event::StartDocument {
+            id: None,
+            language: None,
+            metadata: None,
+        }
+    }
+
+    fn start_para() -> Event {
+        Event::StartParagraph {
+            alignment: None,
+            id: None,
+        }
+    }
+
+    fn text(content: &str) -> Event {
+        Event::Text {
+            content: content.to_string(),
+        }
+    }
+
+    #[test]
+    fn num_id_zero_sentinel_emits_plain_paragraph() {
+        // §17.9.18: numId=0 sentinel escapes list membership
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#;
+
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="0"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>text</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("text"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn missing_num_fmt_defaults_to_decimal() {
+        // §17.9.17: missing numFmt defaults to decimal
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0">
+    </w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#;
+
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>text</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                start_para(),
+                text("text"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn missing_ilvl_defaults_to_zero() {
+        // §17.9.3: missing ilvl defaults to 0
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>
+    <w:lvl w:ilvl="1"><w:numFmt w:val="bullet"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#;
+
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>text</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                start_para(),
+                text("text"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn num_fmt_none_emits_plain_paragraph() {
+        // §17.9.17: numFmt=none emits plain paragraph, not a list item
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="none"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#;
+
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>text</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("text"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn multi_level_type_ignored_for_classification() {
+        // §17.9.12: multiLevelType is a UI hint, not authoritative
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:multiLevelType w:val="singleLevel"/>
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>
+    <w:lvl w:ilvl="1"><w:numFmt w:val="bullet"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#;
+
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>ilvl0</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>ilvl1</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                start_para(),
+                text("ilvl0"),
+                Event::EndParagraph,
+                Event::StartUnorderedListItem {
+                    id: Some("1".to_string()),
+                    level: 1,
+                    style_type: ListStyleType::Disc,
+                },
+                start_para(),
+                text("ilvl1"),
+                Event::EndParagraph,
+                Event::EndUnorderedListItem,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn numbering_change_in_numpr_ignored() {
+        // <w:numberingChange> is a track-changes element recording previous numbering state;
+        // it MUST NOT block the numId/ilvl capture
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#;
+
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/><w:numberingChange w:id="1" w:originalNumId="2" w:originalIlvl="0"/></w:numPr></w:pPr>
+      <w:r><w:t>text</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                start_para(),
+                text("text"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn first_list_item_at_deep_level_keeps_start_marker_on_real_item() {
+        // Regression: when the first authored list item appears at a non-zero ilvl,
+        // reconcile_list_stack synthesizes phantom levels 0..ilvl-1 to keep the event
+        // stream well-formed. Phantoms must NOT consume the per-numId `start: Some(1)`
+        // marker — it belongs on the user-authored item at the target ilvl.
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="3"><w:numFmt w:val="decimal"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#;
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="3"/></w:numPr></w:pPr>
+      <w:r><w:t>text</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 1,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 2,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 3,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                start_para(),
+                text("text"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndOrderedListItem,
+                Event::EndOrderedListItem,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+}
+
+mod resilience_tests {
+    use docspec_core::{Event, ListStyleType};
+
+    use crate::fixture;
+
+    fn root_rels() -> &'static str {
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"#
+    }
+
+    fn doc_rels_with_numbering() -> &'static str {
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
+</Relationships>"#
+    }
+
+    fn doc_rels_no_numbering() -> &'static str {
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>"#
+    }
+
+    fn collect_events(bytes: Vec<u8>) -> Vec<Event> {
+        use docspec_core::EventSource as _;
+        let mut reader =
+            docspec_docx_reader::DocxReader::from_reader(std::io::Cursor::new(bytes)).unwrap();
+        let mut events = Vec::new();
+        loop {
+            match reader.next_event() {
+                Ok(Some(event)) => events.push(event),
+                Ok(None) => break,
+                Err(err) => panic!("unexpected error: {err:?}"),
+            }
+        }
+        events
+    }
+
+    fn build_docx(document_xml: &str, numbering_xml: &str) -> Vec<u8> {
+        fixture::synth_docx_with_entries(&[
+            (
+                "_rels/.rels",
+                zip::CompressionMethod::Deflated,
+                root_rels().as_bytes(),
+            ),
+            (
+                "word/_rels/document.xml.rels",
+                zip::CompressionMethod::Deflated,
+                doc_rels_with_numbering().as_bytes(),
+            ),
+            (
+                "word/document.xml",
+                zip::CompressionMethod::Deflated,
+                document_xml.as_bytes(),
+            ),
+            (
+                "word/numbering.xml",
+                zip::CompressionMethod::Deflated,
+                numbering_xml.as_bytes(),
+            ),
+        ])
+    }
+
+    fn start_doc() -> Event {
+        Event::StartDocument {
+            id: None,
+            language: None,
+            metadata: None,
+        }
+    }
+
+    fn start_para() -> Event {
+        Event::StartParagraph {
+            alignment: None,
+            id: None,
+        }
+    }
+
+    fn text(content: &str) -> Event {
+        Event::Text {
+            content: content.to_string(),
+        }
+    }
+
+    #[test]
+    fn missing_numbering_xml_emits_plain_paragraphs() {
+        // No word/numbering.xml and no word/_rels/document.xml.rels — paragraphs
+        // with <w:numPr> must emit StartParagraph (graceful degradation, no error).
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>text</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let bytes = fixture::synth_docx(root_rels(), document_xml);
+        let events = collect_events(bytes);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("text"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn numbering_rel_missing_target_emits_plain_paragraphs() {
+        // word/_rels/document.xml.rels present but contains no numbering relationship.
+        // Paragraphs with <w:numPr> must emit StartParagraph (no list events, no error).
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>text</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let bytes = fixture::synth_docx_with_entries(&[
+            (
+                "_rels/.rels",
+                zip::CompressionMethod::Deflated,
+                root_rels().as_bytes(),
+            ),
+            (
+                "word/_rels/document.xml.rels",
+                zip::CompressionMethod::Deflated,
+                doc_rels_no_numbering().as_bytes(),
+            ),
+            (
+                "word/document.xml",
+                zip::CompressionMethod::Deflated,
+                document_xml.as_bytes(),
+            ),
+        ]);
+        let events = collect_events(bytes);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("text"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn empty_numbering_xml_emits_plain_paragraphs() {
+        // Empty <w:numbering/> — no abstractNums, no nums defined.
+        // Paragraphs with <w:numPr> must emit StartParagraph (no list events, no error).
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>text</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let numbering_xml = r#"<?xml version="1.0"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#;
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("text"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn malformed_numbering_xml_returns_err() {
+        // An unclosed XML tag leaves element_depth > 0 at EOF, causing parse_numbering
+        // to return Err — which propagates as Err from DocxReader::from_reader.
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>text</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let bytes = fixture::synth_docx_with_entries(&[
+            (
+                "_rels/.rels",
+                zip::CompressionMethod::Deflated,
+                root_rels().as_bytes(),
+            ),
+            (
+                "word/_rels/document.xml.rels",
+                zip::CompressionMethod::Deflated,
+                doc_rels_with_numbering().as_bytes(),
+            ),
+            (
+                "word/document.xml",
+                zip::CompressionMethod::Deflated,
+                document_xml.as_bytes(),
+            ),
+            (
+                "word/numbering.xml",
+                zip::CompressionMethod::Deflated,
+                b"<unclosed>",
+            ),
+        ]);
+        let result = docspec_docx_reader::DocxReader::from_reader(std::io::Cursor::new(bytes));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn unknown_num_id_emits_plain_paragraph() {
+        // Paragraph references numId=999 which is not defined in numbering.xml.
+        // MinimalNumbering.resolve() graceful path: emit StartParagraph (no list events).
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#;
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="999"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>text</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("text"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn ilvl_overflow_clamps_to_eight() {
+        // Paragraph uses <w:ilvl w:val="99"/> — ilvl is clamped to min(99, 8) = 8.
+        // reconcile_list_stack fills phantom levels 0-7 with start: None before reaching
+        // the target level 8, which receives the `start: Some(1)` per-numId marker.
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="8"><w:numFmt w:val="decimal"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#;
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="99"/></w:numPr></w:pPr>
+      <w:r><w:t>text</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 1,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 2,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 3,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 4,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 5,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 6,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 7,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 8,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                start_para(),
+                text("text"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndOrderedListItem,
+                Event::EndOrderedListItem,
+                Event::EndOrderedListItem,
+                Event::EndOrderedListItem,
+                Event::EndOrderedListItem,
+                Event::EndOrderedListItem,
+                Event::EndOrderedListItem,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn non_numeric_num_id_emits_plain_paragraph() {
+        // <w:numId w:val="abc"/> — parse failure leaves pending_num_pr_id = None.
+        // Without a numId, the paragraph emits StartParagraph (no list events).
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#;
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="abc"/><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>text</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("text"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn non_numeric_ilvl_defaults_to_zero() {
+        // <w:ilvl w:val="xyz"/> — parse failure; ilvl defaults to 0 per §17.9.3.
+        // numbering.xml defines numId=1 ilvl=0 as decimal, so level 0 is emitted.
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#;
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="xyz"/></w:numPr></w:pPr>
+      <w:r><w:t>text</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                start_para(),
+                text("text"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+}
+
+mod cross_feature_lists {
+    use docspec_core::{Event, ListStyleType, TableHeaderScope, TextStyleKind};
+
+    use crate::fixture;
+
+    fn root_rels() -> &'static str {
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"#
+    }
+
+    fn doc_rels_with_numbering() -> &'static str {
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
+</Relationships>"#
+    }
+
+    fn doc_rels_with_numbering_and_styles() -> &'static str {
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>"#
+    }
+
+    fn collect_events(bytes: Vec<u8>) -> Vec<Event> {
+        use docspec_core::EventSource as _;
+        let mut reader =
+            docspec_docx_reader::DocxReader::from_reader(std::io::Cursor::new(bytes)).unwrap();
+        let mut events = Vec::new();
+        loop {
+            match reader.next_event() {
+                Ok(Some(event)) => events.push(event),
+                Ok(None) => break,
+                Err(err) => panic!("unexpected error: {err:?}"),
+            }
+        }
+        events
+    }
+
+    fn build_docx(document_xml: &str, numbering_xml: &str) -> Vec<u8> {
+        fixture::synth_docx_with_entries(&[
+            (
+                "_rels/.rels",
+                zip::CompressionMethod::Deflated,
+                root_rels().as_bytes(),
+            ),
+            (
+                "word/_rels/document.xml.rels",
+                zip::CompressionMethod::Deflated,
+                doc_rels_with_numbering().as_bytes(),
+            ),
+            (
+                "word/document.xml",
+                zip::CompressionMethod::Deflated,
+                document_xml.as_bytes(),
+            ),
+            (
+                "word/numbering.xml",
+                zip::CompressionMethod::Deflated,
+                numbering_xml.as_bytes(),
+            ),
+        ])
+    }
+
+    fn build_docx_with_styles(
+        document_xml: &str,
+        numbering_xml: &str,
+        styles_xml: &str,
+    ) -> Vec<u8> {
+        fixture::synth_docx_with_entries(&[
+            (
+                "_rels/.rels",
+                zip::CompressionMethod::Deflated,
+                root_rels().as_bytes(),
+            ),
+            (
+                "word/_rels/document.xml.rels",
+                zip::CompressionMethod::Deflated,
+                doc_rels_with_numbering_and_styles().as_bytes(),
+            ),
+            (
+                "word/document.xml",
+                zip::CompressionMethod::Deflated,
+                document_xml.as_bytes(),
+            ),
+            (
+                "word/numbering.xml",
+                zip::CompressionMethod::Deflated,
+                numbering_xml.as_bytes(),
+            ),
+            (
+                "word/styles.xml",
+                zip::CompressionMethod::Deflated,
+                styles_xml.as_bytes(),
+            ),
+        ])
+    }
+
+    fn decimal_numbering_xml() -> &'static str {
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#
+    }
+
+    fn two_decimal_lists_numbering_xml() -> &'static str {
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+  <w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#
+    }
+
+    fn start_doc() -> Event {
+        Event::StartDocument {
+            id: None,
+            language: None,
+            metadata: None,
+        }
+    }
+
+    fn start_para() -> Event {
+        Event::StartParagraph {
+            alignment: None,
+            id: None,
+        }
+    }
+
+    fn text(content: &str) -> Event {
+        Event::Text {
+            content: content.to_string(),
+        }
+    }
+
+    fn start_table() -> Event {
+        Event::StartTable { id: None }
+    }
+
+    fn start_row() -> Event {
+        Event::StartTableRow { id: None }
+    }
+
+    fn start_cell() -> Event {
+        Event::StartTableCell {
+            colspan: None,
+            id: None,
+            rowspan: None,
+        }
+    }
+
+    fn start_header() -> Event {
+        Event::StartTableHeader {
+            scope: Some(TableHeaderScope::Column),
+            abbr: None,
+            colspan: None,
+            rowspan: None,
+            id: None,
+        }
+    }
+
+    fn start_ordered(id: &str, start: Option<u64>) -> Event {
+        Event::StartOrderedListItem {
+            id: Some(id.to_string()),
+            level: 0,
+            start,
+            style_type: ListStyleType::Decimal,
+        }
+    }
+
+    #[test]
+    fn list_inside_table_cell_nests_correctly() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:tbl><w:tr><w:tc><w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>list item</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, decimal_numbering_xml()));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_ordered("1", Some(1)),
+                start_para(),
+                text("list item"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn list_inside_table_header_cell_nests_correctly() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>list item</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, decimal_numbering_xml()));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_header(),
+                start_ordered("1", Some(1)),
+                start_para(),
+                text("list item"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn styled_text_in_list_item_closes_before_end() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>bold</w:t></w:r></w:p></w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, decimal_numbering_xml()));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_ordered("1", Some(1)),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                text("bold"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn list_paragraph_with_heading_pstyle_emits_heading_not_list() {
+        let styles_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:styleId="Heading1">
+    <w:name w:val="heading 1"/>
+  </w:style>
+</w:styles>"#;
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:p><w:pPr><w:pStyle w:val="Heading1"/><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>Heading</w:t></w:r></w:p></w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx_with_styles(
+            document_xml,
+            decimal_numbering_xml(),
+            styles_xml,
+        ));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartHeading { level: 1, id: None },
+                text("Heading"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn list_open_at_document_end_flushes_correctly() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>item</w:t></w:r></w:p></w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, decimal_numbering_xml()));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_ordered("1", Some(1)),
+                start_para(),
+                text("item"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn two_consecutive_lists_each_first_item_emits_start_some_one() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>one</w:t></w:r></w:p>
+    <w:p><w:pPr><w:numPr><w:numId w:val="2"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>two</w:t></w:r></w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, two_decimal_lists_numbering_xml()));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_ordered("1", Some(1)),
+                start_para(),
+                text("one"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                start_ordered("2", Some(1)),
+                start_para(),
+                text("two"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn same_num_id_reused_after_break_emits_start_none_second_time() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>one</w:t></w:r></w:p>
+    <w:p><w:r><w:t>break</w:t></w:r></w:p>
+    <w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>two</w:t></w:r></w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, decimal_numbering_xml()));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_ordered("1", Some(1)),
+                start_para(),
+                text("one"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                start_para(),
+                text("break"),
+                Event::EndParagraph,
+                start_ordered("1", None),
+                start_para(),
+                text("two"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn list_inside_ins_tracked_change_emits_normally() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:p><w:pPr><w:ins w:id="1" w:author="Author" w:date="2024-01-01T00:00:00Z"><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:ins></w:pPr><w:r><w:t>inserted</w:t></w:r></w:p></w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, decimal_numbering_xml()));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_ordered("1", Some(1)),
+                start_para(),
+                text("inserted"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn list_inside_block_quote_emits_block_quote_not_list() {
+        let styles_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:styleId="BlockQuote">
+    <w:name w:val="Block Text"/>
+  </w:style>
+</w:styles>"#;
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:p><w:pPr><w:pStyle w:val="BlockQuote"/><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>quote</w:t></w:r></w:p></w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx_with_styles(
+            document_xml,
+            decimal_numbering_xml(),
+            styles_xml,
+        ));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartBlockQuote { id: None },
+                text("quote"),
+                Event::EndBlockQuote,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn list_inside_preformatted_emits_preformatted_not_list() {
+        let styles_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:styleId="SourceCode">
+    <w:name w:val="Source Code"/>
+  </w:style>
+</w:styles>"#;
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:p><w:pPr><w:pStyle w:val="SourceCode"/><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>code</w:t></w:r></w:p></w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx_with_styles(
+            document_xml,
+            decimal_numbering_xml(),
+            styles_xml,
+        ));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartPreformatted {
+                    id: None,
+                    syntax: None,
+                },
+                text("code"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn list_inside_nested_table_emits_no_table_header() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:tbl><w:tr><w:tc><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>nested list</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:tc></w:tr></w:tbl></w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, decimal_numbering_xml()));
+
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_ordered("1", Some(1)),
+                start_para(),
+                text("nested list"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
                 Event::EndDocument,
             ]
         );

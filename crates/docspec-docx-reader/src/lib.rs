@@ -12,16 +12,18 @@
 //! line breaks (`<w:br>` — including `w:type="page"` and `w:type="column"`, all
 //! emitted as `LineBreak`), tabs (`<w:tab>`, emitted as a `Text` event whose
 //! content is the single character `"\t"`), tables (`<w:tbl>`, `<w:tr>`,
-//! `<w:tc>`), hyperlinks (`<w:hyperlink>` — resolved via
-//! `word/_rels/document.xml.rels` and emitted as `StartLink`/`EndLink` events
-//! around inline content), structured document tags (`<w:sdt>` — content
-//! emitted normally; `<w:sdtPr>`/`<w:sdtEndPr>` dropped), and tracked
-//! insertions and moves (`<w:ins>`, `<w:moveTo>` — accept-changes semantics).
-//! Emits: `EndDocument`, `EndLink`, `EndParagraph`, `EndTable`, `EndTableCell`,
-//! `EndTableHeader`, `EndTableRow`, `EndTextStyle`, `LineBreak`,
-//! `StartDocument`, `StartLink`, `StartParagraph`, `StartTable`,
-//! `StartTableCell`, `StartTableHeader`, `StartTableRow`, `StartTextStyle`,
-//! `Text`.
+//! `<w:tc>`), lists (`<w:p>` with `<w:numPr>` — ordered and unordered),
+//! hyperlinks (`<w:hyperlink>` — resolved via `word/_rels/document.xml.rels`
+//! and emitted as `StartLink`/`EndLink` events around inline content),
+//! structured document tags (`<w:sdt>` — content emitted normally;
+//! `<w:sdtPr>`/`<w:sdtEndPr>` dropped), and tracked insertions and moves
+//! (`<w:ins>`, `<w:moveTo>` — accept-changes semantics).
+//! Emits: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`,
+//! `EndTextStyle`, `LineBreak`, `EndParagraph`, `StartTable`, `StartTableRow`,
+//! `StartTableCell`, `StartTableHeader`, `EndTableHeader`, `EndTableCell`,
+//! `EndTableRow`, `EndTable`, `StartLink`, `EndLink`, `StartOrderedListItem`,
+//! `EndOrderedListItem`, `StartUnorderedListItem`, `EndUnorderedListItem`,
+//! `EndDocument`.
 //!
 //! The elements listed under "Out of scope" are the reader's denylist — their
 //! entire subtree is silently dropped. Every other element (known or unknown)
@@ -37,7 +39,6 @@
 //! - Table-level property exceptions (`<w:tblPrEx>`) — silently ignored
 //! - Table, row, and cell visual properties (`<w:tblPr>`, `<w:trPr>` visual
 //!   fields, `<w:tcPr>` visual fields, `<w:tblGrid>`)
-//! - Lists
 //! - Drawings and images (`<w:drawing>`, `<w:pict>`)
 //! - Comments, footnotes, headers, footers
 //! - Document metadata
@@ -46,6 +47,10 @@
 //! - Field-code hyperlinks (`<w:fldChar>` + `<w:instrText>HYPERLINK ...`):
 //!   legacy form not currently supported; only the modern `<w:hyperlink>`
 //!   element is recognized.
+//!
+//! # Lists
+//!
+//! See the crate README for V1 list semantics and limitations.
 //!
 //! # Streaming Guarantee
 //!
@@ -72,6 +77,7 @@
 extern crate alloc;
 
 mod document;
+mod numbering;
 mod package;
 mod properties;
 mod rels;
@@ -131,11 +137,12 @@ impl DocxReader {
     /// cannot be opened. Returns [`Error::Io`] for I/O failures.
     #[inline]
     pub fn from_reader<R: Read + Seek + Send + 'static>(reader: R) -> Result<Self> {
-        let (style_list, hyperlink_map, stream) = package::open_package(reader)?;
+        let (style_list, numbering, hyperlink_map, stream) = package::open_package(reader)?;
         let xml = quick_xml::Reader::from_reader(BufReader::new(stream));
         let data = document::DocxData {
             style_list,
             hyperlink_map,
+            numbering,
         };
         Ok(Self {
             inner: document::DocumentReader::from_xml_reader(xml, data),
