@@ -11,6 +11,9 @@ Converts a DocSpec event stream into compact Pandoc native block-list syntax, su
 | `StartDocument` / `EndDocument` | `[` / `]` (block list framing) |
 | `StartParagraph` / `EndParagraph` | `Para [` / `]` |
 | `Text` (styles dropped) | `Str "..."` |
+| `ThematicBreak` (id dropped) | `HorizontalRule` |
+| `LineBreak` | `LineBreak` |
+| `SoftBreak` | `SoftBreak` |
 
 ## Not Supported
 
@@ -21,13 +24,11 @@ The following DocSpec events are silently ignored:
 - Preformatted / code blocks — `StartPreformatted` / `EndPreformatted`
 - Images — `Image`
 - Tables — `StartTable` / `EndTable` and related events
-- Thematic breaks — `ThematicBreak`
 - List items — `StartOrderedListItem` / `StartUnorderedListItem` and related events
 - Inline links — `StartLink` / `EndLink`
 - Footnotes — `StartFootnote` / `EndFootnote` / `FootnoteRef`
 - Definition lists — `StartDefinitionList` / `StartDefinitionTerm` / `StartDefinitionDetail`
 - Captions — `StartCaption` / `EndCaption`
-- Line breaks — `LineBreak` / `SoftBreak`
 - Text formatting styles — `StartTextStyle` / `EndTextStyle` are accepted but silently dropped
 
 ## Usage
