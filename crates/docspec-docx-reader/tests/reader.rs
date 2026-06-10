@@ -565,6 +565,136 @@ mod events {
         events
     }
 
+    fn start_link(href: &str, title: Option<&str>) -> Event {
+        Event::StartLink {
+            href: href.to_string(),
+            id: None,
+            title: title.map(str::to_string),
+        }
+    }
+
+    fn relationship_root() -> &'static str {
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rIdDoc" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"#
+    }
+
+    fn document_with_hyperlink(attrs: &str, content: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:hyperlink {attrs}>{content}</w:hyperlink></w:p></w:body>
+</w:document>"#
+        )
+    }
+
+    fn document_hyperlink_rels(relationship_type: &str, target: &str, target_mode: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="{relationship_type}" Target="{target}" TargetMode="{target_mode}"/>
+</Relationships>"#
+        )
+    }
+
+    fn hyperlink_events(document_xml: &str, document_rels: Option<&str>) -> Vec<Event> {
+        let mut entries = vec![
+            (
+                "_rels/.rels",
+                zip::CompressionMethod::Deflated,
+                relationship_root().as_bytes(),
+            ),
+            (
+                "word/document.xml",
+                zip::CompressionMethod::Deflated,
+                document_xml.as_bytes(),
+            ),
+        ];
+        if let Some(rels_xml) = document_rels {
+            entries.push((
+                "word/_rels/document.xml.rels",
+                zip::CompressionMethod::Deflated,
+                rels_xml.as_bytes(),
+            ));
+        }
+        let docx = fixture::synth_docx_with_entries(&entries);
+        let mut reader = DocxReader::from_reader(Cursor::new(docx)).expect("from_reader");
+        drive(&mut reader)
+    }
+
+    fn styled_hyperlink_events(document_xml: &str, styles_body: &str) -> Vec<Event> {
+        let document_rels = format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+  <Relationship Id="rId1" Type="{TRANSITIONAL_HYPERLINK_TYPE}" Target="https://example.com" TargetMode="External"/>
+</Relationships>"#
+        );
+        let styles_xml = format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  {styles_body}
+</w:styles>"#
+        );
+        let entries = [
+            (
+                "_rels/.rels",
+                zip::CompressionMethod::Deflated,
+                relationship_root().as_bytes(),
+            ),
+            (
+                "word/document.xml",
+                zip::CompressionMethod::Deflated,
+                document_xml.as_bytes(),
+            ),
+            (
+                "word/_rels/document.xml.rels",
+                zip::CompressionMethod::Deflated,
+                document_rels.as_bytes(),
+            ),
+            (
+                "word/styles.xml",
+                zip::CompressionMethod::Deflated,
+                styles_xml.as_bytes(),
+            ),
+        ];
+        let docx = fixture::synth_docx_with_entries(&entries);
+        let mut reader = DocxReader::from_reader(Cursor::new(docx)).expect("from_reader");
+        drive(&mut reader)
+    }
+
+    fn hyperlink_text_document(attrs: &str) -> String {
+        document_with_hyperlink(attrs, "<w:r><w:t>link</w:t></w:r>")
+    }
+
+    fn expected_link_events(href: &str, title: Option<&str>) -> Vec<Event> {
+        vec![
+            start_doc(),
+            start_para(),
+            start_link(href, title),
+            text("link"),
+            Event::EndLink,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]
+    }
+
+    fn expected_plain_link_text_events() -> Vec<Event> {
+        vec![
+            start_doc(),
+            start_para(),
+            text("link"),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]
+    }
+
+    const STRICT_HYPERLINK_TYPE: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/hyperlink";
+    const TRANSITIONAL_HYPERLINK_TYPE: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+
     mod rpr {
         use super::*;
 
@@ -1750,7 +1880,7 @@ mod events {
 
         assert_eq!(
             format!("{reader:?}"),
-            "DocxReader { inner: DocumentReader { buf: [], denied_stack: [], in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, pending_paragraph_classification: None, current_paragraph_block: Paragraph, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, pending_run_font: None, frozen_run_font: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, data: \"<DocxData>\", xml: \"<quick_xml::Reader>\" } }"
+            "DocxReader { inner: DocumentReader { buf: [], denied_stack: [], in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, pending_paragraph_classification: None, current_paragraph_block: Paragraph, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, pending_run_font: None, frozen_run_font: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, data: \"<DocxData>\", hyperlink_map: {}, hyperlink_depth: 0, pending_link: None, xml: \"<quick_xml::Reader>\" } }"
         );
     }
 
@@ -4366,6 +4496,791 @@ mod events {
         );
         let events = drive(&mut reader);
         assert_eq!(events, vec![start_doc(), Event::EndDocument,]);
+    }
+
+    #[test]
+    fn hyperlink_with_valid_rid_emits_start_link_before_text() {
+        let document_xml = hyperlink_text_document(r#"r:id="rId1""#);
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(events, expected_link_events("https://example.com", None));
+    }
+
+    #[test]
+    fn hyperlink_with_strict_uri_type_resolves() {
+        let document_xml = hyperlink_text_document(r#"r:id="rId1""#);
+        let rels_xml =
+            document_hyperlink_rels(STRICT_HYPERLINK_TYPE, "https://example.com", "External");
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(events, expected_link_events("https://example.com", None));
+    }
+
+    #[test]
+    fn hyperlink_with_transitional_uri_type_resolves() {
+        let document_xml = hyperlink_text_document(r#"r:id="rId1""#);
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(events, expected_link_events("https://example.com", None));
+    }
+
+    #[test]
+    fn hyperlink_anchor_only_emits_hash_href() {
+        let document_xml = hyperlink_text_document(r#"w:anchor="section1""#);
+        let events = hyperlink_events(&document_xml, None);
+        assert_eq!(events, expected_link_events("#section1", None));
+    }
+
+    #[test]
+    fn hyperlink_rid_supersedes_anchor() {
+        let document_xml = hyperlink_text_document(r#"r:id="rId1" w:anchor="section1""#);
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(events, expected_link_events("https://example.com", None));
+    }
+
+    #[test]
+    fn hyperlink_tooltip_populates_title() {
+        let document_xml = hyperlink_text_document(r#"r:id="rId1" w:tooltip="Click here""#);
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            expected_link_events("https://example.com", Some("Click here"))
+        );
+    }
+
+    #[test]
+    fn hyperlink_tooltip_with_xml_entity_is_decoded() {
+        let document_xml = hyperlink_text_document(r#"r:id="rId1" w:tooltip="Click &amp; go""#);
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            expected_link_events("https://example.com", Some("Click & go"))
+        );
+    }
+
+    #[test]
+    fn hyperlink_broken_rid_passes_through() {
+        let document_xml = hyperlink_text_document(r#"r:id="rId99""#);
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(events, expected_plain_link_text_events());
+    }
+
+    #[test]
+    fn hyperlink_broken_rid_with_anchor_still_passes_through() {
+        let document_xml = hyperlink_text_document(r#"r:id="rId99" w:anchor="section1""#);
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(events, expected_plain_link_text_events());
+    }
+
+    #[test]
+    fn hyperlink_wrong_type_rid_passes_through() {
+        let document_xml = hyperlink_text_document(r#"r:id="rId1""#);
+        let rels_xml = document_hyperlink_rels(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(events, expected_plain_link_text_events());
+    }
+
+    #[test]
+    fn hyperlink_no_rid_no_anchor_passes_through() {
+        let document_xml = hyperlink_text_document("");
+        let events = hyperlink_events(&document_xml, None);
+        assert_eq!(events, expected_plain_link_text_events());
+    }
+
+    #[test]
+    fn hyperlink_self_closing_with_valid_rid_emits_nothing() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:hyperlink r:id="rId1"/></w:p></w:body>
+</w:document>"#;
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_no_rels_file_passes_through() {
+        let document_xml = hyperlink_text_document(r#"r:id="rId1""#);
+        let events = hyperlink_events(&document_xml, None);
+        assert_eq!(events, expected_plain_link_text_events());
+    }
+
+    #[test]
+    fn no_rels_file_with_hyperlinks_passes_through_as_text() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:hyperlink r:id="rId1"><w:r><w:t>fallback</w:t></w:r></w:hyperlink></w:p></w:body>
+</w:document>"#;
+        let bytes = fixture::synth_docx_with_entries(&[
+            (
+                "_rels/.rels",
+                zip::CompressionMethod::Deflated,
+                relationship_root().as_bytes(),
+            ),
+            (
+                "word/document.xml",
+                zip::CompressionMethod::Deflated,
+                document_xml.as_bytes(),
+            ),
+        ]);
+        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("fallback"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_with_internal_target_mode_emits_target_verbatim() {
+        let document_xml = hyperlink_text_document(r#"r:id="rId1""#);
+        let rels_xml =
+            document_hyperlink_rels(TRANSITIONAL_HYPERLINK_TYPE, "other.docx", "Internal");
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(events, expected_link_events("other.docx", None));
+    }
+
+    #[test]
+    fn hyperlink_emits_end_link_after_content() {
+        let document_xml = document_with_hyperlink(r#"r:id="rId1""#, "<w:r><w:t>x</w:t></w:r>");
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com", None),
+                text("x"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_nested_drops_inner_wrapper_emits_content_inline() {
+        let document_xml = document_with_hyperlink(
+            r#"r:id="rId1""#,
+            r#"<w:r><w:t>outer</w:t></w:r><w:hyperlink r:id="rId1"><w:r><w:t>inner</w:t></w:r></w:hyperlink>"#,
+        );
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com", None),
+                text("outer"),
+                text("inner"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_with_styled_run_emits_link_outer_style_inner() {
+        let document_xml = document_with_hyperlink(
+            r#"r:id="rId1""#,
+            "<w:r><w:rPr><w:b/></w:rPr><w:t>bold</w:t></w:r>",
+        );
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com", None),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                text("bold"),
+                Event::EndTextStyle,
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_multi_run_styled_link_outer_styles_inner_each_run() {
+        let document_xml = document_with_hyperlink(
+            r#"r:id="rId1""#,
+            "<w:r><w:rPr><w:b/></w:rPr><w:t>bold</w:t></w:r><w:r><w:rPr><w:i/></w:rPr><w:t>italic</w:t></w:r>",
+        );
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com", None),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                text("bold"),
+                Event::EndTextStyle,
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Italic,
+                    id: None,
+                },
+                text("italic"),
+                Event::EndTextStyle,
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_empty_emits_nothing_with_valid_rid() {
+        let document_xml = document_with_hyperlink(r#"r:id="rId1""#, "");
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_with_drawing_inside_still_emits_link_around_text() {
+        let document_xml = document_with_hyperlink(
+            r#"r:id="rId1""#,
+            "<w:r><w:t>before</w:t></w:r><w:drawing><wp:inline/></w:drawing><w:r><w:t>after</w:t></w:r>",
+        );
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com", None),
+                text("before"),
+                text("after"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_paragraph_end_with_open_link_auto_closes() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:hyperlink r:id="rId1"><w:r><w:t>x</w:t></w:r></w:p></w:body>
+</w:document>"#;
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com", None),
+                text("x"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_eof_with_open_link_auto_closes() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:hyperlink r:id="rId1"><w:r><w:t>x</w:t></w:r>"#;
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com", None),
+                text("x"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_inside_preformatted_paragraph_passes_through() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:pPr><w:pStyle w:val="Source Code"/></w:pPr><w:hyperlink r:id="rId1"><w:r><w:t>code</w:t></w:r></w:hyperlink></w:p></w:body>
+</w:document>"#;
+        let events = styled_hyperlink_events(
+            document_xml,
+            r#"<w:style w:type="paragraph" w:styleId="Source Code"><w:name w:val="Source Code"/></w:style>"#,
+        );
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartPreformatted {
+                    id: None,
+                    syntax: None,
+                },
+                text("code"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_inside_denied_subtree_emits_nothing() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:drawing><w:hyperlink r:id="rId1"><w:r><w:t>inside-drawing</w:t></w:r></w:hyperlink></w:drawing></w:p></w:body>
+</w:document>"#;
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_inside_heading_emits_link_inside_heading() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:pPr><w:pStyle w:val="Heading 1"/></w:pPr><w:hyperlink r:id="rId1"><w:r><w:t>x</w:t></w:r></w:hyperlink></w:p></w:body>
+</w:document>"#;
+        let events = styled_hyperlink_events(
+            document_xml,
+            r#"<w:style w:type="paragraph" w:styleId="Heading 1"><w:name w:val="heading 1"/></w:style>"#,
+        );
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartHeading { level: 1, id: None },
+                start_link("https://example.com", None),
+                text("x"),
+                Event::EndLink,
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_inside_table_cell_emits_cell_before_link() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:tbl><w:tr><w:tc><w:p><w:hyperlink r:id="rId1"><w:r><w:t>x</w:t></w:r></w:hyperlink></w:p></w:tc></w:tr></w:tbl></w:body>
+</w:document>"#;
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                start_link("https://example.com", None),
+                text("x"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_inside_ins_tracked_insertion_emits_link() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:ins w:id="1" w:author="Author" w:date="2024-01-01T00:00:00Z"><w:hyperlink r:id="rId1"><w:r><w:t>x</w:t></w:r></w:hyperlink></w:ins></w:p></w:body>
+</w:document>"#;
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com", None),
+                text("x"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_inside_sdt_content_emits_link() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:sdt><w:sdtContent><w:hyperlink r:id="rId1"><w:r><w:t>x</w:t></w:r></w:hyperlink></w:sdtContent></w:sdt></w:p></w:body>
+</w:document>"#;
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com", None),
+                text("x"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_with_whitespace_only_content_emits_link_around_whitespace_text() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:hyperlink r:id="rId1"><w:r><w:t xml:space="preserve"> </w:t></w:r></w:hyperlink></w:p></w:body>
+</w:document>"#;
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com", None),
+                text(" "),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_with_tab_content_emits_link_around_tab() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:hyperlink r:id="rId1"><w:r><w:tab/></w:r></w:hyperlink></w:p></w:body>
+</w:document>"#;
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com", None),
+                text("\t"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_with_line_break_content_emits_link_around_break() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:hyperlink r:id="rId1"><w:r><w:br/></w:r></w:hyperlink></w:p></w:body>
+</w:document>"#;
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com", None),
+                Event::LineBreak,
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_with_multiple_text_fragments_emits_single_link_wrapper() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:hyperlink r:id="rId1"><w:r><w:t>a</w:t><w:t>b</w:t></w:r></w:hyperlink></w:p></w:body>
+</w:document>"#;
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com", None),
+                text("a"),
+                text("b"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_with_special_chars_in_anchor_emits_verbatim_fragment() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:hyperlink w:anchor="Section 1.2 §A"><w:r><w:t>x</w:t></w:r></w:hyperlink></w:p></w:body>
+</w:document>"#;
+        let events = hyperlink_events(document_xml, None);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("#Section 1.2 §A", None),
+                text("x"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_with_special_chars_in_rels_target_emits_verbatim() {
+        let document_xml = document_with_hyperlink(r#"r:id="rId1""#, "<w:r><w:t>x</w:t></w:r>");
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com?q=1&amp;r=2",
+            "External",
+        );
+        let events = hyperlink_events(&document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com?q=1&r=2", None),
+                text("x"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_in_multiple_paragraphs_each_emits_independent_link() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p><w:hyperlink r:id="rId1"><w:r><w:t>a</w:t></w:r></w:hyperlink></w:p>
+    <w:p><w:hyperlink r:id="rId1"><w:r><w:t>b</w:t></w:r></w:hyperlink></w:p>
+  </w:body>
+</w:document>"#;
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com", None),
+                text("a"),
+                Event::EndLink,
+                Event::EndParagraph,
+                start_para(),
+                start_link("https://example.com", None),
+                text("b"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_after_unclosed_hyperlink_in_prior_paragraph_emits_correctly() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p><w:hyperlink r:id="rId1"><w:r><w:t>a</w:t></w:r></w:p>
+    <w:p><w:hyperlink r:id="rId1"><w:r><w:t>b</w:t></w:r></w:hyperlink></w:p>
+  </w:body>
+</w:document>"#;
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com",
+            "External",
+        );
+        let events = hyperlink_events(document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                start_link("https://example.com", None),
+                text("a"),
+                Event::EndLink,
+                Event::EndParagraph,
+                start_para(),
+                start_link("https://example.com", None),
+                text("b"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]

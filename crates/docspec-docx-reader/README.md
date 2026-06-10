@@ -19,10 +19,10 @@ architecture, and the event protocol.
 - Paragraph properties (`<w:pPr>`): `<w:jc>` (alignment — `left`/`start` to Left, `right`/`end` to Right, `center` to Center, `both`/`distribute` to Justify)
 - Empty `<w:rPr/>` and `<w:pPr/>` are treated as no properties (default style / alignment None)
 - A `<w:rPr>` or `<w:pPr>` that appears after content in the same parent is silently ignored (per the OOXML spec, both must be the first child element)
-- Hyperlinks (`<w:hyperlink>`) — link text content is emitted as plain runs. The URL target is dropped.
+- Hyperlinks (`<w:hyperlink>`): resolved via `word/_rels/document.xml.rels` and emitted as `StartLink`/`EndLink` events around inline content. Supports external URL targets (both Strict and Transitional OOXML relationship Type URIs), anchor-only links (`w:anchor` without `r:id` emits `#fragment`), and tooltips (`w:tooltip` → `StartLink.title`, XML-decoded). When the relationship cannot be resolved, the link wrapper is dropped and content passes through as plain runs.
 - Structured Document Tags (`<w:sdt>`) — the content of an SDT is emitted normally. The property containers `<w:sdtPr>` and `<w:sdtEndPr>` are dropped.
 - Tracked insertions and moves (`<w:ins>`, `<w:moveTo>`) — the inserted/moved-in content is emitted (accept-changes semantics).
-- Emits: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`, `EndTextStyle`, `LineBreak`, `EndParagraph`, `StartTable`, `StartTableRow`, `StartTableCell`, `StartTableHeader`, `EndTableHeader`, `EndTableCell`, `EndTableRow`, `EndTable`, `EndDocument`
+- Emits: `EndDocument`, `EndLink`, `EndParagraph`, `EndTable`, `EndTableCell`, `EndTableHeader`, `EndTableRow`, `EndTextStyle`, `LineBreak`, `StartDocument`, `StartLink`, `StartParagraph`, `StartTable`, `StartTableCell`, `StartTableHeader`, `StartTableRow`, `StartTextStyle`, `Text`
 - Symbol font character normalization for Wingdings, Wingdings 2, Wingdings 3, Webdings, and Symbol fonts — codepoints are mapped to their Unicode equivalents; unmapped codepoints are dropped
 - Compression: `Stored` and `Deflated` only
 
@@ -58,13 +58,15 @@ The XML elements listed below are the reader's denylist — their entire subtree
 - Document metadata
 - Tracked deletions and moves-from (`<w:del>`, `<w:moveFrom>`) — silently dropped (accept-changes semantics). Their text content uses `<w:delText>` which is not part of the reader's text-matching set.
 - Structured document tag properties (`<w:sdtPr>`, `<w:sdtEndPr>`) — metadata containers; subtree dropped.
-- Hyperlink URL targets — link text is preserved, but the `r:id` attribute pointing to the relationship is dropped.
+- Field-code hyperlinks (`<w:fldChar>` + `<w:instrText>HYPERLINK ...`): legacy form not currently supported; only the modern `<w:hyperlink>` element is recognized.
 
 ## Streaming Guarantee
 
 `DocxReader` streams `document.xml` event by event using constant memory regardless
-of document size. Only `_rels/.rels` (a few hundred bytes) is fully read into memory
-to discover the document target path.
+of document size. `_rels/.rels` and `word/_rels/document.xml.rels` are both fully
+read into memory at package-open time (typical combined size < 10 KB even for large
+documents). `word/document.xml` is consumed in streaming fashion via `quick-xml`.
+The internal event queue remains bounded regardless of document size or hyperlink count.
 
 ## Quick Start
 
