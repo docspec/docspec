@@ -10,7 +10,7 @@ architecture, and the event protocol.
 - Paragraphs (`<w:p>`) and direct text (`<w:t>` inside `<w:r>`)
 - Line breaks (`<w:br>`, including `w:type="page"` and `w:type="column"` — all emit `LineBreak`)
 - Tabs (`<w:tab>` — emitted as a `Text` event containing the single character `"\t"`)
-- Tables (`<w:tbl>`, `<w:tr>`, `<w:tc>`) — emitted as structural events only; cell merging, header rows, and table styles are not represented
+- Tables (`<w:tbl>`, `<w:tr>`, `<w:tc>`) — structural events. Horizontal cell merging via `<w:gridSpan>` is emitted as `colspan`. Header rows via `<w:trPr><w:tblHeader/></w:trPr>` are emitted as `StartTableHeader` (with `scope: Column`) for cells in the contiguous header band at the top of the outermost table. Nested tables emit all cells as `StartTableCell` (header rows in nested tables are not supported). Vertical merging via `<w:vMerge>` is NOT yet supported — rowspan information is lost.
 - Run properties (`<w:rPr>`): `<w:b>` (bold), `<w:i>` (italic), `<w:u>` (underline — any `w:val` other than `none`), `<w:strike>` (strikethrough), `<w:dstrike>` (double-strike, collapses to strikethrough), `<w:vertAlign>` (`subscript` and `superscript` only; `baseline` resets to neither). These are emitted as deferred `StartTextStyle { kind, id: None }` / `EndTextStyle` wrapper events around the first run content, not as fields on `Text` events. Empty styled runs emit no style wrapper events; multiple `<w:t>` elements in one styled run share a single wrapper span.
 - Run color properties (`<w:rPr>`):
   - `<w:color w:val="HEX">` — foreground (text) color. Emitted as `StartTextStyle { kind: TextColor(Color::Rgb { r, g, b }) }`. `w:val="auto"` and non-hex values are silently dropped. Black `(0,0,0)` is preserved by the reader; whether to treat it as "default color" is writer policy.
@@ -19,7 +19,7 @@ architecture, and the event protocol.
 - Paragraph properties (`<w:pPr>`): `<w:jc>` (alignment — `left`/`start` to Left, `right`/`end` to Right, `center` to Center, `both`/`distribute` to Justify)
 - Empty `<w:rPr/>` and `<w:pPr/>` are treated as no properties (default style / alignment None)
 - A `<w:rPr>` or `<w:pPr>` that appears after content in the same parent is silently ignored (per the OOXML spec, both must be the first child element)
-- Emits: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`, `EndTextStyle`, `LineBreak`, `EndParagraph`, `StartTable`, `StartTableRow`, `StartTableCell`, `EndTableCell`, `EndTableRow`, `EndTable`, `EndDocument`
+- Emits: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`, `EndTextStyle`, `LineBreak`, `EndParagraph`, `StartTable`, `StartTableRow`, `StartTableCell`, `StartTableHeader`, `EndTableHeader`, `EndTableCell`, `EndTableRow`, `EndTable`, `EndDocument`
 - Symbol font character normalization for Wingdings, Wingdings 2, Wingdings 3, Webdings, and Symbol fonts — codepoints are mapped to their Unicode equivalents; unmapped codepoints are dropped
 - Compression: `Stored` and `Deflated` only
 
@@ -43,9 +43,10 @@ Adjacent runs with the same color emit separate `StartTextStyle`/`EndTextStyle` 
 - `<w:rPr>` nested inside `<w:pPr>` (paragraph mark / pilcrow run properties)
 - BiDi-aware logical alignment (`start`/`end` flipping based on paragraph direction is not tracked)
 - Math (`m:rPr`) and DrawingML (`a:rPr`) namespaces
-- Cell merging (`<w:gridSpan>`, `<w:vMerge>`) — every cell emits with `colspan: None` and `rowspan: None`
-- Header rows (`<w:tblHeader>`) — every cell emits as `StartTableCell`, never `StartTableHeader`
-- Table, row, and cell properties (`<w:tblPr>`, `<w:trPr>`, `<w:tcPr>`, `<w:tblGrid>`)
+- Vertical cell merging (`<w:vMerge>`) — every cell still emits with `rowspan: None`; covered cells emit as ordinary `StartTableCell` events (visual merge is lost)
+- Header rows in nested tables — only the outermost table honors `<w:tblHeader>`
+- Table-level property exceptions (`<w:tblPrEx>`) — silently ignored (consistent with `<w:tblPr>`)
+- Table, row, and cell visual properties (`<w:tblPr>`, `<w:trPr>` visual fields, `<w:tcPr>` visual fields, `<w:tblGrid>`) — silently dropped
 - Lists
 - Hyperlinks (`<w:hyperlink>`)
 - Drawings and images (`<w:drawing>`, `<w:pict>`)

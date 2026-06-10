@@ -500,7 +500,7 @@ mod constructor {
 mod events {
     use std::io::Cursor;
 
-    use docspec_core::{Color, Event, TextAlignment, TextStyleKind};
+    use docspec_core::{Color, Event, TableHeaderScope, TextAlignment, TextStyleKind};
     use docspec_docx_reader::{DocxReader, EventSource as _};
 
     use crate::fixture;
@@ -2863,9 +2863,9 @@ mod events {
     }
 
     #[test]
-    fn table_row_and_cell_properties_emit_no_events() {
+    fn outer_cell_content_after_nested_table_stays_inside_outer_cell() {
         let mut reader = make_reader(
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="5000" w:type="pct"/></w:tblPr><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2500" w:type="pct"/><w:gridSpan w:val="2"/><w:vMerge w:val="restart"/></w:tcPr><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>before</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>inner</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:t>after</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
         );
         let events = drive(&mut reader);
         assert_eq!(
@@ -2876,9 +2876,135 @@ mod events {
                 start_row(),
                 start_cell(),
                 start_para(),
-                text("cell"),
+                text("before"),
+                Event::EndParagraph,
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("inner"),
                 Event::EndParagraph,
                 Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                start_para(),
+                text("after"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn nested_table_inside_outer_header_cell_preserves_outer_header_end() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tbl><w:tr><w:tc><w:p><w:r><w:t>inner</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                Event::StartTableHeader {
+                    scope: Some(TableHeaderScope::Column),
+                    abbr: None,
+                    colspan: None,
+                    rowspan: None,
+                    id: None,
+                },
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("inner"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn nested_table_inside_outer_header_row_preserves_following_header_cell() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tbl><w:tr><w:tc><w:p><w:r><w:t>inner</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:tc><w:tc><w:p><w:r><w:t>after</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                Event::StartTableHeader {
+                    scope: Some(TableHeaderScope::Column),
+                    abbr: None,
+                    colspan: None,
+                    rowspan: None,
+                    id: None,
+                },
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("inner"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndTableHeader,
+                Event::StartTableHeader {
+                    scope: Some(TableHeaderScope::Column),
+                    abbr: None,
+                    colspan: None,
+                    rowspan: None,
+                    id: None,
+                },
+                start_para(),
+                text("after"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    // gridSpan -> colspan, tblHeader -> StartTableHeader, vMerge ignored (rowspan deferred), tblPr/tcW ignored (table/cell visual props out of scope).
+    #[test]
+    fn table_properties_now_emit_colspan_header_and_drop_vmerge() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="5000" w:type="pct"/></w:tblPr><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2500" w:type="pct"/><w:gridSpan w:val="2"/><w:vMerge w:val="restart"/></w:tcPr><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                Event::StartTableHeader {
+                    scope: Some(TableHeaderScope::Column),
+                    abbr: None,
+                    colspan: Some(2),
+                    rowspan: None,
+                    id: None,
+                },
+                start_para(),
+                text("cell"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
                 Event::EndTableRow,
                 Event::EndTable,
                 Event::EndDocument,
@@ -2901,6 +3027,30 @@ mod events {
                 start_cell(),
                 start_para(),
                 text("a"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn table_with_tbl_pr_ex_emits_no_extra_events() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tblPrEx><w:tblBorders><w:top w:val="single"/></w:tblBorders></w:tblPrEx><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("cell"),
                 Event::EndParagraph,
                 Event::EndTableCell,
                 Event::EndTableRow,
@@ -3446,5 +3596,694 @@ mod events {
                 ]
             );
         }
+    }
+
+    fn start_header() -> Event {
+        Event::StartTableHeader {
+            scope: Some(TableHeaderScope::Column),
+            abbr: None,
+            colspan: None,
+            rowspan: None,
+            id: None,
+        }
+    }
+
+    #[test]
+    fn tbl_header_basic_emits_table_header_event() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_header(),
+                start_para(),
+                text("h"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn tbl_header_multiple_consecutive_header_rows_all_emit_headers() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h1</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h2</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h3</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_header(),
+                start_para(),
+                text("h1"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                start_row(),
+                start_header(),
+                start_para(),
+                text("h2"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                start_row(),
+                start_header(),
+                start_para(),
+                text("h3"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn tbl_header_val_true_emits_header() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader w:val="true"/></w:trPr><w:tc><w:p><w:r><w:t>h</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_header(),
+                start_para(),
+                text("h"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn tbl_header_val_1_emits_header() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader w:val="1"/></w:trPr><w:tc><w:p><w:r><w:t>h</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_header(),
+                start_para(),
+                text("h"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn tbl_header_val_on_emits_header() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader w:val="on"/></w:trPr><w:tc><w:p><w:r><w:t>h</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_header(),
+                start_para(),
+                text("h"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn tbl_header_val_false_emits_data_cell() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader w:val="false"/></w:trPr><w:tc><w:p><w:r><w:t>d</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("d"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn tbl_header_val_0_emits_data_cell() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader w:val="0"/></w:trPr><w:tc><w:p><w:r><w:t>d</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("d"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn tbl_header_val_off_emits_data_cell() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader w:val="off"/></w:trPr><w:tc><w:p><w:r><w:t>d</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("d"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    // OOXML §17.4.49: once a non-header row appears, subsequent tblHeader markers are ignored
+    #[test]
+    fn tbl_header_non_contiguous_is_ignored() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>d</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_header(),
+                start_para(),
+                text("h"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("d"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn tbl_header_with_gridspan_emits_table_header_with_colspan() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:t>h</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                Event::StartTableHeader {
+                    scope: Some(TableHeaderScope::Column),
+                    abbr: None,
+                    colspan: Some(2),
+                    rowspan: None,
+                    id: None,
+                },
+                start_para(),
+                text("h"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn tbl_header_in_nested_table_does_not_propagate() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>inner</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("inner"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn tbl_header_with_empty_trpr_emits_data_cell() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr/><w:tc><w:p><w:r><w:t>d</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("d"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn tbl_header_with_other_trpr_children_still_emits_header() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:trHeight w:val="240"/><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_header(),
+                start_para(),
+                text("h"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn tbl_header_multi_paragraph_header_cell_emits_paragraphs_inside_header() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>p1</w:t></w:r></w:p><w:p><w:r><w:t>p2</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_header(),
+                start_para(),
+                text("p1"),
+                Event::EndParagraph,
+                start_para(),
+                text("p2"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn tbl_header_first_row_has_header_but_second_does_not_keeps_first_as_header() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>d</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_header(),
+                start_para(),
+                text("h"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("d"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn gridspan_two_emits_colspan_some_two() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                Event::StartTableCell {
+                    colspan: Some(2),
+                    rowspan: None,
+                    id: None,
+                },
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn gridspan_one_emits_colspan_none() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan w:val="1"/></w:tcPr><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn gridspan_no_val_emits_colspan_none() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan/></w:tcPr><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn gridspan_zero_emits_colspan_none() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan w:val="0"/></w:tcPr><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn gridspan_non_numeric_emits_colspan_none() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan w:val="abc"/></w:tcPr><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn gridspan_large_value_emits_colspan_some() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan w:val="100"/></w:tcPr><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                Event::StartTableCell {
+                    colspan: Some(100),
+                    rowspan: None,
+                    id: None,
+                },
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn gridspan_with_other_tcpr_children_still_emits_colspan() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:tcPr><w:tcW w:w="2500" w:type="pct"/><w:gridSpan w:val="2"/><w:shd w:val="clear"/></w:tcPr><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                Event::StartTableCell {
+                    colspan: Some(2),
+                    rowspan: None,
+                    id: None,
+                },
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn gridspan_after_cell_content_started_is_ignored() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>x</w:t></w:r></w:p><w:tcPr><w:gridSpan w:val="3"/></w:tcPr></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn gridspan_in_nested_table_still_works() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_table(),
+                start_row(),
+                Event::StartTableCell {
+                    colspan: Some(2),
+                    rowspan: None,
+                    id: None,
+                },
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn gridspan_in_header_row_emits_table_header_with_colspan() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                Event::StartTableHeader {
+                    scope: Some(TableHeaderScope::Column),
+                    abbr: None,
+                    colspan: Some(2),
+                    rowspan: None,
+                    id: None,
+                },
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
     }
 }

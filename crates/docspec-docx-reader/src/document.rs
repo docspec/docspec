@@ -4,7 +4,7 @@ use alloc::collections::VecDeque;
 use core::fmt;
 use std::io::{BufReader, Read};
 
-use docspec_core::{Color, Error, Event, Result, TextAlignment, TextStyleKind};
+use docspec_core::{Color, Error, Event, Result, TableHeaderScope, TextAlignment, TextStyleKind};
 use quick_xml::events::{BytesCData, BytesRef, BytesStart, BytesText};
 
 use crate::properties;
@@ -106,6 +106,29 @@ pub struct DocumentReader {
     run_content_emitted: bool,
     /// Package-level data (styles, future: theme, numbering).
     data: DocxData,
+    /// Whether currently inside a `<w:tcPr>` element that is still legal (first child of cell).
+    in_tcpr: bool,
+    /// Whether currently inside a `<w:trPr>` element that is still legal (first child of row).
+    in_trpr: bool,
+    /// Colspan captured from `<w:gridSpan>` while inside `<w:tcPr>`.
+    pending_colspan: Option<u32>,
+    /// True once `StartTableCell` or `StartTableHeader` has been queued for the current cell.
+    cell_started_emitted: bool,
+    /// Whether currently inside a `<w:tc>` element.
+    in_table_cell: bool,
+    /// True when the most recent cell was emitted as `StartTableHeader` (so `</w:tc>` emits `EndTableHeader`).
+    current_cell_is_header: bool,
+    /// True when `<w:tblHeader/>` (truthy `CT_OnOff`) has been seen in the current `<w:trPr>`.
+    pending_row_is_header: bool,
+    /// True once `StartTableRow` has been queued for the current row.
+    row_started_emitted: bool,
+    /// Stack of outer row state saved while parsing rows inside nested tables.
+    /// Tuple order: `pending_row_is_header`, `row_started_emitted`, `in_trpr`.
+    nested_row_state_stack: Vec<(bool, bool, bool)>,
+    /// Count of currently-open `<w:tbl>` elements (for nested-table depth tracking).
+    table_depth: u32,
+    /// True while the contiguous header band at the top of the outermost table is still open.
+    header_band_open: bool,
     /// The quick-xml reader streaming from the document entry.
     xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
 }
@@ -113,7 +136,8 @@ pub struct DocumentReader {
 impl fmt::Debug for DocumentReader {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DocumentReader")
+        let mut debug = f.debug_struct("DocumentReader");
+        debug
             .field("buf", &self.buf)
             .field("in_ignored_subtree", &self.in_ignored_subtree)
             .field("in_paragraph", &self.in_paragraph)
@@ -144,9 +168,23 @@ impl fmt::Debug for DocumentReader {
             .field("phase", &"<phase>")
             .field("queue", &self.queue)
             .field("run_content_emitted", &self.run_content_emitted)
-            .field("data", &"<DocxData>")
-            .field("xml", &"<quick_xml::Reader>")
-            .finish()
+            .field("data", &"<DocxData>");
+        if std::env::var_os("DOCSPEC_DEBUG_DEFERRED_TABLE_SCAFFOLD").is_some() {
+            debug
+                .field("in_tcpr", &self.in_tcpr)
+                .field("in_trpr", &self.in_trpr)
+                .field("pending_colspan", &self.pending_colspan)
+                .field("cell_started_emitted", &self.cell_started_emitted)
+                .field("in_table_cell", &self.in_table_cell)
+                .field("current_cell_is_header", &self.current_cell_is_header)
+                .field("pending_row_is_header", &self.pending_row_is_header)
+                .field("row_started_emitted", &self.row_started_emitted)
+                .field("nested_row_state_stack", &self.nested_row_state_stack)
+                .field("table_depth", &self.table_depth)
+                .field("header_band_open", &self.header_band_open);
+        }
+        debug.field("xml", &"<quick_xml::Reader>");
+        debug.finish()
     }
 }
 
@@ -181,6 +219,17 @@ impl DocumentReader {
             queue: VecDeque::new(),
             run_content_emitted: false,
             data,
+            in_tcpr: false,
+            in_trpr: false,
+            pending_colspan: None,
+            cell_started_emitted: false,
+            in_table_cell: false,
+            current_cell_is_header: false,
+            pending_row_is_header: false,
+            row_started_emitted: false,
+            nested_row_state_stack: Vec::new(),
+            table_depth: 0,
+            header_band_open: false,
             xml,
         }
     }
@@ -420,6 +469,17 @@ impl DocumentReader {
                     .filter(|s| !s.is_empty())
                     .and_then(|s| self.data.style_list.classify(&s));
             }
+            b"gridSpan" if self.in_tcpr => {
+                let val = read_val_attribute(tag);
+                self.pending_colspan = properties::parse_grid_span_value(val.as_deref());
+            }
+            b"tblHeader" if self.in_trpr => {
+                self.pending_row_is_header =
+                    properties::parse_on_off(read_val_attribute(tag).as_deref());
+            }
+            b"vMerge" if self.in_tcpr => {
+                // vMerge (rowspan) deferred — requires event model change or table buffering, out of scope
+            }
             b"rPr" if self.in_ppr => {}
             b"rPr" if self.in_paragraph && !self.in_ppr && !self.in_rpr => {}
             b"sym" if self.in_paragraph && !self.in_rpr => {
@@ -443,11 +503,18 @@ impl DocumentReader {
                 }
             }
             b"p" if !self.in_paragraph => {
+                self.ensure_cell_started();
                 self.start_paragraph();
                 self.end_paragraph();
             }
-            b"br" if self.in_paragraph => self.emit_line_break(),
-            b"tab" if self.in_paragraph => self.emit_tab(),
+            b"br" if self.in_paragraph => {
+                self.ensure_cell_started();
+                self.emit_line_break();
+            }
+            b"tab" if self.in_paragraph => {
+                self.ensure_cell_started();
+                self.emit_tab();
+            }
             _ => {}
         }
     }
@@ -463,6 +530,13 @@ impl DocumentReader {
             b"pPr" if self.in_ppr => {
                 self.ensure_paragraph_started();
                 self.in_ppr = false;
+            }
+            b"tcPr" if self.in_tcpr => {
+                self.in_tcpr = false;
+                self.ensure_cell_started();
+            }
+            b"trPr" if self.in_trpr => {
+                self.in_trpr = false;
             }
             b"rPr" if self.in_rpr => {
                 self.frozen_run_kinds = core::mem::take(&mut self.pending_run_kinds);
@@ -495,9 +569,32 @@ impl DocumentReader {
                 self.flush_pending_text();
                 self.in_text = false;
             }
-            b"tbl" => self.queue.push_back(Event::EndTable),
-            b"tr" => self.queue.push_back(Event::EndTableRow),
-            b"tc" => self.queue.push_back(Event::EndTableCell),
+            b"tbl" => {
+                self.table_depth = self.table_depth.saturating_sub(1);
+                self.queue.push_back(Event::EndTable);
+            }
+            b"tr" => {
+                self.ensure_row_started();
+                self.queue.push_back(Event::EndTableRow);
+                if self.table_depth > 1 {
+                    if let Some((pending_row_is_header, row_started_emitted, in_trpr)) =
+                        self.nested_row_state_stack.pop()
+                    {
+                        self.pending_row_is_header = pending_row_is_header;
+                        self.row_started_emitted = row_started_emitted;
+                        self.in_trpr = in_trpr;
+                    }
+                }
+            }
+            b"tc" => {
+                self.ensure_cell_started();
+                if self.current_cell_is_header && self.table_depth == 1 {
+                    self.queue.push_back(Event::EndTableHeader);
+                } else {
+                    self.queue.push_back(Event::EndTableCell);
+                }
+                self.in_table_cell = false;
+            }
             _ => {}
         }
     }
@@ -531,6 +628,9 @@ impl DocumentReader {
         let local = local_name.as_ref();
         if self.in_ignored_subtree > 0 {
             self.in_ignored_subtree = self.in_ignored_subtree.saturating_add(1);
+            return;
+        }
+        if self.handle_table_start(local, tag) {
             return;
         }
         if self.handle_rpr_property(local, tag) {
@@ -574,26 +674,92 @@ impl DocumentReader {
                     self.pending_run_font = None;
                 }
             }
-            b"p" if !self.in_paragraph => self.start_paragraph(),
+            b"p" if !self.in_paragraph => {
+                self.ensure_cell_started();
+                self.start_paragraph();
+            }
             b"r" if self.in_paragraph => {
+                self.ensure_cell_started();
                 self.ensure_paragraph_started();
             }
             b"t" if self.in_paragraph => {
+                self.ensure_cell_started();
                 self.ensure_paragraph_started();
                 self.in_text = true;
                 self.pending_text.clear();
                 self.run_content_emitted = true;
             }
-            b"br" if self.in_paragraph => self.emit_line_break(),
-            b"tab" if self.in_paragraph => self.emit_tab(),
-            b"tbl" => self.queue.push_back(Event::StartTable { id: None }),
-            b"tr" => self.queue.push_back(Event::StartTableRow { id: None }),
-            b"tc" => self.queue.push_back(Event::StartTableCell {
-                colspan: None,
-                id: None,
-                rowspan: None,
-            }),
+            b"br" if self.in_paragraph => {
+                self.ensure_cell_started();
+                self.emit_line_break();
+            }
+            b"tab" if self.in_paragraph => {
+                self.ensure_cell_started();
+                self.emit_tab();
+            }
             _ => {}
+        }
+    }
+
+    fn handle_table_start(&mut self, local: &[u8], tag: &BytesStart<'_>) -> bool {
+        match local {
+            b"tbl" => {
+                self.ensure_cell_started();
+                self.table_depth = self.table_depth.saturating_add(1);
+                if self.table_depth == 1 {
+                    self.header_band_open = true;
+                }
+                self.queue.push_back(Event::StartTable { id: None });
+                true
+            }
+            b"tr" => {
+                if self.table_depth > 1 {
+                    self.nested_row_state_stack.push((
+                        self.pending_row_is_header,
+                        self.row_started_emitted,
+                        self.in_trpr,
+                    ));
+                }
+                self.start_table_row();
+                true
+            }
+            b"trPr" => {
+                if self.row_started_emitted {
+                    // Out-of-order trPr: row content already emitted; silently consume
+                    self.in_ignored_subtree = 1;
+                } else {
+                    self.in_trpr = true;
+                }
+                true
+            }
+            b"tblHeader" if self.in_trpr => {
+                self.pending_row_is_header =
+                    properties::parse_on_off(read_val_attribute(tag).as_deref());
+                true
+            }
+            b"tc" => {
+                self.start_table_cell();
+                true
+            }
+            b"tcPr" => {
+                if self.cell_started_emitted {
+                    // Out-of-order tcPr: cell content already emitted; silently consume
+                    self.in_ignored_subtree = 1;
+                } else {
+                    self.in_tcpr = true;
+                }
+                true
+            }
+            b"gridSpan" if self.in_tcpr => {
+                let val = read_val_attribute(tag);
+                self.pending_colspan = properties::parse_grid_span_value(val.as_deref());
+                true
+            }
+            b"vMerge" if self.in_tcpr => {
+                // vMerge (rowspan) deferred — requires event model change or table buffering, out of scope
+                true
+            }
+            _ => false,
         }
     }
 
@@ -686,6 +852,73 @@ impl DocumentReader {
             self.paragraph_started_emitted = true;
         }
     }
+
+    /// Resets cell state at the start of a new `<w:tc>` element.
+    ///
+    /// `current_cell_is_header` is only reset at the outermost table level. Inside a nested
+    /// table, the outer cell's header flag must be preserved so that the outer `</w:tc>` emits
+    /// the matching `EndTableHeader` (nested tables never emit headers — see `ensure_cell_started`).
+    fn start_table_cell(&mut self) {
+        self.cell_started_emitted = false;
+        self.in_table_cell = true;
+        if self.table_depth <= 1 {
+            self.current_cell_is_header = false;
+        }
+        self.pending_colspan = None;
+        self.in_tcpr = false;
+    }
+
+    /// Resets row state at the start of a new `<w:tr>` element.
+    fn start_table_row(&mut self) {
+        self.row_started_emitted = false;
+        self.pending_row_is_header = false;
+        self.in_trpr = false;
+    }
+
+    /// Queues `StartTableRow` once row properties have been parsed.
+    ///
+    /// Also implements the OOXML §17.4.49 contiguous-from-top rule: if this row is NOT a header
+    /// row in the outermost table, the header band is permanently closed for the remainder of
+    /// that table.
+    fn ensure_row_started(&mut self) {
+        if !self.row_started_emitted {
+            // OOXML §17.4.49: close the header band on the first non-header row in the outermost table.
+            if self.table_depth == 1 && !self.pending_row_is_header {
+                self.header_band_open = false;
+            }
+            self.queue.push_back(Event::StartTableRow { id: None });
+            self.row_started_emitted = true;
+        }
+    }
+
+    /// Queues `StartTableCell` or `StartTableHeader` once cell properties have been parsed.
+    ///
+    /// The header decision uses: `pending_row_is_header && header_band_open && table_depth == 1`.
+    fn ensure_cell_started(&mut self) {
+        if self.in_table_cell && !self.cell_started_emitted {
+            self.ensure_row_started();
+            let is_header_cell =
+                self.pending_row_is_header && self.header_band_open && self.table_depth == 1;
+            if is_header_cell {
+                self.queue.push_back(Event::StartTableHeader {
+                    scope: Some(TableHeaderScope::Column),
+                    abbr: None,
+                    colspan: self.pending_colspan,
+                    rowspan: None,
+                    id: None,
+                });
+                self.current_cell_is_header = true;
+            } else {
+                self.queue.push_back(Event::StartTableCell {
+                    colspan: self.pending_colspan,
+                    rowspan: None,
+                    id: None,
+                });
+            }
+            self.cell_started_emitted = true;
+        }
+    }
+
     /// Returns the next parsed `DocSpec` event from `document.xml`.
     #[inline]
     pub fn next_event(&mut self) -> Result<Option<Event>> {
@@ -723,9 +956,8 @@ fn is_ignored_container(local: &[u8]) -> bool {
             | b"moveFrom"
             | b"moveTo"
             | b"tblPr"
-            | b"trPr"
-            | b"tcPr"
             | b"tblGrid"
+            | b"tblPrEx"
     )
 }
 

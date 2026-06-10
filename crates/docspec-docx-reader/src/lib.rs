@@ -21,12 +21,13 @@
 //! **Out of scope (silently dropped)**:
 //! - Run styling not listed in the crate README
 //! - Headings (any `<w:pStyle>` value — every paragraph is `StartParagraph`)
-//! - Cell merging (`<w:gridSpan>`, `<w:vMerge>`) — every cell emits with
-//!   `colspan: None` and `rowspan: None`
-//! - Header rows (`<w:tblHeader>`) — every cell emits as `StartTableCell`,
-//!   never `StartTableHeader`
-//! - Table, row, and cell properties (`<w:tblPr>`, `<w:trPr>`, `<w:tcPr>`,
-//!   `<w:tblGrid>`)
+//! - Vertical cell merging (`<w:vMerge>`) — every cell emits with
+//!   `rowspan: None`
+//! - Header rows in nested tables — only the outermost table honors
+//!   `<w:tblHeader>`
+//! - Table-level property exceptions (`<w:tblPrEx>`) — silently ignored
+//! - Table, row, and cell visual properties (`<w:tblPr>`, `<w:trPr>` visual
+//!   fields, `<w:tcPr>` visual fields, `<w:tblGrid>`)
 //! - Lists
 //! - Hyperlinks (`<w:hyperlink>`)
 //! - Drawings and images (`<w:drawing>`, `<w:pict>`)
