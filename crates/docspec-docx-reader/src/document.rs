@@ -8,6 +8,7 @@ use docspec_core::{Color, Error, Event, Result, TextAlignment, TextStyleKind};
 use quick_xml::events::{BytesCData, BytesRef, BytesStart, BytesText};
 
 use crate::properties;
+use crate::styles::StyleList;
 
 /// Document processing phase.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -18,6 +19,31 @@ enum Phase {
     NotStarted,
     /// Processing events between `StartDocument` and `EndDocument`.
     Running,
+}
+
+/// The kind of block-level element opened for the current paragraph.
+///
+/// Set in `ensure_paragraph_started()` based on `pending_paragraph_classification`.
+/// Consumed in `end_paragraph()` to emit the matching End event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ParagraphBlockKind {
+    /// Plain paragraph (default).
+    Paragraph,
+    /// Heading at the given level.
+    Heading { level: u8 },
+    /// Block quotation.
+    BlockQuote,
+    /// Preformatted / code block.
+    Preformatted,
+}
+
+/// Bundle of package-level data the document reader consults during streaming.
+///
+/// Forward-compatible: additional package parts (theme, numbering, settings)
+/// will be added as fields here without breaking the constructor signature.
+pub struct DocxData {
+    /// Styles loaded from the styles part, used to classify paragraph and run styles.
+    pub style_list: StyleList,
 }
 
 /// Streaming parser for the DOCX main document XML part.
@@ -40,6 +66,12 @@ pub struct DocumentReader {
     in_ppr: bool,
     /// Paragraph alignment captured from `<w:jc>` while inside `<w:pPr>`.
     pending_paragraph_alignment: Option<TextAlignment>,
+    /// Style classification pending for the current paragraph, set by `<w:pStyle>` parsing.
+    /// Consumed and cleared by `ensure_paragraph_started()`.
+    pending_paragraph_classification: Option<crate::styles::StyleClassification>,
+    /// The block kind opened for the current paragraph.
+    /// Set in `ensure_paragraph_started()`, consumed in `end_paragraph()`.
+    current_paragraph_block: ParagraphBlockKind,
     /// True once `StartParagraph` has been queued for the current paragraph.
     paragraph_started_emitted: bool,
     /// Whether currently inside a `<w:rPr>` element that is still legal (first child of run).
@@ -68,6 +100,8 @@ pub struct DocumentReader {
     queue: VecDeque<Event>,
     /// True once the first content event of the current run has been queued.
     run_content_emitted: bool,
+    /// Package-level data (styles, future: theme, numbering).
+    data: DocxData,
     /// The quick-xml reader streaming from the document entry.
     xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
 }
@@ -85,6 +119,11 @@ impl fmt::Debug for DocumentReader {
                 "pending_paragraph_alignment",
                 &self.pending_paragraph_alignment,
             )
+            .field(
+                "pending_paragraph_classification",
+                &self.pending_paragraph_classification,
+            )
+            .field("current_paragraph_block", &self.current_paragraph_block)
             .field("paragraph_started_emitted", &self.paragraph_started_emitted)
             .field("in_rpr", &self.in_rpr)
             .field("pending_run_kinds", &self.pending_run_kinds)
@@ -99,13 +138,17 @@ impl fmt::Debug for DocumentReader {
             .field("phase", &"<phase>")
             .field("queue", &self.queue)
             .field("run_content_emitted", &self.run_content_emitted)
+            .field("data", &"<DocxData>")
             .field("xml", &"<quick_xml::Reader>")
             .finish()
     }
 }
 
 impl DocumentReader {
-    pub fn from_xml_reader(xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>) -> Self {
+    pub fn from_xml_reader(
+        xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
+        data: DocxData,
+    ) -> Self {
         Self {
             buf: Vec::with_capacity(4096),
             in_ignored_subtree: 0,
@@ -113,6 +156,8 @@ impl DocumentReader {
             in_text: false,
             in_ppr: false,
             pending_paragraph_alignment: None,
+            pending_paragraph_classification: None,
+            current_paragraph_block: ParagraphBlockKind::Paragraph,
             paragraph_started_emitted: false,
             in_rpr: false,
             pending_run_kinds: Vec::new(),
@@ -127,6 +172,7 @@ impl DocumentReader {
             phase: Phase::NotStarted,
             queue: VecDeque::new(),
             run_content_emitted: false,
+            data,
             xml,
         }
     }
@@ -167,12 +213,20 @@ impl DocumentReader {
         self.pending_run_text_color = None;
         self.pending_run_mark = None;
         self.pending_run_shade = None;
-        self.queue.push_back(Event::EndParagraph);
+        let end_event = match self.current_paragraph_block {
+            ParagraphBlockKind::Paragraph => Event::EndParagraph,
+            ParagraphBlockKind::Heading { .. } => Event::EndHeading,
+            ParagraphBlockKind::BlockQuote => Event::EndBlockQuote,
+            ParagraphBlockKind::Preformatted => Event::EndPreformatted,
+        };
+        self.queue.push_back(end_event);
         self.in_paragraph = false;
         self.in_text = false;
         self.pending_text.clear();
         self.in_ppr = false;
         self.pending_paragraph_alignment = None;
+        self.pending_paragraph_classification = None;
+        self.current_paragraph_block = ParagraphBlockKind::Paragraph;
         self.paragraph_started_emitted = false;
     }
 
@@ -239,6 +293,17 @@ impl DocumentReader {
         }
     }
 
+    fn handle_rpr_rstyle(&mut self, tag: &BytesStart<'_>) {
+        if let Some(crate::styles::StyleClassification::Code) = read_val_attribute(tag)
+            .filter(|s| !s.is_empty())
+            .and_then(|s| self.data.style_list.classify(&s))
+        {
+            if !self.pending_run_kinds.contains(&TextStyleKind::Code) {
+                self.pending_run_kinds.push(TextStyleKind::Code);
+            }
+        }
+    }
+
     fn handle_cdata(&mut self, cdata: BytesCData<'_>) -> Result<()> {
         if self.can_collect_text() {
             let bytes = cdata.into_inner();
@@ -261,6 +326,11 @@ impl DocumentReader {
                 let val = read_val_attribute(tag);
                 self.pending_paragraph_alignment =
                     val.as_deref().and_then(properties::parse_alignment);
+            }
+            b"pStyle" if self.in_ppr && !self.paragraph_started_emitted => {
+                self.pending_paragraph_classification = read_val_attribute(tag)
+                    .filter(|s| !s.is_empty())
+                    .and_then(|s| self.data.style_list.classify(&s));
             }
             b"rPr" if self.in_ppr => {}
             b"rPr" if self.in_paragraph && !self.in_ppr && !self.in_rpr => {}
@@ -299,12 +369,10 @@ impl DocumentReader {
                 let fill = read_attribute(tag, b"w:fill");
                 self.pending_run_shade = properties::parse_shd_fill(fill.as_deref());
             }
+            b"rStyle" if self.in_rpr => self.handle_rpr_rstyle(tag),
             b"p" if !self.in_paragraph => {
-                self.queue.push_back(Event::StartParagraph {
-                    alignment: None,
-                    id: None,
-                });
-                self.queue.push_back(Event::EndParagraph);
+                self.start_paragraph();
+                self.end_paragraph();
             }
             b"br" if self.in_paragraph => self.emit_line_break(),
             b"tab" if self.in_paragraph => self.emit_tab(),
@@ -407,6 +475,11 @@ impl DocumentReader {
                 self.pending_paragraph_alignment =
                     val.as_deref().and_then(properties::parse_alignment);
             }
+            b"pStyle" if self.in_ppr && !self.paragraph_started_emitted => {
+                self.pending_paragraph_classification = read_val_attribute(tag)
+                    .filter(|s| !s.is_empty())
+                    .and_then(|s| self.data.style_list.classify(&s));
+            }
             b"rPr" if self.in_ppr => {
                 self.in_ignored_subtree = 1;
             }
@@ -457,6 +530,7 @@ impl DocumentReader {
                 let fill = read_attribute(tag, b"w:fill");
                 self.pending_run_shade = properties::parse_shd_fill(fill.as_deref());
             }
+            b"rStyle" if self.in_rpr => self.handle_rpr_rstyle(tag),
             b"p" if !self.in_paragraph => self.start_paragraph(),
             b"r" if self.in_paragraph => {
                 self.ensure_paragraph_started();
@@ -535,15 +609,37 @@ impl DocumentReader {
         self.pending_text.clear();
         self.paragraph_started_emitted = false;
         self.pending_paragraph_alignment = None;
+        self.pending_paragraph_classification = None;
+        self.current_paragraph_block = ParagraphBlockKind::Paragraph;
     }
 
-    /// Queues `StartParagraph` once paragraph properties have been parsed.
+    /// Queues the appropriate Start event once paragraph properties have been parsed.
     fn ensure_paragraph_started(&mut self) {
         if self.in_paragraph && !self.paragraph_started_emitted {
-            self.queue.push_back(Event::StartParagraph {
-                alignment: self.pending_paragraph_alignment.clone(),
-                id: None,
-            });
+            let kind = match self.pending_paragraph_classification.take() {
+                Some(crate::styles::StyleClassification::Heading { level }) => {
+                    ParagraphBlockKind::Heading { level }
+                }
+                Some(crate::styles::StyleClassification::BlockQuote) => {
+                    ParagraphBlockKind::BlockQuote
+                }
+                Some(crate::styles::StyleClassification::Code) => ParagraphBlockKind::Preformatted,
+                _ => ParagraphBlockKind::Paragraph,
+            };
+            self.current_paragraph_block = kind;
+            let event = match kind {
+                ParagraphBlockKind::Paragraph => Event::StartParagraph {
+                    alignment: self.pending_paragraph_alignment.clone(),
+                    id: None,
+                },
+                ParagraphBlockKind::Heading { level } => Event::StartHeading { level, id: None },
+                ParagraphBlockKind::BlockQuote => Event::StartBlockQuote { id: None },
+                ParagraphBlockKind::Preformatted => Event::StartPreformatted {
+                    id: None,
+                    syntax: None,
+                },
+            };
+            self.queue.push_back(event);
             self.paragraph_started_emitted = true;
         }
     }
@@ -619,14 +715,59 @@ fn parse_error(message: String) -> Error {
 #[cfg(test)]
 #[cfg(not(coverage))]
 mod tests {
+    #![allow(clippy::expect_used, clippy::panic)]
     use std::io::{Cursor, Read};
 
     use super::*;
 
+    fn styles_xml(body: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+{body}
+</w:styles>"#
+        )
+    }
+
+    fn make_docx_data(styles_body: &str) -> DocxData {
+        let xml = styles_xml(styles_body);
+        let style_list = crate::styles::StyleList::parse(std::io::Cursor::new(xml.into_bytes()))
+            .expect("valid styles XML");
+        DocxData { style_list }
+    }
+
+    fn make_reader_with_styles(document_xml: &str, styles_body: &str) -> DocumentReader {
+        let stream: Box<dyn std::io::Read + Send> =
+            Box::new(std::io::Cursor::new(document_xml.to_string().into_bytes()));
+        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
+        DocumentReader::from_xml_reader(xml, make_docx_data(styles_body))
+    }
+
+    fn collect_events(reader: &mut DocumentReader) -> Vec<docspec_core::Event> {
+        let mut events = Vec::new();
+        loop {
+            match reader.next_event() {
+                Ok(Some(event)) => {
+                    if matches!(event, docspec_core::Event::EndDocument) {
+                        events.push(event);
+                        break;
+                    }
+                    events.push(event);
+                }
+                Ok(None) => break,
+                Err(err) => panic!("unexpected error: {err:?}"),
+            }
+        }
+        events
+    }
+
     fn make_reader(document_xml: &str) -> DocumentReader {
         let stream: Box<dyn Read + Send> = Box::new(Cursor::new(document_xml.as_bytes().to_vec()));
         let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
-        DocumentReader::from_xml_reader(xml)
+        let data = DocxData {
+            style_list: crate::styles::StyleList::default(),
+        };
+        DocumentReader::from_xml_reader(xml, data)
     }
 
     #[test]
@@ -697,5 +838,513 @@ mod tests {
             }
         }
         Ok(())
+    }
+
+    #[test]
+    fn pstyle_heading1_emits_start_heading() {
+        let styles = r#"<w:style w:type="paragraph" w:styleId="Heading1">
+            <w:name w:val="heading 1"/>
+        </w:style>"#;
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:pStyle w:val="Heading1"/></w:pPr>
+      <w:r><w:t>Hello</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader_with_styles(doc, styles);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartHeading { level: 1, id: None },
+                docspec_core::Event::Text {
+                    content: "Hello".to_string(),
+                },
+                docspec_core::Event::EndHeading,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn pstyle_title_folds_to_heading1() {
+        let styles = r#"<w:style w:type="paragraph" w:styleId="Title">
+            <w:name w:val="Title"/>
+        </w:style>"#;
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:pStyle w:val="Title"/></w:pPr>
+      <w:r><w:t>My Title</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader_with_styles(doc, styles);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartHeading { level: 1, id: None },
+                docspec_core::Event::Text {
+                    content: "My Title".to_string(),
+                },
+                docspec_core::Event::EndHeading,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn pstyle_block_quote_emits_start_block_quote() {
+        let styles = r#"<w:style w:type="paragraph" w:styleId="BlockQuote">
+            <w:name w:val="Block Quote"/>
+        </w:style>"#;
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:pStyle w:val="BlockQuote"/></w:pPr>
+      <w:r><w:t>quoted</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader_with_styles(doc, styles);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartBlockQuote { id: None },
+                docspec_core::Event::Text {
+                    content: "quoted".to_string(),
+                },
+                docspec_core::Event::EndBlockQuote,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn pstyle_source_code_emits_start_preformatted() {
+        let styles = r#"<w:style w:type="paragraph" w:styleId="SourceCode">
+            <w:name w:val="Source Code"/>
+        </w:style>"#;
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:pStyle w:val="SourceCode"/></w:pPr>
+      <w:r><w:t>fn main() {}</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader_with_styles(doc, styles);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartPreformatted {
+                    id: None,
+                    syntax: None,
+                },
+                docspec_core::Event::Text {
+                    content: "fn main() {}".to_string(),
+                },
+                docspec_core::Event::EndPreformatted,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn pstyle_heading_99_emits_level_99() {
+        let styles = r#"<w:style w:type="paragraph" w:styleId="Heading99">
+            <w:name w:val="heading 99"/>
+        </w:style>"#;
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:pStyle w:val="Heading99"/></w:pPr>
+      <w:r><w:t>deep</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader_with_styles(doc, styles);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartHeading {
+                    level: 99,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "deep".to_string(),
+                },
+                docspec_core::Event::EndHeading,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn pstyle_unknown_id_falls_through_to_paragraph() {
+        let styles = r#"<w:style w:type="paragraph" w:styleId="Normal">
+            <w:name w:val="Normal"/>
+        </w:style>"#;
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:pStyle w:val="DoesNotExist"/></w:pPr>
+      <w:r><w:t>plain</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader_with_styles(doc, styles);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "plain".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn pstyle_no_pstyle_emits_paragraph() {
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>bare</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader_with_styles(doc, "");
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "bare".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn pstyle_out_of_order_ppr_ignored() {
+        let styles = r#"<w:style w:type="paragraph" w:styleId="Heading1">
+            <w:name w:val="heading 1"/>
+        </w:style>"#;
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>text</w:t></w:r><w:pPr><w:pStyle w:val="Heading1"/></w:pPr></w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader_with_styles(doc, styles);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "text".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn pstyle_chain_walk_resolves_based_on() {
+        let styles = r#"<w:style w:type="paragraph" w:styleId="Heading2">
+            <w:name w:val="heading 2"/>
+        </w:style>
+        <w:style w:type="paragraph" w:styleId="MyHeading">
+            <w:basedOn w:val="Heading2"/>
+        </w:style>"#;
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:pStyle w:val="MyHeading"/></w:pPr>
+      <w:r><w:t>section</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader_with_styles(doc, styles);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartHeading { level: 2, id: None },
+                docspec_core::Event::Text {
+                    content: "section".to_string(),
+                },
+                docspec_core::Event::EndHeading,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn rstyle_code_classification_emits_inline_code_wrapper() {
+        let styles = r#"<w:style w:type="character" w:styleId="CodeChar">
+            <w:name w:val="Source Code"/>
+        </w:style>"#;
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:rPr><w:rStyle w:val="CodeChar"/></w:rPr><w:t>x</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader_with_styles(doc, styles);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::StartTextStyle {
+                    kind: docspec_core::TextStyleKind::Code,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "x".to_string(),
+                },
+                docspec_core::Event::EndTextStyle,
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn rstyle_unknown_classification_emits_no_wrapper() {
+        let styles = r#"<w:style w:type="character" w:styleId="CodeChar">
+            <w:name w:val="FooBar"/>
+        </w:style>"#;
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:rPr><w:rStyle w:val="CodeChar"/></w:rPr><w:t>x</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader_with_styles(doc, styles);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "x".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn rstyle_non_code_classification_emits_no_wrapper() {
+        let styles = r#"<w:style w:type="character" w:styleId="CodeChar">
+            <w:name w:val="heading 1"/>
+        </w:style>"#;
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:rPr><w:rStyle w:val="CodeChar"/></w:rPr><w:t>x</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader_with_styles(doc, styles);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "x".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn rstyle_inside_ppr_rpr_is_ignored() {
+        let styles = r#"<w:style w:type="character" w:styleId="CodeChar">
+            <w:name w:val="Source Code"/>
+        </w:style>"#;
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:rPr><w:rStyle w:val="CodeChar"/></w:rPr></w:pPr>
+      <w:r><w:t>x</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader_with_styles(doc, styles);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "x".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn rstyle_duplicate_rstyle_emits_single_wrapper() {
+        let styles = r#"<w:style w:type="character" w:styleId="CodeChar">
+            <w:name w:val="Source Code"/>
+        </w:style>"#;
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:rPr><w:rStyle w:val="CodeChar"/><w:rStyle w:val="CodeChar"/></w:rPr><w:t>x</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader_with_styles(doc, styles);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::StartTextStyle {
+                    kind: docspec_core::TextStyleKind::Code,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "x".to_string(),
+                },
+                docspec_core::Event::EndTextStyle,
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndDocument,
+            ]
+        );
     }
 }

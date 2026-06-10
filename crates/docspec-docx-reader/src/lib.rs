@@ -59,6 +59,7 @@ mod document;
 mod package;
 mod properties;
 mod rels;
+mod styles;
 
 use std::io::{BufReader, Read, Seek};
 use std::path::Path;
@@ -112,10 +113,11 @@ impl DocxReader {
     /// cannot be opened. Returns [`Error::Io`] for I/O failures.
     #[inline]
     pub fn from_reader<R: Read + Seek + Send + 'static>(reader: R) -> Result<Self> {
-        let stream = package::open_main_document(reader)?;
+        let (style_list, stream) = package::open_package(reader)?;
         let xml = quick_xml::Reader::from_reader(BufReader::new(stream));
+        let data = document::DocxData { style_list };
         Ok(Self {
-            inner: document::DocumentReader::from_xml_reader(xml),
+            inner: document::DocumentReader::from_xml_reader(xml, data),
         })
     }
 }
@@ -130,11 +132,69 @@ impl EventSource for DocxReader {
 #[cfg(test)]
 #[cfg(not(coverage))]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::panic)]
     use super::*;
 
     #[test]
     fn docx_reader_is_send_static() {
         fn assert_send_static<T: Send + 'static>() {}
         assert_send_static::<DocxReader>();
+    }
+
+    #[test]
+    fn docx_without_styles_emits_only_paragraphs() {
+        use std::io::{Cursor, Write as _};
+        use zip::ZipWriter;
+
+        let root_rels = r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"#;
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>hi</w:t></w:r></w:p>
+  </w:body>
+</w:document>"#;
+
+        let buf = Cursor::new(Vec::new());
+        let mut writer = ZipWriter::new(buf);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        writer.start_file("_rels/.rels", options).unwrap();
+        writer.write_all(root_rels.as_bytes()).unwrap();
+        writer.start_file("word/document.xml", options).unwrap();
+        writer.write_all(document_xml.as_bytes()).unwrap();
+        let zip_bytes = writer.finish().unwrap().into_inner();
+
+        let mut reader = DocxReader::from_reader(Cursor::new(zip_bytes)).unwrap();
+        let mut events = Vec::new();
+        loop {
+            match reader.next_event() {
+                Ok(Some(event)) => events.push(event),
+                Ok(None) => break,
+                Err(err) => panic!("unexpected error: {err:?}"),
+            }
+        }
+
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "hi".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndDocument,
+            ]
+        );
     }
 }
