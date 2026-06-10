@@ -139,6 +139,63 @@ The same code path executes regardless of target. There are no conditional compi
 
 ---
 
+## Event Model Design Decisions
+
+The event protocol is defined in the [`docspec-core`](crates/docspec-core/) crate. Several design decisions shape how events behave.
+
+**SAX-like structure.** Block elements use Start/End pairs. Every `Start*` has exactly one matching `End*`. They nest but never overlap. Sources walk through the input and emit Start before entering a container, End after leaving it.
+
+**Formatting as wrappers.** Inline formatting is expressed via `StartTextStyle { kind: TextStyleKind, id: Option<String> }` and `EndTextStyle` wrapper events around `Text` content. This matches the Start/End uniformity of every other inline and block container. There is no styled-text variant carrying inline format flags on the `Text` event itself.
+
+**Semantic fidelity.** Events capture meaning, not appearance. Visual properties (font, size) are not represented. Color is represented in two places: `TextStyleKind::Mark(Color)` for highlight/background, and `TextStyleKind::TextColor(Color)` for foreground text color.
+
+**Lazy asset references.** Images carry references, not bytes. The `Image` event holds a small `ImageSource` (asset id or URI), not pixel data. Writers resolve bytes via `AssetProvider` only when needed. A 50 MB image flows through using a 32 KB buffer.
+
+**No warnings.** Errors are out-of-band via `Result`. Events carry content only. Readers that cannot continue return `Err`; readers that can recover silently do so without emitting a recovery event.
+
+**Nested list items with level hints.** `StartOrderedListItem` and `StartUnorderedListItem` carry nesting level as a field AND may nest in the event stream. No `StartList`/`EndList` events exist. The `level` field is the authoritative indent depth — writers that do not build a tree may rely on it alone. Nesting in events lets continuation content (e.g., CommonMark paragraphs) sit naturally inside the owning parent item.
+
+---
+
+## Reading Event Documentation
+
+The event types and their semantics are defined in the [`docspec-core`](crates/docspec-core/) crate. There are three ways to read this documentation.
+
+**On docs.rs.** The published crate documentation includes every event variant, field, and well-formedness rule:
+
+- [`docspec_core`](https://docs.rs/docspec-core) — top-level API
+- [`docspec_core::event`](https://docs.rs/docspec-core/latest/docspec_core/event/index.html) — well-formedness rules, error handling, asset reference protocol
+- [`docspec_core::Event`](https://docs.rs/docspec-core/latest/docspec_core/event/enum.Event.html) — every variant with per-variant semantics
+
+**Locally via rustdoc.** Build and open the workspace documentation:
+
+```sh
+just doc-open    # build with warnings-as-errors and open in browser
+# or
+cargo doc --no-deps --open
+```
+
+This produces the same content as docs.rs but reflects your local source tree.
+
+**In the source code.** The canonical definitions live in:
+
+- `crates/docspec-core/src/event.rs` — `Event` enum, `TextStyleKind` enum, and well-formedness rules
+- `crates/docspec-core/src/types.rs` — supporting enums and structs (`TextAlignment`, `ListStyleType`, `Color`, `ImageSource`, `Author`, `DocumentMeta`)
+- `crates/docspec-core/src/traits.rs` — `EventSource`, `EventSink`, `AssetProvider` traits
+- `crates/docspec-core/src/stack.rs` — `BlockKind` enum, `StackTrackingSink`, and the `block_kind_for_start` / `block_kind_for_end` / `end_event_for` lookup functions
+
+**Enumerating events programmatically.** The `BlockKind` enum mirrors Start/End pairs. Use the lookup functions to inspect events at runtime:
+
+```rust
+use docspec_core::{Event, BlockKind, block_kind_for_start};
+
+let kind = block_kind_for_start(&event); // Some(BlockKind::Heading) for StartHeading
+```
+
+This is how `StackTrackingSink` validates well-formedness and how adapters build pair-aware logic without enumerating every variant manually.
+
+---
+
 ## HTTP Boundary
 
 The `docspec-http` crate exposes DocSpec's sync conversion pipeline over HTTP using Axum 0.8 + tokio.

@@ -40,7 +40,7 @@ pub trait EventSink {
     /// Process one event from the stream.
     ///
     /// Events must arrive in valid document order. Writers may assume the
-    /// stream is well-formed per the rules in EVENTS.md.
+    /// stream is well-formed per the rules in [`crate::event`].
     ///
     /// # Errors
     ///

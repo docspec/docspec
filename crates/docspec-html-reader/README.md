@@ -52,4 +52,5 @@ while let Some(event) = reader.next_event()? {
 ## See Also
 
 - [MANIFESTO.md](../../MANIFESTO.md) — philosophy and values
-- [EVENTS.md](../../EVENTS.md) — event types and well-formedness rules
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) — pipeline design, event model decisions, and pointers to the in-code event reference
+- [`docspec_core` on docs.rs](https://docs.rs/docspec-core) — every event variant, field, and well-formedness rule

@@ -34,8 +34,8 @@
 //! # Table Cell Content Semantics
 //!
 //! `BlockNote`'s `tableCell.content` is `InlineContent[]` — it cannot hold block-level types.
-//! `EVENTS.md` declares that `DocSpec` cells may contain any block element, so this writer
-//! flattens block-level events that appear inside a cell:
+//! The [`docspec_core::event`] well-formedness rules declare that `DocSpec` cells may contain any
+//! block element, so this writer flattens block-level events that appear inside a cell:
 //!
 //! - **Preserved**: [`StartTextStyle`](docspec_core::Event::StartTextStyle) / [`EndTextStyle`](docspec_core::Event::EndTextStyle), [`Text`](docspec_core::Event::Text) (with currently open inline styles), [`LineBreak`](docspec_core::Event::LineBreak), [`SoftBreak`](docspec_core::Event::SoftBreak)
 //! - **Absorbed silently**: [`StartParagraph`](docspec_core::Event::StartParagraph) / [`EndParagraph`](docspec_core::Event::EndParagraph) (paragraph boundaries are dropped — adjacent paragraphs concatenate without separator)
