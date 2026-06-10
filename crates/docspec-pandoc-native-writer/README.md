@@ -11,10 +11,16 @@ Converts a DocSpec event stream into compact Pandoc native block-list syntax, su
 | `StartDocument` / `EndDocument` | `[` / `]` (block list framing) |
 | `StartParagraph` / `EndParagraph` | `Para [` / `]` |
 | `StartHeading { level, id }` / `EndHeading` | `Header N ("id",[],[]) [` / `]` (level passed through raw; classes and key-value attrs always empty) |
-| `Text` (styles dropped) | `Str "..."` |
+| `Text` | `Str "..."` |
 | `ThematicBreak` (id dropped) | `HorizontalRule` |
 | `LineBreak` | `LineBreak` |
 | `SoftBreak` | `SoftBreak` |
+| `StartTextStyle { kind: Bold }` / `EndTextStyle` | `Strong [` / `]` |
+| `StartTextStyle { kind: Italic }` / `EndTextStyle` | `Emph [` / `]` |
+| `StartTextStyle { kind: Strikethrough }` / `EndTextStyle` | `Strikeout [` / `]` |
+| `StartTextStyle { kind: Underline }` / `EndTextStyle` | `Underline [` / `]` |
+| `StartTextStyle { kind: Subscript }` / `EndTextStyle` | `Subscript [` / `]` |
+| `StartTextStyle { kind: Superscript }` / `EndTextStyle` | `Superscript [` / `]` |
 
 ## Not Supported
 
@@ -29,7 +35,7 @@ The following DocSpec events are silently ignored:
 - Footnotes — `StartFootnote` / `EndFootnote` / `FootnoteRef`
 - Definition lists — `StartDefinitionList` / `StartDefinitionTerm` / `StartDefinitionDetail`
 - Captions — `StartCaption` / `EndCaption`
-- Text formatting styles — `StartTextStyle` / `EndTextStyle` are accepted but silently dropped
+- Text formatting styles — `StartTextStyle { kind: Code | Mark | TextColor }` are accepted but silently flattened (text inside is preserved without a wrapper)
 
 ## Usage
 
