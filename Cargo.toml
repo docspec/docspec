@@ -66,7 +66,6 @@ cargo = { level = "deny", priority = -1 }
 # --- Nursery cherry-picks (individually selected per official guidance) ---
 cognitive_complexity = "deny"
 option_if_let_else = "deny"
-redundant_pub_crate = "deny"
 use_self = "deny"
 
 # --- Selective allows: restriction group (idiomatic Rust conflicts) ---
@@ -134,6 +133,12 @@ cfg_not_test = "allow"
 decimal_literal_representation = "allow"
 # Reason: Standard re-export pattern in Rust libraries (pub use in lib.rs)
 pub_use = "allow"
+# Reason: pub(super) is idiomatic Rust shorthand; pub(in super) is unnecessarily verbose
+pub_with_shorthand = "allow"
+# Reason: Symbol font mapping tables use Unicode escapes in source; literal chars are acceptable in const data
+non_ascii_literal = "allow"
+# Reason: pub(crate) inside private modules is intentional for clarity; the lint's suggestion of `pub` is less explicit
+redundant_pub_crate = "allow"
 # Reason: Early process startup failures may need stderr before tracing is initialized
 print_stderr = "allow"
 # Reason: Telemetry init helpers are intentionally factored for testability
