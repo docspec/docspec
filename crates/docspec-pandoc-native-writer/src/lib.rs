@@ -7,6 +7,12 @@ mod escape;
 use docspec_core::{Event, EventSink, Result};
 use std::io::Write;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InlineBlockKind {
+    Paragraph,
+    Heading,
+}
+
 /// A streaming Pandoc native writer for `DocSpec` events.
 ///
 /// Writes compact Pandoc native block-list syntax directly to the underlying
@@ -23,12 +29,12 @@ use std::io::Write;
 /// * `W` - Any type implementing [`Write`]
 #[expect(
     clippy::struct_excessive_bools,
-    reason = "PandocNativeWriter uses one boolean per state flag for a direct state machine; a separate state enum would be more complex without benefit"
+    reason = "PandocNativeWriter uses independent boolean state flags for a direct state machine; the active inline-block kind is already an Option<InlineBlockKind>, but `started`, `finished`, `first_block`, and `inline_block_has_content` track orthogonal one-shot signals where a combined enum would obscure intent"
 )]
 pub struct PandocNativeWriter<W: Write> {
     finished: bool,
     first_block: bool,
-    in_inline_block: bool,
+    inline_block: Option<InlineBlockKind>,
     inline_block_has_content: bool,
     started: bool,
     writer: W,
@@ -42,7 +48,7 @@ impl<W: Write> PandocNativeWriter<W> {
         Self {
             finished: false,
             first_block: true,
-            in_inline_block: false,
+            inline_block: None,
             inline_block_has_content: false,
             started: false,
             writer,
@@ -51,7 +57,7 @@ impl<W: Write> PandocNativeWriter<W> {
 
     #[inline]
     fn write_block_literal(&mut self, token: &[u8]) -> Result<()> {
-        if self.started && !self.finished && !self.in_inline_block {
+        if self.started && !self.finished && self.inline_block.is_none() {
             if !self.first_block {
                 self.writer.write_all(b",")?;
             }
@@ -63,7 +69,7 @@ impl<W: Write> PandocNativeWriter<W> {
 
     #[inline]
     fn write_inline_literal(&mut self, token: &[u8]) -> Result<()> {
-        if self.in_inline_block {
+        if self.inline_block.is_some() {
             if self.inline_block_has_content {
                 self.writer.write_all(b",")?;
             }
@@ -83,7 +89,7 @@ impl<W: Write> EventSink for PandocNativeWriter<W> {
     #[inline]
     fn finish(mut self) -> Result<()> {
         if self.started && !self.finished {
-            if self.in_inline_block {
+            if self.inline_block.is_some() {
                 self.writer.write_all(b"]")?;
             }
             self.writer.write_all(b"]")?;
@@ -115,45 +121,51 @@ impl<W: Write> EventSink for PandocNativeWriter<W> {
             }
             Event::EndDocument => {
                 if self.started && !self.finished {
-                    if self.in_inline_block {
+                    if self.inline_block.is_some() {
                         self.writer.write_all(b"]")?;
-                        self.in_inline_block = false;
+                        self.inline_block = None;
                     }
                     self.writer.write_all(b"]")?;
                     self.finished = true;
                 }
             }
             Event::StartParagraph { .. } => {
-                if self.started && !self.finished && !self.in_inline_block {
+                if self.started && !self.finished && self.inline_block.is_none() {
                     if !self.first_block {
                         self.writer.write_all(b",")?;
                     }
                     self.writer.write_all(b"Para [")?;
-                    self.in_inline_block = true;
+                    self.inline_block = Some(InlineBlockKind::Paragraph);
                     self.inline_block_has_content = false;
                     self.first_block = false;
                 }
             }
             Event::StartHeading { id, level } => {
-                if self.started && !self.finished && !self.in_inline_block {
+                if self.started && !self.finished && self.inline_block.is_none() {
                     if !self.first_block {
                         self.writer.write_all(b",")?;
                     }
                     write!(self.writer, "Header {level} (")?;
                     escape::write_haskell_string(&mut self.writer, id.as_deref().unwrap_or(""))?;
                     self.writer.write_all(b",[],[]) [")?;
-                    self.in_inline_block = true;
+                    self.inline_block = Some(InlineBlockKind::Heading);
                     self.inline_block_has_content = false;
                     self.first_block = false;
                 }
             }
-            Event::EndParagraph | Event::EndHeading => {
-                if self.in_inline_block {
+            Event::EndParagraph => {
+                if self.inline_block == Some(InlineBlockKind::Paragraph) {
                     self.writer.write_all(b"]")?;
-                    self.in_inline_block = false;
+                    self.inline_block = None;
                 }
             }
-            Event::Text { content } if self.in_inline_block => {
+            Event::EndHeading => {
+                if self.inline_block == Some(InlineBlockKind::Heading) {
+                    self.writer.write_all(b"]")?;
+                    self.inline_block = None;
+                }
+            }
+            Event::Text { content } if self.inline_block.is_some() => {
                 if self.inline_block_has_content {
                     self.writer.write_all(b",")?;
                 }
