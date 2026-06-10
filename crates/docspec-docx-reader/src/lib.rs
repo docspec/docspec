@@ -12,14 +12,16 @@
 //! line breaks (`<w:br>` — including `w:type="page"` and `w:type="column"`, all
 //! emitted as `LineBreak`), tabs (`<w:tab>`, emitted as a `Text` event whose
 //! content is the single character `"\t"`), tables (`<w:tbl>`, `<w:tr>`,
-//! `<w:tc>`), hyperlinks (`<w:hyperlink>` — link text content is emitted as
-//! plain runs), structured document tags (`<w:sdt>` — content emitted normally;
-//! `<w:sdtPr>`/`<w:sdtEndPr>` dropped), and tracked insertions and moves
-//! (`<w:ins>`, `<w:moveTo>` — accept-changes semantics).
-//! Emits: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`,
-//! `EndTextStyle`, `LineBreak`, `EndParagraph`, `StartTable`, `StartTableRow`,
-//! `StartTableCell`, `StartTableHeader`, `EndTableHeader`, `EndTableCell`,
-//! `EndTableRow`, `EndTable`, `EndDocument`.
+//! `<w:tc>`), hyperlinks (`<w:hyperlink>` — resolved via
+//! `word/_rels/document.xml.rels` and emitted as `StartLink`/`EndLink` events
+//! around inline content), structured document tags (`<w:sdt>` — content
+//! emitted normally; `<w:sdtPr>`/`<w:sdtEndPr>` dropped), and tracked
+//! insertions and moves (`<w:ins>`, `<w:moveTo>` — accept-changes semantics).
+//! Emits: `EndDocument`, `EndLink`, `EndParagraph`, `EndTable`, `EndTableCell`,
+//! `EndTableHeader`, `EndTableRow`, `EndTextStyle`, `LineBreak`,
+//! `StartDocument`, `StartLink`, `StartParagraph`, `StartTable`,
+//! `StartTableCell`, `StartTableHeader`, `StartTableRow`, `StartTextStyle`,
+//! `Text`.
 //!
 //! The elements listed under "Out of scope" are the reader's denylist — their
 //! entire subtree is silently dropped. Every other element (known or unknown)
@@ -41,12 +43,19 @@
 //! - Document metadata
 //! - Tracked deletions (`<w:del>`, `<w:moveFrom>`) — accept-changes semantics
 //! - Structured document tag properties (`<w:sdtPr>`, `<w:sdtEndPr>`)
+//! - Field-code hyperlinks (`<w:fldChar>` + `<w:instrText>HYPERLINK ...`):
+//!   legacy form not currently supported; only the modern `<w:hyperlink>`
+//!   element is recognized.
 //!
 //! # Streaming Guarantee
 //!
 //! `DocxReader` streams `document.xml` event by event using constant memory
-//! regardless of document size. Only `_rels/.rels` (a few hundred bytes) is
-//! fully read into memory to discover the document target path.
+//! regardless of document size. `_rels/.rels` and
+//! `word/_rels/document.xml.rels` are both fully read into memory at
+//! package-open time (typical combined size < 10 KB even for large documents).
+//! `word/document.xml` is consumed in streaming fashion via `quick-xml`. The
+//! internal event queue remains bounded regardless of document size or
+//! hyperlink count.
 //!
 //! # Quick Start
 //!
@@ -85,8 +94,9 @@ use docspec_core::{Error, Result};
 /// # Streaming
 ///
 /// The reader streams `document.xml` event by event using constant memory.
-/// Only `_rels/.rels` (a few hundred bytes) is buffered to discover the
-/// document target path.
+/// `_rels/.rels` and `word/_rels/document.xml.rels` are both fully read into
+/// memory at package-open time (typical combined size < 10 KB). The internal
+/// event queue remains bounded regardless of document size or hyperlink count.
 ///
 /// # Errors
 ///
@@ -121,9 +131,12 @@ impl DocxReader {
     /// cannot be opened. Returns [`Error::Io`] for I/O failures.
     #[inline]
     pub fn from_reader<R: Read + Seek + Send + 'static>(reader: R) -> Result<Self> {
-        let (style_list, stream) = package::open_package(reader)?;
+        let (style_list, hyperlink_map, stream) = package::open_package(reader)?;
         let xml = quick_xml::Reader::from_reader(BufReader::new(stream));
-        let data = document::DocxData { style_list };
+        let data = document::DocxData {
+            style_list,
+            hyperlink_map,
+        };
         Ok(Self {
             inner: document::DocumentReader::from_xml_reader(xml, data),
         })
