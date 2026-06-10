@@ -1278,7 +1278,7 @@ mod events {
 
         assert_eq!(
             format!("{reader:?}"),
-            "DocxReader { inner: DocumentReader { buf: [], in_ignored_subtree: 0, in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, xml: \"<quick_xml::Reader>\" } }"
+            "DocxReader { inner: DocumentReader { buf: [], in_ignored_subtree: 0, in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, pending_paragraph_classification: None, current_paragraph_block: Paragraph, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, data: \"<DocxData>\", xml: \"<quick_xml::Reader>\" } }"
         );
     }
 
