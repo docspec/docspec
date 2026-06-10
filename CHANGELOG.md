@@ -12,6 +12,30 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.8.1](https://github.com/docspec/docspec/compare/v1.7.1...v1.8.1) - 2026-06-10
+
+### Added
+
+- *(docx-reader,blocknote-writer)* text color and highlight support
+- *(core)* replace TextStyle with wrapper events
+- *(docx-reader)* replace opaque-subtree counter with typed enum stack; shrink denylist
+- *(docx-reader)* gridSpan, colspan, tblHeader, StartTableHeader support
+- *(docx-reader)* symbol font character normalization (Wingdings/Webdings/Symbol)
+- *(docx-reader)* Heading, BlockQuote, Preformatted
+- *(pandoc-native-writer)* Strong, Emph, Strikeout, Underline, Subscript, Superscript
+- *(pandoc-native-writer)* Headings
+- *(pandoc-native-writer)* HorizontalRule, LineBreak, SoftBreak
+
+### Fixed
+
+- *(pandoc-native-writer)* prevent cross-close between paragraph and heading
+
+### Other
+
+- *(core)* migrate EVENTS.md spec into rustdoc and ARCHITECTURE.md
+- *(docx-reader)* split DOCX reader modules
+- update Cargo.lock dependencies
+
 ## [1.8.0](https://github.com/docspec/docspec/compare/v1.7.1...v1.8.0) - 2026-06-10
 
 ### Added
