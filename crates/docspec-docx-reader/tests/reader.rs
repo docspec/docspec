@@ -1750,7 +1750,7 @@ mod events {
 
         assert_eq!(
             format!("{reader:?}"),
-            "DocxReader { inner: DocumentReader { buf: [], in_ignored_subtree: 0, in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, pending_paragraph_classification: None, current_paragraph_block: Paragraph, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, pending_run_font: None, frozen_run_font: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, data: \"<DocxData>\", xml: \"<quick_xml::Reader>\" } }"
+            "DocxReader { inner: DocumentReader { buf: [], denied_stack: [], in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, pending_paragraph_classification: None, current_paragraph_block: Paragraph, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, pending_run_font: None, frozen_run_font: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, data: \"<DocxData>\", xml: \"<quick_xml::Reader>\" } }"
         );
     }
 
@@ -1810,9 +1810,9 @@ mod events {
     }
 
     #[test]
-    fn self_closing_ignored_container_emits_no_events() {
+    fn self_closing_drawing_emits_no_events() {
         let mut reader = make_reader(
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:hyperlink/></w:body></w:document>"#,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:drawing/></w:body></w:document>"#,
         );
         let events = drive(&mut reader);
         assert_eq!(events, vec![start_doc(), Event::EndDocument]);
@@ -1856,7 +1856,7 @@ mod events {
     }
 
     #[test]
-    fn wins_subtree_suppressed_inside_paragraph() {
+    fn wins_subtree_passes_through_inside_paragraph() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>before</w:t></w:r><w:ins><w:r><w:t>inserted</w:t></w:r></w:ins><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#,
         );
@@ -1867,6 +1867,7 @@ mod events {
                 start_doc(),
                 start_para(),
                 text("before"),
+                text("inserted"),
                 text("after"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -1894,7 +1895,7 @@ mod events {
     }
 
     #[test]
-    fn paragraph_containing_only_ins_emits_empty_paragraph() {
+    fn paragraph_containing_only_ins_emits_inserted_text() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:ins><w:r><w:t>x</w:t></w:r></w:ins></w:p></w:body></w:document>"#,
         );
@@ -1904,6 +1905,7 @@ mod events {
             vec![
                 start_doc(),
                 start_para(),
+                text("x"),
                 Event::EndParagraph,
                 Event::EndDocument
             ]
@@ -2371,9 +2373,9 @@ mod events {
     }
 
     #[test]
-    fn w_tab_inside_ignored_subtree_is_silently_dropped() {
+    fn w_tab_inside_drawing_is_silently_dropped() {
         let mut reader = make_reader(
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>kept</w:t></w:r><w:ins><w:r><w:tab/></w:r></w:ins></w:p></w:body></w:document>"#,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>kept</w:t></w:r><w:drawing><w:r><w:tab/></w:r></w:drawing></w:p></w:body></w:document>"#,
         );
         let events = drive(&mut reader);
         assert_eq!(
@@ -2613,9 +2615,9 @@ mod events {
     }
 
     #[test]
-    fn w_br_inside_ignored_subtree_is_silently_dropped() {
+    fn w_br_inside_drawing_is_silently_dropped() {
         let mut reader = make_reader(
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>kept</w:t></w:r><w:ins><w:r><w:br/></w:r></w:ins></w:p></w:body></w:document>"#,
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>kept</w:t></w:r><w:drawing><w:r><w:br/></w:r></w:drawing></w:p></w:body></w:document>"#,
         );
         let events = drive(&mut reader);
         assert_eq!(
@@ -2842,7 +2844,7 @@ mod events {
     }
 
     #[test]
-    fn table_inside_ignored_subtree_is_dropped() {
+    fn table_inside_ins_passes_through() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>before</w:t></w:r></w:p><w:ins><w:tbl><w:tr><w:tc><w:p><w:r><w:t>inserted</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:ins><w:p><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#,
         );
@@ -2854,6 +2856,15 @@ mod events {
                 start_para(),
                 text("before"),
                 Event::EndParagraph,
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("inserted"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
                 start_para(),
                 text("after"),
                 Event::EndParagraph,
@@ -3061,7 +3072,7 @@ mod events {
     }
 
     #[test]
-    fn hyperlink_inside_cell_is_still_dropped() {
+    fn hyperlink_text_inside_cell_passes_through() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>keep</w:t></w:r><w:hyperlink><w:r><w:t>link</w:t></w:r></w:hyperlink></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
         );
@@ -3075,6 +3086,7 @@ mod events {
                 start_cell(),
                 start_para(),
                 text("keep"),
+                text("link"),
                 Event::EndParagraph,
                 Event::EndTableCell,
                 Event::EndTableRow,
@@ -4282,6 +4294,631 @@ mod events {
                 Event::EndTableHeader,
                 Event::EndTableRow,
                 Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_with_text_inside_paragraph_emits_inline_text() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>see </w:t></w:r><w:hyperlink><w:r><w:t>link</w:t></w:r></w:hyperlink><w:r><w:t> done</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("see "),
+                text("link"),
+                text(" done"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_styled_run_emits_styled_text() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:hyperlink><w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>link</w:t></w:r></w:hyperlink></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Underline,
+                    id: None,
+                },
+                text("link"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn self_closing_hyperlink_emits_nothing() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:hyperlink/></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn orphan_hyperlink_at_body_level_emits_nothing() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:hyperlink><w:r><w:t>x</w:t></w:r></w:hyperlink></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(events, vec![start_doc(), Event::EndDocument,]);
+    }
+
+    #[test]
+    fn sdt_with_sdt_content_paragraph_emits_paragraph() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:sdt><w:sdtPr><w:tag w:val="myTag"/><w:id w:val="42"/></w:sdtPr><w:sdtContent><w:p><w:r><w:t>SDT content</w:t></w:r></w:p></w:sdtContent></w:sdt></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("SDT content"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn sdt_without_content_child_emits_nothing() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:sdt><w:sdtPr><w:id w:val="42"/></w:sdtPr></w:sdt></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(events, vec![start_doc(), Event::EndDocument,]);
+    }
+
+    #[test]
+    fn sdt_end_pr_subtree_dropped() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>text</w:t></w:r><w:sdtEndPr><w:rPr><w:b/></w:rPr></w:sdtEndPr></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("text"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn wins_run_level_emits_inserted_text() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>a</w:t></w:r><w:ins><w:r><w:t>inserted</w:t></w:r></w:ins><w:r><w:t>b</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("a"),
+                text("inserted"),
+                text("b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn out_of_order_rpr_inside_wins_is_silently_consumed() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:ins><w:r><w:t>x</w:t><w:rPr><w:b/></w:rPr></w:r></w:ins></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_level_wins_wrapping_paragraph_emits_paragraph() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>existing</w:t></w:r></w:p><w:ins><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>inserted para</w:t></w:r></w:p></w:ins></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("existing"),
+                Event::EndParagraph,
+                start_para_with_alignment(TextAlignment::Right),
+                text("inserted para"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_level_wins_wrapping_table_emits_table() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:ins><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:ins></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("cell"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn move_to_run_level_emits_moved_text() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>a</w:t></w:r><w:moveTo><w:r><w:t>moved</w:t></w:r></w:moveTo><w:r><w:t>b</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("a"),
+                text("moved"),
+                text("b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_level_move_to_wrapping_paragraph_emits_paragraph() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:moveTo><w:p><w:r><w:t>moved</w:t></w:r></w:p></w:moveTo></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("moved"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn sdt_pr_subtree_dropped_inside_paragraph() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>before</w:t></w:r><w:sdtPr><w:tag w:val="x"/><w:id w:val="1"/></w:sdtPr><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("before"),
+                text("after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn drawing_inside_wins_is_dropped() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:ins><w:r><w:t>before</w:t></w:r><w:drawing><wp:inline w:width="100"/></w:drawing><w:r><w:t>after</w:t></w:r></w:ins></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("before"),
+                text("after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn self_closing_drawing_inside_wins_is_dropped() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>kept</w:t></w:r><w:ins><w:drawing/></w:ins></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("kept"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn wins_around_hyperlink_around_run_emits_inner_text() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:ins><w:hyperlink><w:r><w:t>x</w:t></w:r></w:hyperlink></w:ins></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn combined_fixture_with_hyperlink_ins_sdt_drawing_emits_expected_events() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>plain </w:t></w:r><w:hyperlink><w:r><w:t>link</w:t></w:r></w:hyperlink><w:r><w:t> </w:t></w:r><w:ins><w:r><w:t>inserted</w:t></w:r></w:ins><w:r><w:t> </w:t></w:r><w:drawing><wp:inline w:width="100"/></w:drawing><w:r><w:t> </w:t></w:r><w:sdt><w:sdtPr><w:id w:val="1"/></w:sdtPr><w:sdtContent><w:r><w:t>sdt</w:t></w:r></w:sdtContent></w:sdt></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("plain "),
+                text("link"),
+                text(" "),
+                text("inserted"),
+                text(" "),
+                text(" "),
+                text("sdt"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn eof_inside_styled_run_auto_closes_styles() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>bold"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                text("bold"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn nested_denied_inside_denied_is_suppressed() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:drawing><w:pict><w:r><w:t>hidden</w:t></w:r></w:pict></w:drawing><w:r><w:t>visible</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                text("visible"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn non_self_closing_bold_in_rpr_emits_bold_text() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:b></w:b></w:rPr><w:t>bold</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                text("bold"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn non_self_closing_italic_in_rpr_emits_italic_text() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:i></w:i></w:rPr><w:t>italic</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Italic,
+                    id: None,
+                },
+                text("italic"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn non_self_closing_strike_in_rpr_emits_strikethrough_text() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:strike></w:strike></w:rPr><w:t>struck</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Strikethrough,
+                    id: None,
+                },
+                text("struck"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn non_self_closing_underline_in_rpr_emits_underline_text() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:u w:val="single"></w:u></w:rPr><w:t>underline</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Underline,
+                    id: None,
+                },
+                text("underline"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn non_self_closing_vert_align_in_rpr_emits_subscript_text() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:vertAlign w:val="subscript"></w:vertAlign></w:rPr><w:t>sub</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Subscript,
+                    id: None,
+                },
+                text("sub"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn non_self_closing_jc_in_ppr_sets_alignment() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:jc w:val="center"></w:jc></w:pPr><w:r><w:t>centered</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para_with_alignment(TextAlignment::Center),
+                text("centered"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn non_self_closing_tbl_header_emits_header() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader></w:tblHeader></w:trPr><w:tc><w:p><w:r><w:t>h</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_header(),
+                start_para(),
+                text("h"),
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn non_self_closing_gridspan_emits_colspan() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan w:val="3"></w:gridSpan></w:tcPr><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                Event::StartTableCell {
+                    colspan: Some(3),
+                    rowspan: None,
+                    id: None,
+                },
+                start_para(),
+                text("cell"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn non_self_closing_vmerge_is_a_no_op() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:tcPr><w:vMerge w:val="restart"></w:vMerge></w:tcPr><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("cell"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn out_of_order_trpr_after_row_content_is_denied() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc><w:trPr><w:jc w:val="center"/></w:trPr></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_table(),
+                start_row(),
+                start_cell(),
+                start_para(),
+                text("cell"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn self_closing_rpr_inside_ppr_is_a_no_op() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:jc w:val="right"/><w:rPr/></w:pPr><w:r><w:t>text</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para_with_alignment(TextAlignment::Right),
+                text("text"),
+                Event::EndParagraph,
                 Event::EndDocument,
             ]
         );

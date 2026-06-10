@@ -46,6 +46,27 @@ pub struct DocxData {
     pub style_list: StyleList,
 }
 
+#[non_exhaustive]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum DeniedKind {
+    // 10 doc-level denied containers.
+    Drawing,
+    Pict,
+    Object,
+    Del,
+    MoveFrom,
+    TblPr,
+    TblGrid,
+    TblPrEx,
+    SdtPr,
+    SdtEndPr,
+    // 4 one-shot suppression markers.
+    PPr,
+    RPr,
+    TrPr,
+    TcPr,
+}
+
 /// Streaming parser for the DOCX main document XML part.
 #[expect(
     clippy::struct_excessive_bools,
@@ -54,10 +75,8 @@ pub struct DocxData {
 pub struct DocumentReader {
     /// Reusable buffer for quick-xml event reading.
     buf: Vec<u8>,
-    /// Depth counter for ignored subtrees (tracked changes, hyperlinks,
-    /// drawings, table/row/cell property containers, etc.).
-    /// Incremented on Start of an ignored container, decremented on End.
-    in_ignored_subtree: u32,
+    /// Stack of denied subtrees and one-shot suppression markers.
+    denied_stack: Vec<DeniedKind>,
     /// Whether the reader is currently inside a `<w:p>` element.
     in_paragraph: bool,
     /// Whether the reader is currently inside a `<w:t>` element.
@@ -139,7 +158,7 @@ impl fmt::Debug for DocumentReader {
         let mut debug = f.debug_struct("DocumentReader");
         debug
             .field("buf", &self.buf)
-            .field("in_ignored_subtree", &self.in_ignored_subtree)
+            .field("denied_stack", &self.denied_stack)
             .field("in_paragraph", &self.in_paragraph)
             .field("in_text", &self.in_text)
             .field("in_ppr", &self.in_ppr)
@@ -195,7 +214,7 @@ impl DocumentReader {
     ) -> Self {
         Self {
             buf: Vec::with_capacity(4096),
-            in_ignored_subtree: 0,
+            denied_stack: Vec::new(),
             in_paragraph: false,
             in_text: false,
             in_ppr: false,
@@ -237,7 +256,7 @@ impl DocumentReader {
 
 impl DocumentReader {
     fn can_collect_text(&self) -> bool {
-        self.in_ignored_subtree == 0 && self.in_paragraph && self.in_text
+        self.denied_stack.is_empty() && self.in_paragraph && self.in_text
     }
 
     fn emit_line_break(&mut self) {
@@ -449,13 +468,14 @@ impl DocumentReader {
     fn handle_empty(&mut self, tag: &BytesStart<'_>) {
         let local_name = tag.local_name();
         let local = local_name.as_ref();
-        if self.in_ignored_subtree > 0 || is_ignored_container(local) {
+        if !self.denied_stack.is_empty() || is_denied_container(local).is_some() {
             return;
         }
         if self.handle_rpr_property(local, tag) {
             return;
         }
         match local {
+            value if !self.denied_stack.is_empty() || is_denied_container(value).is_some() => {}
             b"pPr" if self.in_paragraph && !self.paragraph_started_emitted => {
                 self.ensure_paragraph_started();
             }
@@ -520,8 +540,10 @@ impl DocumentReader {
     }
 
     fn handle_end(&mut self, local: &[u8]) {
-        if self.in_ignored_subtree > 0 {
-            self.in_ignored_subtree = self.in_ignored_subtree.saturating_sub(1);
+        if let Some(&top) = self.denied_stack.last() {
+            if denied_kind_for(local) == Some(top) {
+                self.denied_stack.pop();
+            }
             return;
         }
 
@@ -626,8 +648,10 @@ impl DocumentReader {
     fn handle_start(&mut self, tag: &BytesStart<'_>) {
         let local_name = tag.local_name();
         let local = local_name.as_ref();
-        if self.in_ignored_subtree > 0 {
-            self.in_ignored_subtree = self.in_ignored_subtree.saturating_add(1);
+        if !self.denied_stack.is_empty() {
+            if let Some(kind) = is_denied_container(local) {
+                self.denied_stack.push(kind);
+            }
             return;
         }
         if self.handle_table_start(local, tag) {
@@ -637,34 +661,35 @@ impl DocumentReader {
             return;
         }
 
-        match local {
-            value if is_ignored_container(value) => self.in_ignored_subtree = 1,
-            b"pPr" if self.in_paragraph => {
+        let denied_container = is_denied_container(local);
+        match (local, denied_container) {
+            (_, Some(kind)) => self.denied_stack.push(kind),
+            (b"pPr", _) if self.in_paragraph => {
                 if self.paragraph_started_emitted {
                     // Out-of-order pPr: StartParagraph already emitted; silently consume
-                    self.in_ignored_subtree = 1;
+                    self.denied_stack.push(DeniedKind::PPr);
                 } else {
                     self.in_ppr = true;
                     self.pending_paragraph_alignment = None;
                 }
             }
-            b"jc" if self.in_ppr => {
+            (b"jc", _) if self.in_ppr => {
                 let val = read_val_attribute(tag);
                 self.pending_paragraph_alignment =
                     val.as_deref().and_then(properties::parse_alignment);
             }
-            b"pStyle" if self.in_ppr && !self.paragraph_started_emitted => {
+            (b"pStyle", _) if self.in_ppr && !self.paragraph_started_emitted => {
                 self.pending_paragraph_classification = read_val_attribute(tag)
                     .filter(|s| !s.is_empty())
                     .and_then(|s| self.data.style_list.classify(&s));
             }
-            b"rPr" if self.in_ppr => {
-                self.in_ignored_subtree = 1;
+            (b"rPr", _) if self.in_ppr => {
+                self.denied_stack.push(DeniedKind::RPr);
             }
-            b"rPr" if self.in_paragraph && !self.in_ppr && !self.in_rpr => {
+            (b"rPr", _) if self.in_paragraph && !self.in_ppr && !self.in_rpr => {
                 if self.run_content_emitted {
                     // Out-of-order rPr: content already emitted in this run; silently consume
-                    self.in_ignored_subtree = 1;
+                    self.denied_stack.push(DeniedKind::RPr);
                 } else {
                     self.in_rpr = true;
                     self.pending_run_kinds.clear();
@@ -674,26 +699,26 @@ impl DocumentReader {
                     self.pending_run_font = None;
                 }
             }
-            b"p" if !self.in_paragraph => {
+            (b"p", _) if !self.in_paragraph => {
                 self.ensure_cell_started();
                 self.start_paragraph();
             }
-            b"r" if self.in_paragraph => {
+            (b"r", _) if self.in_paragraph => {
                 self.ensure_cell_started();
                 self.ensure_paragraph_started();
             }
-            b"t" if self.in_paragraph => {
+            (b"t", _) if self.in_paragraph => {
                 self.ensure_cell_started();
                 self.ensure_paragraph_started();
                 self.in_text = true;
                 self.pending_text.clear();
                 self.run_content_emitted = true;
             }
-            b"br" if self.in_paragraph => {
+            (b"br", _) if self.in_paragraph => {
                 self.ensure_cell_started();
                 self.emit_line_break();
             }
-            b"tab" if self.in_paragraph => {
+            (b"tab", _) if self.in_paragraph => {
                 self.ensure_cell_started();
                 self.emit_tab();
             }
@@ -726,7 +751,7 @@ impl DocumentReader {
             b"trPr" => {
                 if self.row_started_emitted {
                     // Out-of-order trPr: row content already emitted; silently consume
-                    self.in_ignored_subtree = 1;
+                    self.denied_stack.push(DeniedKind::TrPr);
                 } else {
                     self.in_trpr = true;
                 }
@@ -744,7 +769,7 @@ impl DocumentReader {
             b"tcPr" => {
                 if self.cell_started_emitted {
                     // Out-of-order tcPr: cell content already emitted; silently consume
-                    self.in_ignored_subtree = 1;
+                    self.denied_stack.push(DeniedKind::TcPr);
                 } else {
                     self.in_tcpr = true;
                 }
@@ -943,22 +968,45 @@ impl DocumentReader {
     }
 }
 
-fn is_ignored_container(local: &[u8]) -> bool {
-    matches!(
-        local,
-        b"sdt"
-            | b"hyperlink"
-            | b"drawing"
-            | b"pict"
-            | b"object"
-            | b"ins"
-            | b"del"
-            | b"moveFrom"
-            | b"moveTo"
-            | b"tblPr"
-            | b"tblGrid"
-            | b"tblPrEx"
-    )
+/// Returns Some only for elements whose entire subtree should be silently dropped
+/// when they appear at the document level. Does NOT include one-shot suppression
+/// markers (PPr/RPr/TrPr/TcPr).
+fn is_denied_container(local: &[u8]) -> Option<DeniedKind> {
+    match local {
+        b"drawing" => Some(DeniedKind::Drawing),
+        b"pict" => Some(DeniedKind::Pict),
+        b"object" => Some(DeniedKind::Object),
+        b"del" => Some(DeniedKind::Del),
+        b"moveFrom" => Some(DeniedKind::MoveFrom),
+        b"tblPr" => Some(DeniedKind::TblPr),
+        b"tblGrid" => Some(DeniedKind::TblGrid),
+        b"tblPrEx" => Some(DeniedKind::TblPrEx),
+        b"sdtPr" => Some(DeniedKind::SdtPr),
+        b"sdtEndPr" => Some(DeniedKind::SdtEndPr),
+        _ => None,
+    }
+}
+
+/// Returns Some for any element that can ever be on the denied stack.
+/// Superset of `is_denied_container`: adds PPr/RPr/TrPr/TcPr.
+fn denied_kind_for(local: &[u8]) -> Option<DeniedKind> {
+    match local {
+        b"drawing" => Some(DeniedKind::Drawing),
+        b"pict" => Some(DeniedKind::Pict),
+        b"object" => Some(DeniedKind::Object),
+        b"del" => Some(DeniedKind::Del),
+        b"moveFrom" => Some(DeniedKind::MoveFrom),
+        b"tblPr" => Some(DeniedKind::TblPr),
+        b"tblGrid" => Some(DeniedKind::TblGrid),
+        b"tblPrEx" => Some(DeniedKind::TblPrEx),
+        b"sdtPr" => Some(DeniedKind::SdtPr),
+        b"sdtEndPr" => Some(DeniedKind::SdtEndPr),
+        b"pPr" => Some(DeniedKind::PPr),
+        b"rPr" => Some(DeniedKind::RPr),
+        b"trPr" => Some(DeniedKind::TrPr),
+        b"tcPr" => Some(DeniedKind::TcPr),
+        _ => None,
+    }
 }
 
 fn read_val_attribute(tag: &BytesStart<'_>) -> Option<String> {

@@ -11,14 +11,21 @@
 //! **In scope**: Paragraphs (`<w:p>`), direct text (`<w:t>` inside `<w:r>`),
 //! line breaks (`<w:br>` — including `w:type="page"` and `w:type="column"`, all
 //! emitted as `LineBreak`), tabs (`<w:tab>`, emitted as a `Text` event whose
-//! content is the single character `"\t"`), and tables (`<w:tbl>`, `<w:tr>`,
-//! `<w:tc>` — emitted as structural events only; cell merging, header rows, and
-//! table styles are not represented).
-//! Emits exactly: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`,
+//! content is the single character `"\t"`), tables (`<w:tbl>`, `<w:tr>`,
+//! `<w:tc>`), hyperlinks (`<w:hyperlink>` — link text content is emitted as
+//! plain runs), structured document tags (`<w:sdt>` — content emitted normally;
+//! `<w:sdtPr>`/`<w:sdtEndPr>` dropped), and tracked insertions and moves
+//! (`<w:ins>`, `<w:moveTo>` — accept-changes semantics).
+//! Emits: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`,
 //! `EndTextStyle`, `LineBreak`, `EndParagraph`, `StartTable`, `StartTableRow`,
-//! `StartTableCell`, `EndTableCell`, `EndTableRow`, `EndTable`, `EndDocument`.
+//! `StartTableCell`, `StartTableHeader`, `EndTableHeader`, `EndTableCell`,
+//! `EndTableRow`, `EndTable`, `EndDocument`.
 //!
-//! **Out of scope (silently dropped)**:
+//! The elements listed under "Out of scope" are the reader's denylist — their
+//! entire subtree is silently dropped. Every other element (known or unknown)
+//! is parsed normally; the reader continues into its children.
+//!
+//! **Out of scope (subtree silently dropped)**:
 //! - Run styling not listed in the crate README
 //! - Headings (any `<w:pStyle>` value — every paragraph is `StartParagraph`)
 //! - Vertical cell merging (`<w:vMerge>`) — every cell emits with
@@ -29,12 +36,11 @@
 //! - Table, row, and cell visual properties (`<w:tblPr>`, `<w:trPr>` visual
 //!   fields, `<w:tcPr>` visual fields, `<w:tblGrid>`)
 //! - Lists
-//! - Hyperlinks (`<w:hyperlink>`)
 //! - Drawings and images (`<w:drawing>`, `<w:pict>`)
-//! - Structured document tags (`<w:sdt>`)
 //! - Comments, footnotes, headers, footers
 //! - Document metadata
-//! - Tracked changes (`<w:ins>`, `<w:del>`, `<w:moveFrom>`, `<w:moveTo>`)
+//! - Tracked deletions (`<w:del>`, `<w:moveFrom>`) — accept-changes semantics
+//! - Structured document tag properties (`<w:sdtPr>`, `<w:sdtEndPr>`)
 //!
 //! # Streaming Guarantee
 //!

@@ -19,6 +19,9 @@ architecture, and the event protocol.
 - Paragraph properties (`<w:pPr>`): `<w:jc>` (alignment — `left`/`start` to Left, `right`/`end` to Right, `center` to Center, `both`/`distribute` to Justify)
 - Empty `<w:rPr/>` and `<w:pPr/>` are treated as no properties (default style / alignment None)
 - A `<w:rPr>` or `<w:pPr>` that appears after content in the same parent is silently ignored (per the OOXML spec, both must be the first child element)
+- Hyperlinks (`<w:hyperlink>`) — link text content is emitted as plain runs. The URL target is dropped.
+- Structured Document Tags (`<w:sdt>`) — the content of an SDT is emitted normally. The property containers `<w:sdtPr>` and `<w:sdtEndPr>` are dropped.
+- Tracked insertions and moves (`<w:ins>`, `<w:moveTo>`) — the inserted/moved-in content is emitted (accept-changes semantics).
 - Emits: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`, `EndTextStyle`, `LineBreak`, `EndParagraph`, `StartTable`, `StartTableRow`, `StartTableCell`, `StartTableHeader`, `EndTableHeader`, `EndTableCell`, `EndTableRow`, `EndTable`, `EndDocument`
 - Symbol font character normalization for Wingdings, Wingdings 2, Wingdings 3, Webdings, and Symbol fonts — codepoints are mapped to their Unicode equivalents; unmapped codepoints are dropped
 - Compression: `Stored` and `Deflated` only
@@ -31,7 +34,9 @@ When both `<w:highlight>` and `<w:shd w:fill>` appear in the same `<w:rPr>`, `<w
 
 Adjacent runs with the same color emit separate `StartTextStyle`/`EndTextStyle` pairs. The reader maintains per-run discipline and does not merge consecutive runs, even when their style properties are identical.
 
-## Out of Scope (silently dropped)
+## Out of Scope (subtree silently dropped)
+
+The XML elements listed below are the reader's denylist — their entire subtree is silently dropped during parsing. Any element NOT listed (whether a known structural tag like `<w:p>` or an unknown extension) is processed normally; the reader just continues into its children.
 
 - Headings (any `<w:pStyle>` value — every paragraph is `StartParagraph`)
 - Style references (`<w:rStyle>`, `<w:pStyle>`)
@@ -48,12 +53,12 @@ Adjacent runs with the same color emit separate `StartTextStyle`/`EndTextStyle` 
 - Table-level property exceptions (`<w:tblPrEx>`) — silently ignored (consistent with `<w:tblPr>`)
 - Table, row, and cell visual properties (`<w:tblPr>`, `<w:trPr>` visual fields, `<w:tcPr>` visual fields, `<w:tblGrid>`) — silently dropped
 - Lists
-- Hyperlinks (`<w:hyperlink>`)
 - Drawings and images (`<w:drawing>`, `<w:pict>`)
-- Structured document tags (`<w:sdt>`)
 - Comments, footnotes, headers, footers
 - Document metadata
-- Tracked changes (`<w:ins>`, `<w:del>`, `<w:moveFrom>`, `<w:moveTo>`)
+- Tracked deletions and moves-from (`<w:del>`, `<w:moveFrom>`) — silently dropped (accept-changes semantics). Their text content uses `<w:delText>` which is not part of the reader's text-matching set.
+- Structured document tag properties (`<w:sdtPr>`, `<w:sdtEndPr>`) — metadata containers; subtree dropped.
+- Hyperlink URL targets — link text is preserved, but the `r:id` attribute pointing to the relationship is dropped.
 
 ## Streaming Guarantee
 
