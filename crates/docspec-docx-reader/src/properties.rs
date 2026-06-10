@@ -1,6 +1,7 @@
 //! OOXML value parsers for run and paragraph properties.
 
-use docspec_core::{Color, TextAlignment};
+use crate::numbering::LevelOutcome;
+use docspec_core::{Color, ListStyleType, TextAlignment};
 
 /// Parses an `ST_OnOff` value (ECMA-376 §22.9.2.7).
 ///
@@ -168,6 +169,29 @@ pub(crate) fn parse_sym_char(hex: &str) -> Option<u8> {
     let raw = u16::from_str_radix(hex, 16).ok()?;
     let stripped = raw.checked_sub(0xF000).unwrap_or(raw);
     u8::try_from(stripped).ok()
+}
+
+/// Parses a `w:numFmt` attribute value (ECMA-376 §17.9.17) into a `LevelOutcome`.
+///
+/// Maps OOXML numFmt values to list style outcomes:
+/// - `"none"` → `LevelOutcome::NotAList`
+/// - `"bullet"` → `LevelOutcome::List(ListStyleType::Disc)`
+/// - `"lowerLetter"` → `LevelOutcome::List(ListStyleType::LowerAlpha)`
+/// - `"upperLetter"` → `LevelOutcome::List(ListStyleType::UpperAlpha)`
+/// - `"lowerRoman"` → `LevelOutcome::List(ListStyleType::LowerRoman)`
+/// - `"upperRoman"` → `LevelOutcome::List(ListStyleType::UpperRoman)`
+/// - All other values (including `"decimal"`, `"decimalZero"`, CJK, exotic, unknown, empty string)
+///   → `LevelOutcome::List(ListStyleType::Decimal)` (default)
+pub fn parse_num_fmt(val: &str) -> LevelOutcome {
+    match val {
+        "none" => LevelOutcome::NotAList,
+        "bullet" => LevelOutcome::List(ListStyleType::Disc),
+        "lowerLetter" => LevelOutcome::List(ListStyleType::LowerAlpha),
+        "upperLetter" => LevelOutcome::List(ListStyleType::UpperAlpha),
+        "lowerRoman" => LevelOutcome::List(ListStyleType::LowerRoman),
+        "upperRoman" => LevelOutcome::List(ListStyleType::UpperRoman),
+        _ => LevelOutcome::List(ListStyleType::Decimal),
+    }
 }
 
 #[cfg(test)]
@@ -739,5 +763,102 @@ mod tests {
     #[test]
     fn parse_grid_span_value_negative_returns_none() {
         assert_eq!(parse_grid_span_value(Some("-1")), None);
+    }
+
+    // ============================================================================
+    // parse_num_fmt tests (12 cases)
+    // ============================================================================
+
+    #[test]
+    fn parse_num_fmt_returns_disc_for_bullet() {
+        assert_eq!(
+            parse_num_fmt("bullet"),
+            LevelOutcome::List(ListStyleType::Disc)
+        );
+    }
+
+    #[test]
+    fn parse_num_fmt_returns_decimal_for_decimal() {
+        assert_eq!(
+            parse_num_fmt("decimal"),
+            LevelOutcome::List(ListStyleType::Decimal)
+        );
+    }
+
+    #[test]
+    fn parse_num_fmt_returns_decimal_for_decimal_zero() {
+        assert_eq!(
+            parse_num_fmt("decimalZero"),
+            LevelOutcome::List(ListStyleType::Decimal)
+        );
+    }
+
+    #[test]
+    fn parse_num_fmt_returns_lower_alpha_for_lower_letter() {
+        assert_eq!(
+            parse_num_fmt("lowerLetter"),
+            LevelOutcome::List(ListStyleType::LowerAlpha)
+        );
+    }
+
+    #[test]
+    fn parse_num_fmt_returns_upper_alpha_for_upper_letter() {
+        assert_eq!(
+            parse_num_fmt("upperLetter"),
+            LevelOutcome::List(ListStyleType::UpperAlpha)
+        );
+    }
+
+    #[test]
+    fn parse_num_fmt_returns_lower_roman_for_lower_roman() {
+        assert_eq!(
+            parse_num_fmt("lowerRoman"),
+            LevelOutcome::List(ListStyleType::LowerRoman)
+        );
+    }
+
+    #[test]
+    fn parse_num_fmt_returns_upper_roman_for_upper_roman() {
+        assert_eq!(
+            parse_num_fmt("upperRoman"),
+            LevelOutcome::List(ListStyleType::UpperRoman)
+        );
+    }
+
+    #[test]
+    fn parse_num_fmt_returns_not_a_list_for_none() {
+        assert_eq!(parse_num_fmt("none"), LevelOutcome::NotAList);
+    }
+
+    #[test]
+    fn parse_num_fmt_returns_decimal_for_japanese_counting() {
+        assert_eq!(
+            parse_num_fmt("japaneseDigital"),
+            LevelOutcome::List(ListStyleType::Decimal)
+        );
+    }
+
+    #[test]
+    fn parse_num_fmt_returns_decimal_for_thai_numbers() {
+        assert_eq!(
+            parse_num_fmt("thaiNumbers"),
+            LevelOutcome::List(ListStyleType::Decimal)
+        );
+    }
+
+    #[test]
+    fn parse_num_fmt_returns_decimal_for_unknown() {
+        assert_eq!(
+            parse_num_fmt("unknownFormat"),
+            LevelOutcome::List(ListStyleType::Decimal)
+        );
+    }
+
+    #[test]
+    fn parse_num_fmt_returns_decimal_for_empty_string() {
+        assert_eq!(
+            parse_num_fmt(""),
+            LevelOutcome::List(ListStyleType::Decimal)
+        );
     }
 }

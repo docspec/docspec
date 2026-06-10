@@ -9,9 +9,19 @@ use crate::rels;
 use crate::rels::HyperlinkMap;
 use crate::styles::StyleList;
 
+/// Opens a DOCX ZIP archive, loads `styles.xml` and `numbering.xml` from the package
+/// relationships, locates `document.xml`, and returns a streaming reader for it.
+///
+/// Returns the loaded [`StyleList`], the loaded [`crate::numbering::MinimalNumbering`],
+/// the [`HyperlinkMap`], and a byte stream positioned at the start of `document.xml` data.
 pub fn open_package<R: Read + Seek + Send + 'static>(
     mut reader: R,
-) -> Result<(StyleList, HyperlinkMap, Box<dyn Read + Send>)> {
+) -> Result<(
+    StyleList,
+    crate::numbering::MinimalNumbering,
+    HyperlinkMap,
+    Box<dyn Read + Send>,
+)> {
     let mut archive = zip::ZipArchive::new(&mut reader).map_err(|err| match err {
         ZipError::InvalidArchive(_) | ZipError::UnsupportedArchive(_) => Error::Parse {
             message: "not a valid ZIP archive".to_string(),
@@ -43,6 +53,7 @@ pub fn open_package<R: Read + Seek + Send + 'static>(
     let document_path = rels::find_document_target(std::io::Cursor::new(rels_bytes))?;
     let (style_list, hyperlink_map) =
         load_style_list_and_hyperlink_map(&mut archive, &document_path)?;
+    let numbering = load_numbering(&mut archive, &document_path)?;
 
     let (data_start, compressed_size, method) = {
         let entry = archive
@@ -75,7 +86,7 @@ pub fn open_package<R: Read + Seek + Send + 'static>(
         });
     };
 
-    Ok((style_list, hyperlink_map, stream))
+    Ok((style_list, numbering, hyperlink_map, stream))
 }
 
 fn load_style_list_and_hyperlink_map<R: Read + Seek>(
@@ -137,6 +148,40 @@ fn read_optional_entry<R: Read + Seek>(
         Err(ZipError::FileNotFound) => Ok(None),
         Err(err) => Err(parse_error(format!("malformed ZIP: {err}"))),
     }
+}
+
+fn load_numbering<R: Read + Seek>(
+    archive: &mut zip::ZipArchive<&mut R>,
+    document_path: &str,
+) -> Result<crate::numbering::MinimalNumbering> {
+    let doc_rels_path = rels::derive_part_rels_path(document_path);
+    let doc_rels_bytes = match archive.by_name(&doc_rels_path) {
+        Ok(mut entry) => {
+            let mut bytes = Vec::new();
+            entry.read_to_end(&mut bytes).map_err(Error::from)?;
+            bytes
+        }
+        Err(ZipError::FileNotFound) => return Ok(crate::numbering::MinimalNumbering::new()),
+        Err(err) => return Err(parse_error(format!("malformed ZIP: {err}"))),
+    };
+
+    let Some(numbering_target) = rels::find_numbering_target(std::io::Cursor::new(doc_rels_bytes))?
+    else {
+        return Ok(crate::numbering::MinimalNumbering::new());
+    };
+
+    let numbering_path = rels::resolve_relative_target(document_path, &numbering_target);
+    let numbering_bytes = match archive.by_name(&numbering_path) {
+        Ok(mut entry) => {
+            let mut bytes = Vec::new();
+            entry.read_to_end(&mut bytes).map_err(Error::from)?;
+            bytes
+        }
+        Err(ZipError::FileNotFound) => return Ok(crate::numbering::MinimalNumbering::new()),
+        Err(err) => return Err(parse_error(format!("malformed ZIP: {err}"))),
+    };
+
+    crate::numbering::parse_numbering(std::io::Cursor::new(numbering_bytes))
 }
 
 fn parse_error(message: String) -> Error {
@@ -414,7 +459,7 @@ mod tests {
         });
 
         match result {
-            Ok((style_list, _hyperlink_map, mut stream)) => {
+            Ok((style_list, _numbering, _hyperlink_map, mut stream)) => {
                 assert!(style_list.get_by_id("Normal").is_some());
                 let mut document = String::new();
                 let read_result = stream.read_to_string(&mut document);
@@ -439,7 +484,7 @@ mod tests {
         });
 
         match result {
-            Ok((style_list, _hyperlink_map, _stream)) => {
+            Ok((style_list, _numbering, _hyperlink_map, _stream)) => {
                 assert_eq!(style_list, StyleList::default());
             }
             Err(err) => assert_eq!(format!("{err:?}"), "expected default StyleList"),
@@ -462,10 +507,139 @@ mod tests {
         });
 
         match result {
-            Ok((style_list, _hyperlink_map, _stream)) => {
+            Ok((style_list, _numbering, _hyperlink_map, _stream)) => {
                 assert_eq!(style_list, StyleList::default());
             }
             Err(err) => assert_eq!(format!("{err:?}"), "expected default StyleList"),
+        }
+    }
+
+    fn doc_rels_with_numbering_xml(styles_target: &str, numbering_target: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="{styles_target}"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="{numbering_target}"/>
+</Relationships>"#
+        )
+    }
+
+    fn doc_rels_with_only_numbering(numbering_target: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="{numbering_target}"/>
+</Relationships>"#
+        )
+    }
+
+    fn minimal_numbering_xml() -> &'static str {
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0">
+      <w:numFmt w:val="decimal"/>
+    </w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1">
+    <w:abstractNumId w:val="1"/>
+  </w:num>
+</w:numbering>"#
+    }
+
+    #[test]
+    fn open_package_loads_numbering_when_present() {
+        let root_rels = root_rels_xml("word/document.xml");
+        let doc_rels = doc_rels_with_numbering_xml("styles.xml", "numbering.xml");
+        let bytes = synth_zip(&[
+            ("_rels/.rels", root_rels.as_bytes()),
+            ("word/_rels/document.xml.rels", doc_rels.as_bytes()),
+            ("word/document.xml", minimal_document_xml().as_bytes()),
+            ("word/styles.xml", minimal_styles_xml().as_bytes()),
+            ("word/numbering.xml", minimal_numbering_xml().as_bytes()),
+        ]);
+
+        let result = bytes.and_then(|zip_bytes| {
+            open_package(Cursor::new(zip_bytes))
+                .map_err(|err| zip::result::ZipError::Io(std::io::Error::other(format!("{err:?}"))))
+        });
+
+        match result {
+            Ok((_style_list, numbering, _hyperlink_map, _stream)) => {
+                assert!(numbering.resolve(1, 0).is_list);
+            }
+            Err(err) => assert_eq!(format!("{err:?}"), "expected numbering and document stream"),
+        }
+    }
+
+    #[test]
+    fn open_package_returns_empty_numbering_when_absent() {
+        let root_rels = root_rels_xml("word/document.xml");
+        let bytes = synth_zip(&[
+            ("_rels/.rels", root_rels.as_bytes()),
+            ("word/document.xml", minimal_document_xml().as_bytes()),
+        ]);
+
+        let result = bytes.and_then(|zip_bytes| {
+            open_package(Cursor::new(zip_bytes))
+                .map_err(|err| zip::result::ZipError::Io(std::io::Error::other(format!("{err:?}"))))
+        });
+
+        match result {
+            Ok((_style_list, numbering, _hyperlink_map, _stream)) => {
+                assert!(!numbering.resolve(1, 0).is_list);
+            }
+            Err(err) => assert_eq!(format!("{err:?}"), "expected empty numbering"),
+        }
+    }
+
+    #[test]
+    fn open_package_returns_empty_numbering_when_rels_missing_link() {
+        let root_rels = root_rels_xml("word/document.xml");
+        let doc_rels = doc_rels_xml("styles.xml");
+        let bytes = synth_zip(&[
+            ("_rels/.rels", root_rels.as_bytes()),
+            ("word/_rels/document.xml.rels", doc_rels.as_bytes()),
+            ("word/document.xml", minimal_document_xml().as_bytes()),
+            ("word/styles.xml", minimal_styles_xml().as_bytes()),
+        ]);
+
+        let result = bytes.and_then(|zip_bytes| {
+            open_package(Cursor::new(zip_bytes))
+                .map_err(|err| zip::result::ZipError::Io(std::io::Error::other(format!("{err:?}"))))
+        });
+
+        match result {
+            Ok((_style_list, numbering, _hyperlink_map, _stream)) => {
+                assert!(!numbering.resolve(1, 0).is_list);
+            }
+            Err(err) => assert_eq!(format!("{err:?}"), "expected empty numbering"),
+        }
+    }
+
+    #[test]
+    fn open_package_returns_err_on_malformed_numbering_xml() {
+        let root_rels = root_rels_xml("word/document.xml");
+        let doc_rels = doc_rels_with_only_numbering("numbering.xml");
+        let malformed = b"<w:numbering xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:lvl";
+        let bytes = synth_zip(&[
+            ("_rels/.rels", root_rels.as_bytes()),
+            ("word/_rels/document.xml.rels", doc_rels.as_bytes()),
+            ("word/document.xml", minimal_document_xml().as_bytes()),
+            ("word/numbering.xml", &malformed[..]),
+        ]);
+
+        let result = bytes.and_then(|zip_bytes| {
+            open_package(Cursor::new(zip_bytes))
+                .map_err(|err| zip::result::ZipError::Io(std::io::Error::other(format!("{err:?}"))))
+        });
+
+        match result {
+            Err(_) => {}
+            Ok(_) => assert_eq!(
+                "opened without error",
+                "expected parse error for malformed numbering.xml",
+            ),
         }
     }
 }

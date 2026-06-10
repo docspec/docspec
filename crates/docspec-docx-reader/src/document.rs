@@ -11,6 +11,8 @@ use crate::properties;
 use crate::rels::HyperlinkMap;
 use crate::styles::StyleList;
 
+const MAX_LIST_LEVEL: u32 = 8;
+
 /// Document processing phase.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Phase {
@@ -26,7 +28,7 @@ enum Phase {
 ///
 /// Set in `ensure_paragraph_started()` based on `pending_paragraph_classification`.
 /// Consumed in `end_paragraph()` to emit the matching End event.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum ParagraphBlockKind {
     /// Plain paragraph (default).
     Paragraph,
@@ -36,17 +38,43 @@ enum ParagraphBlockKind {
     BlockQuote,
     /// Preformatted / code block.
     Preformatted,
+    /// Ordered list item at the given nesting depth.
+    OrderedListItem {
+        num_id: u32,
+        ilvl: u32,
+        start: Option<u64>,
+        style_type: docspec_core::ListStyleType,
+    },
+    /// Unordered list item at the given nesting depth.
+    UnorderedListItem {
+        num_id: u32,
+        ilvl: u32,
+        style_type: docspec_core::ListStyleType,
+    },
+}
+
+/// One open level on the list nesting stack.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct ListStackEntry {
+    /// The w:numId of the list this entry belongs to.
+    num_id: u32,
+    /// The 0-indexed nesting depth (w:ilvl).
+    ilvl: u32,
+    /// Whether this entry's level is ordered (true) or unordered (false).
+    is_ordered: bool,
 }
 
 /// Bundle of package-level data the document reader consults during streaming.
 ///
-/// Forward-compatible: additional package parts (theme, numbering, settings)
+/// Forward-compatible: additional package parts (theme, settings)
 /// will be added as fields here without breaking the constructor signature.
 pub struct DocxData {
     /// Styles loaded from the styles part, used to classify paragraph and run styles.
     pub style_list: StyleList,
     /// Map of relationship Id → Target URL for every <w:hyperlink> r:id reference. Resolved from word/_rels/document.xml.rels at package-open time; empty if the rels file is absent or contains no hyperlink relationships.
     pub hyperlink_map: HyperlinkMap,
+    /// Numbering definitions loaded from the numbering part, used to resolve list styles.
+    pub numbering: crate::numbering::MinimalNumbering,
 }
 
 /// Deferred-emission state for an open <w:hyperlink>.
@@ -181,6 +209,21 @@ pub struct DocumentReader {
     /// Some when a hyperlink has been opened but possibly before its
     /// `StartLink` has been flushed. None when no hyperlink is open.
     pending_link: Option<PendingLink>,
+    /// Open list nesting stack. Each entry represents one open list level.
+    list_stack: Vec<ListStackEntry>,
+    /// Set of numIds whose first item has been emitted document-wide.
+    /// Persists across non-list paragraph breaks.
+    seen_lists: std::collections::HashSet<u32>,
+    /// (numId, ilvl) captured from `<w:numPr>` during `<w:pPr>` parsing.
+    /// Consumed by `ensure_paragraph_started`.
+    pending_paragraph_list: Option<(u32, u32)>,
+    /// True while inside `<w:numPr>` and capturing children.
+    /// Mirrors the `in_ppr` field pattern.
+    in_numpr: bool,
+    /// w:numId captured from `<w:numId w:val="..."/>` inside `<w:numPr>` (None until seen).
+    pending_num_pr_id: Option<u32>,
+    /// w:ilvl captured from `<w:ilvl w:val="..."/>` inside `<w:numPr>` (None until seen).
+    pending_num_pr_ilvl: Option<u32>,
     /// The quick-xml reader streaming from the document entry.
     xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
 }
@@ -227,7 +270,13 @@ impl fmt::Debug for DocumentReader {
             .field("data", &"<DocxData>")
             .field("hyperlink_map", &self.hyperlink_map)
             .field("hyperlink_depth", &self.hyperlink_depth)
-            .field("pending_link", &pending_link);
+            .field("pending_link", &pending_link)
+            .field("list_stack", &self.list_stack)
+            .field("seen_lists", &self.seen_lists)
+            .field("pending_paragraph_list", &self.pending_paragraph_list)
+            .field("in_numpr", &self.in_numpr)
+            .field("pending_num_pr_id", &self.pending_num_pr_id)
+            .field("pending_num_pr_ilvl", &self.pending_num_pr_ilvl);
         if std::env::var_os("DOCSPEC_DEBUG_DEFERRED_TABLE_SCAFFOLD").is_some() {
             debug
                 .field("in_tcpr", &self.in_tcpr)
@@ -256,6 +305,7 @@ impl DocumentReader {
         let DocxData {
             style_list,
             hyperlink_map,
+            numbering,
         } = data;
         Self {
             buf: Vec::with_capacity(4096),
@@ -285,6 +335,7 @@ impl DocumentReader {
             data: DocxData {
                 style_list,
                 hyperlink_map: HyperlinkMap::default(),
+                numbering,
             },
             hyperlink_map,
             in_tcpr: false,
@@ -300,6 +351,12 @@ impl DocumentReader {
             header_band_open: false,
             hyperlink_depth: 0,
             pending_link: None,
+            list_stack: Vec::new(),
+            seen_lists: std::collections::HashSet::new(),
+            pending_paragraph_list: None,
+            in_numpr: false,
+            pending_num_pr_id: None,
+            pending_num_pr_ilvl: None,
             xml,
         }
     }
@@ -350,8 +407,10 @@ impl DocumentReader {
             }
         }
         self.hyperlink_depth = 0;
-        let end_event = match self.current_paragraph_block {
-            ParagraphBlockKind::Paragraph => Event::EndParagraph,
+        let end_event = match &self.current_paragraph_block {
+            ParagraphBlockKind::Paragraph
+            | ParagraphBlockKind::OrderedListItem { .. }
+            | ParagraphBlockKind::UnorderedListItem { .. } => Event::EndParagraph,
             ParagraphBlockKind::Heading { .. } => Event::EndHeading,
             ParagraphBlockKind::BlockQuote => Event::EndBlockQuote,
             ParagraphBlockKind::Preformatted => Event::EndPreformatted,
@@ -361,10 +420,91 @@ impl DocumentReader {
         self.in_text = false;
         self.pending_text.clear();
         self.in_ppr = false;
+        self.in_numpr = false;
+        self.pending_num_pr_id = None;
+        self.pending_num_pr_ilvl = None;
         self.pending_paragraph_alignment = None;
         self.pending_paragraph_classification = None;
         self.current_paragraph_block = ParagraphBlockKind::Paragraph;
         self.paragraph_started_emitted = false;
+    }
+
+    fn flush_list_stack(&mut self) {
+        while let Some(entry) = self.list_stack.pop() {
+            let event = if entry.is_ordered {
+                Event::EndOrderedListItem
+            } else {
+                Event::EndUnorderedListItem
+            };
+            self.queue.push_back(event);
+        }
+    }
+
+    fn compute_start(&mut self, num_id: u32) -> Option<u64> {
+        self.seen_lists.insert(num_id).then_some(1)
+    }
+
+    fn reconcile_list_stack(&mut self, num_id: u32, ilvl: u32, is_ordered: bool) {
+        while let Some(top) = self.list_stack.last().copied() {
+            match top.ilvl.cmp(&ilvl) {
+                core::cmp::Ordering::Greater => {
+                    self.list_stack.pop();
+                    let end = if top.is_ordered {
+                        Event::EndOrderedListItem
+                    } else {
+                        Event::EndUnorderedListItem
+                    };
+                    self.queue.push_back(end);
+                }
+                core::cmp::Ordering::Equal => {
+                    self.list_stack.pop();
+                    let end = if top.is_ordered {
+                        Event::EndOrderedListItem
+                    } else {
+                        Event::EndUnorderedListItem
+                    };
+                    self.queue.push_back(end);
+                    break;
+                }
+                core::cmp::Ordering::Less => break,
+            }
+        }
+
+        let target_depth = usize::try_from(ilvl).unwrap_or(usize::MAX);
+        while self.list_stack.len() < target_depth {
+            let phantom_ilvl = u32::try_from(self.list_stack.len()).unwrap_or(u32::MAX);
+            let phantom_style = if is_ordered {
+                docspec_core::ListStyleType::Decimal
+            } else {
+                docspec_core::ListStyleType::Disc
+            };
+            let start_event = if is_ordered {
+                Event::StartOrderedListItem {
+                    id: Some(num_id.to_string()),
+                    level: phantom_ilvl,
+                    start: None,
+                    style_type: phantom_style,
+                }
+            } else {
+                Event::StartUnorderedListItem {
+                    id: Some(num_id.to_string()),
+                    level: phantom_ilvl,
+                    style_type: phantom_style,
+                }
+            };
+            self.list_stack.push(ListStackEntry {
+                num_id,
+                ilvl: phantom_ilvl,
+                is_ordered,
+            });
+            self.queue.push_back(start_event);
+        }
+
+        self.list_stack.push(ListStackEntry {
+            num_id,
+            ilvl,
+            is_ordered,
+        });
     }
 
     fn flush_pending_text(&mut self) {
@@ -583,6 +723,20 @@ impl DocumentReader {
                 self.pending_row_is_header =
                     properties::parse_on_off(read_val_attribute(tag).as_deref());
             }
+            b"numId" if self.in_numpr => {
+                if let Some(val) = read_val_attribute(tag) {
+                    if let Ok(n) = val.parse::<u32>() {
+                        self.pending_num_pr_id = Some(n);
+                    }
+                }
+            }
+            b"ilvl" if self.in_numpr => {
+                if let Some(val) = read_val_attribute(tag) {
+                    if let Ok(n) = val.parse::<u32>() {
+                        self.pending_num_pr_ilvl = Some(n);
+                    }
+                }
+            }
             b"vMerge" if self.in_tcpr => {
                 // vMerge (rowspan) deferred — requires event model change or table buffering, out of scope
             }
@@ -638,6 +792,15 @@ impl DocumentReader {
 
         match local {
             b"p" if self.in_paragraph => self.end_paragraph(),
+            b"numPr" if self.in_numpr => {
+                if let Some(num_id) = self.pending_num_pr_id {
+                    let ilvl = self.pending_num_pr_ilvl.unwrap_or(0);
+                    self.pending_paragraph_list = Some((num_id, ilvl));
+                }
+                self.in_numpr = false;
+                self.pending_num_pr_id = None;
+                self.pending_num_pr_ilvl = None;
+            }
             b"pPr" if self.in_ppr => {
                 self.ensure_paragraph_started();
                 self.in_ppr = false;
@@ -681,6 +844,7 @@ impl DocumentReader {
                 self.in_text = false;
             }
             b"tbl" => {
+                self.flush_list_stack();
                 self.table_depth = self.table_depth.saturating_sub(1);
                 self.queue.push_back(Event::EndTable);
             }
@@ -699,6 +863,7 @@ impl DocumentReader {
             }
             b"tc" => {
                 self.ensure_cell_started();
+                self.flush_list_stack();
                 if self.current_cell_is_header && self.table_depth == 1 {
                     self.queue.push_back(Event::EndTableHeader);
                 } else {
@@ -727,6 +892,7 @@ impl DocumentReader {
         if self.in_paragraph {
             self.end_paragraph();
         }
+        self.flush_list_stack();
         self.queue.push_back(Event::EndDocument);
         self.phase = Phase::Finished;
     }
@@ -781,6 +947,11 @@ impl DocumentReader {
                 self.pending_paragraph_classification = read_val_attribute(tag)
                     .filter(|s| !s.is_empty())
                     .and_then(|s| self.data.style_list.classify(&s));
+            }
+            (b"numPr", _) if self.in_ppr && !self.paragraph_started_emitted => {
+                self.in_numpr = true;
+                self.pending_num_pr_id = None;
+                self.pending_num_pr_ilvl = None;
             }
             (b"rPr", _) if self.in_ppr => {
                 self.denied_stack.push(DeniedKind::RPr);
@@ -871,6 +1042,7 @@ impl DocumentReader {
         match local {
             b"tbl" => {
                 self.ensure_cell_started();
+                self.flush_list_stack();
                 self.table_depth = self.table_depth.saturating_add(1);
                 if self.table_depth == 1 {
                     self.header_band_open = true;
@@ -985,37 +1157,123 @@ impl DocumentReader {
         self.paragraph_started_emitted = false;
         self.pending_paragraph_alignment = None;
         self.pending_paragraph_classification = None;
+        self.pending_paragraph_list = None;
         self.current_paragraph_block = ParagraphBlockKind::Paragraph;
     }
 
     /// Queues the appropriate Start event once paragraph properties have been parsed.
     fn ensure_paragraph_started(&mut self) {
         if self.in_paragraph && !self.paragraph_started_emitted {
+            let list_classification = match self.pending_paragraph_list.take() {
+                None => None,
+                Some((num_id, raw_ilvl)) => {
+                    let ilvl = core::cmp::min(raw_ilvl, MAX_LIST_LEVEL);
+                    let result = self.data.numbering.resolve(num_id, ilvl);
+                    result
+                        .is_list
+                        .then_some((num_id, ilvl, result.is_ordered, result.style_type))
+                }
+            };
+
             let kind = match self.pending_paragraph_classification.take() {
                 Some(crate::styles::StyleClassification::Heading { level }) => {
+                    self.flush_list_stack();
                     ParagraphBlockKind::Heading { level }
                 }
                 Some(crate::styles::StyleClassification::BlockQuote) => {
+                    self.flush_list_stack();
                     ParagraphBlockKind::BlockQuote
                 }
-                Some(crate::styles::StyleClassification::Code) => ParagraphBlockKind::Preformatted,
-                _ => ParagraphBlockKind::Paragraph,
+                Some(crate::styles::StyleClassification::Code) => {
+                    self.flush_list_stack();
+                    ParagraphBlockKind::Preformatted
+                }
+                _ => match list_classification {
+                    None => {
+                        self.flush_list_stack();
+                        ParagraphBlockKind::Paragraph
+                    }
+                    Some((num_id, ilvl, is_ordered, style_type)) => {
+                        self.reconcile_list_stack(num_id, ilvl, is_ordered);
+                        let start = self.compute_start(num_id);
+                        if is_ordered {
+                            ParagraphBlockKind::OrderedListItem {
+                                num_id,
+                                ilvl,
+                                start,
+                                style_type,
+                            }
+                        } else {
+                            ParagraphBlockKind::UnorderedListItem {
+                                num_id,
+                                ilvl,
+                                style_type,
+                            }
+                        }
+                    }
+                },
             };
             self.current_paragraph_block = kind;
-            let event = match kind {
-                ParagraphBlockKind::Paragraph => Event::StartParagraph {
+            self.emit_paragraph_start_for_current_block();
+            self.paragraph_started_emitted = true;
+        }
+    }
+
+    fn emit_paragraph_start_for_current_block(&mut self) {
+        match &self.current_paragraph_block {
+            ParagraphBlockKind::Paragraph => {
+                self.queue.push_back(Event::StartParagraph {
                     alignment: self.pending_paragraph_alignment.clone(),
                     id: None,
-                },
-                ParagraphBlockKind::Heading { level } => Event::StartHeading { level, id: None },
-                ParagraphBlockKind::BlockQuote => Event::StartBlockQuote { id: None },
-                ParagraphBlockKind::Preformatted => Event::StartPreformatted {
+                });
+            }
+            ParagraphBlockKind::Heading { level } => {
+                self.queue.push_back(Event::StartHeading {
+                    level: *level,
+                    id: None,
+                });
+            }
+            ParagraphBlockKind::BlockQuote => {
+                self.queue.push_back(Event::StartBlockQuote { id: None });
+            }
+            ParagraphBlockKind::Preformatted => {
+                self.queue.push_back(Event::StartPreformatted {
                     id: None,
                     syntax: None,
-                },
-            };
-            self.queue.push_back(event);
-            self.paragraph_started_emitted = true;
+                });
+            }
+            ParagraphBlockKind::OrderedListItem {
+                num_id,
+                ilvl,
+                start,
+                style_type,
+            } => {
+                self.queue.push_back(Event::StartOrderedListItem {
+                    id: Some(num_id.to_string()),
+                    level: *ilvl,
+                    start: *start,
+                    style_type: style_type.clone(),
+                });
+                self.queue.push_back(Event::StartParagraph {
+                    alignment: self.pending_paragraph_alignment.clone(),
+                    id: None,
+                });
+            }
+            ParagraphBlockKind::UnorderedListItem {
+                num_id,
+                ilvl,
+                style_type,
+            } => {
+                self.queue.push_back(Event::StartUnorderedListItem {
+                    id: Some(num_id.to_string()),
+                    level: *ilvl,
+                    style_type: style_type.clone(),
+                });
+                self.queue.push_back(Event::StartParagraph {
+                    alignment: self.pending_paragraph_alignment.clone(),
+                    id: None,
+                });
+            }
         }
     }
 
@@ -1194,6 +1452,8 @@ mod tests {
     use core::fmt::Write as _;
     use std::io::{Cursor, Read};
 
+    use docspec_core::ListStyleType;
+
     use super::*;
 
     fn styles_xml(body: &str) -> String {
@@ -1212,7 +1472,62 @@ mod tests {
         DocxData {
             style_list,
             hyperlink_map: HyperlinkMap::default(),
+            numbering: crate::numbering::MinimalNumbering::new(),
         }
+    }
+
+    fn numbering_xml(body: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+{body}
+</w:numbering>"#
+        )
+    }
+
+    fn decimal_numbering() -> crate::numbering::MinimalNumbering {
+        let xml = numbering_xml(
+            r#"<w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>
+    <w:lvl w:ilvl="1"><w:numFmt w:val="decimal"/></w:lvl>
+</w:abstractNum>
+<w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>"#,
+        );
+        crate::numbering::parse_numbering(Cursor::new(xml.into_bytes()))
+            .expect("valid numbering XML")
+    }
+
+    fn make_reader_with_numbering(
+        document_xml: &str,
+        numbering: crate::numbering::MinimalNumbering,
+    ) -> DocumentReader {
+        let stream: Box<dyn Read + Send> = Box::new(Cursor::new(document_xml.as_bytes().to_vec()));
+        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
+        let data = DocxData {
+            style_list: crate::styles::StyleList::default(),
+            hyperlink_map: HyperlinkMap::default(),
+            numbering,
+        };
+        DocumentReader::from_xml_reader(xml, data)
+    }
+
+    fn list_paragraph(num_id: u32, ilvl: u32, text: &str) -> String {
+        format!(
+            r#"<w:p><w:pPr><w:numPr><w:numId w:val="{num_id}"/><w:ilvl w:val="{ilvl}"/></w:numPr></w:pPr><w:r><w:t>{text}</w:t></w:r></w:p>"#
+        )
+    }
+
+    fn plain_paragraph(text: &str) -> String {
+        format!("<w:p><w:r><w:t>{text}</w:t></w:r></w:p>")
+    }
+
+    fn document_with_body(body: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>{body}</w:body>
+</w:document>"#
+        )
     }
 
     fn make_reader_with_styles(document_xml: &str, styles_body: &str) -> DocumentReader {
@@ -1246,6 +1561,7 @@ mod tests {
         let data = DocxData {
             style_list: crate::styles::StyleList::default(),
             hyperlink_map: HyperlinkMap::default(),
+            numbering: crate::numbering::MinimalNumbering::new(),
         };
         DocumentReader::from_xml_reader(xml, data)
     }
@@ -1259,6 +1575,7 @@ mod tests {
         let data = DocxData {
             style_list: crate::styles::StyleList::default(),
             hyperlink_map,
+            numbering: crate::numbering::MinimalNumbering::new(),
         };
         DocumentReader::from_xml_reader(xml, data)
     }
@@ -1891,5 +2208,580 @@ mod tests {
                 docspec_core::Event::EndDocument,
             ]
         );
+    }
+
+    #[test]
+    fn single_ordered_list_item_emits_correct_events() {
+        let doc = document_with_body(&list_paragraph(1, 0, "item"));
+        let mut reader = make_reader_with_numbering(&doc, decimal_numbering());
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "item".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn nested_list_items_emit_correct_events() {
+        let body = format!(
+            "{}{}",
+            list_paragraph(1, 0, "parent"),
+            list_paragraph(1, 1, "child")
+        );
+        let doc = document_with_body(&body);
+        let mut reader = make_reader_with_numbering(&doc, decimal_numbering());
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "parent".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 1,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "child".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn level_decrease_pops_stack_correctly() {
+        let body = format!(
+            "{}{}{}",
+            list_paragraph(1, 0, "one"),
+            list_paragraph(1, 1, "child"),
+            list_paragraph(1, 0, "two")
+        );
+        let doc = document_with_body(&body);
+        let mut reader = make_reader_with_numbering(&doc, decimal_numbering());
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "one".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 1,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "child".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "two".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn non_list_paragraph_between_list_items_breaks_list() {
+        let body = format!(
+            "{}{}{}",
+            list_paragraph(1, 0, "one"),
+            plain_paragraph("plain"),
+            list_paragraph(1, 0, "two")
+        );
+        let doc = document_with_body(&body);
+        let mut reader = make_reader_with_numbering(&doc, decimal_numbering());
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "one".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "plain".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "two".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn document_end_flush_closes_open_list() {
+        let doc = format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{}"#,
+            r#"<w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>item</w:t></w:r>"#
+        );
+        let mut reader = make_reader_with_numbering(&doc, decimal_numbering());
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "item".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn num_id_zero_sentinel_emits_plain_paragraph() {
+        let doc = document_with_body(&list_paragraph(0, 0, "plain"));
+        let mut reader = make_reader_with_numbering(&doc, decimal_numbering());
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "plain".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn oversized_list_level_is_clamped_to_eight() {
+        let doc = document_with_body(&list_paragraph(1, 99, "deep"));
+        let mut reader = make_reader_with_numbering(&doc, decimal_numbering());
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 1,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 2,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 3,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 4,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 5,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 6,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 7,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 8,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "deep".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn list_item_inside_table_cell_closes_before_cell_end() {
+        let doc = document_with_body(&format!(
+            "<w:tbl><w:tr><w:tc>{}</w:tc></w:tr></w:tbl>",
+            list_paragraph(1, 0, "cell")
+        ));
+        let mut reader = make_reader_with_numbering(&doc, decimal_numbering());
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartTable { id: None },
+                docspec_core::Event::StartTableRow { id: None },
+                docspec_core::Event::StartTableCell {
+                    colspan: None,
+                    rowspan: None,
+                    id: None,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "cell".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndTableCell,
+                docspec_core::Event::EndTableRow,
+                docspec_core::Event::EndTable,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn table_after_list_item_breaks_list_before_table_start() {
+        let doc = document_with_body(&format!(
+            "{}<w:tbl><w:tr><w:tc>{}</w:tc></w:tr></w:tbl>",
+            list_paragraph(1, 0, "item"),
+            plain_paragraph("cell")
+        ));
+        let mut reader = make_reader_with_numbering(&doc, decimal_numbering());
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "item".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::StartTable { id: None },
+                docspec_core::Event::StartTableRow { id: None },
+                docspec_core::Event::StartTableCell {
+                    colspan: None,
+                    rowspan: None,
+                    id: None,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "cell".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndTableCell,
+                docspec_core::Event::EndTableRow,
+                docspec_core::Event::EndTable,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn numpr_with_num_id_and_ilvl_is_consumed_by_paragraph_start() {
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="3"/><w:ilvl w:val="2"/></w:numPr></w:pPr>
+      <w:r><w:t>item</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader(doc);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "item".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+        assert_eq!(reader.pending_paragraph_list, None);
+    }
+
+    #[test]
+    fn numpr_with_num_id_only_defaults_ilvl_to_zero_before_consuming() {
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>item</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader(doc);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "item".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+        assert_eq!(reader.pending_paragraph_list, None);
+    }
+
+    #[test]
+    fn numpr_without_num_id_leaves_pending_paragraph_list_none() {
+        let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="0"/></w:numPr></w:pPr>
+      <w:r><w:t>plain</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+        let mut reader = make_reader(doc);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "plain".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+        assert_eq!(reader.pending_paragraph_list, None);
     }
 }

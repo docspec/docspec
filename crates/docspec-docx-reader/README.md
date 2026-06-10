@@ -17,12 +17,14 @@ architecture, and the event protocol.
   - `<w:highlight w:val="namedColor">` — highlight color using the 17-entry ECMA-376 named palette. Emitted as `StartTextStyle { kind: Mark(Color::Rgb { r, g, b }) }`. `w:val="none"` and unknown names are silently dropped.
   - `<w:shd w:fill="HEX">` — background fill, used as a fallback highlight when `<w:highlight>` is absent. Emitted as `StartTextStyle { kind: Mark(Color::Rgb { r, g, b }) }`. `w:fill="auto"` and a missing `w:fill` attribute are silently dropped.
 - Paragraph properties (`<w:pPr>`): `<w:jc>` (alignment — `left`/`start` to Left, `right`/`end` to Right, `center` to Center, `both`/`distribute` to Justify)
+- Lists (`<w:p>` with `<w:numPr>`): ordered (Decimal/LowerAlpha/UpperAlpha/LowerRoman/UpperRoman) and unordered (Disc) — emitted as `Start*ListItem`/`End*ListItem` with `id` (numId stringified), `level` (ilvl), `start` (`Some(1)` on first item per numId), and `style_type`. Per-level classification: same numId can mix ordered and unordered levels.
 - Empty `<w:rPr/>` and `<w:pPr/>` are treated as no properties (default style / alignment None)
 - A `<w:rPr>` or `<w:pPr>` that appears after content in the same parent is silently ignored (per the OOXML spec, both must be the first child element)
 - Hyperlinks (`<w:hyperlink>`): resolved via `word/_rels/document.xml.rels` and emitted as `StartLink`/`EndLink` events around inline content. Supports external URL targets (both Strict and Transitional OOXML relationship Type URIs), anchor-only links (`w:anchor` without `r:id` emits `#fragment`), and tooltips (`w:tooltip` → `StartLink.title`, XML-decoded). When the relationship cannot be resolved, the link wrapper is dropped and content passes through as plain runs.
 - Structured Document Tags (`<w:sdt>`) — the content of an SDT is emitted normally. The property containers `<w:sdtPr>` and `<w:sdtEndPr>` are dropped.
 - Tracked insertions and moves (`<w:ins>`, `<w:moveTo>`) — the inserted/moved-in content is emitted (accept-changes semantics).
-- Emits: `EndDocument`, `EndLink`, `EndParagraph`, `EndTable`, `EndTableCell`, `EndTableHeader`, `EndTableRow`, `EndTextStyle`, `LineBreak`, `StartDocument`, `StartLink`, `StartParagraph`, `StartTable`, `StartTableCell`, `StartTableHeader`, `StartTableRow`, `StartTextStyle`, `Text`
+- Hyperlinks (`<w:hyperlink>`): resolved via `word/_rels/document.xml.rels` and emitted as `StartLink`/`EndLink` events around inline content. Supports external URL targets (both Strict and Transitional OOXML relationship Type URIs), anchor-only links (`w:anchor` without `r:id` emits `#fragment`), and tooltips (`w:tooltip` → `StartLink.title`, XML-decoded). When the relationship cannot be resolved, the link wrapper is dropped and content passes through as plain runs.
+- Emits: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`, `EndTextStyle`, `LineBreak`, `EndParagraph`, `StartTable`, `StartTableRow`, `StartTableCell`, `StartTableHeader`, `EndTableHeader`, `EndTableCell`, `EndTableRow`, `EndTable`, `StartLink`, `EndLink`, `StartOrderedListItem`, `EndOrderedListItem`, `StartUnorderedListItem`, `EndUnorderedListItem`, `EndDocument`
 - Symbol font character normalization for Wingdings, Wingdings 2, Wingdings 3, Webdings, and Symbol fonts — codepoints are mapped to their Unicode equivalents; unmapped codepoints are dropped
 - Compression: `Stored` and `Deflated` only
 
@@ -44,7 +46,7 @@ The XML elements listed below are the reader's denylist — their entire subtree
 - `<w:rFonts>` (general font tracking is not exposed as events, *except for symbol font resolution (Wingdings, Wingdings 2, Wingdings 3, Webdings, Symbol) which is used internally to normalize codepoints to Unicode*)
 - `themeColor` / `themeTint` / `themeShade` attributes on `<w:color>` and `<w:shd>` — silently dropped. The reader does not parse `styles.xml` or `theme1.xml`, so theme-referenced colors cannot be resolved. Future work.
 - Revision tracking (`<w:rPrChange>`, `<w:pPrChange>`)
-- Advanced paragraph layout beyond alignment: `<w:numPr>`, `<w:ind>`, `<w:tabs>`, `<w:framePr>`, `<w:sectPr>`
+- Advanced paragraph layout beyond alignment: `<w:ind>`, `<w:tabs>`, `<w:framePr>`, `<w:sectPr>`
 - `<w:rPr>` nested inside `<w:pPr>` (paragraph mark / pilcrow run properties)
 - BiDi-aware logical alignment (`start`/`end` flipping based on paragraph direction is not tracked)
 - Math (`m:rPr`) and DrawingML (`a:rPr`) namespaces
@@ -52,13 +54,25 @@ The XML elements listed below are the reader's denylist — their entire subtree
 - Header rows in nested tables — only the outermost table honors `<w:tblHeader>`
 - Table-level property exceptions (`<w:tblPrEx>`) — silently ignored (consistent with `<w:tblPr>`)
 - Table, row, and cell visual properties (`<w:tblPr>`, `<w:trPr>` visual fields, `<w:tcPr>` visual fields, `<w:tblGrid>`) — silently dropped
-- Lists
 - Drawings and images (`<w:drawing>`, `<w:pict>`)
 - Comments, footnotes, headers, footers
 - Document metadata
 - Tracked deletions and moves-from (`<w:del>`, `<w:moveFrom>`) — silently dropped (accept-changes semantics). Their text content uses `<w:delText>` which is not part of the reader's text-matching set.
 - Structured document tag properties (`<w:sdtPr>`, `<w:sdtEndPr>`) — metadata containers; subtree dropped.
 - Field-code hyperlinks (`<w:fldChar>` + `<w:instrText>HYPERLINK ...`): legacy form not currently supported; only the modern `<w:hyperlink>` element is recognized.
+
+### Lists (V1 cuts)
+
+The following list features are intentionally out of scope for V1:
+- No `<w:start>` element parsing — `start` is always `Some(1)` on the first item of each list, `None` thereafter
+- No `<w:lvlOverride>` resolution — abstractNum's level definitions are authoritative
+- No picture bullets (`<w:lvlPicBulletId>`) — picture-bullet levels emit `Disc`
+- No style-linked lists (`<w:numStyleLink>`, `<w:styleLink>`) — fall back to `Decimal` defaults
+- No continuation-paragraph attachment — paragraphs without `<w:numPr>` between list items emit `StartParagraph` and close the list stack
+- `<w:multiLevelType>` is ignored — per-level `<w:numFmt>` is authoritative (§17.9.12)
+- No per-level marker text (`<w:lvlText>`) — not parsed
+- No level-specific font, color, or indent
+- No per-level resolution for synthesised phantom levels — when the first authored item appears at `ilvl > 0`, intermediate levels inherit the target item's ordered/unordered classification and use `Decimal`/`Disc` defaults instead of resolving each phantom level's own `numFmt`
 
 ## Streaming Guarantee
 
