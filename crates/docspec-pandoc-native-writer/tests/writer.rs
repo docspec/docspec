@@ -67,6 +67,13 @@ mod tests {
         }
     }
 
+    fn start_heading(level: u8, id: Option<&str>) -> Event {
+        Event::StartHeading {
+            level,
+            id: id.map(String::from),
+        }
+    }
+
     #[test]
     fn empty_document_emits_empty_list() {
         assert_eq!(run([start_doc(), Event::EndDocument]), "[]");
@@ -239,8 +246,11 @@ mod tests {
         assert_eq!(
             run([
                 start_doc(),
-                Event::StartHeading { level: 1, id: None },
-                Event::EndHeading,
+                Event::StartPreformatted {
+                    syntax: None,
+                    id: None
+                },
+                Event::EndPreformatted,
                 start_para(),
                 text("x"),
                 Event::EndParagraph,
@@ -545,5 +555,224 @@ mod tests {
             Event::EndDocument,
         ]);
         assert_eq!(result.unwrap(), "[Para [Str \"ok\"]]");
+    }
+
+    #[test]
+    fn heading_basic_level_1_no_id() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(1, None),
+                text("Hello"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 1 (\"\",[],[]) [Str \"Hello\"]]"
+        );
+    }
+
+    #[test]
+    fn heading_with_id() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(2, Some("sec1")),
+                text("Hello"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 2 (\"sec1\",[],[]) [Str \"Hello\"]]"
+        );
+    }
+
+    #[test]
+    fn heading_empty_body() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(1, None),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 1 (\"\",[],[]) []]"
+        );
+    }
+
+    #[test]
+    fn heading_levels_1_through_9() {
+        for level in 1..=9 {
+            let out = run([
+                start_doc(),
+                start_heading(level, None),
+                text("h"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]);
+            assert_eq!(out, format!("[Header {level} (\"\",[],[]) [Str \"h\"]]"));
+        }
+    }
+
+    #[test]
+    fn heading_level_zero_passes_through_raw() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(0, None),
+                text("h"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 0 (\"\",[],[]) [Str \"h\"]]"
+        );
+    }
+
+    #[test]
+    fn heading_level_above_nine_passes_through_raw() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(42, None),
+                text("h"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 42 (\"\",[],[]) [Str \"h\"]]"
+        );
+    }
+
+    #[test]
+    fn heading_level_u8_max_passes_through_raw() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(u8::MAX, None),
+                text("h"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 255 (\"\",[],[]) [Str \"h\"]]"
+        );
+    }
+
+    #[test]
+    fn heading_with_multiple_text_runs_separated_by_comma() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(1, None),
+                text("first"),
+                text("second"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 1 (\"\",[],[]) [Str \"first\",Str \"second\"]]"
+        );
+    }
+
+    #[test]
+    fn heading_with_line_break_inline() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(1, None),
+                text("a"),
+                Event::LineBreak,
+                text("b"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 1 (\"\",[],[]) [Str \"a\",LineBreak,Str \"b\"]]"
+        );
+    }
+
+    #[test]
+    fn heading_with_soft_break_inline() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(1, None),
+                text("a"),
+                Event::SoftBreak,
+                text("b"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 1 (\"\",[],[]) [Str \"a\",SoftBreak,Str \"b\"]]"
+        );
+    }
+
+    #[test]
+    fn heading_id_with_special_chars_is_escaped() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(1, Some("a\"b\\c")),
+                text("x"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 1 (\"a\\\"b\\\\c\",[],[]) [Str \"x\"]]"
+        );
+    }
+
+    #[test]
+    fn heading_between_paragraphs_with_comma_separation() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("before"),
+                Event::EndParagraph,
+                start_heading(2, None),
+                text("title"),
+                Event::EndHeading,
+                start_para(),
+                text("after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Str \"before\"],Header 2 (\"\",[],[]) [Str \"title\"],Para [Str \"after\"]]"
+        );
+    }
+
+    #[test]
+    fn multiple_consecutive_headings() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_heading(1, None),
+                text("one"),
+                Event::EndHeading,
+                start_heading(2, Some("two")),
+                text("two"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]),
+            "[Header 1 (\"\",[],[]) [Str \"one\"],Header 2 (\"two\",[],[]) [Str \"two\"]]"
+        );
+    }
+
+    #[test]
+    fn heading_outside_document_ignored() {
+        assert_eq!(
+            run([start_heading(1, None), text("dropped"), Event::EndHeading,]),
+            ""
+        );
+    }
+
+    #[test]
+    fn start_heading_inside_paragraph_is_silently_dropped() {
+        assert_eq!(
+            run([
+                start_doc(),
+                start_para(),
+                text("a"),
+                start_heading(1, None),
+                text("b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Str \"a\",Str \"b\"]]"
+        );
     }
 }

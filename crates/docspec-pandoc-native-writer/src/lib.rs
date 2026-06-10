@@ -28,8 +28,8 @@ use std::io::Write;
 pub struct PandocNativeWriter<W: Write> {
     finished: bool,
     first_block: bool,
-    in_paragraph: bool,
-    paragraph_has_inline: bool,
+    in_inline_block: bool,
+    inline_block_has_content: bool,
     started: bool,
     writer: W,
 }
@@ -42,8 +42,8 @@ impl<W: Write> PandocNativeWriter<W> {
         Self {
             finished: false,
             first_block: true,
-            in_paragraph: false,
-            paragraph_has_inline: false,
+            in_inline_block: false,
+            inline_block_has_content: false,
             started: false,
             writer,
         }
@@ -51,7 +51,7 @@ impl<W: Write> PandocNativeWriter<W> {
 
     #[inline]
     fn write_block_literal(&mut self, token: &[u8]) -> Result<()> {
-        if self.started && !self.finished && !self.in_paragraph {
+        if self.started && !self.finished && !self.in_inline_block {
             if !self.first_block {
                 self.writer.write_all(b",")?;
             }
@@ -63,12 +63,12 @@ impl<W: Write> PandocNativeWriter<W> {
 
     #[inline]
     fn write_inline_literal(&mut self, token: &[u8]) -> Result<()> {
-        if self.in_paragraph {
-            if self.paragraph_has_inline {
+        if self.in_inline_block {
+            if self.inline_block_has_content {
                 self.writer.write_all(b",")?;
             }
             self.writer.write_all(token)?;
-            self.paragraph_has_inline = true;
+            self.inline_block_has_content = true;
         }
         Ok(())
     }
@@ -83,7 +83,7 @@ impl<W: Write> EventSink for PandocNativeWriter<W> {
     #[inline]
     fn finish(mut self) -> Result<()> {
         if self.started && !self.finished {
-            if self.in_paragraph {
+            if self.in_inline_block {
                 self.writer.write_all(b"]")?;
             }
             self.writer.write_all(b"]")?;
@@ -97,6 +97,7 @@ impl<W: Write> EventSink for PandocNativeWriter<W> {
     /// The following events produce output:
     /// - `StartDocument` / `EndDocument` — block-list framing
     /// - `StartParagraph` / `EndParagraph` — `Para [...]`
+    /// - `StartHeading` / `EndHeading` — `Header N ("id",[],[]) [...]` (level passed through raw)
     /// - `Text` — `Str "..."`
     /// - `ThematicBreak` — `HorizontalRule`
     /// - `LineBreak` — `LineBreak`
@@ -114,38 +115,51 @@ impl<W: Write> EventSink for PandocNativeWriter<W> {
             }
             Event::EndDocument => {
                 if self.started && !self.finished {
-                    if self.in_paragraph {
+                    if self.in_inline_block {
                         self.writer.write_all(b"]")?;
-                        self.in_paragraph = false;
+                        self.in_inline_block = false;
                     }
                     self.writer.write_all(b"]")?;
                     self.finished = true;
                 }
             }
             Event::StartParagraph { .. } => {
-                if self.started && !self.finished && !self.in_paragraph {
+                if self.started && !self.finished && !self.in_inline_block {
                     if !self.first_block {
                         self.writer.write_all(b",")?;
                     }
                     self.writer.write_all(b"Para [")?;
-                    self.in_paragraph = true;
-                    self.paragraph_has_inline = false;
+                    self.in_inline_block = true;
+                    self.inline_block_has_content = false;
                     self.first_block = false;
                 }
             }
-            Event::EndParagraph => {
-                if self.in_paragraph {
-                    self.writer.write_all(b"]")?;
-                    self.in_paragraph = false;
+            Event::StartHeading { id, level } => {
+                if self.started && !self.finished && !self.in_inline_block {
+                    if !self.first_block {
+                        self.writer.write_all(b",")?;
+                    }
+                    write!(self.writer, "Header {level} (")?;
+                    escape::write_haskell_string(&mut self.writer, id.as_deref().unwrap_or(""))?;
+                    self.writer.write_all(b",[],[]) [")?;
+                    self.in_inline_block = true;
+                    self.inline_block_has_content = false;
+                    self.first_block = false;
                 }
             }
-            Event::Text { content } if self.in_paragraph => {
-                if self.paragraph_has_inline {
+            Event::EndParagraph | Event::EndHeading => {
+                if self.in_inline_block {
+                    self.writer.write_all(b"]")?;
+                    self.in_inline_block = false;
+                }
+            }
+            Event::Text { content } if self.in_inline_block => {
+                if self.inline_block_has_content {
                     self.writer.write_all(b",")?;
                 }
                 self.writer.write_all(b"Str ")?;
                 escape::write_haskell_string(&mut self.writer, &content)?;
-                self.paragraph_has_inline = true;
+                self.inline_block_has_content = true;
             }
             Event::ThematicBreak { .. } => self.write_block_literal(b"HorizontalRule")?,
             Event::LineBreak => self.write_inline_literal(b"LineBreak")?,
