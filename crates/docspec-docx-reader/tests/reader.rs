@@ -36,6 +36,21 @@ fn synth_docx_roundtrips_through_zip_archive() {
     );
 }
 
+fn collect_events(bytes: Vec<u8>) -> Vec<docspec_core::Event> {
+    use docspec_core::EventSource as _;
+    let mut reader =
+        docspec_docx_reader::DocxReader::from_reader(std::io::Cursor::new(bytes)).unwrap();
+    let mut events = Vec::new();
+    loop {
+        match reader.next_event() {
+            Ok(Some(event)) => events.push(event),
+            Ok(None) => break,
+            Err(err) => panic!("unexpected error: {err:?}"),
+        }
+    }
+    events
+}
+
 mod constructor {
     use std::io::Cursor;
     use std::io::{Read, Seek};
@@ -520,6 +535,22 @@ mod events {
         events
     }
 
+    fn collect_events(content: &str) -> Vec<Event> {
+        let document_xml = format!(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{content}</w:body></w:document>"#,
+        );
+        let mut reader = make_reader(&document_xml);
+        drive(&mut reader)
+    }
+
+    fn expected_events(mut content_events: Vec<Event>) -> Vec<Event> {
+        let mut events = vec![start_doc(), start_para()];
+        events.append(&mut content_events);
+        events.push(Event::EndParagraph);
+        events.push(Event::EndDocument);
+        events
+    }
+
     fn start_doc() -> Event {
         Event::StartDocument {
             id: None,
@@ -697,22 +728,6 @@ mod events {
 
     mod rpr {
         use super::*;
-
-        fn collect_events(content: &str) -> Vec<Event> {
-            let document_xml = format!(
-                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{content}</w:body></w:document>"#,
-            );
-            let mut reader = make_reader(&document_xml);
-            drive(&mut reader)
-        }
-
-        fn expected_events(mut content_events: Vec<Event>) -> Vec<Event> {
-            let mut events = vec![start_doc(), start_para()];
-            events.append(&mut content_events);
-            events.push(Event::EndParagraph);
-            events.push(Event::EndDocument);
-            events
-        }
 
         #[test]
         fn rpr_bold_applied_to_text() {
@@ -1276,22 +1291,6 @@ mod events {
     mod sym_element {
         use super::*;
 
-        fn collect_events(content: &str) -> Vec<Event> {
-            let document_xml = format!(
-                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{content}</w:body></w:document>"#,
-            );
-            let mut reader = make_reader(&document_xml);
-            drive(&mut reader)
-        }
-
-        fn expected_events(mut content_events: Vec<Event>) -> Vec<Event> {
-            let mut events = vec![start_doc(), start_para()];
-            events.append(&mut content_events);
-            events.push(Event::EndParagraph);
-            events.push(Event::EndDocument);
-            events
-        }
-
         #[test]
         fn sym_wingdings_skull_via_sym_element() {
             let events = collect_events(
@@ -1413,22 +1412,6 @@ mod events {
 
     mod wt_symbol_transform {
         use super::*;
-
-        fn collect_events(content: &str) -> Vec<Event> {
-            let document_xml = format!(
-                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{content}</w:body></w:document>"#,
-            );
-            let mut reader = make_reader(&document_xml);
-            drive(&mut reader)
-        }
-
-        fn expected_events(mut content_events: Vec<Event>) -> Vec<Event> {
-            let mut events = vec![start_doc(), start_para()];
-            events.append(&mut content_events);
-            events.push(Event::EndParagraph);
-            events.push(Event::EndDocument);
-            events
-        }
 
         #[test]
         fn wt_wingdings_pua_codepoint_transforms() {
@@ -1561,14 +1544,6 @@ mod events {
 
     mod ppr {
         use super::*;
-
-        fn collect_events(content: &str) -> Vec<Event> {
-            let document_xml = format!(
-                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{content}</w:body></w:document>"#,
-            );
-            let mut reader = make_reader(&document_xml);
-            drive(&mut reader)
-        }
 
         fn expected_paragraph_events(start: Event) -> Vec<Event> {
             vec![start_doc(), start, Event::EndParagraph, Event::EndDocument]
@@ -1714,22 +1689,6 @@ mod events {
 
     mod rfonts_resolution {
         use super::*;
-
-        fn collect_events(content: &str) -> Vec<Event> {
-            let document_xml = format!(
-                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{content}</w:body></w:document>"#,
-            );
-            let mut reader = make_reader(&document_xml);
-            drive(&mut reader)
-        }
-
-        fn expected_events(mut content_events: Vec<Event>) -> Vec<Event> {
-            let mut events = vec![start_doc(), start_para()];
-            events.append(&mut content_events);
-            events.push(Event::EndParagraph);
-            events.push(Event::EndDocument);
-            events
-        }
 
         #[test]
         fn rfonts_ascii_only_resolves() {
@@ -3484,22 +3443,6 @@ mod events {
     mod per_font_smoke {
         use super::*;
 
-        fn collect_events(content: &str) -> Vec<Event> {
-            let document_xml = format!(
-                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{content}</w:body></w:document>"#,
-            );
-            let mut reader = make_reader(&document_xml);
-            drive(&mut reader)
-        }
-
-        fn expected_events(mut content_events: Vec<Event>) -> Vec<Event> {
-            let mut events = vec![start_doc(), start_para()];
-            events.append(&mut content_events);
-            events.push(Event::EndParagraph);
-            events.push(Event::EndDocument);
-            events
-        }
-
         #[test]
         fn font_wingdings_skull_via_sym() {
             let events = collect_events(
@@ -3581,22 +3524,6 @@ mod events {
 
     mod edge_cases {
         use super::*;
-
-        fn collect_events(content: &str) -> Vec<Event> {
-            let document_xml = format!(
-                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{content}</w:body></w:document>"#,
-            );
-            let mut reader = make_reader(&document_xml);
-            drive(&mut reader)
-        }
-
-        fn expected_events(mut content_events: Vec<Event>) -> Vec<Event> {
-            let mut events = vec![start_doc(), start_para()];
-            events.append(&mut content_events);
-            events.push(Event::EndParagraph);
-            events.push(Event::EndDocument);
-            events
-        }
 
         #[test]
         fn edge_queue_length_bounded_under_symbol_heavy_run() {
@@ -5845,6 +5772,8 @@ mod happy_path_lists {
 
     use crate::fixture;
 
+    use super::collect_events;
+
     fn root_rels() -> &'static str {
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
@@ -5857,21 +5786,6 @@ mod happy_path_lists {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
 </Relationships>"#
-    }
-
-    fn collect_events(bytes: Vec<u8>) -> Vec<Event> {
-        use docspec_core::EventSource as _;
-        let mut reader =
-            docspec_docx_reader::DocxReader::from_reader(std::io::Cursor::new(bytes)).unwrap();
-        let mut events = Vec::new();
-        loop {
-            match reader.next_event() {
-                Ok(Some(event)) => events.push(event),
-                Ok(None) => break,
-                Err(err) => panic!("unexpected error: {err:?}"),
-            }
-        }
-        events
     }
 
     fn build_docx(document_xml: &str, numbering_xml: &str) -> Vec<u8> {
@@ -6310,6 +6224,8 @@ mod spec_edge_cases {
 
     use crate::fixture;
 
+    use super::collect_events;
+
     fn root_rels() -> &'static str {
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
@@ -6322,21 +6238,6 @@ mod spec_edge_cases {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
 </Relationships>"#
-    }
-
-    fn collect_events(bytes: Vec<u8>) -> Vec<Event> {
-        use docspec_core::EventSource as _;
-        let mut reader =
-            docspec_docx_reader::DocxReader::from_reader(std::io::Cursor::new(bytes)).unwrap();
-        let mut events = Vec::new();
-        loop {
-            match reader.next_event() {
-                Ok(Some(event)) => events.push(event),
-                Ok(None) => break,
-                Err(err) => panic!("unexpected error: {err:?}"),
-            }
-        }
-        events
     }
 
     fn build_docx(document_xml: &str, numbering_xml: &str) -> Vec<u8> {
@@ -6710,6 +6611,8 @@ mod resilience_tests {
 
     use crate::fixture;
 
+    use super::collect_events;
+
     fn root_rels() -> &'static str {
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
@@ -6729,21 +6632,6 @@ mod resilience_tests {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 </Relationships>"#
-    }
-
-    fn collect_events(bytes: Vec<u8>) -> Vec<Event> {
-        use docspec_core::EventSource as _;
-        let mut reader =
-            docspec_docx_reader::DocxReader::from_reader(std::io::Cursor::new(bytes)).unwrap();
-        let mut events = Vec::new();
-        loop {
-            match reader.next_event() {
-                Ok(Some(event)) => events.push(event),
-                Ok(None) => break,
-                Err(err) => panic!("unexpected error: {err:?}"),
-            }
-        }
-        events
     }
 
     fn build_docx(document_xml: &str, numbering_xml: &str) -> Vec<u8> {
@@ -7137,6 +7025,8 @@ mod cross_feature_lists {
 
     use crate::fixture;
 
+    use super::collect_events;
+
     fn root_rels() -> &'static str {
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
@@ -7157,21 +7047,6 @@ mod cross_feature_lists {
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 </Relationships>"#
-    }
-
-    fn collect_events(bytes: Vec<u8>) -> Vec<Event> {
-        use docspec_core::EventSource as _;
-        let mut reader =
-            docspec_docx_reader::DocxReader::from_reader(std::io::Cursor::new(bytes)).unwrap();
-        let mut events = Vec::new();
-        loop {
-            match reader.next_event() {
-                Ok(Some(event)) => events.push(event),
-                Ok(None) => break,
-                Err(err) => panic!("unexpected error: {err:?}"),
-            }
-        }
-        events
     }
 
     fn build_docx(document_xml: &str, numbering_xml: &str) -> Vec<u8> {
