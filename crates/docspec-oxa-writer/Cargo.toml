@@ -15,6 +15,7 @@ docspec-json = { workspace = true }
 
 [dev-dependencies]
 serde_json = "1"
+docspec-test-utils = { workspace = true }
 
 [lints]
 workspace = true

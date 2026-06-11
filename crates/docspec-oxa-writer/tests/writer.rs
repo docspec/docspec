@@ -6,6 +6,7 @@
 mod tests {
     use docspec_core::{Error, Event, EventSink as _, ImageSource, TextStyleKind};
     use docspec_oxa_writer::OxaWriter;
+    use docspec_test_utils::builders::{start_document, start_paragraph, text};
     use serde_json::{json, Value};
 
     fn run(events: Vec<Event>) -> Value {
@@ -35,46 +36,25 @@ mod tests {
         })
     }
 
-    fn start_doc() -> Event {
-        Event::StartDocument {
-            id: None,
-            language: None,
-            metadata: None,
-        }
-    }
-
     fn end_doc() -> Event {
         Event::EndDocument
-    }
-
-    fn start_para() -> Event {
-        Event::StartParagraph {
-            alignment: None,
-            id: None,
-        }
     }
 
     fn end_para() -> Event {
         Event::EndParagraph
     }
 
-    fn text(s: &str) -> Event {
-        Event::Text {
-            content: s.to_string(),
-        }
-    }
-
     #[test]
     fn document_only() {
-        let v = run(vec![start_doc(), end_doc()]);
+        let v = run(vec![start_document(), end_doc()]);
         assert_eq!(v, json!({"type": "Document", "children": []}));
     }
 
     #[test]
     fn single_paragraph_single_text() {
         let v = run(vec![
-            start_doc(),
-            start_para(),
+            start_document(),
+            start_paragraph(),
             text("Hello"),
             end_para(),
             end_doc(),
@@ -94,11 +74,11 @@ mod tests {
     #[test]
     fn multi_paragraph_multi_text() {
         let v = run(vec![
-            start_doc(),
-            start_para(),
+            start_document(),
+            start_paragraph(),
             text("One"),
             end_para(),
-            start_para(),
+            start_paragraph(),
             text("Two"),
             end_para(),
             end_doc(),
@@ -123,7 +103,12 @@ mod tests {
 
     #[test]
     fn empty_paragraph() {
-        let v = run(vec![start_doc(), start_para(), end_para(), end_doc()]);
+        let v = run(vec![
+            start_document(),
+            start_paragraph(),
+            end_para(),
+            end_doc(),
+        ]);
         assert_eq!(
             v,
             json!({
@@ -136,8 +121,8 @@ mod tests {
     #[test]
     fn multiple_text_in_paragraph() {
         let v = run(vec![
-            start_doc(),
-            start_para(),
+            start_document(),
+            start_paragraph(),
             text("a"),
             text("b"),
             end_para(),
@@ -161,7 +146,7 @@ mod tests {
     #[test]
     fn unsupported_block_events_at_document_level_dropped() {
         let v = run(vec![
-            start_doc(),
+            start_document(),
             Event::StartHeading { level: 1, id: None },
             text("Title"),
             Event::EndHeading,
@@ -183,8 +168,8 @@ mod tests {
     #[test]
     fn softbreak_and_linebreak_dropped() {
         let v = run(vec![
-            start_doc(),
-            start_para(),
+            start_document(),
+            start_paragraph(),
             text("a"),
             Event::SoftBreak,
             text("b"),
@@ -212,8 +197,8 @@ mod tests {
     #[test]
     fn text_with_json_special_chars() {
         let json = run_raw(vec![
-            start_doc(),
-            start_para(),
+            start_document(),
+            start_paragraph(),
             text("a\nb\t\"c\\d"),
             end_para(),
             end_doc(),
@@ -229,8 +214,8 @@ mod tests {
     #[test]
     fn text_with_unicode() {
         let json = run_raw(vec![
-            start_doc(),
-            start_para(),
+            start_document(),
+            start_paragraph(),
             text("héllo 🎉 日本語"),
             end_para(),
             end_doc(),
@@ -244,8 +229,8 @@ mod tests {
     #[test]
     fn empty_string_text() {
         let v = run(vec![
-            start_doc(),
-            start_para(),
+            start_document(),
+            start_paragraph(),
             text(""),
             end_para(),
             end_doc(),
@@ -266,11 +251,11 @@ mod tests {
     fn orphan_text_dropped() {
         let v = run(vec![
             text("before"),
-            start_doc(),
-            start_para(),
+            start_document(),
+            start_paragraph(),
             end_para(),
             text("between"),
-            start_para(),
+            start_paragraph(),
             text("inside"),
             end_para(),
             end_doc(),
@@ -292,16 +277,16 @@ mod tests {
 
     #[test]
     fn orphan_end_paragraph_no_op() {
-        let v = run(vec![start_doc(), end_para(), end_doc()]);
+        let v = run(vec![start_document(), end_para(), end_doc()]);
         assert_eq!(v, json!({"type": "Document", "children": []}));
     }
 
     #[test]
     fn double_start_document_no_op() {
         let v = run(vec![
-            start_doc(),
-            start_doc(),
-            start_para(),
+            start_document(),
+            start_document(),
+            start_paragraph(),
             text("x"),
             end_para(),
             end_doc(),
@@ -330,9 +315,9 @@ mod tests {
     #[test]
     fn nested_paragraph_no_op() {
         let v = run(vec![
-            start_doc(),
-            start_para(),
-            start_para(),
+            start_document(),
+            start_paragraph(),
+            start_paragraph(),
             text("a"),
             end_para(),
             end_para(),
@@ -353,8 +338,8 @@ mod tests {
     #[test]
     fn styled_input_dropped() {
         let styled_events = vec![
-            start_doc(),
-            start_para(),
+            start_document(),
+            start_paragraph(),
             Event::StartTextStyle {
                 kind: TextStyleKind::Bold,
                 id: None,
@@ -364,7 +349,13 @@ mod tests {
             end_para(),
             end_doc(),
         ];
-        let unstyled_events = vec![start_doc(), start_para(), text("x"), end_para(), end_doc()];
+        let unstyled_events = vec![
+            start_document(),
+            start_paragraph(),
+            text("x"),
+            end_para(),
+            end_doc(),
+        ];
         let styled_output = run_raw(styled_events);
         let unstyled_output = run_raw(unstyled_events);
         assert_eq!(styled_output, unstyled_output);

@@ -32,38 +32,7 @@ mod tests {
         feature = "html-writer",
         feature = "pandoc-native-writer"
     ))]
-    fn start_document() -> Event {
-        Event::StartDocument {
-            id: None,
-            language: None,
-            metadata: None,
-        }
-    }
-
-    #[cfg(any(
-        feature = "blocknote-writer",
-        feature = "oxa-writer",
-        feature = "html-writer",
-        feature = "pandoc-native-writer"
-    ))]
-    fn start_paragraph() -> Event {
-        Event::StartParagraph {
-            alignment: None,
-            id: None,
-        }
-    }
-
-    #[cfg(any(
-        feature = "blocknote-writer",
-        feature = "oxa-writer",
-        feature = "html-writer",
-        feature = "pandoc-native-writer"
-    ))]
-    fn text(content: &str) -> Event {
-        Event::Text {
-            content: content.to_string(),
-        }
-    }
+    use docspec_test_utils::builders::{start_document, start_paragraph, text};
 
     #[cfg(feature = "blocknote-writer")]
     #[test]

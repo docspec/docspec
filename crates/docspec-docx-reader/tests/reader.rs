@@ -519,6 +519,7 @@ mod events {
     use docspec_docx_reader::{DocxReader, EventSource as _};
 
     use crate::fixture;
+    use docspec_test_utils::builders::{start_document, start_paragraph, text};
 
     const SIMPLE_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
 
@@ -544,38 +545,17 @@ mod events {
     }
 
     fn expected_events(mut content_events: Vec<Event>) -> Vec<Event> {
-        let mut events = vec![start_doc(), start_para()];
+        let mut events = vec![start_document(), start_paragraph()];
         events.append(&mut content_events);
         events.push(Event::EndParagraph);
         events.push(Event::EndDocument);
         events
     }
 
-    fn start_doc() -> Event {
-        Event::StartDocument {
-            id: None,
-            language: None,
-            metadata: None,
-        }
-    }
-
-    fn start_para() -> Event {
-        Event::StartParagraph {
-            alignment: None,
-            id: None,
-        }
-    }
-
     fn start_para_with_alignment(alignment: TextAlignment) -> Event {
         Event::StartParagraph {
             alignment: Some(alignment),
             id: None,
-        }
-    }
-
-    fn text(content: &str) -> Event {
-        Event::Text {
-            content: content.to_string(),
         }
     }
 
@@ -701,8 +681,8 @@ mod events {
 
     fn expected_link_events(href: &str, title: Option<&str>) -> Vec<Event> {
         vec![
-            start_doc(),
-            start_para(),
+            start_document(),
+            start_paragraph(),
             start_link(href, title),
             text("link"),
             Event::EndLink,
@@ -713,8 +693,8 @@ mod events {
 
     fn expected_plain_link_text_events() -> Vec<Event> {
         vec![
-            start_doc(),
-            start_para(),
+            start_document(),
+            start_paragraph(),
             text("link"),
             Event::EndParagraph,
             Event::EndDocument,
@@ -828,8 +808,8 @@ mod events {
             assert_eq!(
                 events,
                 vec![
-                    start_doc(),
-                    start_para(),
+                    start_document(),
+                    start_paragraph(),
                     Event::StartTextStyle {
                         kind: TextStyleKind::Bold,
                         id: None,
@@ -962,8 +942,8 @@ mod events {
             assert_eq!(
                 events,
                 vec![
-                    start_doc(),
-                    start_para(),
+                    start_document(),
+                    start_paragraph(),
                     Event::EndParagraph,
                     Event::EndDocument
                 ]
@@ -978,8 +958,8 @@ mod events {
             assert_eq!(
                 events,
                 vec![
-                    start_doc(),
-                    start_para(),
+                    start_document(),
+                    start_paragraph(),
                     Event::StartTextStyle {
                         kind: TextStyleKind::Bold,
                         id: None,
@@ -1001,8 +981,8 @@ mod events {
             assert_eq!(
                 events,
                 vec![
-                    start_doc(),
-                    start_para(),
+                    start_document(),
+                    start_paragraph(),
                     Event::StartTextStyle {
                         kind: TextStyleKind::Bold,
                         id: None,
@@ -1166,8 +1146,8 @@ mod events {
             assert_eq!(
                 events,
                 vec![
-                    start_doc(),
-                    start_para(),
+                    start_document(),
+                    start_paragraph(),
                     Event::StartTextStyle {
                         kind: TextStyleKind::TextColor(Color::Rgb { r: 255, g: 0, b: 0 }),
                         id: None,
@@ -1216,8 +1196,8 @@ mod events {
             assert_eq!(
                 events,
                 vec![
-                    start_doc(),
-                    start_para(),
+                    start_document(),
+                    start_paragraph(),
                     Event::StartTextStyle {
                         kind: TextStyleKind::TextColor(Color::Rgb { r: 255, g: 0, b: 0 }),
                         id: None,
@@ -1275,11 +1255,11 @@ mod events {
             assert_eq!(
                 events,
                 vec![
-                    start_doc(),
-                    start_para(),
+                    start_document(),
+                    start_paragraph(),
                     text("\u{2620}"),
                     Event::EndParagraph,
-                    start_para(),
+                    start_paragraph(),
                     text("N"),
                     Event::EndParagraph,
                     Event::EndDocument,
@@ -1521,11 +1501,11 @@ mod events {
             assert_eq!(
                 events,
                 vec![
-                    start_doc(),
-                    start_para(),
+                    start_document(),
+                    start_paragraph(),
                     text("\u{2620}"),
                     Event::EndParagraph,
-                    start_para(),
+                    start_paragraph(),
                     text("N"),
                     Event::EndParagraph,
                     Event::EndDocument,
@@ -1546,7 +1526,12 @@ mod events {
         use super::*;
 
         fn expected_paragraph_events(start: Event) -> Vec<Event> {
-            vec![start_doc(), start, Event::EndParagraph, Event::EndDocument]
+            vec![
+                start_document(),
+                start,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
         }
 
         #[test]
@@ -1616,13 +1601,13 @@ mod events {
         fn ppr_jc_unmapped_leaves_alignment_none() {
             let events =
                 collect_events(r#"<w:p><w:pPr><w:jc w:val="mediumKashida"/></w:pPr></w:p>"#);
-            assert_eq!(events, expected_paragraph_events(start_para()));
+            assert_eq!(events, expected_paragraph_events(start_paragraph()));
         }
 
         #[test]
         fn ppr_jc_no_val_leaves_alignment_none() {
             let events = collect_events("<w:p><w:pPr><w:jc/></w:pPr></w:p>");
-            assert_eq!(events, expected_paragraph_events(start_para()));
+            assert_eq!(events, expected_paragraph_events(start_paragraph()));
         }
 
         #[test]
@@ -1631,8 +1616,8 @@ mod events {
             assert_eq!(
                 events,
                 vec![
-                    start_doc(),
-                    start_para(),
+                    start_document(),
+                    start_paragraph(),
                     text("x"),
                     Event::EndParagraph,
                     Event::EndDocument,
@@ -1643,13 +1628,13 @@ mod events {
         #[test]
         fn ppr_empty_emits_default_alignment() {
             let events = collect_events("<w:p><w:pPr/></w:p>");
-            assert_eq!(events, expected_paragraph_events(start_para()));
+            assert_eq!(events, expected_paragraph_events(start_paragraph()));
         }
 
         #[test]
         fn empty_paragraph_still_emits_start_end() {
             let events = collect_events("<w:p></w:p>");
-            assert_eq!(events, expected_paragraph_events(start_para()));
+            assert_eq!(events, expected_paragraph_events(start_paragraph()));
         }
 
         #[test]
@@ -1660,7 +1645,7 @@ mod events {
             assert_eq!(
                 events,
                 vec![
-                    start_doc(),
+                    start_document(),
                     start_para_with_alignment(TextAlignment::Right),
                     text("x"),
                     Event::EndParagraph,
@@ -1677,8 +1662,8 @@ mod events {
             assert_eq!(
                 events,
                 vec![
-                    start_doc(),
-                    start_para(),
+                    start_document(),
+                    start_paragraph(),
                     text("x"),
                     Event::EndParagraph,
                     Event::EndDocument,
@@ -1822,8 +1807,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("hello"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -1852,11 +1837,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("foo"),
                 Event::EndParagraph,
-                start_para(),
+                start_paragraph(),
                 text("bar"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -1873,8 +1858,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::EndParagraph,
                 Event::EndDocument
             ]
@@ -1890,8 +1875,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::EndParagraph,
                 Event::EndDocument
             ]
@@ -1904,7 +1889,7 @@ mod events {
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:drawing/></w:body></w:document>"#,
         );
         let events = drive(&mut reader);
-        assert_eq!(events, vec![start_doc(), Event::EndDocument]);
+        assert_eq!(events, vec![start_document(), Event::EndDocument]);
     }
 
     #[test]
@@ -1913,7 +1898,7 @@ mod events {
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
         );
         let events = drive(&mut reader);
-        assert_eq!(events, vec![start_doc(), Event::EndDocument]);
+        assert_eq!(events, vec![start_document(), Event::EndDocument]);
     }
 
     #[test]
@@ -1925,8 +1910,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("foo"),
                 text("bar"),
                 Event::EndParagraph,
@@ -1941,7 +1926,7 @@ mod events {
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:t>orphan</w:t></w:body></w:document>"#,
         );
         let events = drive(&mut reader);
-        assert_eq!(events, vec![start_doc(), Event::EndDocument]);
+        assert_eq!(events, vec![start_document(), Event::EndDocument]);
     }
 
     #[test]
@@ -1953,8 +1938,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("before"),
                 text("inserted"),
                 text("after"),
@@ -1973,8 +1958,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("before"),
                 text("after"),
                 Event::EndParagraph,
@@ -1992,8 +1977,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndDocument
@@ -2010,8 +1995,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text(" hello  world "),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2028,8 +2013,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a & b"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2046,8 +2031,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a < b"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2064,8 +2049,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2082,11 +2067,11 @@ mod events {
         let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
         assert_eq!(
             reader.next_event().expect("start document"),
-            Some(start_doc())
+            Some(start_document())
         );
         assert_eq!(
             reader.next_event().expect("start paragraph"),
-            Some(start_para())
+            Some(start_paragraph())
         );
         match reader.next_event() {
             Err(docspec_core::Error::Parse { message, position }) => {
@@ -2109,8 +2094,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2173,8 +2158,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("visible"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2199,11 +2184,11 @@ mod events {
         let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
         assert_eq!(
             reader.next_event().expect("start document"),
-            Some(start_doc())
+            Some(start_document())
         );
         assert_eq!(
             reader.next_event().expect("start paragraph"),
-            Some(start_para())
+            Some(start_paragraph())
         );
         match reader.next_event() {
             Err(docspec_core::Error::Parse { message, position }) => {
@@ -2226,8 +2211,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("hello <world>"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2244,8 +2229,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("kept"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2270,11 +2255,11 @@ mod events {
         let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
         assert_eq!(
             reader.next_event().expect("start document"),
-            Some(start_doc())
+            Some(start_document())
         );
         assert_eq!(
             reader.next_event().expect("start paragraph"),
-            Some(start_para())
+            Some(start_paragraph())
         );
         match reader.next_event() {
             Err(docspec_core::Error::Parse { message, position }) => {
@@ -2299,8 +2284,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("partial"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2319,8 +2304,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::EndParagraph,
                 Event::EndDocument
             ]
@@ -2336,8 +2321,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 text("\t"),
                 text("b"),
@@ -2356,8 +2341,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("foo"),
                 text("\t"),
                 text("bar"),
@@ -2376,8 +2361,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("\t"),
                 text("after"),
                 Event::EndParagraph,
@@ -2395,8 +2380,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("before"),
                 text("\t"),
                 Event::EndParagraph,
@@ -2414,8 +2399,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("\t"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2432,8 +2417,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 text("\t"),
                 text("b"),
@@ -2452,8 +2437,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2470,8 +2455,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("kept"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2488,7 +2473,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartTable { id: None },
                 Event::StartTableRow { id: None },
                 Event::StartTableCell {
@@ -2496,7 +2481,7 @@ mod events {
                     id: None,
                     rowspan: None,
                 },
-                start_para(),
+                start_paragraph(),
                 text("a"),
                 text("\t"),
                 text("b"),
@@ -2518,8 +2503,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("\t"),
                 text("\t"),
                 text("\t"),
@@ -2538,8 +2523,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 Event::LineBreak,
                 text("b"),
@@ -2558,8 +2543,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("foo"),
                 Event::LineBreak,
                 text("bar"),
@@ -2578,8 +2563,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::LineBreak,
                 text("after"),
                 Event::EndParagraph,
@@ -2597,8 +2582,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("before"),
                 Event::LineBreak,
                 Event::EndParagraph,
@@ -2616,8 +2601,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::LineBreak,
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2634,8 +2619,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 Event::LineBreak,
                 text("b"),
@@ -2654,8 +2639,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 Event::LineBreak,
                 text("b"),
@@ -2674,8 +2659,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 Event::LineBreak,
                 text("b"),
@@ -2694,8 +2679,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2712,8 +2697,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("kept"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2730,7 +2715,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartTable { id: None },
                 Event::StartTableRow { id: None },
                 Event::StartTableCell {
@@ -2738,7 +2723,7 @@ mod events {
                     id: None,
                     rowspan: None,
                 },
-                start_para(),
+                start_paragraph(),
                 text("a"),
                 Event::LineBreak,
                 text("b"),
@@ -2760,8 +2745,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::LineBreak,
                 Event::LineBreak,
                 Event::LineBreak,
@@ -2796,11 +2781,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("cell"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -2820,28 +2805,28 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("a"),
                 Event::EndParagraph,
                 Event::EndTableCell,
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("b"),
                 Event::EndParagraph,
                 Event::EndTableCell,
                 Event::EndTableRow,
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("c"),
                 Event::EndParagraph,
                 Event::EndTableCell,
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("d"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -2861,11 +2846,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 Event::EndParagraph,
                 Event::EndTableCell,
                 Event::EndTableRow,
@@ -2884,14 +2869,14 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("first"),
                 Event::EndParagraph,
-                start_para(),
+                start_paragraph(),
                 text("second"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -2911,14 +2896,14 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("inner"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -2941,20 +2926,20 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("before"),
                 Event::EndParagraph,
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("inserted"),
                 Event::EndParagraph,
                 Event::EndTableCell,
                 Event::EndTableRow,
                 Event::EndTable,
-                start_para(),
+                start_paragraph(),
                 text("after"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2971,23 +2956,23 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("before"),
                 Event::EndParagraph,
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("inner"),
                 Event::EndParagraph,
                 Event::EndTableCell,
                 Event::EndTableRow,
                 Event::EndTable,
-                start_para(),
+                start_paragraph(),
                 text("after"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -3007,7 +2992,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 Event::StartTableHeader {
@@ -3020,7 +3005,7 @@ mod events {
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("inner"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -3043,7 +3028,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 Event::StartTableHeader {
@@ -3056,7 +3041,7 @@ mod events {
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("inner"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -3070,7 +3055,7 @@ mod events {
                     rowspan: None,
                     id: None,
                 },
-                start_para(),
+                start_paragraph(),
                 text("after"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
@@ -3091,7 +3076,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 Event::StartTableHeader {
@@ -3101,7 +3086,7 @@ mod events {
                     rowspan: None,
                     id: None,
                 },
-                start_para(),
+                start_paragraph(),
                 text("cell"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
@@ -3121,11 +3106,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("a"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -3145,11 +3130,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("cell"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -3169,11 +3154,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("keep"),
                 text("link"),
                 Event::EndParagraph,
@@ -3194,8 +3179,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -3212,8 +3197,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("foo"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -3230,8 +3215,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 text("b"),
                 Event::EndParagraph,
@@ -3249,8 +3234,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("foo"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -3267,7 +3252,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_para_with_alignment(TextAlignment::Right),
                 text("x"),
                 Event::EndParagraph,
@@ -3285,8 +3270,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 Event::StartTextStyle {
                     kind: TextStyleKind::Italic,
@@ -3309,8 +3294,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -3327,8 +3312,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -3345,8 +3330,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -3364,8 +3349,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::StartTextStyle {
                     kind: TextStyleKind::Bold,
                     id: None,
@@ -3387,7 +3372,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_para_with_alignment(TextAlignment::Center),
                 text("x"),
                 Event::EndParagraph,
@@ -3405,8 +3390,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::LineBreak,
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -3423,7 +3408,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_para_with_alignment(TextAlignment::Right),
                 Event::StartTextStyle {
                     kind: TextStyleKind::Bold,
@@ -3432,7 +3417,7 @@ mod events {
                 text("a"),
                 Event::EndTextStyle,
                 Event::EndParagraph,
-                start_para(),
+                start_paragraph(),
                 text("b"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -3544,7 +3529,7 @@ mod events {
             assert_eq!(
                 events,
                 vec![
-                    start_doc(),
+                    start_document(),
                     start_para_with_alignment(TextAlignment::Center),
                     text("\u{2620}"),
                     Event::EndParagraph,
@@ -3588,11 +3573,11 @@ mod events {
             assert_eq!(
                 events,
                 vec![
-                    start_doc(),
+                    start_document(),
                     start_table(),
                     start_row(),
                     start_cell(),
-                    start_para(),
+                    start_paragraph(),
                     text("\u{2620}"),
                     Event::EndParagraph,
                     Event::EndTableCell,
@@ -3619,11 +3604,11 @@ mod events {
             assert_eq!(
                 events,
                 vec![
-                    start_doc(),
+                    start_document(),
                     start_table(),
                     start_row(),
                     start_cell(),
-                    start_para(),
+                    start_paragraph(),
                     text("cell"),
                     Event::EndParagraph,
                     Event::EndTableCell,
@@ -3655,8 +3640,8 @@ mod events {
             assert_eq!(
                 events,
                 vec![
-                    start_doc(),
-                    start_para(),
+                    start_document(),
+                    start_paragraph(),
                     text("\u{2620}"),
                     text("\u{1F577}"),
                     text("hello"),
@@ -3686,11 +3671,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_header(),
-                start_para(),
+                start_paragraph(),
                 text("h"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
@@ -3710,25 +3695,25 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_header(),
-                start_para(),
+                start_paragraph(),
                 text("h1"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
                 Event::EndTableRow,
                 start_row(),
                 start_header(),
-                start_para(),
+                start_paragraph(),
                 text("h2"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
                 Event::EndTableRow,
                 start_row(),
                 start_header(),
-                start_para(),
+                start_paragraph(),
                 text("h3"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
@@ -3748,11 +3733,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_header(),
-                start_para(),
+                start_paragraph(),
                 text("h"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
@@ -3772,11 +3757,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_header(),
-                start_para(),
+                start_paragraph(),
                 text("h"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
@@ -3796,11 +3781,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_header(),
-                start_para(),
+                start_paragraph(),
                 text("h"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
@@ -3820,11 +3805,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("d"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -3844,11 +3829,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("d"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -3868,11 +3853,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("d"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -3893,25 +3878,25 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_header(),
-                start_para(),
+                start_paragraph(),
                 text("h"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
                 Event::EndTableRow,
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("d"),
                 Event::EndParagraph,
                 Event::EndTableCell,
                 Event::EndTableRow,
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -3931,7 +3916,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 Event::StartTableHeader {
@@ -3941,7 +3926,7 @@ mod events {
                     rowspan: None,
                     id: None,
                 },
-                start_para(),
+                start_paragraph(),
                 text("h"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
@@ -3961,14 +3946,14 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("inner"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -3991,11 +3976,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("d"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -4015,11 +4000,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_header(),
-                start_para(),
+                start_paragraph(),
                 text("h"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
@@ -4039,14 +4024,14 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_header(),
-                start_para(),
+                start_paragraph(),
                 text("p1"),
                 Event::EndParagraph,
-                start_para(),
+                start_paragraph(),
                 text("p2"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
@@ -4066,18 +4051,18 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_header(),
-                start_para(),
+                start_paragraph(),
                 text("h"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
                 Event::EndTableRow,
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("d"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -4097,7 +4082,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 Event::StartTableCell {
@@ -4105,7 +4090,7 @@ mod events {
                     rowspan: None,
                     id: None,
                 },
-                start_para(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -4125,11 +4110,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -4149,11 +4134,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -4173,11 +4158,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -4197,11 +4182,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -4221,7 +4206,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 Event::StartTableCell {
@@ -4229,7 +4214,7 @@ mod events {
                     rowspan: None,
                     id: None,
                 },
-                start_para(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -4249,7 +4234,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 Event::StartTableCell {
@@ -4257,7 +4242,7 @@ mod events {
                     rowspan: None,
                     id: None,
                 },
-                start_para(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -4277,11 +4262,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -4301,7 +4286,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
@@ -4312,7 +4297,7 @@ mod events {
                     rowspan: None,
                     id: None,
                 },
-                start_para(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -4335,7 +4320,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 Event::StartTableHeader {
@@ -4345,7 +4330,7 @@ mod events {
                     rowspan: None,
                     id: None,
                 },
-                start_para(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
@@ -4365,8 +4350,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("see "),
                 text("link"),
                 text(" done"),
@@ -4385,8 +4370,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::StartTextStyle {
                     kind: TextStyleKind::Underline,
                     id: None,
@@ -4408,8 +4393,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -4422,7 +4407,7 @@ mod events {
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:hyperlink><w:r><w:t>x</w:t></w:r></w:hyperlink></w:body></w:document>"#,
         );
         let events = drive(&mut reader);
-        assert_eq!(events, vec![start_doc(), Event::EndDocument,]);
+        assert_eq!(events, vec![start_document(), Event::EndDocument,]);
     }
 
     #[test]
@@ -4565,8 +4550,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::EndParagraph,
                 Event::EndDocument
             ]
@@ -4603,8 +4588,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("fallback"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -4633,8 +4618,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 text("x"),
                 Event::EndLink,
@@ -4659,8 +4644,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 text("outer"),
                 text("inner"),
@@ -4686,8 +4671,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 Event::StartTextStyle {
                     kind: TextStyleKind::Bold,
@@ -4717,8 +4702,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 Event::StartTextStyle {
                     kind: TextStyleKind::Bold,
@@ -4751,8 +4736,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::EndParagraph,
                 Event::EndDocument
             ]
@@ -4774,8 +4759,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 text("before"),
                 text("after"),
@@ -4801,8 +4786,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 text("x"),
                 Event::EndLink,
@@ -4826,8 +4811,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 text("x"),
                 Event::EndLink,
@@ -4850,7 +4835,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartPreformatted {
                     id: None,
                     syntax: None,
@@ -4877,8 +4862,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::EndParagraph,
                 Event::EndDocument
             ]
@@ -4898,7 +4883,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartHeading { level: 1, id: None },
                 start_link("https://example.com", None),
                 text("x"),
@@ -4924,11 +4909,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 text("x"),
                 Event::EndLink,
@@ -4956,8 +4941,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 text("x"),
                 Event::EndLink,
@@ -4982,8 +4967,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 text("x"),
                 Event::EndLink,
@@ -5008,8 +4993,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 text(" "),
                 Event::EndLink,
@@ -5034,8 +5019,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 text("\t"),
                 Event::EndLink,
@@ -5060,8 +5045,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 Event::LineBreak,
                 Event::EndLink,
@@ -5086,8 +5071,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 text("a"),
                 text("b"),
@@ -5108,8 +5093,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("#Section 1.2 §A", None),
                 text("x"),
                 Event::EndLink,
@@ -5131,8 +5116,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com?q=1&r=2", None),
                 text("x"),
                 Event::EndLink,
@@ -5160,13 +5145,13 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 text("a"),
                 Event::EndLink,
                 Event::EndParagraph,
-                start_para(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 text("b"),
                 Event::EndLink,
@@ -5194,13 +5179,13 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 text("a"),
                 Event::EndLink,
                 Event::EndParagraph,
-                start_para(),
+                start_paragraph(),
                 start_link("https://example.com", None),
                 text("b"),
                 Event::EndLink,
@@ -5219,8 +5204,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("SDT content"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -5234,7 +5219,7 @@ mod events {
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:sdt><w:sdtPr><w:id w:val="42"/></w:sdtPr></w:sdt></w:body></w:document>"#,
         );
         let events = drive(&mut reader);
-        assert_eq!(events, vec![start_doc(), Event::EndDocument,]);
+        assert_eq!(events, vec![start_document(), Event::EndDocument,]);
     }
 
     #[test]
@@ -5246,8 +5231,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("text"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -5264,8 +5249,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 text("inserted"),
                 text("b"),
@@ -5284,8 +5269,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -5302,8 +5287,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("existing"),
                 Event::EndParagraph,
                 start_para_with_alignment(TextAlignment::Right),
@@ -5323,11 +5308,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("cell"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -5347,8 +5332,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 text("moved"),
                 text("b"),
@@ -5367,8 +5352,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("moved"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -5385,8 +5370,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("before"),
                 text("after"),
                 Event::EndParagraph,
@@ -5404,8 +5389,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("before"),
                 text("after"),
                 Event::EndParagraph,
@@ -5423,8 +5408,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("kept"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -5441,8 +5426,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -5459,8 +5444,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("plain "),
                 text("link"),
                 text(" "),
@@ -5483,8 +5468,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::StartTextStyle {
                     kind: TextStyleKind::Bold,
                     id: None,
@@ -5506,8 +5491,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("visible"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -5524,8 +5509,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::StartTextStyle {
                     kind: TextStyleKind::Bold,
                     id: None,
@@ -5547,8 +5532,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::StartTextStyle {
                     kind: TextStyleKind::Italic,
                     id: None,
@@ -5570,8 +5555,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::StartTextStyle {
                     kind: TextStyleKind::Strikethrough,
                     id: None,
@@ -5593,8 +5578,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::StartTextStyle {
                     kind: TextStyleKind::Underline,
                     id: None,
@@ -5616,8 +5601,8 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::StartTextStyle {
                     kind: TextStyleKind::Subscript,
                     id: None,
@@ -5639,7 +5624,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_para_with_alignment(TextAlignment::Center),
                 text("centered"),
                 Event::EndParagraph,
@@ -5657,11 +5642,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_header(),
-                start_para(),
+                start_paragraph(),
                 text("h"),
                 Event::EndParagraph,
                 Event::EndTableHeader,
@@ -5681,7 +5666,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 Event::StartTableCell {
@@ -5689,7 +5674,7 @@ mod events {
                     rowspan: None,
                     id: None,
                 },
-                start_para(),
+                start_paragraph(),
                 text("cell"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -5709,11 +5694,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("cell"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -5733,11 +5718,11 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
-                start_para(),
+                start_paragraph(),
                 text("cell"),
                 Event::EndParagraph,
                 Event::EndTableCell,
@@ -5757,7 +5742,7 @@ mod events {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_para_with_alignment(TextAlignment::Right),
                 text("text"),
                 Event::EndParagraph,
@@ -5771,6 +5756,7 @@ mod happy_path_lists {
     use docspec_core::{Event, ListStyleType};
 
     use crate::fixture;
+    use docspec_test_utils::builders::{start_document, start_paragraph, text};
 
     use super::collect_events;
 
@@ -5813,27 +5799,6 @@ mod happy_path_lists {
         ])
     }
 
-    fn start_doc() -> Event {
-        Event::StartDocument {
-            id: None,
-            language: None,
-            metadata: None,
-        }
-    }
-
-    fn start_para() -> Event {
-        Event::StartParagraph {
-            alignment: None,
-            id: None,
-        }
-    }
-
-    fn text(content: &str) -> Event {
-        Event::Text {
-            content: content.to_string(),
-        }
-    }
-
     #[test]
     fn flat_ordered_two_items_emits_correct_sequence() {
         let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -5864,14 +5829,14 @@ mod happy_path_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
                     start: Some(1),
                     style_type: ListStyleType::Decimal,
                 },
-                start_para(),
+                start_paragraph(),
                 text("First item"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -5881,7 +5846,7 @@ mod happy_path_lists {
                     start: None,
                     style_type: ListStyleType::Decimal,
                 },
-                start_para(),
+                start_paragraph(),
                 text("Second item"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -5919,13 +5884,13 @@ mod happy_path_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartUnorderedListItem {
                     id: Some("2".to_string()),
                     level: 0,
                     style_type: ListStyleType::Disc,
                 },
-                start_para(),
+                start_paragraph(),
                 text("First item"),
                 Event::EndParagraph,
                 Event::EndUnorderedListItem,
@@ -5934,7 +5899,7 @@ mod happy_path_lists {
                     level: 0,
                     style_type: ListStyleType::Disc,
                 },
-                start_para(),
+                start_paragraph(),
                 text("Second item"),
                 Event::EndParagraph,
                 Event::EndUnorderedListItem,
@@ -5973,14 +5938,14 @@ mod happy_path_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
                     start: Some(1),
                     style_type: ListStyleType::Decimal,
                 },
-                start_para(),
+                start_paragraph(),
                 text("Parent"),
                 Event::EndParagraph,
                 Event::StartOrderedListItem {
@@ -5989,7 +5954,7 @@ mod happy_path_lists {
                     start: None,
                     style_type: ListStyleType::Decimal,
                 },
-                start_para(),
+                start_paragraph(),
                 text("Child"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -6029,14 +5994,14 @@ mod happy_path_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartOrderedListItem {
                     id: Some("3".to_string()),
                     level: 0,
                     start: Some(1),
                     style_type: ListStyleType::Decimal,
                 },
-                start_para(),
+                start_paragraph(),
                 text("Ordered parent"),
                 Event::EndParagraph,
                 Event::StartUnorderedListItem {
@@ -6044,7 +6009,7 @@ mod happy_path_lists {
                     level: 1,
                     style_type: ListStyleType::Disc,
                 },
-                start_para(),
+                start_paragraph(),
                 text("Unordered child"),
                 Event::EndParagraph,
                 Event::EndUnorderedListItem,
@@ -6079,14 +6044,14 @@ mod happy_path_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
                     start: Some(1),
                     style_type: ListStyleType::LowerAlpha,
                 },
-                start_para(),
+                start_paragraph(),
                 text("Item"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -6120,14 +6085,14 @@ mod happy_path_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
                     start: Some(1),
                     style_type: ListStyleType::LowerRoman,
                 },
-                start_para(),
+                start_paragraph(),
                 text("Item"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -6161,14 +6126,14 @@ mod happy_path_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
                     start: Some(1),
                     style_type: ListStyleType::UpperAlpha,
                 },
-                start_para(),
+                start_paragraph(),
                 text("Item"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -6202,14 +6167,14 @@ mod happy_path_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
                     start: Some(1),
                     style_type: ListStyleType::UpperRoman,
                 },
-                start_para(),
+                start_paragraph(),
                 text("Item"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -6223,6 +6188,7 @@ mod spec_edge_cases {
     use docspec_core::{Event, ListStyleType};
 
     use crate::fixture;
+    use docspec_test_utils::builders::{start_document, start_paragraph, text};
 
     use super::collect_events;
 
@@ -6265,27 +6231,6 @@ mod spec_edge_cases {
         ])
     }
 
-    fn start_doc() -> Event {
-        Event::StartDocument {
-            id: None,
-            language: None,
-            metadata: None,
-        }
-    }
-
-    fn start_para() -> Event {
-        Event::StartParagraph {
-            alignment: None,
-            id: None,
-        }
-    }
-
-    fn text(content: &str) -> Event {
-        Event::Text {
-            content: content.to_string(),
-        }
-    }
-
     #[test]
     fn num_id_zero_sentinel_emits_plain_paragraph() {
         // §17.9.18: numId=0 sentinel escapes list membership
@@ -6312,8 +6257,8 @@ mod spec_edge_cases {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("text"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -6348,14 +6293,14 @@ mod spec_edge_cases {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
                     start: Some(1),
                     style_type: ListStyleType::Decimal,
                 },
-                start_para(),
+                start_paragraph(),
                 text("text"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -6391,14 +6336,14 @@ mod spec_edge_cases {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
                     start: Some(1),
                     style_type: ListStyleType::Decimal,
                 },
-                start_para(),
+                start_paragraph(),
                 text("text"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -6433,8 +6378,8 @@ mod spec_edge_cases {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("text"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -6474,14 +6419,14 @@ mod spec_edge_cases {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
                     start: Some(1),
                     style_type: ListStyleType::Decimal,
                 },
-                start_para(),
+                start_paragraph(),
                 text("ilvl0"),
                 Event::EndParagraph,
                 Event::StartUnorderedListItem {
@@ -6489,7 +6434,7 @@ mod spec_edge_cases {
                     level: 1,
                     style_type: ListStyleType::Disc,
                 },
-                start_para(),
+                start_paragraph(),
                 text("ilvl1"),
                 Event::EndParagraph,
                 Event::EndUnorderedListItem,
@@ -6526,14 +6471,14 @@ mod spec_edge_cases {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
                     start: Some(1),
                     style_type: ListStyleType::Decimal,
                 },
-                start_para(),
+                start_paragraph(),
                 text("text"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -6568,7 +6513,7 @@ mod spec_edge_cases {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
@@ -6593,7 +6538,7 @@ mod spec_edge_cases {
                     start: Some(1),
                     style_type: ListStyleType::Decimal,
                 },
-                start_para(),
+                start_paragraph(),
                 text("text"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -6610,6 +6555,7 @@ mod resilience_tests {
     use docspec_core::{Event, ListStyleType};
 
     use crate::fixture;
+    use docspec_test_utils::builders::{start_document, start_paragraph, text};
 
     use super::collect_events;
 
@@ -6659,27 +6605,6 @@ mod resilience_tests {
         ])
     }
 
-    fn start_doc() -> Event {
-        Event::StartDocument {
-            id: None,
-            language: None,
-            metadata: None,
-        }
-    }
-
-    fn start_para() -> Event {
-        Event::StartParagraph {
-            alignment: None,
-            id: None,
-        }
-    }
-
-    fn text(content: &str) -> Event {
-        Event::Text {
-            content: content.to_string(),
-        }
-    }
-
     #[test]
     fn missing_numbering_xml_emits_plain_paragraphs() {
         // No word/numbering.xml and no word/_rels/document.xml.rels — paragraphs
@@ -6698,8 +6623,8 @@ mod resilience_tests {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("text"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -6741,8 +6666,8 @@ mod resilience_tests {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("text"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -6768,8 +6693,8 @@ mod resilience_tests {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("text"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -6840,8 +6765,8 @@ mod resilience_tests {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("text"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -6874,7 +6799,7 @@ mod resilience_tests {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
@@ -6929,7 +6854,7 @@ mod resilience_tests {
                     start: Some(1),
                     style_type: ListStyleType::Decimal,
                 },
-                start_para(),
+                start_paragraph(),
                 text("text"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -6970,8 +6895,8 @@ mod resilience_tests {
         assert_eq!(
             events,
             vec![
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("text"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -7003,14 +6928,14 @@ mod resilience_tests {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
                     start: Some(1),
                     style_type: ListStyleType::Decimal,
                 },
-                start_para(),
+                start_paragraph(),
                 text("text"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -7024,6 +6949,7 @@ mod cross_feature_lists {
     use docspec_core::{Event, ListStyleType, TableHeaderScope, TextStyleKind};
 
     use crate::fixture;
+    use docspec_test_utils::builders::{start_document, start_paragraph, text};
 
     use super::collect_events;
 
@@ -7129,27 +7055,6 @@ mod cross_feature_lists {
 </w:numbering>"#
     }
 
-    fn start_doc() -> Event {
-        Event::StartDocument {
-            id: None,
-            language: None,
-            metadata: None,
-        }
-    }
-
-    fn start_para() -> Event {
-        Event::StartParagraph {
-            alignment: None,
-            id: None,
-        }
-    }
-
-    fn text(content: &str) -> Event {
-        Event::Text {
-            content: content.to_string(),
-        }
-    }
-
     fn start_table() -> Event {
         Event::StartTable { id: None }
     }
@@ -7197,12 +7102,12 @@ mod cross_feature_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
                 start_ordered("1", Some(1)),
-                start_para(),
+                start_paragraph(),
                 text("list item"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -7226,12 +7131,12 @@ mod cross_feature_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_header(),
                 start_ordered("1", Some(1)),
-                start_para(),
+                start_paragraph(),
                 text("list item"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -7255,9 +7160,9 @@ mod cross_feature_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_ordered("1", Some(1)),
-                start_para(),
+                start_paragraph(),
                 Event::StartTextStyle {
                     kind: TextStyleKind::Bold,
                     id: None,
@@ -7293,7 +7198,7 @@ mod cross_feature_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartHeading { level: 1, id: None },
                 text("Heading"),
                 Event::EndHeading,
@@ -7314,9 +7219,9 @@ mod cross_feature_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_ordered("1", Some(1)),
-                start_para(),
+                start_paragraph(),
                 text("item"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -7340,14 +7245,14 @@ mod cross_feature_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_ordered("1", Some(1)),
-                start_para(),
+                start_paragraph(),
                 text("one"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
                 start_ordered("2", Some(1)),
-                start_para(),
+                start_paragraph(),
                 text("two"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -7372,17 +7277,17 @@ mod cross_feature_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_ordered("1", Some(1)),
-                start_para(),
+                start_paragraph(),
                 text("one"),
                 Event::EndParagraph,
-                start_para(),
+                start_paragraph(),
                 text("break"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
                 start_ordered("1", None),
-                start_para(),
+                start_paragraph(),
                 text("two"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -7403,9 +7308,9 @@ mod cross_feature_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_ordered("1", Some(1)),
-                start_para(),
+                start_paragraph(),
                 text("inserted"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,
@@ -7436,7 +7341,7 @@ mod cross_feature_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartBlockQuote { id: None },
                 text("quote"),
                 Event::EndBlockQuote,
@@ -7467,7 +7372,7 @@ mod cross_feature_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 Event::StartPreformatted {
                     id: None,
                     syntax: None,
@@ -7491,7 +7396,7 @@ mod cross_feature_lists {
         assert_eq!(
             events,
             vec![
-                start_doc(),
+                start_document(),
                 start_table(),
                 start_row(),
                 start_cell(),
@@ -7499,7 +7404,7 @@ mod cross_feature_lists {
                 start_row(),
                 start_cell(),
                 start_ordered("1", Some(1)),
-                start_para(),
+                start_paragraph(),
                 text("nested list"),
                 Event::EndParagraph,
                 Event::EndOrderedListItem,

@@ -25,6 +25,7 @@ mod tests {
 
     use super::*;
     use docspec_core::EventSink as _;
+    use docspec_test_utils::builders::{start_document, start_paragraph, text};
 
     fn run(events: impl IntoIterator<Item = Event>) -> String {
         let mut buf: Vec<u8> = Vec::new();
@@ -46,27 +47,6 @@ mod tests {
         Ok(String::from_utf8(buf).unwrap())
     }
 
-    fn start_doc() -> Event {
-        Event::StartDocument {
-            id: None,
-            language: None,
-            metadata: None,
-        }
-    }
-
-    fn start_para() -> Event {
-        Event::StartParagraph {
-            alignment: None,
-            id: None,
-        }
-    }
-
-    fn text(s: &str) -> Event {
-        Event::Text {
-            content: s.to_string(),
-        }
-    }
-
     fn start_heading(level: u8, id: Option<&str>) -> Event {
         Event::StartHeading {
             level,
@@ -80,15 +60,15 @@ mod tests {
 
     #[test]
     fn empty_document_emits_empty_list() {
-        assert_eq!(run([start_doc(), Event::EndDocument]), "[]");
+        assert_eq!(run([start_document(), Event::EndDocument]), "[]");
     }
 
     #[test]
     fn single_empty_paragraph() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::EndParagraph,
                 Event::EndDocument
             ]),
@@ -100,8 +80,8 @@ mod tests {
     fn single_text_in_paragraph() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("hi"),
                 Event::EndParagraph,
                 Event::EndDocument
@@ -114,8 +94,8 @@ mod tests {
     fn two_texts_in_one_paragraph_emit_two_strs() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 text("b"),
                 Event::EndParagraph,
@@ -129,11 +109,11 @@ mod tests {
     fn two_paragraphs_separated_by_comma() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 Event::EndParagraph,
-                start_para(),
+                start_paragraph(),
                 text("b"),
                 Event::EndParagraph,
                 Event::EndDocument
@@ -149,8 +129,8 @@ mod tests {
         };
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 bold_text,
                 Event::EndParagraph,
                 Event::EndDocument
@@ -161,21 +141,24 @@ mod tests {
 
     #[test]
     fn text_outside_paragraph_ignored() {
-        assert_eq!(run([start_doc(), text("orphan"), Event::EndDocument]), "[]");
+        assert_eq!(
+            run([start_document(), text("orphan"), Event::EndDocument]),
+            "[]"
+        );
     }
 
     #[test]
     fn text_before_startdocument_ignored() {
-        assert_eq!(run([text("a"), start_doc(), Event::EndDocument]), "[]");
+        assert_eq!(run([text("a"), start_document(), Event::EndDocument]), "[]");
     }
 
     #[test]
     fn events_after_enddocument_ignored() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 Event::EndDocument,
-                start_para(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph
             ]),
@@ -185,13 +168,16 @@ mod tests {
 
     #[test]
     fn double_start_document_is_noop() {
-        assert_eq!(run([start_doc(), start_doc(), Event::EndDocument]), "[]");
+        assert_eq!(
+            run([start_document(), start_document(), Event::EndDocument]),
+            "[]"
+        );
     }
 
     #[test]
     fn orphan_end_paragraph_is_noop() {
         assert_eq!(
-            run([start_doc(), Event::EndParagraph, Event::EndDocument]),
+            run([start_document(), Event::EndParagraph, Event::EndDocument]),
             "[]"
         );
     }
@@ -205,8 +191,8 @@ mod tests {
     fn ignored_events_do_not_break_structure() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("x"),
                 Event::EndParagraph,
                 Event::StartBlockQuote { id: None },
@@ -221,7 +207,7 @@ mod tests {
     fn thematic_break_standalone() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 Event::ThematicBreak { id: None },
                 Event::EndDocument
             ]),
@@ -233,12 +219,12 @@ mod tests {
     fn thematic_break_between_paragraphs() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 Event::EndParagraph,
                 Event::ThematicBreak { id: None },
-                start_para(),
+                start_paragraph(),
                 text("b"),
                 Event::EndParagraph,
                 Event::EndDocument
@@ -251,7 +237,7 @@ mod tests {
     fn thematic_break_with_id_ignored() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 Event::ThematicBreak {
                     id: Some("hr1".to_string()),
                 },
@@ -266,7 +252,7 @@ mod tests {
         assert_eq!(
             run([
                 Event::ThematicBreak { id: None },
-                start_doc(),
+                start_document(),
                 Event::EndDocument
             ]),
             "[]"
@@ -277,8 +263,8 @@ mod tests {
     fn thematic_break_inside_paragraph_ignored() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 Event::ThematicBreak { id: None },
                 text("b"),
@@ -293,8 +279,8 @@ mod tests {
     fn line_break_inside_paragraph() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 Event::LineBreak,
                 text("b"),
@@ -309,8 +295,8 @@ mod tests {
     fn line_break_at_start_of_paragraph_no_leading_comma() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::LineBreak,
                 text("a"),
                 Event::EndParagraph,
@@ -323,7 +309,7 @@ mod tests {
     #[test]
     fn line_break_outside_paragraph_ignored() {
         assert_eq!(
-            run([start_doc(), Event::LineBreak, Event::EndDocument]),
+            run([start_document(), Event::LineBreak, Event::EndDocument]),
             "[]"
         );
     }
@@ -332,8 +318,8 @@ mod tests {
     fn soft_break_inside_paragraph() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 Event::SoftBreak,
                 text("b"),
@@ -348,8 +334,8 @@ mod tests {
     fn soft_break_at_start_of_paragraph_no_leading_comma() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::SoftBreak,
                 text("a"),
                 Event::EndParagraph,
@@ -362,7 +348,7 @@ mod tests {
     #[test]
     fn soft_break_outside_paragraph_ignored() {
         assert_eq!(
-            run([start_doc(), Event::SoftBreak, Event::EndDocument]),
+            run([start_document(), Event::SoftBreak, Event::EndDocument]),
             "[]"
         );
     }
@@ -371,8 +357,8 @@ mod tests {
     fn mixed_breaks_and_text_in_paragraph() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 Event::SoftBreak,
                 text("b"),
@@ -389,8 +375,8 @@ mod tests {
     fn escaped_text_quotes_and_backslashes() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a\"b\\c"),
                 Event::EndParagraph,
                 Event::EndDocument
@@ -403,8 +389,8 @@ mod tests {
     fn escaped_text_newline_and_tab() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a\nb\tc"),
                 Event::EndParagraph,
                 Event::EndDocument
@@ -417,8 +403,8 @@ mod tests {
     fn escaped_text_nul_byte() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("\u{0}"),
                 Event::EndParagraph,
                 Event::EndDocument
@@ -430,8 +416,8 @@ mod tests {
     #[test]
     fn escaped_text_unicode_raw_utf8() {
         let result = run([
-            start_doc(),
-            start_para(),
+            start_document(),
+            start_paragraph(),
             text("it\u{2019}s"),
             Event::EndParagraph,
             Event::EndDocument,
@@ -444,8 +430,8 @@ mod tests {
     fn gap_escape_so_followed_by_h() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("\u{0e}H"),
                 Event::EndParagraph,
                 Event::EndDocument
@@ -458,8 +444,8 @@ mod tests {
     fn gap_escape_decimal_followed_by_digit() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("\u{1}5"),
                 Event::EndParagraph,
                 Event::EndDocument
@@ -471,8 +457,8 @@ mod tests {
     #[test]
     fn non_ascii_emits_raw_utf8_no_gap_escape() {
         let result = run([
-            start_doc(),
-            start_para(),
+            start_document(),
+            start_paragraph(),
             text("\u{a0}5"),
             Event::EndParagraph,
             Event::EndDocument,
@@ -485,8 +471,8 @@ mod tests {
     fn finish_without_enddocument_best_effort_closes() {
         let mut buf: Vec<u8> = Vec::new();
         let mut writer = PandocNativeWriter::new(&mut buf);
-        writer.handle_event(start_doc()).unwrap();
-        writer.handle_event(start_para()).unwrap();
+        writer.handle_event(start_document()).unwrap();
+        writer.handle_event(start_paragraph()).unwrap();
         writer.handle_event(text("hi")).unwrap();
         writer.finish().unwrap();
         let output = String::from_utf8(buf).unwrap();
@@ -496,15 +482,15 @@ mod tests {
     #[test]
     fn write_error_propagates() {
         let mut writer = PandocNativeWriter::new(FailingWriter);
-        let result = writer.handle_event(start_doc());
+        let result = writer.handle_event(start_document());
         assert!(result.is_err());
     }
 
     #[test]
     fn try_run_returns_ok_for_valid_events() {
         let result = try_run([
-            start_doc(),
-            start_para(),
+            start_document(),
+            start_paragraph(),
             text("ok"),
             Event::EndParagraph,
             Event::EndDocument,
@@ -516,7 +502,7 @@ mod tests {
     fn heading_basic_level_1_no_id() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(1, None),
                 text("Hello"),
                 Event::EndHeading,
@@ -530,7 +516,7 @@ mod tests {
     fn heading_with_id() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(2, Some("sec1")),
                 text("Hello"),
                 Event::EndHeading,
@@ -544,7 +530,7 @@ mod tests {
     fn heading_empty_body() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(1, None),
                 Event::EndHeading,
                 Event::EndDocument,
@@ -557,7 +543,7 @@ mod tests {
     fn heading_levels_1_through_9() {
         for level in 1..=9 {
             let out = run([
-                start_doc(),
+                start_document(),
                 start_heading(level, None),
                 text("h"),
                 Event::EndHeading,
@@ -571,7 +557,7 @@ mod tests {
     fn heading_level_zero_passes_through_raw() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(0, None),
                 text("h"),
                 Event::EndHeading,
@@ -585,7 +571,7 @@ mod tests {
     fn heading_level_above_nine_passes_through_raw() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(42, None),
                 text("h"),
                 Event::EndHeading,
@@ -599,7 +585,7 @@ mod tests {
     fn heading_level_u8_max_passes_through_raw() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(u8::MAX, None),
                 text("h"),
                 Event::EndHeading,
@@ -613,7 +599,7 @@ mod tests {
     fn heading_with_multiple_text_runs_separated_by_comma() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(1, None),
                 text("first"),
                 text("second"),
@@ -628,7 +614,7 @@ mod tests {
     fn heading_with_line_break_inline() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(1, None),
                 text("a"),
                 Event::LineBreak,
@@ -644,7 +630,7 @@ mod tests {
     fn heading_with_soft_break_inline() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(1, None),
                 text("a"),
                 Event::SoftBreak,
@@ -660,7 +646,7 @@ mod tests {
     fn heading_id_with_special_chars_is_escaped() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(1, Some("a\"b\\c")),
                 text("x"),
                 Event::EndHeading,
@@ -674,14 +660,14 @@ mod tests {
     fn heading_between_paragraphs_with_comma_separation() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("before"),
                 Event::EndParagraph,
                 start_heading(2, None),
                 text("title"),
                 Event::EndHeading,
-                start_para(),
+                start_paragraph(),
                 text("after"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -694,7 +680,7 @@ mod tests {
     fn multiple_consecutive_headings() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(1, None),
                 text("one"),
                 Event::EndHeading,
@@ -719,8 +705,8 @@ mod tests {
     fn start_heading_inside_paragraph_is_silently_dropped() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 start_heading(1, None),
                 text("b"),
@@ -735,8 +721,8 @@ mod tests {
     fn stray_end_heading_inside_paragraph_does_not_close_paragraph() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 Event::EndHeading,
                 text("b"),
@@ -751,7 +737,7 @@ mod tests {
     fn stray_end_paragraph_inside_heading_does_not_close_heading() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(1, None),
                 text("a"),
                 Event::EndParagraph,
@@ -767,8 +753,8 @@ mod tests {
     fn bold_wraps_text_inside_paragraph() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 start_style(docspec_core::TextStyleKind::Bold),
                 text("b"),
@@ -785,8 +771,8 @@ mod tests {
     fn italic_wraps_text_inside_paragraph() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Italic),
                 text("hello"),
                 Event::EndTextStyle,
@@ -801,8 +787,8 @@ mod tests {
     fn strikethrough_wraps_text_inside_paragraph() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Strikethrough),
                 text("gone"),
                 Event::EndTextStyle,
@@ -817,8 +803,8 @@ mod tests {
     fn underline_wraps_text_inside_paragraph() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Underline),
                 text("under"),
                 Event::EndTextStyle,
@@ -833,8 +819,8 @@ mod tests {
     fn subscript_wraps_text_inside_paragraph() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Subscript),
                 text("2"),
                 Event::EndTextStyle,
@@ -849,8 +835,8 @@ mod tests {
     fn superscript_wraps_text_inside_paragraph() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Superscript),
                 text("th"),
                 Event::EndTextStyle,
@@ -865,8 +851,8 @@ mod tests {
     fn adjacent_styles_each_emit_their_wrapper() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Bold),
                 text("b"),
                 Event::EndTextStyle,
@@ -884,8 +870,8 @@ mod tests {
     fn nested_styles_emit_nested_wrappers() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Bold),
                 start_style(docspec_core::TextStyleKind::Italic),
                 text("bi"),
@@ -902,7 +888,7 @@ mod tests {
     fn style_inside_heading_emits_wrapper() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(2, Some("h")),
                 text("a "),
                 start_style(docspec_core::TextStyleKind::Bold),
@@ -920,8 +906,8 @@ mod tests {
     fn style_with_multiple_inlines_inside_wrapper() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Bold),
                 text("a"),
                 Event::SoftBreak,
@@ -938,8 +924,8 @@ mod tests {
     fn code_style_emits_code_construct_inside_paragraph() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a "),
                 start_style(docspec_core::TextStyleKind::Code),
                 text("code"),
@@ -956,8 +942,8 @@ mod tests {
     fn code_style_inside_bold_emits_code_inside_strong() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Bold),
                 start_style(docspec_core::TextStyleKind::Code),
                 text("a"),
@@ -975,8 +961,8 @@ mod tests {
     fn nested_styles_inside_code_are_absorbed_into_buffer() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Code),
                 start_style(docspec_core::TextStyleKind::Bold),
                 text("a"),
@@ -999,8 +985,8 @@ mod tests {
         };
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a "),
                 start_style(docspec_core::TextStyleKind::Mark(color)),
                 text("mark"),
@@ -1018,8 +1004,8 @@ mod tests {
         let color = docspec_core::Color::Rgb { r: 255, g: 0, b: 0 };
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a "),
                 start_style(docspec_core::TextStyleKind::TextColor(color)),
                 text("red"),
@@ -1036,7 +1022,7 @@ mod tests {
     fn start_text_style_outside_inline_block_is_dropped() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_style(docspec_core::TextStyleKind::Bold),
                 text("b"),
                 Event::EndTextStyle,
@@ -1049,7 +1035,7 @@ mod tests {
     #[test]
     fn stray_end_text_style_outside_inline_block_is_noop() {
         assert_eq!(
-            run([start_doc(), Event::EndTextStyle, Event::EndDocument]),
+            run([start_document(), Event::EndTextStyle, Event::EndDocument]),
             "[]"
         );
     }
@@ -1058,8 +1044,8 @@ mod tests {
     fn stray_end_text_style_inside_paragraph_does_not_close_paragraph() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 Event::EndTextStyle,
                 text("b"),
@@ -1074,8 +1060,8 @@ mod tests {
     fn unclosed_style_at_end_of_paragraph_is_closed_defensively() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Bold),
                 text("a"),
                 Event::EndParagraph,
@@ -1089,7 +1075,7 @@ mod tests {
     fn unclosed_style_at_end_of_heading_is_closed_defensively() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(1, None),
                 start_style(docspec_core::TextStyleKind::Italic),
                 text("x"),
@@ -1104,8 +1090,8 @@ mod tests {
     fn unclosed_style_at_end_of_document_is_closed_defensively() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Bold),
                 text("a"),
                 Event::EndDocument,
@@ -1125,7 +1111,7 @@ mod tests {
     fn preformatted_with_no_id_no_syntax_emits_empty_attr() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_pre(None, None),
                 text("hello"),
                 Event::EndPreformatted,
@@ -1139,7 +1125,7 @@ mod tests {
     fn preformatted_with_syntax_emits_language_class() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_pre(None, Some("rust")),
                 text("fn main() {}"),
                 Event::EndPreformatted,
@@ -1153,7 +1139,7 @@ mod tests {
     fn preformatted_with_id_and_syntax_emits_both() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_pre(Some("ex1"), Some("python")),
                 text("print('hi')"),
                 Event::EndPreformatted,
@@ -1167,7 +1153,7 @@ mod tests {
     fn preformatted_concatenates_multiple_text_events() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_pre(None, None),
                 text("line1\n"),
                 text("line2\n"),
@@ -1183,7 +1169,7 @@ mod tests {
     fn preformatted_preserves_literal_newlines_in_text() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_pre(None, None),
                 text("a\nb\nc"),
                 Event::EndPreformatted,
@@ -1197,7 +1183,7 @@ mod tests {
     fn preformatted_with_empty_content_emits_empty_string() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_pre(None, None),
                 Event::EndPreformatted,
                 Event::EndDocument,
@@ -1210,7 +1196,7 @@ mod tests {
     fn preformatted_escapes_quotes_and_backslashes_in_content() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_pre(None, Some("c")),
                 text("printf(\"hello\\n\");"),
                 Event::EndPreformatted,
@@ -1224,7 +1210,7 @@ mod tests {
     fn preformatted_escapes_id_attribute() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_pre(Some("a\"b"), None),
                 text("x"),
                 Event::EndPreformatted,
@@ -1238,14 +1224,14 @@ mod tests {
     fn preformatted_between_paragraphs_emits_block_separators() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("before"),
                 Event::EndParagraph,
                 start_pre(None, Some("sh")),
                 text("ls -la"),
                 Event::EndPreformatted,
-                start_para(),
+                start_paragraph(),
                 text("after"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -1258,8 +1244,8 @@ mod tests {
     fn start_preformatted_inside_paragraph_is_dropped_but_text_passes_through() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("a"),
                 start_pre(None, Some("rust")),
                 text("nope"),
@@ -1275,7 +1261,7 @@ mod tests {
     #[test]
     fn stray_end_preformatted_is_noop() {
         assert_eq!(
-            run([start_doc(), Event::EndPreformatted, Event::EndDocument]),
+            run([start_document(), Event::EndPreformatted, Event::EndDocument]),
             "[]"
         );
     }
@@ -1284,8 +1270,8 @@ mod tests {
     fn inline_code_with_no_id_emits_empty_attr() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Code),
                 text("let x = 1;"),
                 Event::EndTextStyle,
@@ -1300,8 +1286,8 @@ mod tests {
     fn inline_code_with_id_emits_id() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 Event::StartTextStyle {
                     kind: docspec_core::TextStyleKind::Code,
                     id: Some("ref1".to_string()),
@@ -1319,8 +1305,8 @@ mod tests {
     fn inline_code_between_plain_text_emits_separators() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 text("before "),
                 start_style(docspec_core::TextStyleKind::Code),
                 text("x"),
@@ -1337,7 +1323,7 @@ mod tests {
     fn inline_code_inside_heading() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(1, Some("h")),
                 text("Use "),
                 start_style(docspec_core::TextStyleKind::Code),
@@ -1354,8 +1340,8 @@ mod tests {
     fn inline_code_inside_wrapper_style() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Bold),
                 text("bold "),
                 start_style(docspec_core::TextStyleKind::Code),
@@ -1373,8 +1359,8 @@ mod tests {
     fn inline_code_concatenates_multiple_text_events() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Code),
                 text("a"),
                 text("b"),
@@ -1391,8 +1377,8 @@ mod tests {
     fn inline_code_escapes_quotes_in_content() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Code),
                 text("say \"hi\""),
                 Event::EndTextStyle,
@@ -1407,7 +1393,7 @@ mod tests {
     fn inline_code_outside_inline_block_is_dropped() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_style(docspec_core::TextStyleKind::Code),
                 text("x"),
                 Event::EndTextStyle,
@@ -1421,12 +1407,12 @@ mod tests {
     fn unclosed_inline_code_at_end_of_paragraph_does_not_swallow_following_block() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Code),
                 text("x"),
                 Event::EndParagraph,
-                start_para(),
+                start_paragraph(),
                 text("y"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -1439,12 +1425,12 @@ mod tests {
     fn unclosed_inline_code_at_end_of_heading_does_not_swallow_following_block() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(1, None),
                 start_style(docspec_core::TextStyleKind::Code),
                 text("x"),
                 Event::EndHeading,
-                start_para(),
+                start_paragraph(),
                 text("y"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -1457,8 +1443,8 @@ mod tests {
     fn unclosed_inline_code_at_end_of_paragraph_is_flushed_defensively() {
         assert_eq!(
             run([
-                start_doc(),
-                start_para(),
+                start_document(),
+                start_paragraph(),
                 start_style(docspec_core::TextStyleKind::Code),
                 text("x"),
                 Event::EndParagraph,
@@ -1472,7 +1458,7 @@ mod tests {
     fn unclosed_inline_code_at_end_of_heading_is_flushed_defensively() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_heading(1, None),
                 start_style(docspec_core::TextStyleKind::Code),
                 text("x"),
@@ -1487,7 +1473,7 @@ mod tests {
     fn unclosed_preformatted_at_end_of_document_is_flushed_defensively() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_pre(None, Some("rust")),
                 text("fn main"),
                 Event::EndDocument,
@@ -1500,7 +1486,7 @@ mod tests {
     fn nested_inline_events_inside_preformatted_are_ignored() {
         assert_eq!(
             run([
-                start_doc(),
+                start_document(),
                 start_pre(None, None),
                 text("a"),
                 Event::LineBreak,
