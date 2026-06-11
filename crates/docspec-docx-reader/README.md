@@ -17,7 +17,7 @@ architecture, and the event protocol.
   - `<w:highlight w:val="namedColor">` — highlight color using the 17-entry ECMA-376 named palette. Emitted as `StartTextStyle { kind: Mark(Color::Rgb { r, g, b }) }`. `w:val="none"` and unknown names are silently dropped.
   - `<w:shd w:fill="HEX">` — background fill, used as a fallback highlight when `<w:highlight>` is absent. Emitted as `StartTextStyle { kind: Mark(Color::Rgb { r, g, b }) }`. `w:fill="auto"` and a missing `w:fill` attribute are silently dropped.
 - Paragraph properties (`<w:pPr>`): `<w:jc>` (alignment — `left`/`start` to Left, `right`/`end` to Right, `center` to Center, `both`/`distribute` to Justify)
-- Lists (`<w:p>` with `<w:numPr>`): ordered (Decimal/LowerAlpha/UpperAlpha/LowerRoman/UpperRoman) and unordered (Disc) — emitted as `Start*ListItem`/`End*ListItem` with `id` (numId stringified), `level` (ilvl), `start` (`Some(1)` on first item per numId), and `style_type`. Per-level classification: same numId can mix ordered and unordered levels.
+- Lists (`<w:p>` with `<w:numPr>`): ordered (Decimal/LowerAlpha/UpperAlpha/LowerRoman/UpperRoman) and unordered (Disc) — emitted as `Start*ListItem`/`End*ListItem` with `id` (numId stringified), `level` (ilvl), `start` (`Some(1)` on first item per numId), and `style_type`. Per-level classification: same numId can mix ordered and unordered levels. Continuation paragraphs — paragraphs without `<w:numPr>` between list items — attach to the preceding open list item as additional `StartParagraph`/`EndParagraph` content inside the still-open `Start*ListItem`. The list closes only at a heading, block quote, preformatted block, table boundary, table-cell boundary, or end of document.
 - Empty `<w:rPr/>` and `<w:pPr/>` are treated as no properties (default style / alignment None)
 - A `<w:rPr>` or `<w:pPr>` that appears after content in the same parent is silently ignored (per the OOXML spec, both must be the first child element)
 - Hyperlinks (`<w:hyperlink>`): resolved via `word/_rels/document.xml.rels` and emitted as `StartLink`/`EndLink` events around inline content. Supports external URL targets (both Strict and Transitional OOXML relationship Type URIs), anchor-only links (`w:anchor` without `r:id` emits `#fragment`), and tooltips (`w:tooltip` → `StartLink.title`, XML-decoded). When the relationship cannot be resolved, the link wrapper is dropped and content passes through as plain runs.
@@ -68,7 +68,6 @@ The following list features are intentionally out of scope for V1:
 - No `<w:lvlOverride>` resolution — abstractNum's level definitions are authoritative
 - No picture bullets (`<w:lvlPicBulletId>`) — picture-bullet levels emit `Disc`
 - No style-linked lists (`<w:numStyleLink>`, `<w:styleLink>`) — fall back to `Decimal` defaults
-- No continuation-paragraph attachment — paragraphs without `<w:numPr>` between list items emit `StartParagraph` and close the list stack
 - `<w:multiLevelType>` is ignored — per-level `<w:numFmt>` is authoritative (§17.9.12)
 - No per-level marker text (`<w:lvlText>`) — not parsed
 - No level-specific font, color, or indent
