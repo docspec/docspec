@@ -84,7 +84,9 @@ If your crate's TP config still points at any old filename, update it now. On cr
 - Workflow filename `ci.yml`, environment `release` (used by the automated release pipeline).
 - Workflow filename `publish-crate-manual.yml`, environment `release` (used by the manual single-crate publish workflow).
 
-Failing to update means the OIDC token exchange will fail silently when the new workflow runs. The publish step will error with an authentication failure. There is no fallback: the legacy `CARGO_REGISTRY_TOKEN` path was removed when we migrated to Trusted Publishing. Fix the TP config on crates.io and re-run the workflow.
+Failing to update means the OIDC token exchange will fail silently when the new workflow runs. The publish step will error with an authentication failure. For routine releases there is no fallback: re-publishing an existing crate requires Trusted Publishing. Fix the TP config on crates.io and re-run the workflow.
+
+The repo does retain a single `CARGO_REGISTRY_TOKEN` secret, but only for the **first-ever** publish of a new crate (see [First-time publish of a new crate](#first-time-publish-of-a-new-crate)). Trusted Publishing tokens cannot create new crates on crates.io, so the bootstrap insert must use an API token. Once a crate exists, every subsequent publish flows through OIDC.
 
 ## Supply Chain Guarantees
 
@@ -133,6 +135,35 @@ release-plz publishes crates in topological dependency order so that each crate'
 After each publish, crates.io needs time to propagate the new version to its index before the next crate can resolve it as a dependency. `release-plz` waits for newly published crates according to `publish_timeout = "30m"` in `release-plz.toml`, so normal propagation lag should not need manual intervention.
 
 If propagation takes longer than the configured timeout, the workflow will fail. In that case, wait for the index to catch up and re-run the workflow manually. release-plz skips crates that are already published at the target version, so re-running is safe.
+
+## First-time publish of a new crate
+
+When a brand-new crate is added to the workspace, the very first publish to crates.io cannot use Trusted Publishing. crates.io rejects the request with `HTTP 403: Trusted Publishing tokens do not support creating new crates. Publish the crate manually, first`. This is by design: a Trusted Publisher config can only be attached to an existing crate, and the crate has to exist first.
+
+Bootstrap the new crate with the **`publish-crate-initial.yml`** workflow:
+
+1. Go to the Actions tab and pick **Publish crate (initial)**.
+2. Click **Run workflow**.
+3. In the **Crate name** field, type the crate name exactly (e.g. `docspec-markdown-writer`). It must match a directory under `crates/` and must not have `publish = false`.
+4. Leave **Register Trusted Publisher configs on crates.io** ticked unless you have a reason to opt out.
+5. Run.
+
+The workflow:
+
+- Validates the crate exists, is publishable, and that the declared `[package].name` matches the input.
+- Publishes with `CARGO_REGISTRY_TOKEN` (the repo secret scoped exclusively to new-crate creation).
+- Best-effort: POSTs two Trusted Publisher configs to `https://crates.io/api/v1/trusted_publishing/github_configs` so future versions can flow through OIDC without any web-UI steps:
+  - `ci.yml` + environment `release` (automated release pipeline)
+  - `publish-crate-manual.yml` + environment `release` (manual emergency publish)
+
+If the registration step warns (HTTP 403 or anything other than 200/201/409), the `CARGO_REGISTRY_TOKEN` likely lacks the `trusted-publishing` scope. The publish itself has already succeeded; just configure the two TP entries manually via the web UI as described in [Trusted Publishing Setup (One-Time Per Crate)](#trusted-publishing-setup-one-time-per-crate).
+
+After this bootstrap step the crate is permanently set up for OIDC-only releases. The next time release-plz runs, it picks up the new crate alongside the rest of the ecosystem.
+
+After a failed mid-release that left a new crate unpublished (the classic symptom: the `Tag and publish crates` job stops on the new crate with the 403 above, while earlier crates in topological order land successfully), the recovery path is:
+
+1. Run `publish-crate-initial.yml` for the new crate.
+2. Re-run the failed `CI` workflow run on `main` (Actions → failed run → **Re-run failed jobs**). release-plz skips the crates already at the target version and publishes the remaining ones via OIDC.
 
 ## Manual Operations
 

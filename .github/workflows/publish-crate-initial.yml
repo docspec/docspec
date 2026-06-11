@@ -1,0 +1,192 @@
+name: Publish crate (initial)
+
+# Manual workflow for the *first-ever* publish of a new crate to crates.io.
+#
+# Why this exists:
+# Trusted Publishing (OIDC) cannot create new crates. crates.io returns
+# HTTP 403: "Trusted Publishing tokens do not support creating new crates.
+# Publish the crate manually, first". A long-lived API token is required
+# for the bootstrap publish. After that, future versions publish via OIDC
+# through release-plz (see ci.yml's release-plz-release job).
+#
+# Token used: the repo secret CARGO_REGISTRY_TOKEN. It is scoped to crate
+# creation only; routine releases continue to flow through Trusted Publishing
+# with no long-lived credential.
+#
+# This workflow:
+#   1. Validates the crate exists in this workspace and is publishable.
+#   2. Publishes it with CARGO_REGISTRY_TOKEN.
+#   3. Best-effort: registers two Trusted Publishing configs on crates.io
+#      (ci.yml + release, and publish-crate-manual.yml + release) so future
+#      versions can publish via OIDC without web-UI steps. If the token
+#      lacks the `trusted-publishing` scope or the user is not a crate
+#      owner, registration is skipped with a warning — configure manually
+#      at https://crates.io/crates/<NAME>/settings (see RELEASING.md).
+#
+# Usage:
+#   Actions -> "Publish crate (initial)" -> Run workflow ->
+#   enter the crate name (e.g. "docspec-markdown-writer") -> Run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      crate:
+        description: 'Crate name to publish (directory under crates/, must not be publish=false)'
+        required: true
+        type: string
+      register_trusted_publishers:
+        description: 'After publish, register Trusted Publisher configs on crates.io (best-effort)'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+# Allow only one initial-publish per crate at a time to avoid double-submit races
+# on the very first crates.io insert.
+concurrency:
+  group: publish-crate-initial-${{ inputs.crate }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: 'Initial publish: ${{ inputs.crate }}'
+    runs-on: ubuntu-latest
+    # Bind to the `release` GitHub environment (shared with the automated
+    # release pipeline). The environment can later gate this workflow with
+    # required reviewers without touching the workflow file.
+    environment: release
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Validate crate is publishable
+        env:
+          CRATE: ${{ inputs.crate }}
+        run: |
+          set -euo pipefail
+
+          # Reject path traversal, empty input, and anything outside the crate
+          # name charset accepted by crates.io. crates.io itself accepts a
+          # narrower set, but this is the cargo/crates.io regex floor.
+          if ! printf '%s' "${CRATE}" | grep -Eq '^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}$'; then
+            echo "::error::invalid crate name '${CRATE}': must match ^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}$"
+            exit 1
+          fi
+
+          crate_toml="crates/${CRATE}/Cargo.toml"
+          if [ ! -f "${crate_toml}" ]; then
+            echo "::error::${crate_toml} not found. Crate must exist under crates/."
+            exit 1
+          fi
+
+          if grep -Eq '^[[:space:]]*publish[[:space:]]*=[[:space:]]*false' "${crate_toml}"; then
+            echo "::error::crate ${CRATE} has publish = false in ${crate_toml}; refusing to publish."
+            exit 1
+          fi
+
+          # Defence in depth: the directory name must match the [package].name
+          # field. Prevents a misnamed directory from publishing under a
+          # surprising name.
+          declared_name=$(awk -F\" '/^[[:space:]]*name[[:space:]]*=/ { print $2; exit }' "${crate_toml}")
+          if [ "${declared_name}" != "${CRATE}" ]; then
+            echo "::error::crate name mismatch: ${crate_toml} declares name='${declared_name}' but input was '${CRATE}'"
+            exit 1
+          fi
+
+          echo "Validated: ${CRATE} is publishable from ${crate_toml}"
+
+      - name: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CRATE: ${{ inputs.crate }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
+            echo "::error::CARGO_REGISTRY_TOKEN secret is not set on the repository or the 'release' environment."
+            exit 1
+          fi
+          cargo publish -p "${CRATE}"
+
+      - name: Register Trusted Publishers on crates.io (best-effort)
+        if: ${{ inputs.register_trusted_publishers }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CRATE: ${{ inputs.crate }}
+        run: |
+          # NOTE: no `set -e` here — failures are reported as workflow warnings,
+          # never as hard failures. The publish has already succeeded by this
+          # point; TP registration is a nicety.
+          set -uo pipefail
+
+          # Give crates.io a moment to settle ownership records after publish.
+          sleep 5
+
+          owner="${GITHUB_REPOSITORY%%/*}"
+          repo="${GITHUB_REPOSITORY##*/}"
+
+          if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
+            echo "::warning::CARGO_REGISTRY_TOKEN not available; skipping Trusted Publisher registration. Configure manually at https://crates.io/crates/${CRATE}/settings"
+            exit 0
+          fi
+
+          register_config() {
+            workflow_filename=$1
+            environment=$2
+            payload=$(jq -nc \
+              --arg crate "${CRATE}" \
+              --arg owner "${owner}" \
+              --arg repo "${repo}" \
+              --arg wf "${workflow_filename}" \
+              --arg env "${environment}" \
+              '{github_config: {
+                  crate: $crate,
+                  repository_owner: $owner,
+                  repository_name: $repo,
+                  workflow_filename: $wf,
+                  environment: $env
+                }}')
+
+            echo "→ Registering ${workflow_filename} + ${environment}"
+
+            http_code=$(curl -sS -o /tmp/trustpub.body -w '%{http_code}' \
+              -X POST "https://crates.io/api/v1/trusted_publishing/github_configs" \
+              -H "Authorization: ${CARGO_REGISTRY_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -H "User-Agent: docspec-publish-bot (release@docspec.dev)" \
+              --data "${payload}" || echo "000")
+
+            body=$(cat /tmp/trustpub.body 2>/dev/null || true)
+            echo "   HTTP ${http_code}"
+            echo "   Body: ${body}"
+
+            case "${http_code}" in
+              200|201)
+                echo "::notice::Registered Trusted Publisher for ${CRATE}: ${workflow_filename} + ${environment}"
+                ;;
+              409)
+                # Already configured — idempotent success.
+                echo "::notice::Trusted Publisher already configured for ${CRATE}: ${workflow_filename} + ${environment}"
+                ;;
+              403)
+                echo "::warning::Trusted Publisher registration refused (HTTP 403) for ${CRATE}: ${workflow_filename} + ${environment}. The CARGO_REGISTRY_TOKEN likely lacks the 'trusted-publishing' scope, or the token's crates.io account is not yet a verified owner of the crate. Configure manually at https://crates.io/crates/${CRATE}/settings"
+                ;;
+              *)
+                echo "::warning::Trusted Publisher registration failed (HTTP ${http_code}) for ${CRATE}: ${workflow_filename} + ${environment}. Configure manually at https://crates.io/crates/${CRATE}/settings — see RELEASING.md > Trusted Publishing Setup."
+                ;;
+            esac
+          }
+
+          # Match RELEASING.md > Trusted Publishing Setup: two configs per crate.
+          register_config "ci.yml" "release"
+          register_config "publish-crate-manual.yml" "release"
+
+          echo
+          echo "Done. Verify configuration at https://crates.io/crates/${CRATE}/settings"
