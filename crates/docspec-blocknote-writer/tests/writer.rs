@@ -16,6 +16,7 @@ mod tests {
         AssetProvider, Color, Event, EventSink as _, ImageSource, StackTrackingSink, TextAlignment,
         TextStyleKind,
     };
+    use docspec_test_utils::builders::text;
 
     struct FailingWriter {
         fail_after: usize,
@@ -168,12 +169,6 @@ mod tests {
         Event::StartParagraph {
             alignment: Some(alignment),
             id: None,
-        }
-    }
-
-    fn text(content: &str) -> Event {
-        Event::Text {
-            content: content.to_string(),
         }
     }
 

@@ -7,6 +7,8 @@
 // terse. Equivalent to the per-file allows used in workspace test modules.
 #![allow(clippy::expect_used)]
 
+pub mod builders;
+
 use std::io::{Cursor, Write as _};
 
 pub use zip::CompressionMethod;

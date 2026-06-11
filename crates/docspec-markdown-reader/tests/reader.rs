@@ -13,34 +13,11 @@ mod helpers {
 
     use docspec_core::{Event, ImageSource, ListStyleType, TableHeaderScope, TextStyleKind};
 
-    /// Returns a `StartDocument` event with all optional fields set to `None`.
-    /// Use in tests that do not exercise document-level metadata.
-    pub fn start_document() -> Event {
-        Event::StartDocument {
-            id: None,
-            language: None,
-            metadata: None,
-        }
-    }
-
-    /// Returns a `StartParagraph` event with no alignment or id.
-    pub fn start_paragraph() -> Event {
-        Event::StartParagraph {
-            alignment: None,
-            id: None,
-        }
-    }
+    pub use docspec_test_utils::builders::{start_document, start_paragraph, text};
 
     /// Returns a `StartHeading` event with no id.
     pub fn start_heading(level: u8) -> Event {
         Event::StartHeading { level, id: None }
-    }
-
-    /// Returns a text event with exact content.
-    pub fn text(content: &str) -> Event {
-        Event::Text {
-            content: content.to_string(),
-        }
     }
 
     /// Returns wrapper style events around an exact text event.
