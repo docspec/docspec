@@ -10,7 +10,6 @@ Thank you for considering a contribution. DocSpec is a memory-conscious streamin
 - Git with your user name and email configured
 - [pre-commit](https://pre-commit.com/) for running pre-commit hooks
 - [taplo](https://taplo.tamasfe.dev/) for TOML formatting (`cargo install taplo-cli`)
-- [typos](https://github.com/crate-ci/typos) for spell checking (`cargo install typos-cli`)
 
 Clone the repository:
 ```bash
@@ -21,7 +20,7 @@ pre-commit install --hook-type commit-msg
 pre-commit install --hook-type pre-push
 ```
 
-The pre-commit hooks enforce formatting, linting, spell checking, and conventional commit message format; the pre-push hooks verify the full build, test suite, and documentation. Before diving into code, read the [Manifesto](MANIFESTO.md) to understand our philosophy: memory efficiency, streaming design, and strict quality above convenience.
+The pre-commit hooks enforce formatting, linting, and conventional commit message format; the pre-push hooks verify the full build, test suite, and documentation. Before diving into code, read the [Manifesto](MANIFESTO.md) to understand our philosophy: memory efficiency, streaming design, and strict quality above convenience.
 
 The pre-commit stage (runs on every commit) enforces formatting, linting, and hygiene checks. The pre-push stage (runs before push) runs the full build, test suite, and documentation build.
 
