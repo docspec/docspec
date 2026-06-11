@@ -21,12 +21,49 @@ architecture, and the event protocol.
 - Bullet and numbered lists (nested)
 - Links (inline, reference, autolink)
 
+## Supported Raw HTML Tags
+
+Raw HTML tags embedded in markdown source are translated into DocSpec events. All
+attributes on these tags are silently ignored. All other HTML tags are silently dropped.
+
+### Inline formatting
+
+| Tag(s) | DocSpec event |
+|---|---|
+| `<b>`, `<strong>` | `StartTextStyle { kind: Bold }` / `EndTextStyle` |
+| `<i>`, `<em>` | `StartTextStyle { kind: Italic }` / `EndTextStyle` |
+| `<u>` | `StartTextStyle { kind: Underline }` / `EndTextStyle` |
+| `<s>`, `<strike>`, `<del>` | `StartTextStyle { kind: Strikethrough }` / `EndTextStyle` |
+| `<code>` | `StartTextStyle { kind: Code }` / `EndTextStyle` |
+| `<sub>` | `StartTextStyle { kind: Subscript }` / `EndTextStyle` |
+| `<sup>` | `StartTextStyle { kind: Superscript }` / `EndTextStyle` |
+| `<mark>` | `StartTextStyle { kind: Mark }` with constant yellow `#FFFF00` |
+
+### Self-closing / void
+
+| Tag(s) | DocSpec event |
+|---|---|
+| `<br>`, `<br/>`, `<br />` | `Event::LineBreak` |
+| `<hr>` | `Event::ThematicBreak` (block context only; ignored in paragraph context) |
+
+### Block headings
+
+`<h1>` through `<h6>` inside an HTML block emit `StartHeading { level: N }` + content +
+`EndHeading`. Inline styles inside headings are fully supported.
+
+### Known limitations
+
+- `<pre><code>...</code></pre>` is NOT treated as a code block. The `<pre>` is dropped and
+  `<code>` becomes an inline style. Use markdown fenced code blocks instead.
+- HTML attributes (id, class, style, href, src, etc.) are NOT extracted.
+- Unclosed tags are auto-closed at the end of the containing block.
+
 ## Out of Scope (silently dropped)
 
 - Definition lists and footnotes
-- HTML blocks and inline HTML
 - Math blocks and inline math
-- Subscript and superscript formatting
+- Subscript and superscript formatting (use `<sub>` / `<sup>` raw HTML instead)
+- All HTML tags not listed in "Supported Raw HTML Tags" above
 
 ## Memory Model
 

@@ -588,6 +588,7 @@ version = "1.9.0"
 dependencies = [
  "docspec-core",
  "docspec-test-utils",
+ "html5gum",
  "pulldown-cmark",
  "self_cell",
 ]

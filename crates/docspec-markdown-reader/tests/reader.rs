@@ -112,7 +112,9 @@ mod helpers {
 #[cfg(test)]
 mod tests {
     use super::helpers;
-    use docspec_core::{Error, Event, EventSource as _, ImageSource, ListStyleType, TextStyleKind};
+    use docspec_core::{
+        Color, Error, Event, EventSource as _, ImageSource, ListStyleType, TextStyleKind,
+    };
     use docspec_markdown_reader::MarkdownReader;
     use std::io::Cursor;
 
@@ -132,6 +134,18 @@ mod tests {
     fn collect_markdown(markdown: &str) -> Vec<Event> {
         let mut reader = MarkdownReader::from_str(markdown);
         collect_events(&mut reader)
+    }
+
+    fn start_style(kind: TextStyleKind) -> Event {
+        Event::StartTextStyle { kind, id: None }
+    }
+
+    fn mark_color() -> Color {
+        Color::Rgb {
+            r: 255,
+            g: 255,
+            b: 0,
+        }
     }
 
     fn assert_text_styles_well_formed(events: &[Event]) {
@@ -775,8 +789,11 @@ mod tests {
         );
     }
 
+    /// Verifies that out-of-scope HTML block tags (`<div>`) continue to be silently dropped
+    /// after the HTML translation feature lands. Only in-scope tags (b, strong, i, em,
+    /// u, s, strike, del, code, sub, sup, mark, br, hr, h1-h6) are translated.
     #[test]
-    fn html_events_silently_ignored() {
+    fn out_of_scope_html_block_silently_ignored() {
         let mut reader = MarkdownReader::from_str("<div>hello</div>");
         let events = collect_events(&mut reader);
 
@@ -1736,12 +1753,612 @@ mod tests {
     }
 
     #[test]
+    fn inline_bold() {
+        let events = collect_markdown("plain **md** and <b>html</b>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("plain "),
+                start_style(TextStyleKind::Bold),
+                helpers::text("md"),
+                Event::EndTextStyle,
+                helpers::text(" and "),
+                start_style(TextStyleKind::Bold),
+                helpers::text("html"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_strong_alias() {
+        let events = collect_markdown("<strong>x</strong>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Bold),
+                helpers::text("x"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_italic() {
+        let events = collect_markdown("<i>x</i>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Italic),
+                helpers::text("x"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_em_alias() {
+        let events = collect_markdown("<em>x</em>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Italic),
+                helpers::text("x"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_underline_u() {
+        let events = collect_markdown("<u>x</u>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Underline),
+                helpers::text("x"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_strikethrough_s() {
+        let events = collect_markdown("<s>x</s>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Strikethrough),
+                helpers::text("x"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_strikethrough_strike_alias() {
+        let events = collect_markdown("<strike>x</strike>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Strikethrough),
+                helpers::text("x"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_strikethrough_del_alias() {
+        let events = collect_markdown("<del>x</del>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Strikethrough),
+                helpers::text("x"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_code_html() {
+        let events = collect_markdown("<code>x</code>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Code),
+                helpers::text("x"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_subscript() {
+        let events = collect_markdown("<sub>x</sub>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Subscript),
+                helpers::text("x"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_superscript() {
+        let events = collect_markdown("<sup>x</sup>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Superscript),
+                helpers::text("x"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_mark() {
+        let events = collect_markdown("<mark>x</mark>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Mark(mark_color())),
+                helpers::text("x"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_br() {
+        let events = collect_markdown("line1<br>line2");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("line1"),
+                Event::LineBreak,
+                helpers::text("line2"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_h1_single_line() {
+        let events = collect_markdown("<h1>Title</h1>\n");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_heading(1),
+                helpers::text("Title"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_h2_single_line() {
+        let events = collect_markdown("<h2>Title</h2>\n");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_heading(2),
+                helpers::text("Title"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_h3_single_line() {
+        let events = collect_markdown("<h3>Title</h3>\n");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_heading(3),
+                helpers::text("Title"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_h4_single_line() {
+        let events = collect_markdown("<h4>Title</h4>\n");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_heading(4),
+                helpers::text("Title"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_h5_single_line() {
+        let events = collect_markdown("<h5>Title</h5>\n");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_heading(5),
+                helpers::text("Title"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_h6_single_line() {
+        let events = collect_markdown("<h6>Title</h6>\n");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_heading(6),
+                helpers::text("Title"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_h7_dropped() {
+        let events = collect_markdown("<h7>x</h7>\n");
+
+        // <h7> is out of scope — the tag is dropped, but pulldown-cmark still
+        // delivers its text content as paragraph text.
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_multi_line_heading() {
+        let events = collect_markdown("<h1>\n  Title\n</h1>\n");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_heading(1),
+                helpers::text("  Title\n"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_heading_with_inline_bold() {
+        let events = collect_markdown("<h1><b>Title</b></h1>\n");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_heading(1),
+                start_style(TextStyleKind::Bold),
+                helpers::text("Title"),
+                Event::EndTextStyle,
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_heading_with_unclosed_inline() {
+        let events = collect_markdown("<h1><b>Title</h1>\n");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_heading(1),
+                start_style(TextStyleKind::Bold),
+                helpers::text("Title"),
+                Event::EndTextStyle,
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_hr_emits_thematic_break() {
+        let events = collect_markdown("<hr>\n");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                Event::ThematicBreak { id: None },
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_out_of_scope_tag() {
+        let events = collect_markdown("<table><tr><td>x</td></tr></table>\n");
+
+        assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
+    }
+
+    #[test]
+    fn block_html_then_markdown() {
+        let events = collect_markdown("<h1>Title</h1>\n\nParagraph");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_heading(1),
+                helpers::text("Title"),
+                Event::EndHeading,
+                helpers::start_paragraph(),
+                helpers::text("Paragraph"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn block_unclosed_heading_auto_closed_at_htmlblock_end() {
+        let events = collect_markdown("<h1>x\n");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_heading(1),
+                helpers::text("x\n"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_overlap_rule_9() {
+        let events = collect_markdown("<b>bold <i>both</b> only italic</i>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Bold),
+                helpers::text("bold "),
+                start_style(TextStyleKind::Italic),
+                helpers::text("both"),
+                Event::EndTextStyle,
+                Event::EndTextStyle,
+                start_style(TextStyleKind::Italic),
+                helpers::text(" only italic"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_overlap_rule_9_mixed_markdown_and_html_bold() {
+        let events = collect_markdown(
+            "**md bold** and <b>html bold</b> and <b>bold <i>both</b> only italic</i>",
+        );
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Bold),
+                helpers::text("md bold"),
+                Event::EndTextStyle,
+                helpers::text(" and "),
+                start_style(TextStyleKind::Bold),
+                helpers::text("html bold"),
+                Event::EndTextStyle,
+                helpers::text(" and "),
+                start_style(TextStyleKind::Bold),
+                helpers::text("bold "),
+                start_style(TextStyleKind::Italic),
+                helpers::text("both"),
+                Event::EndTextStyle,
+                Event::EndTextStyle,
+                start_style(TextStyleKind::Italic),
+                helpers::text(" only italic"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_unclosed_auto_closed_at_paragraph_end() {
+        let events = collect_markdown("<b>oops\n\nnext para");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Bold),
+                helpers::text("oops"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                helpers::start_paragraph(),
+                helpers::text("next para"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_uppercase_normalized() {
+        let events = collect_markdown("<B>x</B>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Bold),
+                helpers::text("x"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_unknown_tag_dropped() {
+        let events = collect_markdown("<custom>x</custom>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_attributes_ignored() {
+        let events = collect_markdown("<b id=foo class=bar>x</b>");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                start_style(TextStyleKind::Bold),
+                helpers::text("x"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    /// Verifies that a paragraph consisting entirely of out-of-scope inline HTML (`<span>`)
+    /// emits nothing — no paragraph wrapper, no text events. Out-of-scope tags are silently
+    /// dropped; only in-scope tags (b, strong, i, em, u, s, strike, del, code, sub, sup,
+    /// mark, br, hr, h1-h6) produce `DocSpec` events.
+    #[test]
     fn inline_html_only_paragraph_emits_nothing() {
         let mut reader = MarkdownReader::from_str("<span id=\"ferris\"></span>");
         let events = collect_events(&mut reader);
         assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
     }
 
+    /// Verifies that out-of-scope inline HTML (`<span>`) between two text paragraphs is
+    /// silently dropped while the surrounding paragraphs are preserved. Only in-scope tags
+    /// (b, strong, i, em, u, s, strike, del, code, sub, sup, mark, br, hr, h1-h6) produce
+    /// `DocSpec` events.
     #[test]
     fn inline_html_between_paragraphs_preserves_surrounding() {
         let markdown = "Before\n\n<span id=\"ferris\"></span>\n\nAfter";
@@ -1763,6 +2380,10 @@ mod tests {
         );
     }
 
+    /// Verifies that a paragraph containing out-of-scope inline HTML (`<span>`) mixed with
+    /// plain text still emits the paragraph with its text events — the HTML is silently
+    /// dropped while surrounding text is preserved. Only in-scope tags (b, strong, i, em,
+    /// u, s, strike, del, code, sub, sup, mark, br, hr, h1-h6) produce style events.
     #[test]
     fn inline_html_with_text_still_emits_paragraph() {
         let markdown = "text <span></span> more";
@@ -1782,6 +2403,11 @@ mod tests {
         );
     }
 
+    /// Verifies that emphasis containing only out-of-scope inline HTML (`<span>`) emits
+    /// nothing — no paragraph, no emphasis, no text events. pulldown-cmark emits
+    /// `Start(Emphasis)`, `InlineHtml`, `End(Emphasis)` with no `Text`, so the deferred
+    /// paragraph is suppressed. Only in-scope tags (b, strong, i, em, u, s, strike, del,
+    /// code, sub, sup, mark, br, hr, h1-h6) produce `DocSpec` events.
     #[test]
     fn inline_html_inside_emphasis_emits_nothing() {
         // pulldown-cmark emits: Start(Paragraph), Start(Emphasis), InlineHtml(...), InlineHtml(...), End(Emphasis), End(Paragraph)
