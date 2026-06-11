@@ -313,7 +313,7 @@ fn bucket_input_mime_docx_returns_docx_label() {
     );
     assert_eq!(
         docspec_http::mime_parser::bucket_input_mime(Some(&header)),
-        docspec_http::metrics::INPUT_MIME_DOCX
+        docspec_http::mime::MIME_DOCX
     );
 }
 
@@ -324,6 +324,6 @@ fn bucket_input_mime_docx_with_params_returns_docx_label() {
     );
     assert_eq!(
         docspec_http::mime_parser::bucket_input_mime(Some(&header)),
-        docspec_http::metrics::INPUT_MIME_DOCX
+        docspec_http::mime::MIME_DOCX
     );
 }

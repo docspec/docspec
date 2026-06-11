@@ -4,10 +4,7 @@ use axum::http::HeaderValue;
 use docspec::{InputFormat, OutputFormat};
 
 use crate::error::HttpError;
-use crate::format::{
-    OUTPUT_MIME_ALIAS, OUTPUT_MIME_HTML_PRIMARY, OUTPUT_MIME_OXA_PRIMARY,
-    OUTPUT_MIME_PANDOC_NATIVE_PRIMARY, OUTPUT_MIME_PRIMARY,
-};
+use crate::mime::{MIME_BLOCKNOTE, MIME_BLOCKNOTE_ALIAS, MIME_HTML, MIME_OXA, MIME_PANDOC_NATIVE};
 
 /// Negotiates the `Accept` header for the `/conversion` endpoint.
 ///
@@ -34,19 +31,19 @@ pub fn negotiate_accept(header_value: Option<&HeaderValue>) -> Result<OutputForm
 
     for part in header_str.split(',') {
         let type_part = part.trim().split(';').next().map_or("", str::trim);
-        if type_part.eq_ignore_ascii_case(OUTPUT_MIME_OXA_PRIMARY) {
+        if type_part.eq_ignore_ascii_case(MIME_OXA) {
             return Ok(OutputFormat::Oxa);
         }
-        if type_part.eq_ignore_ascii_case(OUTPUT_MIME_PANDOC_NATIVE_PRIMARY) {
+        if type_part.eq_ignore_ascii_case(MIME_PANDOC_NATIVE) {
             return Ok(OutputFormat::PandocNative);
         }
-        if type_part.eq_ignore_ascii_case(OUTPUT_MIME_HTML_PRIMARY) {
+        if type_part.eq_ignore_ascii_case(MIME_HTML) {
             return Ok(OutputFormat::Html);
         }
         if type_part.eq_ignore_ascii_case("*/*")
             || type_part.eq_ignore_ascii_case("application/*")
-            || type_part.eq_ignore_ascii_case(OUTPUT_MIME_PRIMARY)
-            || type_part.eq_ignore_ascii_case(OUTPUT_MIME_ALIAS)
+            || type_part.eq_ignore_ascii_case(MIME_BLOCKNOTE)
+            || type_part.eq_ignore_ascii_case(MIME_BLOCKNOTE_ALIAS)
         {
             return Ok(OutputFormat::Blocknote);
         }
@@ -139,9 +136,9 @@ pub fn validate_content_type(header_value: Option<&HeaderValue>) -> Result<Input
 /// # Label values
 ///
 /// - [`crate::metrics::INPUT_MIME_NONE`] — header absent
-/// - [`crate::metrics::INPUT_MIME_MARKDOWN`] — `text/markdown` (any params)
-/// - [`crate::metrics::INPUT_MIME_HTML`] — `text/html` (any params)
-/// - [`crate::metrics::INPUT_MIME_DOCX`] — `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (any params)
+/// - [`crate::mime::MIME_MARKDOWN`] — `text/markdown` (any params)
+/// - [`crate::mime::MIME_HTML`] — `text/html` (any params)
+/// - [`crate::mime::MIME_DOCX`] — `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (any params)
 /// - [`crate::metrics::INPUT_MIME_UNSUPPORTED`] — anything else
 #[must_use]
 #[inline]
@@ -156,10 +153,10 @@ pub fn bucket_input_mime(header_value: Option<&HeaderValue>) -> &'static str {
         return crate::metrics::INPUT_MIME_UNSUPPORTED;
     };
     match (parsed.type_(), parsed.subtype().as_str()) {
-        (mime::TEXT, "markdown") => crate::metrics::INPUT_MIME_MARKDOWN,
-        (mime::TEXT, "html") => crate::metrics::INPUT_MIME_HTML,
+        (mime::TEXT, "markdown") => crate::mime::MIME_MARKDOWN,
+        (mime::TEXT, "html") => crate::mime::MIME_HTML,
         (mime::APPLICATION, "vnd.openxmlformats-officedocument.wordprocessingml.document") => {
-            crate::metrics::INPUT_MIME_DOCX
+            crate::mime::MIME_DOCX
         }
         _ => crate::metrics::INPUT_MIME_UNSUPPORTED,
     }
@@ -172,10 +169,10 @@ pub fn bucket_input_mime(header_value: Option<&HeaderValue>) -> &'static str {
 #[must_use]
 pub fn bucket_output_mime(chosen_format: Option<OutputFormat>) -> &'static str {
     match chosen_format {
-        Some(OutputFormat::Blocknote) => crate::metrics::OUTPUT_MIME_BLOCKNOTE,
-        Some(OutputFormat::Html) => crate::metrics::OUTPUT_MIME_HTML,
-        Some(OutputFormat::Oxa) => crate::metrics::OUTPUT_MIME_OXA,
-        Some(OutputFormat::PandocNative) => crate::metrics::OUTPUT_MIME_PANDOC_NATIVE,
+        Some(OutputFormat::Blocknote) => crate::mime::MIME_BLOCKNOTE,
+        Some(OutputFormat::Html) => crate::mime::MIME_HTML,
+        Some(OutputFormat::Oxa) => crate::mime::MIME_OXA,
+        Some(OutputFormat::PandocNative) => crate::mime::MIME_PANDOC_NATIVE,
         None | Some(_) => crate::metrics::OUTPUT_MIME_NONE,
     }
 }
@@ -201,64 +198,43 @@ mod bucket_tests {
     #[test]
     fn bucket_input_mime_markdown_when_text_markdown() {
         let val = HeaderValue::from_static("text/markdown");
-        assert_eq!(
-            bucket_input_mime(Some(&val)),
-            crate::metrics::INPUT_MIME_MARKDOWN
-        );
+        assert_eq!(bucket_input_mime(Some(&val)), crate::mime::MIME_MARKDOWN);
     }
 
     #[test]
     fn bucket_input_mime_markdown_when_text_markdown_with_charset() {
         let val = HeaderValue::from_static("text/markdown; charset=utf-8");
-        assert_eq!(
-            bucket_input_mime(Some(&val)),
-            crate::metrics::INPUT_MIME_MARKDOWN
-        );
+        assert_eq!(bucket_input_mime(Some(&val)), crate::mime::MIME_MARKDOWN);
     }
 
     #[test]
     fn bucket_input_mime_markdown_case_insensitive() {
         let val = HeaderValue::from_static("TEXT/MARKDOWN");
-        assert_eq!(
-            bucket_input_mime(Some(&val)),
-            crate::metrics::INPUT_MIME_MARKDOWN
-        );
+        assert_eq!(bucket_input_mime(Some(&val)), crate::mime::MIME_MARKDOWN);
     }
 
     #[test]
     fn bucket_input_mime_html_when_text_html() {
         let val = HeaderValue::from_static("text/html");
-        assert_eq!(
-            bucket_input_mime(Some(&val)),
-            crate::metrics::INPUT_MIME_HTML
-        );
+        assert_eq!(bucket_input_mime(Some(&val)), crate::mime::MIME_HTML);
     }
 
     #[test]
     fn bucket_input_mime_html_when_text_html_with_charset() {
         let val = HeaderValue::from_static("text/html; charset=utf-8");
-        assert_eq!(
-            bucket_input_mime(Some(&val)),
-            crate::metrics::INPUT_MIME_HTML
-        );
+        assert_eq!(bucket_input_mime(Some(&val)), crate::mime::MIME_HTML);
     }
 
     #[test]
     fn bucket_input_mime_html_case_insensitive() {
         let val = HeaderValue::from_static("TEXT/HTML");
-        assert_eq!(
-            bucket_input_mime(Some(&val)),
-            crate::metrics::INPUT_MIME_HTML
-        );
+        assert_eq!(bucket_input_mime(Some(&val)), crate::mime::MIME_HTML);
     }
 
     #[test]
     fn bucket_input_mime_html_with_non_utf8_charset_still_buckets_html() {
         let val = HeaderValue::from_static("text/html; charset=iso-8859-1");
-        assert_eq!(
-            bucket_input_mime(Some(&val)),
-            crate::metrics::INPUT_MIME_HTML
-        );
+        assert_eq!(bucket_input_mime(Some(&val)), crate::mime::MIME_HTML);
     }
 
     #[test]
@@ -294,7 +270,7 @@ mod bucket_tests {
     fn bucket_output_mime_blocknote_when_blocknote_succeeded() {
         assert_eq!(
             bucket_output_mime(Some(OutputFormat::Blocknote)),
-            crate::metrics::OUTPUT_MIME_BLOCKNOTE
+            crate::mime::MIME_BLOCKNOTE
         );
     }
 
@@ -302,7 +278,7 @@ mod bucket_tests {
     fn bucket_output_mime_html_when_html_succeeded() {
         assert_eq!(
             bucket_output_mime(Some(OutputFormat::Html)),
-            crate::metrics::OUTPUT_MIME_HTML
+            crate::mime::MIME_HTML
         );
     }
 
@@ -310,7 +286,7 @@ mod bucket_tests {
     fn bucket_output_mime_oxa_when_oxa_succeeded() {
         assert_eq!(
             bucket_output_mime(Some(OutputFormat::Oxa)),
-            crate::metrics::OUTPUT_MIME_OXA
+            crate::mime::MIME_OXA
         );
     }
 
@@ -318,7 +294,7 @@ mod bucket_tests {
     fn bucket_output_mime_pandoc_native_when_pandoc_native_succeeded() {
         assert_eq!(
             bucket_output_mime(Some(OutputFormat::PandocNative)),
-            crate::metrics::OUTPUT_MIME_PANDOC_NATIVE
+            crate::mime::MIME_PANDOC_NATIVE
         );
     }
 
