@@ -14,7 +14,9 @@ use std::io::{Cursor, Write as _};
 pub use zip::CompressionMethod;
 use zip::{write::SimpleFileOptions, ZipWriter};
 
+mod collect;
 mod drive;
+pub use collect::{collect_events, try_collect_events};
 pub use drive::{drive, try_drive};
 
 /// Builds a minimal 2-entry DOCX archive (Deflated) from raw XML strings.

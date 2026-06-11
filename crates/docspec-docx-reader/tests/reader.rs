@@ -37,18 +37,9 @@ fn synth_docx_roundtrips_through_zip_archive() {
 }
 
 fn collect_events(bytes: Vec<u8>) -> Vec<docspec_core::Event> {
-    use docspec_core::EventSource as _;
     let mut reader =
         docspec_docx_reader::DocxReader::from_reader(std::io::Cursor::new(bytes)).unwrap();
-    let mut events = Vec::new();
-    loop {
-        match reader.next_event() {
-            Ok(Some(event)) => events.push(event),
-            Ok(None) => break,
-            Err(err) => panic!("unexpected error: {err:?}"),
-        }
-    }
-    events
+    docspec_test_utils::collect_events(&mut reader)
 }
 
 mod constructor {
@@ -529,11 +520,7 @@ mod events {
     }
 
     fn drive(reader: &mut DocxReader) -> Vec<Event> {
-        let mut events = Vec::new();
-        while let Some(event) = reader.next_event().expect("next_event") {
-            events.push(event);
-        }
-        events
+        docspec_test_utils::collect_events(reader)
     }
 
     fn collect_events(content: &str) -> Vec<Event> {
