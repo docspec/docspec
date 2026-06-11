@@ -17,6 +17,9 @@ use zip::{write::SimpleFileOptions, ZipWriter};
 mod drive;
 pub use drive::{drive, try_drive};
 
+mod failing_writer;
+pub use failing_writer::FailingWriter;
+
 /// Builds a minimal 2-entry DOCX archive (Deflated) from raw XML strings.
 ///
 /// Entries:

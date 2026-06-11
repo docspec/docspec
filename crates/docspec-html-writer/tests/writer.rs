@@ -5,20 +5,9 @@
 use core::cell::Cell;
 use docspec_core::{Error, Event, EventSink as _, ImageSource, ListStyleType, TextStyleKind};
 use docspec_html_writer::HtmlWriter;
+use docspec_test_utils::FailingWriter;
 use std::io::{self, Write};
 use std::rc::Rc;
-
-struct FailingWriter;
-
-impl Write for FailingWriter {
-    fn flush(&mut self) -> io::Result<()> {
-        Err(io::Error::new(io::ErrorKind::BrokenPipe, "fail"))
-    }
-
-    fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
-        Err(io::Error::new(io::ErrorKind::BrokenPipe, "fail"))
-    }
-}
 
 struct FlushTrackingWriter {
     buf: Vec<u8>,
@@ -229,7 +218,8 @@ mod tests {
 
     #[test]
     fn write_failure_propagates_error() {
-        let mut writer = HtmlWriter::new(FailingWriter);
+        let mut writer =
+            HtmlWriter::new(FailingWriter::new(0).with_kind(io::ErrorKind::BrokenPipe));
         let result = writer.handle_event(Event::StartDocument {
             id: None,
             language: None,
