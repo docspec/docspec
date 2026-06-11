@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! Markdown to `DocSpec` event stream reader.
 //!
 //! This crate provides a [`MarkdownReader`] that implements [`EventSource`] to convert
@@ -48,14 +50,42 @@
 //!   following the image is outside the link, and the link is empty only when the
 //!   image is the sole link label, e.g. `[![alt](img)](url)`)
 //!
+//! # Supported Raw HTML Tags
+//!
+//! The following raw HTML tags embedded in markdown source are translated into
+//! `DocSpec` events. All attributes on these tags are silently ignored. All other
+//! HTML tags continue to be silently dropped.
+//!
+//! ## Inline formatting (translated to `StartTextStyle` / `EndTextStyle`)
+//! - `<b>`, `<strong>` → `TextStyleKind::Bold`
+//! - `<i>`, `<em>` → `TextStyleKind::Italic`
+//! - `<u>` → `TextStyleKind::Underline`
+//! - `<s>`, `<strike>`, `<del>` → `TextStyleKind::Strikethrough`
+//! - `<code>` → `TextStyleKind::Code`
+//! - `<sub>` → `TextStyleKind::Subscript`
+//! - `<sup>` → `TextStyleKind::Superscript`
+//! - `<mark>` → `TextStyleKind::Mark` with constant yellow `#FFFF00`
+//!
+//! ## Self-closing / void
+//! - `<br>`, `<br/>`, `<br />` → `Event::LineBreak`
+//! - `<hr>` → `Event::ThematicBreak` (block context only; ignored in paragraph context)
+//!
+//! ## Block (only inside an `HtmlBlock`)
+//! - `<h1>`...`<h6>` → `Event::StartHeading { level: N }` + content + `Event::EndHeading`
+//!
+//! ## Known limitations
+//! - Raw HTML `<pre><code>...</code></pre>` is NOT treated as a code block; the `<pre>` is dropped
+//!   (out of scope) and the `<code>` becomes an inline style. Use markdown fenced code blocks instead.
+//! - HTML attributes (id, class, style, href, src, etc.) are NOT extracted.
+//! - Unclosed tags are auto-closed at the end of the containing block.
+//!
 //! # Unsupported Elements
 //!
 //! The following elements are not emitted as structured events. Text content is
 //! recursively extracted where applicable; structure is silently dropped:
 //! - Definition lists and footnotes
-//! - HTML blocks and inline HTML
 //! - Math blocks and inline math
-//! - Subscript and superscript formatting
+//! - Subscript and superscript formatting (use `<sub>` / `<sup>` raw HTML instead)
 //!
 //! # Memory Model
 //!
@@ -86,6 +116,8 @@ mod parser_cell {
         }
     );
 }
+
+mod html;
 
 use alloc::collections::VecDeque;
 use std::io::{Read, Seek};
@@ -143,9 +175,11 @@ struct ImageBuffer {
 }
 
 enum MarkdownPulldownEvent {
+    BlockHtml(String),
     Code(String),
     End(TagEnd),
     HardBreak,
+    InlineHtml(String),
     Ignored,
     Rule,
     SoftBreak,
@@ -171,6 +205,7 @@ enum MarkdownStartTag {
         dest_url: String,
         title: Option<String>,
     },
+    HtmlBlock,
     List(Option<u64>),
     Paragraph,
     Strikethrough,
@@ -217,6 +252,12 @@ pub struct MarkdownReader {
     code_block_buffer: Option<String>,
     /// Buffered image being processed (alt text accumulation).
     image: Option<ImageBuffer>,
+    /// Heading accumulator for block HTML fragments.
+    html_block_heading_acc: crate::html::translator::BlockHeadingAccumulator,
+    /// Inline style stack scoped to block HTML headings.
+    html_block_inline_stack: crate::html::stack::StyleStack,
+    /// Whether the parser is currently inside a pulldown HTML block wrapper.
+    in_html_block: bool,
     /// Whether the parser is currently inside a preformatted code block.
     in_preformatted: bool,
     /// Whether the parser is currently inside a table header row.
@@ -226,10 +267,8 @@ pub struct MarkdownReader {
     /// LIFO stack of list contexts. `len()` gives the current nesting depth;
     /// `level = list_stack.len().saturating_sub(1)` at item-emit time.
     list_stack: alloc::vec::Vec<ListContext>,
-    /// Inline styles already emitted and currently open.
-    open_styles: alloc::vec::Vec<TextStyleKind>,
-    /// Inline styles waiting to be emitted before the next text event.
-    pending_open_styles: alloc::vec::Vec<TextStyleKind>,
+    /// Unified inline style stack shared by markdown emphasis and inline HTML.
+    inline_style_stack: crate::html::stack::StyleStack,
     /// Document processing phase.
     phase: Phase,
     /// Queue of `DocSpec` events to emit.
@@ -246,7 +285,7 @@ impl MarkdownReader {
         }
 
         let ordered = ctx.ordered;
-        self.close_all_open_styles();
+        self.flush_html_styles();
         if ordered {
             self.queue.push_back(Event::EndOrderedListItem);
         } else {
@@ -258,53 +297,41 @@ impl MarkdownReader {
         self.block_state = BlockState::None;
     }
 
-    fn close_all_open_styles(&mut self) {
-        self.pending_open_styles.clear();
-        while self.open_styles.pop().is_some() {
-            self.queue.push_back(Event::EndTextStyle);
-        }
-    }
-
     fn close_style(&mut self, kind: &TextStyleKind) {
         if self.in_preformatted {
             return;
         }
 
-        if let Some(pos) = self.pending_open_styles.iter().rposition(|k| k == kind) {
-            self.pending_open_styles.remove(pos);
-            return;
-        }
-
-        if let Some(pos) = self.open_styles.iter().rposition(|k| k == kind) {
-            let split_pos = pos
-                .checked_add(1)
-                .map_or(self.open_styles.len(), |value| value);
-            let above: alloc::vec::Vec<TextStyleKind> =
-                self.open_styles.drain(split_pos..).collect();
-            self.open_styles.pop();
-            for _ in above.iter().rev() {
-                self.queue.push_back(Event::EndTextStyle);
-            }
-            self.queue.push_back(Event::EndTextStyle);
-            for reopened in above {
-                self.pending_open_styles.push(reopened);
-            }
+        for event in self
+            .inline_style_stack
+            .close(intent_from_text_style_kind(kind))
+        {
+            self.queue.push_back(event);
         }
     }
 
-    fn flush_pending_styles(&mut self) {
-        for kind in self.pending_open_styles.drain(..) {
-            self.queue.push_back(Event::StartTextStyle {
-                kind: kind.clone(),
-                id: None,
-            });
-            self.open_styles.push(kind);
-        }
-    }
-
-    fn open_style(&mut self, kind: TextStyleKind) {
+    fn open_style(&mut self, kind: &TextStyleKind) {
         if !self.in_preformatted {
-            self.pending_open_styles.push(kind);
+            for event in self
+                .inline_style_stack
+                .open(intent_from_text_style_kind(kind))
+            {
+                self.queue.push_back(event);
+            }
+        }
+    }
+
+    fn enqueue_text(&mut self, content: String) {
+        for event in self.inline_style_stack.note_text() {
+            self.queue.push_back(event);
+        }
+        let text_event = Event::Text { content };
+        self.queue.push_back(text_event);
+    }
+
+    fn flush_html_styles(&mut self) {
+        for event in self.inline_style_stack.close_all() {
+            self.queue.push_back(event);
         }
     }
 
@@ -344,12 +371,14 @@ impl MarkdownReader {
             cell,
             code_block_buffer: None,
             image: None,
+            html_block_heading_acc: crate::html::translator::BlockHeadingAccumulator::default(),
+            html_block_inline_stack: crate::html::stack::StyleStack::default(),
+            in_html_block: false,
             in_preformatted: false,
             in_table_head: false,
             link: None,
             list_stack: Vec::new(),
-            open_styles: Vec::new(),
-            pending_open_styles: Vec::new(),
+            inline_style_stack: crate::html::stack::StyleStack::default(),
             phase: Phase::NotStarted,
             queue: VecDeque::new(),
         }
@@ -403,13 +432,9 @@ impl MarkdownReader {
                 });
                 self.block_state = BlockState::AutoParagraph;
             }
-            self.flush_pending_styles();
-            self.queue.push_back(Event::StartTextStyle {
-                kind: TextStyleKind::Code,
-                id: None,
-            });
-            self.queue.push_back(Event::Text { content });
-            self.queue.push_back(Event::EndTextStyle);
+            self.open_style(&TextStyleKind::Code);
+            self.enqueue_text(content);
+            self.close_style(&TextStyleKind::Code);
         }
     }
 
@@ -419,7 +444,7 @@ impl MarkdownReader {
         if let Some(buf) = self.code_block_buffer.take() {
             let content = buf.strip_suffix('\n').unwrap_or(&buf).to_owned();
             if !content.is_empty() {
-                self.queue.push_back(Event::Text { content });
+                self.enqueue_text(content);
             }
         }
         self.in_preformatted = false;
@@ -452,7 +477,7 @@ impl MarkdownReader {
     /// list item and resets block state.
     fn handle_end_item(&mut self) {
         if self.block_state == BlockState::AutoParagraph {
-            self.close_all_open_styles();
+            self.flush_html_styles();
             self.queue.push_back(Event::EndParagraph);
         }
         self.close_current_item_if_open();
@@ -509,13 +534,22 @@ impl MarkdownReader {
             TagEnd::CodeBlock => self.handle_end_code_block(),
             TagEnd::Emphasis => self.close_style(&TextStyleKind::Italic),
             TagEnd::Heading(_) => self.push_event_end(Event::EndHeading),
+            TagEnd::HtmlBlock => {
+                self.in_html_block = false;
+                for event in self.html_block_inline_stack.close_all() {
+                    self.queue.push_back(event);
+                }
+                if let Some(event) = self.html_block_heading_acc.finish_block() {
+                    self.queue.push_back(event);
+                }
+            }
             TagEnd::Image => self.handle_end_image(),
             TagEnd::Item => self.handle_end_item(),
             TagEnd::Link => self.handle_end_link(),
             TagEnd::List(_) => self.handle_end_list(),
             TagEnd::Paragraph => {
                 if self.block_state == BlockState::PendingExplicit {
-                    self.close_all_open_styles();
+                    self.flush_html_styles();
                     self.block_state = BlockState::None;
                 } else {
                     self.push_event_end(Event::EndParagraph);
@@ -532,7 +566,6 @@ impl MarkdownReader {
             | TagEnd::DefinitionListDefinition
             | TagEnd::DefinitionListTitle
             | TagEnd::FootnoteDefinition
-            | TagEnd::HtmlBlock
             | TagEnd::MetadataBlock(_)
             | TagEnd::Subscript
             | TagEnd::Superscript => {}
@@ -676,15 +709,16 @@ impl MarkdownReader {
                 self.push_event_start(Event::StartBlockQuote { id: None });
             }
             MarkdownStartTag::CodeBlock { syntax } => self.handle_start_code_block(syntax),
-            MarkdownStartTag::Emphasis => self.open_style(TextStyleKind::Italic),
+            MarkdownStartTag::Emphasis => self.open_style(&TextStyleKind::Italic),
             MarkdownStartTag::Heading { level } => self.handle_start_heading(level),
+            MarkdownStartTag::HtmlBlock => self.in_html_block = true,
             MarkdownStartTag::Image { dest_url, title } => self.handle_start_image(dest_url, title),
             MarkdownStartTag::Item => self.handle_item_start(),
             MarkdownStartTag::Link { dest_url, title } => self.handle_start_link(dest_url, title),
             MarkdownStartTag::List(start_opt) => self.handle_list_start(start_opt),
             MarkdownStartTag::Paragraph => self.block_state = BlockState::PendingExplicit,
-            MarkdownStartTag::Strikethrough => self.open_style(TextStyleKind::Strikethrough),
-            MarkdownStartTag::Strong => self.open_style(TextStyleKind::Bold),
+            MarkdownStartTag::Strikethrough => self.open_style(&TextStyleKind::Strikethrough),
+            MarkdownStartTag::Strong => self.open_style(&TextStyleKind::Bold),
             MarkdownStartTag::Table => self.push_event_start(Event::StartTable { id: None }),
             MarkdownStartTag::TableCell => self.handle_start_table_cell(),
             MarkdownStartTag::TableHead => self.handle_start_table_head(),
@@ -706,8 +740,7 @@ impl MarkdownReader {
                 });
                 self.block_state = BlockState::AutoParagraph;
             }
-            self.flush_pending_styles();
-            self.queue.push_back(Event::Text { content });
+            self.enqueue_text(content);
         }
     }
 
@@ -726,10 +759,14 @@ impl MarkdownReader {
                 pulldown_cmark::Event::HardBreak => MarkdownPulldownEvent::HardBreak,
                 pulldown_cmark::Event::SoftBreak => MarkdownPulldownEvent::SoftBreak,
                 pulldown_cmark::Event::Rule => MarkdownPulldownEvent::Rule,
+                pulldown_cmark::Event::InlineHtml(tag_str) => {
+                    MarkdownPulldownEvent::InlineHtml(tag_str.into_string())
+                }
+                pulldown_cmark::Event::Html(fragment) => {
+                    MarkdownPulldownEvent::BlockHtml(fragment.into_string())
+                }
                 pulldown_cmark::Event::DisplayMath(_)
                 | pulldown_cmark::Event::FootnoteReference(_)
-                | pulldown_cmark::Event::Html(_)
-                | pulldown_cmark::Event::InlineHtml(_)
                 | pulldown_cmark::Event::InlineMath(_)
                 | pulldown_cmark::Event::TaskListMarker(_) => MarkdownPulldownEvent::Ignored,
             })
@@ -740,16 +777,44 @@ impl MarkdownReader {
         let Some(pm_event) = self.next_pulldown_event() else {
             if self.phase != Phase::Finished {
                 self.phase = Phase::Finished;
+                self.flush_html_styles();
                 self.queue.push_back(Event::EndDocument);
             }
             return;
         };
 
         match pm_event {
+            MarkdownPulldownEvent::BlockHtml(fragment) => {
+                let events = crate::html::translator::translate_block(
+                    &fragment,
+                    &mut self.html_block_heading_acc,
+                    &mut self.html_block_inline_stack,
+                    self.in_preformatted,
+                );
+                for event in events {
+                    match event {
+                        Event::Text { content } => self.enqueue_text(content),
+                        other => self.queue.push_back(other),
+                    }
+                }
+            }
             MarkdownPulldownEvent::Start(tag) => self.handle_start_tag(tag),
             MarkdownPulldownEvent::End(tag_end) => self.handle_end_tag(tag_end),
             MarkdownPulldownEvent::Text(text) => self.handle_text(text),
             MarkdownPulldownEvent::Code(code) => self.handle_code(code),
+            MarkdownPulldownEvent::InlineHtml(fragment) => {
+                let events = crate::html::translator::translate_inline(
+                    &fragment,
+                    &mut self.inline_style_stack,
+                    self.in_preformatted,
+                );
+                for event in events {
+                    match event {
+                        Event::Text { content } => self.enqueue_text(content),
+                        other => self.queue.push_back(other),
+                    }
+                }
+            }
             MarkdownPulldownEvent::HardBreak => {
                 if let Some(img) = &mut self.image {
                     img.alt_buf.push(' ');
@@ -783,7 +848,7 @@ impl MarkdownReader {
     }
 
     fn push_event_end(&mut self, event: Event) {
-        self.close_all_open_styles();
+        self.flush_html_styles();
         self.push_event(event, BlockState::None);
     }
 
@@ -816,6 +881,21 @@ impl EventSource for MarkdownReader {
     }
 }
 
+fn intent_from_text_style_kind(k: &TextStyleKind) -> crate::html::tags::TagIntent {
+    use crate::html::tags::TagIntent;
+    match k {
+        TextStyleKind::Bold => TagIntent::Bold,
+        TextStyleKind::Italic => TagIntent::Italic,
+        TextStyleKind::Underline => TagIntent::Underline,
+        TextStyleKind::Strikethrough => TagIntent::Strikethrough,
+        TextStyleKind::Code => TagIntent::Code,
+        TextStyleKind::Subscript => TagIntent::Subscript,
+        TextStyleKind::Superscript => TagIntent::Superscript,
+        TextStyleKind::Mark(_) => TagIntent::Mark,
+        _ => TagIntent::Ignored,
+    }
+}
+
 fn markdown_start_tag(tag: Tag<'_>) -> Option<MarkdownStartTag> {
     match tag {
         Tag::BlockQuote(_) => Some(MarkdownStartTag::BlockQuote),
@@ -830,6 +910,7 @@ fn markdown_start_tag(tag: Tag<'_>) -> Option<MarkdownStartTag> {
             dest_url: dest_url.into_string(),
             title: cow_to_optional_string(title),
         }),
+        Tag::HtmlBlock => Some(MarkdownStartTag::HtmlBlock),
         Tag::Item => Some(MarkdownStartTag::Item),
         Tag::Link {
             dest_url, title, ..
@@ -849,7 +930,6 @@ fn markdown_start_tag(tag: Tag<'_>) -> Option<MarkdownStartTag> {
         | Tag::DefinitionListDefinition
         | Tag::DefinitionListTitle
         | Tag::FootnoteDefinition(_)
-        | Tag::HtmlBlock
         | Tag::MetadataBlock(_)
         | Tag::Subscript
         | Tag::Superscript => None,

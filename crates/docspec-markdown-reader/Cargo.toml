@@ -11,6 +11,7 @@ categories = ["parsing"]
 
 [dependencies]
 docspec-core = { workspace = true }
+html5gum = "0.8"
 pulldown-cmark = "0.13"
 self_cell = { workspace = true }
 
