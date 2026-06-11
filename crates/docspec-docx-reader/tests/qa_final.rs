@@ -14,7 +14,7 @@ mod fixture;
 
 use std::io::Cursor;
 
-use docspec_core::{Event, EventSource as _, TextStyleKind};
+use docspec_core::{Event, TextStyleKind};
 use docspec_docx_reader::DocxReader;
 
 const ROOT_RELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -57,11 +57,7 @@ fn synth_docx_with_styles(document_xml: &str, styles_xml: &str) -> Vec<u8> {
 }
 
 fn drive(reader: &mut DocxReader) -> Vec<Event> {
-    let mut events = Vec::new();
-    while let Some(event) = reader.next_event().expect("next_event") {
-        events.push(event);
-    }
-    events
+    docspec_test_utils::collect_events(reader)
 }
 
 #[test]

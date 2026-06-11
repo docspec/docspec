@@ -9,22 +9,12 @@ mod tests {
 
     fn collect_events(input: &str) -> Vec<Event> {
         let mut reader = HtmlReader::from_str(input);
-        let mut events = Vec::new();
-        while let Some(ev) = reader.next_event().expect("unexpected parse error") {
-            events.push(ev);
-        }
-        events
+        docspec_test_utils::collect_events(&mut reader)
     }
 
     fn collect_events_result(input: &str) -> Result<Vec<Event>> {
         let mut reader = HtmlReader::from_str(input);
-        let mut events = Vec::new();
-        loop {
-            match reader.next_event()? {
-                Some(ev) => events.push(ev),
-                None => return Ok(events),
-            }
-        }
+        docspec_test_utils::try_collect_events(&mut reader)
     }
 
     #[test]

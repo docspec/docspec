@@ -13,5 +13,8 @@ categories = ["parsing"]
 docspec-core = { workspace = true }
 html5gum = "0.8"
 
+[dev-dependencies]
+docspec-test-utils = { workspace = true }
+
 [lints]
 workspace = true

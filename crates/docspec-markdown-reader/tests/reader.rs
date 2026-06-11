@@ -117,16 +117,7 @@ mod tests {
     use std::io::Cursor;
 
     fn collect_events(reader: &mut MarkdownReader) -> Vec<Event> {
-        let mut events = Vec::new();
-        loop {
-            let result = reader.next_event();
-            assert!(result.is_ok(), "next_event failed: {:?}", result.err());
-            match result {
-                Ok(Some(event)) => events.push(event),
-                Ok(None) | Err(_) => break,
-            }
-        }
-        events
+        docspec_test_utils::collect_events(reader)
     }
 
     fn collect_markdown(markdown: &str) -> Vec<Event> {
