@@ -13,6 +13,7 @@ members = [
   "crates/docspec-http",
   "crates/docspec-oxa-writer",
   "crates/docspec-pandoc-native-writer",
+  "crates/docspec-test-utils",
   "crates/docspec-wasm",
 ]
 
@@ -34,6 +35,7 @@ docspec-html-writer = { path = "crates/docspec-html-writer", version = "1.9.0" }
 docspec-http = { path = "crates/docspec-http", version = "1.9.0" }
 docspec-oxa-writer = { path = "crates/docspec-oxa-writer", version = "1.9.0" }
 docspec-pandoc-native-writer = { path = "crates/docspec-pandoc-native-writer", version = "1.9.0" }
+docspec-test-utils = { path = "crates/docspec-test-utils" }
 self_cell = "1.2"
 
 [workspace.lints.rust]

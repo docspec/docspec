@@ -12,7 +12,8 @@ use assert_cmd::Command;
 use predicates::prelude::PredicateBooleanExt as _;
 use predicates::str::contains;
 use tempfile::NamedTempFile;
-use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
+
+use docspec_test_utils::synth_docx;
 
 fn docspec_cmd() -> Command {
     let result = Command::cargo_bin("docspec");
@@ -63,19 +64,6 @@ fn read_output(path: &std::path::Path) -> String {
 }
 
 const SIMPLE_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
-
-fn synth_docx(rels_xml: &str, document_xml: &str) -> Vec<u8> {
-    use std::io::Cursor;
-    let buf = Cursor::new(Vec::new());
-    let mut writer = ZipWriter::new(buf);
-    let opts = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
-    writer.start_file("_rels/.rels", opts).unwrap();
-    writer.write_all(rels_xml.as_bytes()).unwrap();
-    let opts_doc = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
-    writer.start_file("word/document.xml", opts_doc).unwrap();
-    writer.write_all(document_xml.as_bytes()).unwrap();
-    writer.finish().unwrap().into_inner()
-}
 
 #[cfg(test)]
 mod tests {
