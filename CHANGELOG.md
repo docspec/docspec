@@ -12,6 +12,29 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.10.0](https://github.com/docspec/docspec/compare/v1.9.0...v1.10.0) - 2026-06-11
+
+### Added
+
+- *(markdown-writer)* minimal markdown writer
+- *(docx-reader)* image support
+- *(markdown-reader)* translate raw HTML to DocSpec events
+
+### Fixed
+
+- *(blocknote-writer)* lift embedded elements/blocks
+- *(docspec-docx-reader)* continued lists
+
+### Other
+
+- *(tests)* share event builders via docspec-test-utils
+- *(tests)* centralize synth_docx fixture in docspec-test-utils
+- *(tests)* share FailingWriter mock via docspec-test-utils
+- *(tests)* share collect_events harness via docspec-test-utils
+- *(tests)* share writer drive harness via docspec-test-utils
+- *(docx-reader)* consolidate test collect_events helpers
+- *(http)* centralize MIME constants
+
 ## [1.9.0](https://github.com/docspec/docspec/compare/v1.8.0...v1.9.0) - 2026-06-11
 
 ### Added
