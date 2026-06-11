@@ -13,5 +13,8 @@ categories = ["encoding"]
 docspec-core = { workspace = true }
 html5ever = "0.39"
 
+[dev-dependencies]
+docspec-test-utils = { workspace = true }
+
 [lints]
 workspace = true

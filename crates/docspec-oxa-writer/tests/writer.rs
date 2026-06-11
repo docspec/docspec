@@ -4,7 +4,7 @@
 
 #[cfg(test)]
 mod tests {
-    use docspec_core::{Error, Event, EventSink as _, ImageSource, TextStyleKind};
+    use docspec_core::{Error, Event, ImageSource, TextStyleKind};
     use docspec_oxa_writer::OxaWriter;
     use docspec_test_utils::builders::{start_document, start_paragraph, text};
     use serde_json::{json, Value};
@@ -16,21 +16,15 @@ mod tests {
 
     fn run_raw(events: Vec<Event>) -> String {
         let mut buf = Vec::new();
-        let mut w = OxaWriter::new(&mut buf);
-        for e in events {
-            w.handle_event(e).expect("handle_event");
-        }
-        w.finish().expect("finish");
+        let w = OxaWriter::new(&mut buf);
+        docspec_test_utils::drive(w, events);
         String::from_utf8(buf).expect("utf-8")
     }
 
     fn try_run(events: Vec<Event>) -> docspec_core::Result<String> {
         let mut buf = Vec::new();
-        let mut w = OxaWriter::new(&mut buf);
-        for e in events {
-            w.handle_event(e)?;
-        }
-        w.finish()?;
+        let w = OxaWriter::new(&mut buf);
+        docspec_test_utils::try_drive(w, events)?;
         String::from_utf8(buf).map_err(|err| Error::Other {
             message: err.to_string(),
         })

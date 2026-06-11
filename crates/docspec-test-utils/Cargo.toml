@@ -8,6 +8,7 @@ repository.workspace = true
 description = "Internal test fixtures shared across the docspec workspace. Not published."
 
 [dependencies]
+docspec-core = { workspace = true }
 zip = { version = "8", default-features = false, features = ["deflate"] }
 docspec-core = { workspace = true }
 

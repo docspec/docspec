@@ -109,11 +109,8 @@ mod tests {
 
     fn assert_output(events: impl IntoIterator<Item = Event>, expected: &str) {
         let mut buf: Vec<u8> = Vec::new();
-        let mut writer = HtmlWriter::new(&mut buf);
-        for e in events {
-            let _r = writer.handle_event(e);
-        }
-        let _r = writer.finish();
+        let writer = HtmlWriter::new(&mut buf);
+        let _r = docspec_test_utils::try_drive(writer, events);
         let output = String::from_utf8(buf).unwrap();
         assert_eq!(output, expected);
     }
