@@ -4,20 +4,7 @@
 
 use docspec_core::Event;
 use docspec_pandoc_native_writer::PandocNativeWriter;
-use std::io::{self, Write};
-
-/// A writer that always fails on write.
-struct FailingWriter;
-
-impl Write for FailingWriter {
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-
-    fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
-        Err(io::Error::other("write failed"))
-    }
-}
+use docspec_test_utils::FailingWriter;
 
 #[cfg(test)]
 mod tests {
@@ -475,7 +462,7 @@ mod tests {
 
     #[test]
     fn write_error_propagates() {
-        let mut writer = PandocNativeWriter::new(FailingWriter);
+        let mut writer = PandocNativeWriter::new(FailingWriter::new(0));
         let result = writer.handle_event(start_document());
         assert!(result.is_err());
     }

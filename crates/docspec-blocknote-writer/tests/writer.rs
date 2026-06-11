@@ -17,34 +17,7 @@ mod tests {
         TextStyleKind,
     };
     use docspec_test_utils::builders::text;
-
-    struct FailingWriter {
-        fail_after: usize,
-        writes: usize,
-    }
-
-    impl FailingWriter {
-        fn new(fail_after: usize) -> Self {
-            Self {
-                fail_after,
-                writes: 0,
-            }
-        }
-    }
-
-    impl Write for FailingWriter {
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.writes = self.writes.saturating_add(1);
-            if self.writes > self.fail_after {
-                return Err(std::io::Error::other("simulated write failure"));
-            }
-            Ok(buf.len())
-        }
-    }
+    use docspec_test_utils::FailingWriter;
 
     struct MockAssetProvider {
         assets: HashMap<String, (String, Vec<u8>)>,
