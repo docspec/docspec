@@ -477,9 +477,9 @@ dependencies = [
  "docspec-markdown-reader",
  "docspec-oxa-writer",
  "docspec-pandoc-native-writer",
+ "docspec-test-utils",
  "serde_json",
  "tempfile",
- "zip",
 ]
 
 [[package]]
@@ -504,12 +504,12 @@ dependencies = [
  "docspec",
  "docspec-core",
  "docspec-http",
+ "docspec-test-utils",
  "predicates",
  "reqwest",
  "serde_json",
  "tempfile",
  "thiserror",
- "zip",
 ]
 
 [[package]]
@@ -524,6 +524,7 @@ name = "docspec-docx-reader"
 version = "1.9.0"
 dependencies = [
  "docspec-core",
+ "docspec-test-utils",
  "flate2",
  "quick-xml",
  "tempfile",
@@ -555,6 +556,7 @@ dependencies = [
  "docspec",
  "docspec-core",
  "docspec-json",
+ "docspec-test-utils",
  "metrics",
  "metrics-exporter-prometheus",
  "mime",
@@ -568,7 +570,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "zip",
 ]
 
 [[package]]
@@ -602,6 +603,13 @@ name = "docspec-pandoc-native-writer"
 version = "1.9.0"
 dependencies = [
  "docspec-core",
+]
+
+[[package]]
+name = "docspec-test-utils"
+version = "1.9.0"
+dependencies = [
+ "zip",
 ]
 
 [[package]]

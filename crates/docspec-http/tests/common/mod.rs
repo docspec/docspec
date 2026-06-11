@@ -17,11 +17,14 @@
     dead_code
 )]
 
-use std::io::Write as _;
-
 use axum::{body::Body, http::Request, Router};
 use metrics_exporter_prometheus::PrometheusHandle;
-use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
+
+// Reason: this module is included by every integration test binary in the crate.
+// Not every binary uses the re-export, so the unused-import warning is unavoidable
+// per-binary without splitting the module per test file.
+#[allow(unused_imports)]
+pub use docspec_test_utils::synth_docx;
 
 /// Builds a single-threaded Tokio runtime for synchronous integration tests.
 ///
@@ -116,24 +119,6 @@ where
 
 /// Minimal `_rels/.rels` XML for a DOCX archive pointing at `word/document.xml`.
 pub const SIMPLE_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
-
-/// Builds a minimal 2-entry DOCX ZIP archive (Deflated) from raw XML strings.
-///
-/// # Panics
-///
-/// Panics if the ZIP writer fails (should never happen in tests).
-pub fn synth_docx(rels_xml: &str, document_xml: &str) -> Vec<u8> {
-    use std::io::Cursor;
-    let buf = Cursor::new(Vec::new());
-    let mut writer = ZipWriter::new(buf);
-    let opts = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
-    writer.start_file("_rels/.rels", opts).unwrap();
-    writer.write_all(rels_xml.as_bytes()).unwrap();
-    let opts_doc = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
-    writer.start_file("word/document.xml", opts_doc).unwrap();
-    writer.write_all(document_xml.as_bytes()).unwrap();
-    writer.finish().unwrap().into_inner()
-}
 
 /// Builds a valid DOCX conversion request.
 ///

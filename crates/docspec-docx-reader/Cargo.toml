@@ -18,6 +18,7 @@ flate2 = "1"
 [dev-dependencies]
 zip = { version = "8", default-features = false, features = ["deflate", "bzip2"] }
 tempfile = "3"
+docspec-test-utils = { workspace = true }
 
 [lints]
 workspace = true
