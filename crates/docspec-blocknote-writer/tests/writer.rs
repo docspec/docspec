@@ -2489,13 +2489,7 @@ mod tests {
     }
 
     #[test]
-    fn nested_table_inner_structure_is_dropped() {
-        // Drives a nested StartTable inside an outer table cell. The writer's
-        // depth guards drop every inner table event (start, row, cell, text,
-        // and their closes); only the outer table is emitted with the outer
-        // cell's text intact. Bypasses StackTrackingSink to drive a hand-
-        // crafted sequence that no current reader produces but DOCX/ODT
-        // readers may produce in the future.
+    fn nested_table_lifts_to_top_level_sibling() {
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
         assert!(writer.handle_event(start_document()).is_ok());
@@ -2503,7 +2497,6 @@ mod tests {
         assert!(writer.handle_event(start_table_row()).is_ok());
         assert!(writer.handle_event(start_table_cell()).is_ok());
         assert!(writer.handle_event(text("outer")).is_ok());
-        // Nested inner table — every event below is silently absorbed by guards
         assert!(writer.handle_event(start_table()).is_ok());
         assert!(writer.handle_event(start_table_row()).is_ok());
         assert!(writer.handle_event(start_table_cell()).is_ok());
@@ -2519,7 +2512,188 @@ mod tests {
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"outer","styles":{}}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"outer","styles":{}}]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"inner","styles":{}}]}]}]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn three_deep_nested_tables_all_lift_in_document_order() {
+        let json = run_direct_writer_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("c"),
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"c","styles":{}}]}]}]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn multiple_nested_tables_in_same_outer_cell_lift_in_document_order() {
+        let json = run_direct_writer_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("b1"),
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("b2"),
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"b1","styles":{}}]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"b2","styles":{}}]}]}]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn text_before_and_after_nested_table_stays_in_outer_cell() {
+        let json = run_direct_writer_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("before"),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("inner"),
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            text("after"),
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"before","styles":{}},{"type":"text","text":"after","styles":{}}]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"inner","styles":{}}]}]}]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn nested_table_inside_header_cell_lifts_to_top_level() {
+        let json = run_direct_writer_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            Event::StartTableHeader {
+                id: None,
+                scope: None,
+                abbr: None,
+                colspan: None,
+                rowspan: None,
+            },
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("nested"),
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndTableHeader,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"nested","styles":{}}]}]}]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn nested_table_preserves_styled_text_after_lift() {
+        let json = run_direct_writer_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            start_text_style(TextStyleKind::Bold),
+            text("b"),
+            Event::EndTextStyle,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"b","styles":{"bold":true}}]}]}]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn outer_table_inside_list_item_drops_table_and_nested_table_alike() {
+        let json = run_events(&[
+            start_document(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            text("bullet"),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("dropped"),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("also dropped"),
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"bullet","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -2754,7 +2928,7 @@ mod tests {
     }
 
     #[test]
-    fn nested_table_with_list_in_cell_drops_list() {
+    fn nested_table_with_list_in_cell_lifts_table_drops_list() {
         let json = run_events(&[
             start_document(),
             start_table(),
@@ -2781,7 +2955,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"outer","styles":{}}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"outer","styles":{}}]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
         );
     }
 

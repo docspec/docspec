@@ -1,6 +1,6 @@
 # `docspec-blocknote-writer`
 
-Converts a DocSpec event stream into [BlockNote](https://www.blocknotejs.org/) JSON. Implements the `EventSink` trait and emits JSON tokens directly to any `Write` target as events arrive — no intermediate document representation, constant memory regardless of file size.
+Converts a DocSpec event stream into [BlockNote](https://www.blocknotejs.org/) JSON. Implements the `EventSink` trait and emits JSON tokens directly to any `Write` target as events arrive. Conversion is streaming-first, with local buffering only for bounded conversion details such as asset data URI encoding and lifting nested table event substreams after their enclosing table closes.
 
 ## Supported Features
 
@@ -127,7 +127,8 @@ let json = String::from_utf8(buf)?;
 
 - `StartParagraph` / `EndParagraph` boundaries are absorbed silently (adjacent paragraphs concatenate without separator)
 - `Text` and `LineBreak` are preserved
-- Everything else (images, headings, code blocks, blockquotes, list items, nested tables) is dropped silently
+- Images, headings, code blocks, blockquotes, and list items are dropped silently
+- Nested tables are lifted: their events are buffered between the inner `StartTable` and matching `EndTable`, then replayed as top-level sibling blocks immediately after the enclosing outermost table closes. Deep nesting (`A` containing `B` containing `C`) flattens to a top-level sequence (`A, B, C`) in document order. Inline text adjacent to a nested table in the same outer cell stays in that outer cell.
 
 **Non-paragraph children inside list items**: headings, images, code blocks, and blockquotes that appear as children of a list item are dropped. The first paragraph's inline content populates the item's `content[]` array; each subsequent paragraph becomes a child `paragraph` block in `children[]`.
 
