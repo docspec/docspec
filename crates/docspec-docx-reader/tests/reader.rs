@@ -4835,7 +4835,7 @@ mod events {
     }
 
     #[test]
-    fn hyperlink_inside_denied_subtree_emits_nothing() {
+    fn hyperlink_inside_drawing_subtree_emits_nothing() {
         let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <w:body><w:p><w:drawing><w:hyperlink r:id="rId1"><w:r><w:t>inside-drawing</w:t></w:r></w:hyperlink></w:drawing></w:p></w:body>

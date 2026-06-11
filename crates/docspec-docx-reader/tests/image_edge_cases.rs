@@ -1,0 +1,466 @@
+//! Integration tests for `DocxReader` image edge cases.
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::redundant_test_prefix,
+    clippy::separated_literal_suffix,
+    clippy::std_instead_of_core,
+    clippy::tests_outside_test_module,
+    clippy::unseparated_literal_suffix,
+    clippy::unwrap_used
+)]
+
+mod fixture;
+
+use std::io::Cursor;
+
+use docspec_core::{AssetProvider as _, Event, EventSource as _, ImageSource};
+use docspec_docx_reader::{DocxAssetProvider, DocxReader};
+use zip::CompressionMethod;
+
+const ROOT_RELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1"
+    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+    Target="word/document.xml"/>
+</Relationships>"#;
+
+const IMAGE_REL_TYPE: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+
+fn doc_rels(body: &str) -> String {
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+{body}
+</Relationships>"#
+    )
+}
+
+fn drawing_doc(drawing_inner: &str) -> String {
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"
+  xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+  <w:body><w:p><w:r><w:drawing>{drawing_inner}</w:drawing></w:r></w:p></w:body>
+</w:document>"#
+    )
+}
+
+fn inline_pic(blip: &str) -> String {
+    format!(
+        "<wp:inline><a:graphic><a:graphicData><pic:pic><pic:blipFill>{blip}</pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline>"
+    )
+}
+
+fn build_docx(doc_rels_xml: &str, document_xml: &str) -> Vec<u8> {
+    fixture::synth_docx_with_entries(&[
+        (
+            "_rels/.rels",
+            CompressionMethod::Deflated,
+            ROOT_RELS.as_bytes(),
+        ),
+        (
+            "word/_rels/document.xml.rels",
+            CompressionMethod::Deflated,
+            doc_rels_xml.as_bytes(),
+        ),
+        (
+            "word/document.xml",
+            CompressionMethod::Deflated,
+            document_xml.as_bytes(),
+        ),
+    ])
+}
+
+fn build_provider_docx() -> Vec<u8> {
+    fixture::synth_docx_with_entries(&[
+        (
+            "[Content_Types].xml",
+            CompressionMethod::Deflated,
+            br#"<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="png" ContentType="image/png"/></Types>"#,
+        ),
+        (
+            "word/media/image1.png",
+            CompressionMethod::Stored,
+            &[0x89u8, 0x50, 0x4E, 0x47],
+        ),
+    ])
+}
+
+fn drive(reader: &mut DocxReader) -> Vec<Event> {
+    let mut events = Vec::new();
+    while let Some(event) = reader.next_event().expect("next_event") {
+        events.push(event);
+    }
+    events
+}
+
+fn start_doc() -> Event {
+    Event::StartDocument {
+        id: None,
+        language: None,
+        metadata: None,
+    }
+}
+
+fn start_para() -> Event {
+    Event::StartParagraph {
+        alignment: None,
+        id: None,
+    }
+}
+
+fn image_event(source: ImageSource, alt: Option<&str>) -> Event {
+    Event::Image {
+        alt: alt.map(str::to_string),
+        decorative: false,
+        id: None,
+        source,
+        title: None,
+    }
+}
+
+#[test]
+fn external_link_emits_uri() {
+    let rels = doc_rels(&format!(
+        r#"<Relationship Id="rId2" Type="{IMAGE_REL_TYPE}" Target="https://example.com/img.png" TargetMode="External"/>"#
+    ));
+    let drawing = inline_pic(r#"<a:blip r:link="rId2"/>"#);
+    let doc = drawing_doc(&drawing);
+    let bytes = build_docx(&rels, &doc);
+    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+    assert_eq!(
+        drive(&mut reader),
+        vec![
+            start_doc(),
+            start_para(),
+            image_event(
+                ImageSource::Uri {
+                    uri: "https://example.com/img.png".to_string(),
+                },
+                None,
+            ),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]
+    );
+}
+
+#[test]
+fn embed_external_target_mode() {
+    let rels = doc_rels(&format!(
+        r#"<Relationship Id="rId5" Type="{IMAGE_REL_TYPE}" Target="https://cdn.example.com/x.png" TargetMode="External"/>"#
+    ));
+    let drawing = inline_pic(r#"<a:blip r:embed="rId5"/>"#);
+    let doc = drawing_doc(&drawing);
+    let bytes = build_docx(&rels, &doc);
+    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+    assert_eq!(
+        drive(&mut reader),
+        vec![
+            start_doc(),
+            start_para(),
+            image_event(
+                ImageSource::Uri {
+                    uri: "https://cdn.example.com/x.png".to_string(),
+                },
+                None,
+            ),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]
+    );
+}
+
+#[test]
+fn missing_rel_emits_raw_rid() {
+    let rels = doc_rels("");
+    let drawing = inline_pic(r#"<a:blip r:embed="rId99"/>"#);
+    let doc = drawing_doc(&drawing);
+    let bytes = build_docx(&rels, &doc);
+    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+    assert_eq!(
+        drive(&mut reader),
+        vec![
+            start_doc(),
+            start_para(),
+            image_event(
+                ImageSource::Asset {
+                    asset_id: "rId99".to_string(),
+                },
+                None,
+            ),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]
+    );
+}
+
+#[test]
+fn empty_drawing_no_event() {
+    let rels = doc_rels("");
+    let drawing = r#"<wp:inline><wp:docPr id="1" name="img1"/></wp:inline>"#;
+    let doc = drawing_doc(drawing);
+    let bytes = build_docx(&rels, &doc);
+    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+    assert_eq!(
+        drive(&mut reader),
+        vec![
+            start_doc(),
+            start_para(),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]
+    );
+}
+
+#[test]
+fn embed_wins_over_link() {
+    let rels = doc_rels(&format!(
+        r#"<Relationship Id="rId4" Type="{IMAGE_REL_TYPE}" Target="media/embed.png"/>
+<Relationship Id="rId5" Type="{IMAGE_REL_TYPE}" Target="https://example.com/link.png" TargetMode="External"/>"#
+    ));
+    let drawing = inline_pic(r#"<a:blip r:embed="rId4" r:link="rId5"/>"#);
+    let doc = drawing_doc(&drawing);
+    let bytes = build_docx(&rels, &doc);
+    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+    assert_eq!(
+        drive(&mut reader),
+        vec![
+            start_doc(),
+            start_para(),
+            image_event(
+                ImageSource::Asset {
+                    asset_id: "zip://word/media/embed.png".to_string(),
+                },
+                None,
+            ),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]
+    );
+}
+
+#[test]
+fn pict_still_skipped() {
+    let rels = doc_rels("");
+    let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"
+  xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+  <w:body>
+    <w:p>
+      <w:r><w:t>before</w:t></w:r>
+      <w:r><w:drawing><w:pict><w:r><w:t>hidden</w:t></w:r></w:pict></w:drawing></w:r>
+      <w:r><w:t>after</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>"#;
+    let bytes = build_docx(&rels, doc);
+    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+    assert_eq!(
+        drive(&mut reader),
+        vec![
+            start_doc(),
+            start_para(),
+            Event::Text {
+                content: "before".to_string(),
+            },
+            Event::Text {
+                content: "after".to_string(),
+            },
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]
+    );
+}
+
+#[test]
+fn smartart_blip_ignored() {
+    let rels = doc_rels(&format!(
+        r#"<Relationship Id="rIdSmart" Type="{IMAGE_REL_TYPE}" Target="word/media/smart.png"/>"#
+    ));
+    // blip is at a:graphicData/a:blip — NOT inside pic:pic/pic:blipFill
+    let drawing = r#"<wp:inline><a:graphic><a:graphicData><a:blip r:embed="rIdSmart"/></a:graphicData></a:graphic></wp:inline>"#;
+    let doc = drawing_doc(drawing);
+    let bytes = build_docx(&rels, &doc);
+    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+    assert_eq!(
+        drive(&mut reader),
+        vec![
+            start_doc(),
+            start_para(),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]
+    );
+}
+
+#[test]
+fn multiple_pics_multiple_events() {
+    let rels = doc_rels(&format!(
+        r#"<Relationship Id="rId1" Type="{IMAGE_REL_TYPE}" Target="media/one.png"/>
+<Relationship Id="rId2" Type="{IMAGE_REL_TYPE}" Target="media/two.png"/>"#
+    ));
+    let drawing = format!(
+        "{}{}",
+        inline_pic(r#"<a:blip r:embed="rId1"/>"#),
+        inline_pic(r#"<a:blip r:embed="rId2"/>"#),
+    );
+    let doc = drawing_doc(&drawing);
+    let bytes = build_docx(&rels, &doc);
+    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+    assert_eq!(
+        drive(&mut reader),
+        vec![
+            start_doc(),
+            start_para(),
+            image_event(
+                ImageSource::Asset {
+                    asset_id: "zip://word/media/one.png".to_string(),
+                },
+                None,
+            ),
+            image_event(
+                ImageSource::Asset {
+                    asset_id: "zip://word/media/two.png".to_string(),
+                },
+                None,
+            ),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]
+    );
+}
+
+#[test]
+fn provider_non_zip_scheme_returns_none() {
+    let bytes = build_provider_docx();
+    let provider = DocxAssetProvider::from_reader(Cursor::new(bytes)).expect("from_reader");
+    let ct = provider.content_type("rId99");
+    assert_eq!(ct, None);
+    let mut buf = Vec::new();
+    let result = provider.stream_to("rId99", &mut buf);
+    assert!(result.is_none());
+}
+
+#[test]
+fn provider_unknown_internal_path_returns_none() {
+    let bytes = build_provider_docx();
+    let provider = DocxAssetProvider::from_reader(Cursor::new(bytes)).expect("from_reader");
+    let mut buf = Vec::new();
+    let result = provider.stream_to("zip://word/media/nonexistent.png", &mut buf);
+    assert!(result.is_none());
+}
+
+const HYPERLINK_REL_TYPE: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+
+fn hyperlink_drawing_doc(paragraph_inner: &str) -> String {
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"
+  xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+  <w:body><w:p>{paragraph_inner}</w:p></w:body>
+</w:document>"#
+    )
+}
+
+#[test]
+fn hyperlink_wrapping_only_a_drawing_emits_start_and_end_link_around_image() {
+    let rels = doc_rels(&format!(
+        r#"<Relationship Id="rId1" Type="{HYPERLINK_REL_TYPE}" Target="https://example.com" TargetMode="External"/>
+<Relationship Id="rId2" Type="{IMAGE_REL_TYPE}" Target="media/image1.png"/>"#
+    ));
+    let drawing = inline_pic(r#"<a:blip r:embed="rId2"/>"#);
+    let paragraph_inner = format!(
+        r#"<w:hyperlink r:id="rId1"><w:r><w:drawing>{drawing}</w:drawing></w:r></w:hyperlink>"#
+    );
+    let doc = hyperlink_drawing_doc(&paragraph_inner);
+    let bytes = build_docx(&rels, &doc);
+    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+    assert_eq!(
+        drive(&mut reader),
+        vec![
+            start_doc(),
+            start_para(),
+            Event::StartLink {
+                href: "https://example.com".to_string(),
+                id: None,
+                title: None,
+            },
+            image_event(
+                ImageSource::Asset {
+                    asset_id: "zip://word/media/image1.png".to_string(),
+                },
+                None,
+            ),
+            Event::EndLink,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]
+    );
+}
+
+#[test]
+fn sibling_drawing_without_docpr_does_not_inherit_alt() {
+    let rels = doc_rels(&format!(
+        r#"<Relationship Id="rId1" Type="{IMAGE_REL_TYPE}" Target="media/one.png"/>
+<Relationship Id="rId2" Type="{IMAGE_REL_TYPE}" Target="media/two.png"/>"#
+    ));
+    let drawing_with_alt = r#"<wp:inline><wp:docPr id="1" name="img1" descr="first"/><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="rId1"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline>"#;
+    let drawing_without_alt = inline_pic(r#"<a:blip r:embed="rId2"/>"#);
+    let doc = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"
+  xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+  <w:body>
+    <w:p><w:r><w:drawing>{drawing_with_alt}</w:drawing></w:r></w:p>
+    <w:p><w:r><w:drawing>{drawing_without_alt}</w:drawing></w:r></w:p>
+  </w:body>
+</w:document>"#
+    );
+    let bytes = build_docx(&rels, &doc);
+    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+    assert_eq!(
+        drive(&mut reader),
+        vec![
+            start_doc(),
+            start_para(),
+            image_event(
+                ImageSource::Asset {
+                    asset_id: "zip://word/media/one.png".to_string(),
+                },
+                Some("first"),
+            ),
+            Event::EndParagraph,
+            start_para(),
+            image_event(
+                ImageSource::Asset {
+                    asset_id: "zip://word/media/two.png".to_string(),
+                },
+                None,
+            ),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]
+    );
+}

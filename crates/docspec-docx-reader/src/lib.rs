@@ -16,14 +16,16 @@
 //! hyperlinks (`<w:hyperlink>` — resolved via `word/_rels/document.xml.rels`
 //! and emitted as `StartLink`/`EndLink` events around inline content),
 //! structured document tags (`<w:sdt>` — content emitted normally;
-//! `<w:sdtPr>`/`<w:sdtEndPr>` dropped), and tracked insertions and moves
-//! (`<w:ins>`, `<w:moveTo>` — accept-changes semantics).
+//! `<w:sdtPr>`/`<w:sdtEndPr>` dropped), tracked insertions and moves
+//! (`<w:ins>`, `<w:moveTo>` — accept-changes semantics), and `DrawingML` images
+//! (`<w:drawing>` — emitted as `Image` events; see the crate README for
+//! `ImageSource` variants and `DocxAssetProvider` usage).
 //! Emits: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`,
 //! `EndTextStyle`, `LineBreak`, `EndParagraph`, `StartTable`, `StartTableRow`,
 //! `StartTableCell`, `StartTableHeader`, `EndTableHeader`, `EndTableCell`,
 //! `EndTableRow`, `EndTable`, `StartLink`, `EndLink`, `StartOrderedListItem`,
 //! `EndOrderedListItem`, `StartUnorderedListItem`, `EndUnorderedListItem`,
-//! `EndDocument`.
+//! `Image`, `EndDocument`.
 //!
 //! The elements listed under "Out of scope" are the reader's denylist — their
 //! entire subtree is silently dropped. Every other element (known or unknown)
@@ -39,7 +41,7 @@
 //! - Table-level property exceptions (`<w:tblPrEx>`) — silently ignored
 //! - Table, row, and cell visual properties (`<w:tblPr>`, `<w:trPr>` visual
 //!   fields, `<w:tcPr>` visual fields, `<w:tblGrid>`)
-//! - Drawings and images (`<w:drawing>`, `<w:pict>`)
+//! - VML images (`<w:pict>`) — deferred to follow-up; subtree silently dropped
 //! - Comments, footnotes, headers, footers
 //! - Document metadata
 //! - Tracked deletions (`<w:del>`, `<w:moveFrom>`) — accept-changes semantics
@@ -76,6 +78,8 @@
 
 extern crate alloc;
 
+mod asset_provider;
+mod content_types;
 mod document;
 mod numbering;
 mod package;
@@ -88,14 +92,55 @@ use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 
 pub use docspec_core::EventSource;
+
+/// Provides streaming access to binary assets stored inside a DOCX ZIP archive.
+///
+/// Use this alongside [`DocxReader`] when you need to resolve embedded images.
+/// [`DocxReader`] emits `Event::Image` with an `asset_id` of the form
+/// `zip://word/media/image1.png`; pass that `asset_id` to
+/// [`DocxAssetProvider`] to stream the raw bytes.
+///
+/// # Example
+///
+/// ```no_run
+/// use docspec_docx_reader::DocxAssetProvider;
+/// use docspec_core::AssetProvider;
+///
+/// let provider = DocxAssetProvider::from_path("document.docx")?;
+/// let mut buf = Vec::new();
+/// if let Some(result) = provider.stream_to("zip://word/media/image1.png", &mut buf) {
+///     result?;
+/// }
+/// # Ok::<(), docspec_core::Error>(())
+/// ```
+pub use asset_provider::DocxAssetProvider;
 use docspec_core::{Error, Result};
+
+const _: for<'a> fn(&'a content_types::ContentTypes, &str) -> Option<&'a str> =
+    content_types::ContentTypes::lookup;
+fn _image_rel_fields(r: &rels::ImageRel) -> (&str, bool) {
+    (&r.target, r.is_external)
+}
+const _: for<'a> fn(&'a rels::ImageRel) -> (&'a str, bool) = _image_rel_fields;
+fn _use_docx_asset_provider_from_path(p: &Path) -> Result<asset_provider::DocxAssetProvider> {
+    asset_provider::DocxAssetProvider::from_path(p)
+}
+const _: fn(&Path) -> Result<asset_provider::DocxAssetProvider> =
+    _use_docx_asset_provider_from_path;
+fn _use_docx_asset_provider_from_reader(
+    r: std::io::Cursor<Vec<u8>>,
+) -> Result<asset_provider::DocxAssetProvider> {
+    asset_provider::DocxAssetProvider::from_reader(r)
+}
+const _: fn(std::io::Cursor<Vec<u8>>) -> Result<asset_provider::DocxAssetProvider> =
+    _use_docx_asset_provider_from_reader;
 
 /// A streaming DOCX reader that implements [`EventSource`].
 ///
 /// `DocxReader` parses a DOCX archive and emits `DocSpec` events one at a time.
-/// `<w:p>` paragraphs, `<w:t>` text, `<w:br>` line breaks, `<w:tab>` tabs, and
-/// table elements (`<w:tbl>`, `<w:tr>`, `<w:tc>`) are recognized; all other
-/// elements are silently ignored.
+/// `<w:p>` paragraphs, `<w:t>` text, `<w:br>` line breaks, `<w:tab>` tabs,
+/// table elements (`<w:tbl>`, `<w:tr>`, `<w:tc>`), and `DrawingML` images
+/// (`<w:drawing>`) are recognized; all other elements are silently ignored.
 ///
 /// # Streaming
 ///
@@ -137,12 +182,14 @@ impl DocxReader {
     /// cannot be opened. Returns [`Error::Io`] for I/O failures.
     #[inline]
     pub fn from_reader<R: Read + Seek + Send + 'static>(reader: R) -> Result<Self> {
-        let (style_list, numbering, hyperlink_map, stream) = package::open_package(reader)?;
+        let (style_list, numbering, hyperlink_map, image_map, _content_types, stream) =
+            package::open_package(reader)?;
         let xml = quick_xml::Reader::from_reader(BufReader::new(stream));
         let data = document::DocxData {
             style_list,
             hyperlink_map,
             numbering,
+            image_map,
         };
         Ok(Self {
             inner: document::DocumentReader::from_xml_reader(xml, data),

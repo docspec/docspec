@@ -23,8 +23,8 @@ architecture, and the event protocol.
 - Hyperlinks (`<w:hyperlink>`): resolved via `word/_rels/document.xml.rels` and emitted as `StartLink`/`EndLink` events around inline content. Supports external URL targets (both Strict and Transitional OOXML relationship Type URIs), anchor-only links (`w:anchor` without `r:id` emits `#fragment`), and tooltips (`w:tooltip` → `StartLink.title`, XML-decoded). When the relationship cannot be resolved, the link wrapper is dropped and content passes through as plain runs.
 - Structured Document Tags (`<w:sdt>`) — the content of an SDT is emitted normally. The property containers `<w:sdtPr>` and `<w:sdtEndPr>` are dropped.
 - Tracked insertions and moves (`<w:ins>`, `<w:moveTo>`) — the inserted/moved-in content is emitted (accept-changes semantics).
-- Hyperlinks (`<w:hyperlink>`): resolved via `word/_rels/document.xml.rels` and emitted as `StartLink`/`EndLink` events around inline content. Supports external URL targets (both Strict and Transitional OOXML relationship Type URIs), anchor-only links (`w:anchor` without `r:id` emits `#fragment`), and tooltips (`w:tooltip` → `StartLink.title`, XML-decoded). When the relationship cannot be resolved, the link wrapper is dropped and content passes through as plain runs.
-- Emits: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`, `EndTextStyle`, `LineBreak`, `EndParagraph`, `StartTable`, `StartTableRow`, `StartTableCell`, `StartTableHeader`, `EndTableHeader`, `EndTableCell`, `EndTableRow`, `EndTable`, `StartLink`, `EndLink`, `StartOrderedListItem`, `EndOrderedListItem`, `StartUnorderedListItem`, `EndUnorderedListItem`, `EndDocument`
+- DrawingML images (`<w:drawing>`) — emitted as `Event::Image`. See [Image Support](#image-support) below.
+- Emits: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`, `EndTextStyle`, `LineBreak`, `EndParagraph`, `StartTable`, `StartTableRow`, `StartTableCell`, `StartTableHeader`, `EndTableHeader`, `EndTableCell`, `EndTableRow`, `EndTable`, `StartLink`, `EndLink`, `StartOrderedListItem`, `EndOrderedListItem`, `StartUnorderedListItem`, `EndUnorderedListItem`, `Image`, `EndDocument`
 - Symbol font character normalization for Wingdings, Wingdings 2, Wingdings 3, Webdings, and Symbol fonts — codepoints are mapped to their Unicode equivalents; unmapped codepoints are dropped
 - Compression: `Stored` and `Deflated` only
 
@@ -54,7 +54,7 @@ The XML elements listed below are the reader's denylist — their entire subtree
 - Header rows in nested tables — only the outermost table honors `<w:tblHeader>`
 - Table-level property exceptions (`<w:tblPrEx>`) — silently ignored (consistent with `<w:tblPr>`)
 - Table, row, and cell visual properties (`<w:tblPr>`, `<w:trPr>` visual fields, `<w:tcPr>` visual fields, `<w:tblGrid>`) — silently dropped
-- Drawings and images (`<w:drawing>`, `<w:pict>`)
+- VML images (`<w:pict>`) — deferred to follow-up; subtree silently dropped
 - Comments, footnotes, headers, footers
 - Document metadata
 - Tracked deletions and moves-from (`<w:del>`, `<w:moveFrom>`) — silently dropped (accept-changes semantics). Their text content uses `<w:delText>` which is not part of the reader's text-matching set.
@@ -72,6 +72,48 @@ The following list features are intentionally out of scope for V1:
 - No per-level marker text (`<w:lvlText>`) — not parsed
 - No level-specific font, color, or indent
 - No per-level resolution for synthesised phantom levels — when the first authored item appears at `ilvl > 0`, intermediate levels inherit the target item's ordered/unordered classification and use `Decimal`/`Disc` defaults instead of resolving each phantom level's own `numFmt`
+
+## Image Support
+
+`<w:drawing>` elements are parsed and emit `Event::Image`. The `source` field is one of two variants:
+
+- **Embedded image** (`r:embed`): `ImageSource::Asset { asset_id: "zip://word/media/image1.png" }`. The `asset_id` is the resolved ZIP entry path with a `zip://` scheme prefix. Use [`DocxAssetProvider`] to stream the raw bytes.
+- **External image** (`r:link`): `ImageSource::Uri { uri: "<url>" }`. The URL is passed through verbatim from the relationship target.
+
+When both `r:embed` and `r:link` appear on the same blip, `r:embed` wins.
+
+A relationship marked `TargetMode="External"` is honored even when referenced via `r:embed` — the reader emits `ImageSource::Uri` in that case, matching Word and LibreOffice behavior.
+
+If the relationship ID cannot be resolved (missing or malformed rels), the reader emits `ImageSource::Asset { asset_id: "<rId>" }` using the raw relationship ID with no `zip://` prefix. Writers should apply their own missing-asset policy.
+
+`wp:docPr/@descr` maps to `Event::Image.alt`. The `title` field is always `None` in this release.
+
+VML images (`<w:pict>`) are not supported in this release — their subtree is silently dropped.
+
+### DocxAssetProvider
+
+[`DocxAssetProvider`] implements the `AssetProvider` trait and streams asset bytes from the DOCX ZIP archive on demand. Open it independently from [`DocxReader`] using the same file path or an in-memory buffer.
+
+```rust,no_run
+use docspec_docx_reader::{DocxReader, DocxAssetProvider, EventSource};
+use docspec_core::{AssetProvider, Event, ImageSource};
+
+let mut reader = DocxReader::from_path("document.docx")?;
+let provider = DocxAssetProvider::from_path("document.docx")?;
+
+while let Some(event) = reader.next_event()? {
+    if let Event::Image { source: ImageSource::Asset { asset_id }, .. } = &event {
+        let mut buf = Vec::new();
+        if let Some(result) = provider.stream_to(asset_id, &mut buf) {
+            result?;
+        }
+        // buf now contains the raw image bytes (or is empty if the asset was missing)
+    }
+}
+# Ok::<(), docspec_core::Error>(())
+```
+
+For in-memory DOCX data, use `DocxAssetProvider::from_reader` with a `Cursor<Vec<u8>>`.
 
 ## Streaming Guarantee
 
