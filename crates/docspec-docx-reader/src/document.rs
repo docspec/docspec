@@ -4,11 +4,13 @@ use alloc::collections::VecDeque;
 use core::fmt;
 use std::io::{BufReader, Read};
 
-use docspec_core::{Color, Error, Event, Result, TableHeaderScope, TextAlignment, TextStyleKind};
+use docspec_core::{
+    Color, Error, Event, ImageSource, Result, TableHeaderScope, TextAlignment, TextStyleKind,
+};
 use quick_xml::events::{BytesCData, BytesRef, BytesStart, BytesText};
 
 use crate::properties;
-use crate::rels::HyperlinkMap;
+use crate::rels::{HyperlinkMap, ImageMap};
 use crate::styles::StyleList;
 
 const MAX_LIST_LEVEL: u32 = 8;
@@ -64,6 +66,15 @@ struct ListStackEntry {
     is_ordered: bool,
 }
 
+#[derive(Default)]
+struct DrawingScanState {
+    pending_alt: Option<String>,
+    current_pic_alt: Option<String>,
+    pic_depth: u32,
+    blip_fill_depth: u32,
+    emitted_for_current_pic: bool,
+}
+
 /// Bundle of package-level data the document reader consults during streaming.
 ///
 /// Forward-compatible: additional package parts (theme, settings)
@@ -75,6 +86,8 @@ pub struct DocxData {
     pub hyperlink_map: HyperlinkMap,
     /// Numbering definitions loaded from the numbering part, used to resolve list styles.
     pub numbering: crate::numbering::MinimalNumbering,
+    /// Map of relationship Id → [`crate::rels::ImageRel`] for every image relationship in the document part. Resolved from word/_rels/document.xml.rels at package-open time; empty if absent.
+    pub image_map: ImageMap,
 }
 
 /// Deferred-emission state for an open <w:hyperlink>.
@@ -99,8 +112,7 @@ pub(crate) struct PendingLink {
 #[non_exhaustive]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum DeniedKind {
-    // 10 doc-level denied containers.
-    Drawing,
+    // 9 doc-level denied containers.
     Pict,
     Object,
     Del,
@@ -306,6 +318,7 @@ impl DocumentReader {
             style_list,
             hyperlink_map,
             numbering,
+            image_map,
         } = data;
         Self {
             buf: Vec::with_capacity(4096),
@@ -336,6 +349,7 @@ impl DocumentReader {
                 style_list,
                 hyperlink_map: HyperlinkMap::default(),
                 numbering,
+                image_map,
             },
             hyperlink_map,
             in_tcpr: false,
@@ -910,20 +924,24 @@ impl DocumentReader {
         Ok(())
     }
 
-    fn handle_start(&mut self, tag: &BytesStart<'_>) {
+    fn handle_start(&mut self, tag: &BytesStart<'_>) -> Result<()> {
         let local_name = tag.local_name();
         let local = local_name.as_ref();
         if !self.denied_stack.is_empty() {
             if let Some(kind) = is_denied_container(local) {
                 self.denied_stack.push(kind);
             }
-            return;
+            return Ok(());
+        }
+        if local == b"drawing" {
+            self.handle_drawing_start()?;
+            return Ok(());
         }
         if self.handle_table_start(local, tag) {
-            return;
+            return Ok(());
         }
         if self.handle_rpr_property(local, tag) {
-            return;
+            return Ok(());
         }
 
         let denied_container = is_denied_container(local);
@@ -997,6 +1015,148 @@ impl DocumentReader {
             }
             (b"hyperlink", _) => self.handle_hyperlink_start(tag),
             _ => {}
+        }
+        Ok(())
+    }
+
+    fn handle_drawing_start(&mut self) -> Result<()> {
+        if self.in_paragraph {
+            self.ensure_cell_started();
+            self.ensure_paragraph_started();
+            self.flush_pending_text();
+            self.flush_pending_link_start();
+        }
+        self.run_content_emitted = true;
+        self.parse_drawing_subtree()
+    }
+
+    fn parse_drawing_subtree(&mut self) -> Result<()> {
+        let mut state = DrawingScanState::default();
+        let mut drawing_depth: u32 = 1;
+
+        while drawing_depth > 0 {
+            let event = self
+                .xml
+                .read_event_into(&mut self.buf)
+                .map_err(map_quick_xml_error)?
+                .into_owned();
+
+            match event {
+                quick_xml::events::Event::Start(tag) => {
+                    self.handle_drawing_child_start(&mut state, &tag);
+                    drawing_depth = drawing_depth.saturating_add(1);
+                }
+                quick_xml::events::Event::Empty(tag) => {
+                    self.handle_drawing_child_empty(&mut state, &tag);
+                }
+                quick_xml::events::Event::End(tag) => {
+                    if tag.local_name().as_ref() == b"drawing" && drawing_depth == 1 {
+                        drawing_depth = drawing_depth.saturating_sub(1);
+                    } else {
+                        Self::handle_drawing_child_end(&mut state, tag.local_name().as_ref());
+                        drawing_depth = drawing_depth.saturating_sub(1);
+                    }
+                }
+                quick_xml::events::Event::Eof => {
+                    self.handle_eof();
+                    drawing_depth = 0;
+                }
+                quick_xml::events::Event::Text(_)
+                | quick_xml::events::Event::GeneralRef(_)
+                | quick_xml::events::Event::CData(_)
+                | quick_xml::events::Event::Comment(_)
+                | quick_xml::events::Event::Decl(_)
+                | quick_xml::events::Event::PI(_)
+                | quick_xml::events::Event::DocType(_) => {}
+            }
+            self.buf.clear();
+        }
+
+        Ok(())
+    }
+
+    fn handle_drawing_child_start(&mut self, state: &mut DrawingScanState, tag: &BytesStart<'_>) {
+        let local_name = tag.local_name();
+        let local = local_name.as_ref();
+        match local {
+            b"docPr" => {
+                state.pending_alt = read_decoded_attribute(tag, b"descr");
+            }
+            b"pic" => {
+                state.pic_depth = state.pic_depth.saturating_add(1);
+                if state.pic_depth == 1 {
+                    state.current_pic_alt = state.pending_alt.take();
+                    state.emitted_for_current_pic = false;
+                }
+            }
+            b"blipFill" if state.pic_depth > 0 => {
+                state.blip_fill_depth = state.blip_fill_depth.saturating_add(1);
+            }
+            b"blip" => self.maybe_emit_drawing_blip(state, tag),
+            _ => {}
+        }
+    }
+
+    fn handle_drawing_child_empty(&mut self, state: &mut DrawingScanState, tag: &BytesStart<'_>) {
+        let local_name = tag.local_name();
+        let local = local_name.as_ref();
+        match local {
+            b"docPr" => {
+                state.pending_alt = read_decoded_attribute(tag, b"descr");
+            }
+            b"blip" => self.maybe_emit_drawing_blip(state, tag),
+            _ => {}
+        }
+    }
+
+    fn handle_drawing_child_end(state: &mut DrawingScanState, local: &[u8]) {
+        match local {
+            b"blipFill" if state.blip_fill_depth > 0 => {
+                state.blip_fill_depth = state.blip_fill_depth.saturating_sub(1);
+            }
+            b"pic" if state.pic_depth > 0 => {
+                state.pic_depth = state.pic_depth.saturating_sub(1);
+                if state.pic_depth == 0 {
+                    state.current_pic_alt = None;
+                    state.emitted_for_current_pic = false;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn maybe_emit_drawing_blip(&mut self, state: &mut DrawingScanState, tag: &BytesStart<'_>) {
+        if state.pic_depth == 0 || state.blip_fill_depth == 0 || state.emitted_for_current_pic {
+            return;
+        }
+
+        let embed = read_attribute(tag, b"r:embed");
+        let link = read_attribute(tag, b"r:link");
+        let Some(rid) = embed.or(link) else {
+            return;
+        };
+
+        state.emitted_for_current_pic = true;
+        self.queue.push_back(Event::Image {
+            alt: state.current_pic_alt.clone(),
+            decorative: false,
+            id: None,
+            source: self.image_source_for_rid(&rid),
+            title: None,
+        });
+    }
+
+    fn image_source_for_rid(&self, rid: &str) -> ImageSource {
+        match self.data.image_map.get(rid) {
+            Some(rel) if rel.is_external => ImageSource::Uri {
+                uri: rel.target.clone(),
+            },
+            Some(rel) => ImageSource::Asset {
+                asset_id: format!("zip://{}", rel.target),
+            },
+            None => ImageSource::Asset {
+                asset_id: rid.to_string(),
+            },
         }
     }
 
@@ -1129,7 +1289,7 @@ impl DocumentReader {
             .into_owned();
 
         match event {
-            quick_xml::events::Event::Start(tag) => self.handle_start(&tag),
+            quick_xml::events::Event::Start(tag) => self.handle_start(&tag)?,
             quick_xml::events::Event::End(tag) => self.handle_end(tag.local_name().as_ref()),
             quick_xml::events::Event::Empty(tag) => self.handle_empty(&tag),
             quick_xml::events::Event::Text(text) => {
@@ -1375,7 +1535,6 @@ impl DocumentReader {
 /// markers (PPr/RPr/TrPr/TcPr).
 fn is_denied_container(local: &[u8]) -> Option<DeniedKind> {
     match local {
-        b"drawing" => Some(DeniedKind::Drawing),
         b"pict" => Some(DeniedKind::Pict),
         b"object" => Some(DeniedKind::Object),
         b"del" => Some(DeniedKind::Del),
@@ -1393,7 +1552,6 @@ fn is_denied_container(local: &[u8]) -> Option<DeniedKind> {
 /// Superset of `is_denied_container`: adds PPr/RPr/TrPr/TcPr.
 fn denied_kind_for(local: &[u8]) -> Option<DeniedKind> {
     match local {
-        b"drawing" => Some(DeniedKind::Drawing),
         b"pict" => Some(DeniedKind::Pict),
         b"object" => Some(DeniedKind::Object),
         b"del" => Some(DeniedKind::Del),
@@ -1425,6 +1583,13 @@ fn read_attribute(tag: &BytesStart<'_>, name: &[u8]) -> Option<String> {
         .map(str::to_owned)
 }
 
+fn read_decoded_attribute(tag: &BytesStart<'_>, name: &[u8]) -> Option<String> {
+    let value = read_attribute(tag, name)?;
+    quick_xml::escape::unescape(&value)
+        .ok()
+        .map(std::borrow::Cow::into_owned)
+}
+
 fn read_rfonts_symbol(tag: &BytesStart<'_>) -> Option<crate::symbol_fonts::SymbolFont> {
     for attr_name in [b"w:ascii".as_ref(), b"w:hAnsi".as_ref(), b"w:cs".as_ref()] {
         if let Some(name) = read_attribute(tag, attr_name) {
@@ -1448,6 +1613,18 @@ fn parse_error(message: String) -> Error {
     }
 }
 
+fn map_quick_xml_error(err: quick_xml::Error) -> Error {
+    match err {
+        quick_xml::Error::Io(source) => Error::Io {
+            source: std::io::Error::new(source.kind(), source.to_string()),
+        },
+        other => Error::Parse {
+            message: format!("malformed document.xml: {other}"),
+            position: None,
+        },
+    }
+}
+
 #[cfg(test)]
 #[cfg(not(coverage))]
 mod tests {
@@ -1460,7 +1637,7 @@ mod tests {
     use core::fmt::Write as _;
     use std::io::{Cursor, Read};
 
-    use docspec_core::ListStyleType;
+    use docspec_core::{ImageSource, ListStyleType};
 
     use super::*;
 
@@ -1481,6 +1658,7 @@ mod tests {
             style_list,
             hyperlink_map: HyperlinkMap::default(),
             numbering: crate::numbering::MinimalNumbering::new(),
+            image_map: crate::rels::ImageMap::default(),
         }
     }
 
@@ -1515,6 +1693,7 @@ mod tests {
             style_list: crate::styles::StyleList::default(),
             hyperlink_map: HyperlinkMap::default(),
             numbering,
+            image_map: crate::rels::ImageMap::default(),
         };
         DocumentReader::from_xml_reader(xml, data)
     }
@@ -1570,8 +1749,328 @@ mod tests {
             style_list: crate::styles::StyleList::default(),
             hyperlink_map: HyperlinkMap::default(),
             numbering: crate::numbering::MinimalNumbering::new(),
+            image_map: crate::rels::ImageMap::default(),
         };
         DocumentReader::from_xml_reader(xml, data)
+    }
+
+    fn make_reader_with_images(
+        document_xml: &str,
+        image_map: crate::rels::ImageMap,
+    ) -> DocumentReader {
+        let stream: Box<dyn Read + Send> = Box::new(Cursor::new(document_xml.as_bytes().to_vec()));
+        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
+        let data = DocxData {
+            style_list: crate::styles::StyleList::default(),
+            hyperlink_map: HyperlinkMap::default(),
+            numbering: crate::numbering::MinimalNumbering::new(),
+            image_map,
+        };
+        DocumentReader::from_xml_reader(xml, data)
+    }
+
+    fn image_rel(target: &str, is_external: bool) -> crate::rels::ImageRel {
+        crate::rels::ImageRel {
+            target: target.to_string(),
+            is_external,
+        }
+    }
+
+    fn image_event(source: ImageSource, alt: Option<&str>) -> Event {
+        Event::Image {
+            alt: alt.map(str::to_string),
+            decorative: false,
+            id: None,
+            source,
+            title: None,
+        }
+    }
+
+    fn drawing_document(drawing_inner: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+    xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"
+    xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+  <w:body><w:p><w:r><w:drawing>{drawing_inner}</w:drawing></w:r></w:p></w:body>
+</w:document>"#
+        )
+    }
+
+    fn picture_with_blip(doc_pr_attrs: &str, blip: &str) -> String {
+        format!(
+            "<wp:inline>
+  <wp:docPr {doc_pr_attrs}/>
+  <a:graphic><a:graphicData><pic:pic><pic:blipFill>{blip}</pic:blipFill></pic:pic></a:graphicData></a:graphic>
+</wp:inline>"
+        )
+    }
+
+    fn start_doc() -> Event {
+        Event::StartDocument {
+            id: None,
+            language: None,
+            metadata: None,
+        }
+    }
+
+    fn start_para() -> Event {
+        Event::StartParagraph {
+            alignment: None,
+            id: None,
+        }
+    }
+
+    #[test]
+    fn drawing_embedded_internal_png_emits_zip_asset_with_alt_text() {
+        let mut image_map = crate::rels::ImageMap::default();
+        image_map.insert(
+            "rId1".to_string(),
+            image_rel("word/media/image1.png", false),
+        );
+        let doc = drawing_document(&picture_with_blip(
+            r#"descr="alt text" name="ignored title""#,
+            r#"<a:blip r:embed="rId1"/>"#,
+        ));
+        let mut reader = make_reader_with_images(&doc, image_map);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                image_event(
+                    ImageSource::Asset {
+                        asset_id: "zip://word/media/image1.png".to_string(),
+                    },
+                    Some("alt text"),
+                ),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn drawing_external_link_emits_uri_without_alt() {
+        let mut image_map = crate::rels::ImageMap::default();
+        image_map.insert(
+            "rId2".to_string(),
+            image_rel("https://example.com/img.png", true),
+        );
+        let doc = drawing_document(&picture_with_blip("", r#"<a:blip r:link="rId2"/>"#));
+        let mut reader = make_reader_with_images(&doc, image_map);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                image_event(
+                    ImageSource::Uri {
+                        uri: "https://example.com/img.png".to_string(),
+                    },
+                    None,
+                ),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn drawing_missing_rid_emits_raw_asset_id() {
+        let doc = drawing_document(&picture_with_blip(
+            r#"descr="missing rel""#,
+            r#"<a:blip r:embed="rId99"/>"#,
+        ));
+        let mut reader = make_reader_with_images(&doc, crate::rels::ImageMap::default());
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                image_event(
+                    ImageSource::Asset {
+                        asset_id: "rId99".to_string(),
+                    },
+                    Some("missing rel"),
+                ),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn drawing_empty_or_blip_without_ids_emits_no_image() {
+        let doc = drawing_document(&picture_with_blip(r#"descr="ignored""#, "<a:blip/>"));
+        let mut reader = make_reader_with_images(&doc, crate::rels::ImageMap::default());
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]
+        );
+    }
+
+    #[test]
+    fn drawing_with_embed_and_link_prefers_embed() {
+        let mut image_map = crate::rels::ImageMap::default();
+        image_map.insert(
+            "rIdEmbed".to_string(),
+            image_rel("word/media/embed.png", false),
+        );
+        image_map.insert(
+            "rIdLink".to_string(),
+            image_rel("https://example.com/link.png", true),
+        );
+        let doc = drawing_document(&picture_with_blip(
+            r#"descr="embed wins""#,
+            r#"<a:blip r:embed="rIdEmbed" r:link="rIdLink"/>"#,
+        ));
+        let mut reader = make_reader_with_images(&doc, image_map);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                image_event(
+                    ImageSource::Asset {
+                        asset_id: "zip://word/media/embed.png".to_string(),
+                    },
+                    Some("embed wins"),
+                ),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn drawing_embed_with_external_target_mode_emits_uri() {
+        let mut image_map = crate::rels::ImageMap::default();
+        image_map.insert(
+            "rIdExternalEmbed".to_string(),
+            image_rel("https://cdn.example.com/embed.png", true),
+        );
+        let doc = drawing_document(&picture_with_blip(
+            r#"descr="external embed""#,
+            r#"<a:blip r:embed="rIdExternalEmbed"/>"#,
+        ));
+        let mut reader = make_reader_with_images(&doc, image_map);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                image_event(
+                    ImageSource::Uri {
+                        uri: "https://cdn.example.com/embed.png".to_string(),
+                    },
+                    Some("external embed"),
+                ),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn drawing_ignores_smart_art_blip_outside_picture_blip_fill() {
+        let mut image_map = crate::rels::ImageMap::default();
+        image_map.insert(
+            "rIdSmart".to_string(),
+            image_rel("word/media/smart.png", false),
+        );
+        let doc = drawing_document(
+            r#"<wp:inline><wp:docPr descr="ignored"/><a:graphic><a:graphicData><a:blip r:embed="rIdSmart"/></a:graphicData></a:graphic></wp:inline>"#,
+        );
+        let mut reader = make_reader_with_images(&doc, image_map);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]
+        );
+    }
+
+    #[test]
+    fn drawing_two_pictures_emit_two_images_in_source_order() {
+        let mut image_map = crate::rels::ImageMap::default();
+        image_map.insert("rId1".to_string(), image_rel("word/media/one.png", false));
+        image_map.insert("rId2".to_string(), image_rel("word/media/two.png", false));
+        let doc = drawing_document(&format!(
+            "{}{}",
+            picture_with_blip(r#"descr="one""#, r#"<a:blip r:embed="rId1"/>"#),
+            picture_with_blip(r#"descr="two""#, r#"<a:blip r:embed="rId2"/>"#),
+        ));
+        let mut reader = make_reader_with_images(&doc, image_map);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                image_event(
+                    ImageSource::Asset {
+                        asset_id: "zip://word/media/one.png".to_string(),
+                    },
+                    Some("one"),
+                ),
+                image_event(
+                    ImageSource::Asset {
+                        asset_id: "zip://word/media/two.png".to_string(),
+                    },
+                    Some("two"),
+                ),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn drawing_non_empty_blip_element_emits_like_self_closing_blip() {
+        let mut image_map = crate::rels::ImageMap::default();
+        image_map.insert(
+            "rId1".to_string(),
+            image_rel("word/media/image1.png", false),
+        );
+        let doc = drawing_document(&picture_with_blip(
+            r#"descr="start tag""#,
+            r#"<a:blip r:embed="rId1"><a:alphaModFix/></a:blip>"#,
+        ));
+        let mut reader = make_reader_with_images(&doc, image_map);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                image_event(
+                    ImageSource::Asset {
+                        asset_id: "zip://word/media/image1.png".to_string(),
+                    },
+                    Some("start tag"),
+                ),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     fn make_reader_with_hyperlinks(
@@ -1584,6 +2083,7 @@ mod tests {
             style_list: crate::styles::StyleList::default(),
             hyperlink_map,
             numbering: crate::numbering::MinimalNumbering::new(),
+            image_map: crate::rels::ImageMap::default(),
         };
         DocumentReader::from_xml_reader(xml, data)
     }
@@ -2807,6 +3307,7 @@ mod tests {
             style_list,
             hyperlink_map: HyperlinkMap::default(),
             numbering,
+            image_map: crate::rels::ImageMap::default(),
         };
         DocumentReader::from_xml_reader(xml, data)
     }

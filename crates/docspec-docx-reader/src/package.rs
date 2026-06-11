@@ -5,23 +5,26 @@ use std::io::{Read, Seek};
 use docspec_core::{Error, Result};
 use zip::result::ZipError;
 
+use crate::content_types;
+use crate::content_types::ContentTypes;
 use crate::rels;
-use crate::rels::HyperlinkMap;
+use crate::rels::{HyperlinkMap, ImageMap};
 use crate::styles::StyleList;
 
-/// Opens a DOCX ZIP archive, loads `styles.xml` and `numbering.xml` from the package
-/// relationships, locates `document.xml`, and returns a streaming reader for it.
-///
-/// Returns the loaded [`StyleList`], the loaded [`crate::numbering::MinimalNumbering`],
-/// the [`HyperlinkMap`], and a byte stream positioned at the start of `document.xml` data.
-pub fn open_package<R: Read + Seek + Send + 'static>(
-    mut reader: R,
-) -> Result<(
+type PackageContents = (
     StyleList,
     crate::numbering::MinimalNumbering,
     HyperlinkMap,
+    ImageMap,
+    ContentTypes,
     Box<dyn Read + Send>,
-)> {
+);
+
+/// Opens a DOCX ZIP archive, loads `styles.xml` and `numbering.xml` from the package
+/// relationships, locates `document.xml`, reads `[Content_Types].xml`, and returns
+/// a [`PackageContents`] tuple with all parsed data and a streaming reader for the
+/// main document part.
+pub fn open_package<R: Read + Seek + Send + 'static>(mut reader: R) -> Result<PackageContents> {
     let mut archive = zip::ZipArchive::new(&mut reader).map_err(|err| match err {
         ZipError::InvalidArchive(_) | ZipError::UnsupportedArchive(_) => Error::Parse {
             message: "not a valid ZIP archive".to_string(),
@@ -51,9 +54,14 @@ pub fn open_package<R: Read + Seek + Send + 'static>(
     };
 
     let document_path = rels::find_document_target(std::io::Cursor::new(rels_bytes))?;
-    let (style_list, hyperlink_map) =
+    let (style_list, hyperlink_map, image_map) =
         load_style_list_and_hyperlink_map(&mut archive, &document_path)?;
     let numbering = load_numbering(&mut archive, &document_path)?;
+
+    let content_types = match read_optional_entry(&mut archive, "[Content_Types].xml")? {
+        Some(bytes) => content_types::parse(&bytes)?,
+        None => ContentTypes::default(),
+    };
 
     let (data_start, compressed_size, method) = {
         let entry = archive
@@ -86,13 +94,20 @@ pub fn open_package<R: Read + Seek + Send + 'static>(
         });
     };
 
-    Ok((style_list, numbering, hyperlink_map, stream))
+    Ok((
+        style_list,
+        numbering,
+        hyperlink_map,
+        image_map,
+        content_types,
+        stream,
+    ))
 }
 
 fn load_style_list_and_hyperlink_map<R: Read + Seek>(
     archive: &mut zip::ZipArchive<&mut R>,
     document_path: &str,
-) -> Result<(StyleList, HyperlinkMap)> {
+) -> Result<(StyleList, HyperlinkMap, ImageMap)> {
     let doc_rels_path = rels::derive_part_rels_path(document_path);
     let maybe_doc_rels_bytes = if doc_rels_path == "word/_rels/document.xml.rels" {
         match archive.by_name("word/_rels/document.xml.rels") {
@@ -108,16 +123,21 @@ fn load_style_list_and_hyperlink_map<R: Read + Seek>(
         read_optional_entry(archive, &doc_rels_path)?
     };
     let Some(doc_rels_bytes) = maybe_doc_rels_bytes else {
-        return Ok((StyleList::default(), HyperlinkMap::default()));
+        return Ok((
+            StyleList::default(),
+            HyperlinkMap::default(),
+            ImageMap::default(),
+        ));
     };
 
     let hyperlink_map =
         rels::collect_hyperlink_map(std::io::Cursor::new(doc_rels_bytes.as_slice()))?;
+    let image_map = rels::collect_image_map(doc_rels_bytes.as_slice(), document_path)?;
 
     let Some(styles_target) =
         rels::find_styles_target(std::io::Cursor::new(doc_rels_bytes.as_slice()))?
     else {
-        return Ok((StyleList::default(), hyperlink_map));
+        return Ok((StyleList::default(), hyperlink_map, image_map));
     };
 
     let styles_path = rels::resolve_relative_target(document_path, &styles_target);
@@ -127,12 +147,12 @@ fn load_style_list_and_hyperlink_map<R: Read + Seek>(
             entry.read_to_end(&mut bytes).map_err(Error::from)?;
             bytes
         }
-        Err(ZipError::FileNotFound) => return Ok((StyleList::default(), hyperlink_map)),
+        Err(ZipError::FileNotFound) => return Ok((StyleList::default(), hyperlink_map, image_map)),
         Err(err) => return Err(parse_error(format!("malformed ZIP: {err}"))),
     };
 
     let style_list = StyleList::parse(std::io::Cursor::new(styles_bytes))?;
-    Ok((style_list, hyperlink_map))
+    Ok((style_list, hyperlink_map, image_map))
 }
 
 fn read_optional_entry<R: Read + Seek>(
@@ -194,7 +214,7 @@ fn parse_error(message: String) -> Error {
 #[cfg(test)]
 #[cfg(not(coverage))]
 mod tests {
-    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::unwrap_used, clippy::indexing_slicing)]
     use core::fmt::Write as _;
     use std::collections::HashMap;
     use std::io::{Cursor, Read as _, Write as _};
@@ -289,6 +309,23 @@ mod tests {
         xml
     }
 
+    fn image_doc_rels_xml(entries: &[(&str, &str)]) -> String {
+        let mut xml = String::from(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#,
+        );
+        for (id, target) in entries {
+            write!(
+                xml,
+                r#"
+  <Relationship Id="{id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="{target}"/>"#
+            )
+            .unwrap();
+        }
+        xml.push_str("\n</Relationships>");
+        xml
+    }
+
     fn load_package_data(
         entries: &[(&str, &[u8])],
     ) -> core::result::Result<(StyleList, HashMap<String, String>), zip::result::ZipError> {
@@ -296,6 +333,7 @@ mod tests {
         let mut reader = Cursor::new(zip_bytes);
         let mut archive = zip::ZipArchive::new(&mut reader)?;
         load_style_list_and_hyperlink_map(&mut archive, "word/document.xml")
+            .map(|(style_list, hyperlink_map, _image_map)| (style_list, hyperlink_map))
             .map_err(|err| zip::result::ZipError::Io(std::io::Error::other(format!("{err:?}"))))
     }
 
@@ -459,7 +497,14 @@ mod tests {
         });
 
         match result {
-            Ok((style_list, _numbering, _hyperlink_map, mut stream)) => {
+            Ok((
+                style_list,
+                _numbering,
+                _hyperlink_map,
+                _image_map,
+                _content_types,
+                mut stream,
+            )) => {
                 assert!(style_list.get_by_id("Normal").is_some());
                 let mut document = String::new();
                 let read_result = stream.read_to_string(&mut document);
@@ -484,7 +529,7 @@ mod tests {
         });
 
         match result {
-            Ok((style_list, _numbering, _hyperlink_map, _stream)) => {
+            Ok((style_list, _numbering, _hyperlink_map, _image_map, _content_types, _stream)) => {
                 assert_eq!(style_list, StyleList::default());
             }
             Err(err) => assert_eq!(format!("{err:?}"), "expected default StyleList"),
@@ -507,7 +552,7 @@ mod tests {
         });
 
         match result {
-            Ok((style_list, _numbering, _hyperlink_map, _stream)) => {
+            Ok((style_list, _numbering, _hyperlink_map, _image_map, _content_types, _stream)) => {
                 assert_eq!(style_list, StyleList::default());
             }
             Err(err) => assert_eq!(format!("{err:?}"), "expected default StyleList"),
@@ -565,7 +610,7 @@ mod tests {
         });
 
         match result {
-            Ok((_style_list, numbering, _hyperlink_map, _stream)) => {
+            Ok((_style_list, numbering, _hyperlink_map, _image_map, _content_types, _stream)) => {
                 assert!(numbering.resolve(1, 0).is_list);
             }
             Err(err) => assert_eq!(format!("{err:?}"), "expected numbering and document stream"),
@@ -586,7 +631,7 @@ mod tests {
         });
 
         match result {
-            Ok((_style_list, numbering, _hyperlink_map, _stream)) => {
+            Ok((_style_list, numbering, _hyperlink_map, _image_map, _content_types, _stream)) => {
                 assert!(!numbering.resolve(1, 0).is_list);
             }
             Err(err) => assert_eq!(format!("{err:?}"), "expected empty numbering"),
@@ -610,7 +655,7 @@ mod tests {
         });
 
         match result {
-            Ok((_style_list, numbering, _hyperlink_map, _stream)) => {
+            Ok((_style_list, numbering, _hyperlink_map, _image_map, _content_types, _stream)) => {
                 assert!(!numbering.resolve(1, 0).is_list);
             }
             Err(err) => assert_eq!(format!("{err:?}"), "expected empty numbering"),
@@ -640,6 +685,91 @@ mod tests {
                 "opened without error",
                 "expected parse error for malformed numbering.xml",
             ),
+        }
+    }
+
+    #[test]
+    fn open_package_with_images() {
+        let root_rels = root_rels_xml("word/document.xml");
+        let doc_rels = image_doc_rels_xml(&[("rId5", "media/image1.png")]);
+        let bytes = synth_zip(&[
+            ("_rels/.rels", root_rels.as_bytes()),
+            ("word/_rels/document.xml.rels", doc_rels.as_bytes()),
+            ("word/document.xml", minimal_document_xml().as_bytes()),
+            ("word/media/image1.png", b"\x89PNG\r\n\x1a\n"),
+        ]);
+
+        let result = bytes.and_then(|zip_bytes| {
+            open_package(Cursor::new(zip_bytes))
+                .map_err(|err| zip::result::ZipError::Io(std::io::Error::other(format!("{err:?}"))))
+        });
+
+        match result {
+            Ok((_style_list, _numbering, _hyperlink_map, image_map, _content_types, _stream)) => {
+                assert_eq!(image_map.len(), 1);
+                let rel = &image_map["rId5"];
+                assert_eq!(rel.target, "word/media/image1.png");
+                assert!(!rel.is_external);
+            }
+            Err(err) => assert_eq!(format!("{err:?}"), "expected image map with one entry"),
+        }
+    }
+
+    #[test]
+    fn open_package_without_content_types() {
+        let root_rels = root_rels_xml("word/document.xml");
+        let bytes = synth_zip(&[
+            ("_rels/.rels", root_rels.as_bytes()),
+            ("word/document.xml", minimal_document_xml().as_bytes()),
+        ]);
+
+        let result = bytes.and_then(|zip_bytes| {
+            open_package(Cursor::new(zip_bytes))
+                .map_err(|err| zip::result::ZipError::Io(std::io::Error::other(format!("{err:?}"))))
+        });
+
+        match result {
+            Ok((_style_list, _numbering, _hyperlink_map, _image_map, content_types, _stream)) => {
+                assert_eq!(content_types.lookup("word/document.xml"), None);
+                assert_eq!(content_types.lookup("word/media/image1.png"), None);
+            }
+            Err(err) => assert_eq!(format!("{err:?}"), "expected default content types"),
+        }
+    }
+
+    #[test]
+    fn content_types_lookup_works() {
+        let root_rels = root_rels_xml("word/document.xml");
+        let content_types_xml = br#"<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="png" ContentType="image/png"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>"#;
+        let bytes = synth_zip(&[
+            ("_rels/.rels", root_rels.as_bytes()),
+            ("word/document.xml", minimal_document_xml().as_bytes()),
+            ("[Content_Types].xml", content_types_xml),
+        ]);
+
+        let result = bytes.and_then(|zip_bytes| {
+            open_package(Cursor::new(zip_bytes))
+                .map_err(|err| zip::result::ZipError::Io(std::io::Error::other(format!("{err:?}"))))
+        });
+
+        match result {
+            Ok((_style_list, _numbering, _hyperlink_map, _image_map, content_types, _stream)) => {
+                assert_eq!(
+                    content_types.lookup("word/media/image1.png"),
+                    Some("image/png")
+                );
+                assert_eq!(
+                    content_types.lookup("word/document.xml"),
+                    Some(
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+                    )
+                );
+            }
+            Err(err) => assert_eq!(format!("{err:?}"), "expected content types lookup to work"),
         }
     }
 }

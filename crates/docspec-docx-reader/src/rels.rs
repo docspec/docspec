@@ -8,6 +8,22 @@ use quick_xml::XmlVersion;
 /// Maps relationship Id (e.g., "rId7") to Target URL/path for every <Relationship> entry whose Type ends with "/hyperlink".
 pub(crate) type HyperlinkMap = HashMap<String, String>;
 
+const REL_TYPE_IMAGE: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+
+/// Represents an image relationship in a DOCX package.
+#[derive(Debug)]
+pub(crate) struct ImageRel {
+    /// Resolved package path for internal images, or raw URL for external ones.
+    pub target: String,
+    /// `true` when `TargetMode="External"`.
+    pub is_external: bool,
+}
+
+/// Maps relationship Id (e.g., "rId5") to [`ImageRel`] for every `<Relationship>` entry
+/// whose Type ends with "/image".
+pub(crate) type ImageMap = HashMap<String, ImageRel>;
+
 pub fn find_document_target<R: Read>(reader: R) -> docspec_core::Result<String> {
     let mut xml_reader = quick_xml::Reader::from_reader(std::io::BufReader::new(reader));
     let mut buf = Vec::new();
@@ -134,6 +150,55 @@ pub(crate) fn collect_hyperlink_map<R: Read>(reader: R) -> Result<HyperlinkMap, 
                     return Err(parse_error("malformed _rels/.rels".to_string()));
                 }
                 return Ok(hyperlinks);
+            }
+            Err(_err) => {
+                return Err(parse_error("malformed _rels/.rels".to_string()));
+            }
+            Ok(_) => {}
+        }
+        buf.clear();
+    }
+}
+
+/// Parses a DOCX part relationships XML and returns every image relationship.
+///
+/// For internal images, resolves the target path relative to `document_path` and
+/// validates it contains no `..` traversal segments. For external images
+/// (`TargetMode="External"`), stores the raw URL without path resolution.
+///
+/// Returns `Err` if the XML is malformed or an internal target contains a `..` segment.
+pub(crate) fn collect_image_map(rels_xml: &[u8], document_path: &str) -> Result<ImageMap, Error> {
+    let mut xml_reader = quick_xml::Reader::from_reader(std::io::BufReader::new(rels_xml));
+    let mut buf = Vec::new();
+    let mut element_depth: usize = 0;
+    let mut images = HashMap::new();
+
+    loop {
+        match xml_reader.read_event_into(&mut buf) {
+            Ok(Event::Start(element)) => {
+                element_depth = element_depth.saturating_add(1);
+                if element.local_name().as_ref() == b"Relationship" {
+                    if let Some((id, rel)) = image_entry(&xml_reader, &element, document_path)? {
+                        images.insert(id, rel);
+                    }
+                }
+            }
+            Ok(Event::Empty(element)) if element.local_name().as_ref() == b"Relationship" => {
+                if let Some((id, rel)) = image_entry(&xml_reader, &element, document_path)? {
+                    images.insert(id, rel);
+                }
+            }
+            Ok(Event::End(_)) => {
+                let Some(next_depth) = element_depth.checked_sub(1) else {
+                    return Err(parse_error("malformed _rels/.rels".to_string()));
+                };
+                element_depth = next_depth;
+            }
+            Ok(Event::Eof) => {
+                if element_depth != 0 {
+                    return Err(parse_error("malformed _rels/.rels".to_string()));
+                }
+                return Ok(images);
             }
             Err(_err) => {
                 return Err(parse_error("malformed _rels/.rels".to_string()));
@@ -327,6 +392,66 @@ fn hyperlink_entry<R: Read>(
     })
 }
 
+fn image_entry<R: Read>(
+    reader: &quick_xml::Reader<R>,
+    element: &quick_xml::events::BytesStart<'_>,
+    document_path: &str,
+) -> Result<Option<(String, ImageRel)>, Error> {
+    let mut id = None;
+    let mut rel_type = None;
+    let mut target = None;
+    let mut target_mode = None;
+
+    for attribute_result in element.attributes() {
+        let attribute = attribute_result.map_err(|err| Error::Parse {
+            message: format!("malformed _rels/.rels: {err}"),
+            position: None,
+        })?;
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|err| Error::Parse {
+                message: format!("malformed _rels/.rels: {err}"),
+                position: None,
+            })?
+            .into_owned();
+
+        match attribute.key.local_name().as_ref() {
+            b"Id" => id = Some(value),
+            b"Type" => rel_type = Some(value),
+            b"Target" => target = Some(value),
+            b"TargetMode" => target_mode = Some(value),
+            _ => {}
+        }
+    }
+
+    match (id, rel_type, target) {
+        (Some(found_id), Some(found_type), Some(found_target))
+            if found_type == REL_TYPE_IMAGE || found_type.ends_with("/image") =>
+        {
+            let is_external = target_mode.as_deref() == Some("External");
+            if is_external {
+                Ok(Some((
+                    found_id,
+                    ImageRel {
+                        target: found_target,
+                        is_external: true,
+                    },
+                )))
+            } else {
+                let validated = normalize_relative_target(document_path, &found_target)?;
+                Ok(Some((
+                    found_id,
+                    ImageRel {
+                        target: validated,
+                        is_external: false,
+                    },
+                )))
+            }
+        }
+        _ => Ok(None),
+    }
+}
+
 fn numbering_target<R: Read>(
     reader: &quick_xml::Reader<R>,
     element: &quick_xml::events::BytesStart<'_>,
@@ -403,9 +528,39 @@ pub fn resolve_relative_target(base_part: &str, target: &str) -> String {
     }
 }
 
+/// Resolves a relative target against `base_part` and canonicalizes `.` / `..`
+/// segments per ECMA-376 Part 2 §6.5.3 / RFC 3986 §5.2.
+///
+/// Word and other DOCX writers routinely emit `Target="../media/image1.png"`
+/// or `Target="../customXml/item1.xml"` from `word/_rels/document.xml.rels`;
+/// rejecting `..` outright (the old behavior of [`validate_document_path`])
+/// breaks reading those files. This helper collapses the segments instead,
+/// while still refusing references that escape the package root — a `..`
+/// segment that pops past the start of the resolved path returns
+/// [`docspec_core::Error::Parse`].
+fn normalize_relative_target(base_part: &str, target: &str) -> docspec_core::Result<String> {
+    let joined = resolve_relative_target(base_part, target);
+    let mut normalized: Vec<&str> = Vec::new();
+    for segment in joined.split('/') {
+        match segment {
+            "" | "." => {}
+            ".." => {
+                if normalized.pop().is_none() {
+                    return Err(parse_error(format!(
+                        "rels target escapes package root: {joined}"
+                    )));
+                }
+            }
+            other => normalized.push(other),
+        }
+    }
+    Ok(normalized.join("/"))
+}
+
 #[cfg(test)]
 #[cfg(not(coverage))]
 mod tests {
+    #![allow(clippy::expect_used, clippy::panic)]
     use super::*;
     use std::io::Cursor;
 
@@ -939,5 +1094,111 @@ mod tests {
     fn resolve_relative_target_without_directory() {
         let result = resolve_relative_target("document.xml", "styles.xml");
         assert_eq!(result, "styles.xml");
+    }
+
+    fn minimal_image_rels(target: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="{target}"/>
+</Relationships>"#
+        )
+    }
+
+    #[test]
+    fn collect_image_map_internal() {
+        let rels_xml = minimal_image_rels("media/image1.png");
+
+        let result = collect_image_map(rels_xml.as_bytes(), "word/document.xml");
+
+        match result {
+            Ok(map) => {
+                assert_eq!(map.len(), 1);
+                let rel = map.get("rId5").expect("rId5 must be present");
+                assert_eq!(rel.target, "word/media/image1.png");
+                assert!(!rel.is_external);
+            }
+            Err(err) => panic!("expected Ok, got {err:?}"),
+        }
+    }
+
+    #[test]
+    fn collect_image_map_external() {
+        let rels_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="https://example.com/img.png" TargetMode="External"/>
+</Relationships>"#;
+
+        let result = collect_image_map(rels_xml.as_bytes(), "word/document.xml");
+
+        match result {
+            Ok(map) => {
+                assert_eq!(map.len(), 1);
+                let rel = map.get("rId5").expect("rId5 must be present");
+                assert_eq!(rel.target, "https://example.com/img.png");
+                assert!(rel.is_external);
+            }
+            Err(err) => panic!("expected Ok, got {err:?}"),
+        }
+    }
+
+    #[test]
+    fn collect_image_map_rejects_dotdot_escaping_root() {
+        let rels_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../../../etc/passwd"/>
+</Relationships>"#;
+
+        let result = collect_image_map(rels_xml.as_bytes(), "word/document.xml");
+
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "rels target escapes package root: word/../../../etc/passwd"
+                );
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Err(Parse), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn collect_image_map_normalizes_parent_segment_into_package_root() {
+        let rels_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/>
+</Relationships>"#;
+
+        let result = collect_image_map(rels_xml.as_bytes(), "word/document.xml");
+
+        match result {
+            Ok(map) => {
+                assert_eq!(map.len(), 1);
+                let rel = map.get("rId5").expect("rId5 must be present");
+                assert_eq!(rel.target, "media/image1.png");
+                assert!(!rel.is_external);
+            }
+            Err(err) => panic!("expected Ok, got {err:?}"),
+        }
+    }
+
+    #[test]
+    fn collect_image_map_collapses_dot_and_double_dot_segments() {
+        let rels_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="./media/sub/../image1.png"/>
+</Relationships>"#;
+
+        let result = collect_image_map(rels_xml.as_bytes(), "word/document.xml");
+
+        match result {
+            Ok(map) => {
+                let rel = map.get("rId5").expect("rId5 must be present");
+                assert_eq!(rel.target, "word/media/image1.png");
+                assert!(!rel.is_external);
+            }
+            Err(err) => panic!("expected Ok, got {err:?}"),
+        }
     }
 }
