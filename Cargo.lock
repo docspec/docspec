@@ -489,6 +489,7 @@ dependencies = [
  "base64",
  "docspec-core",
  "docspec-json",
+ "docspec-test-utils",
  "paste",
  "serde_json",
 ]
@@ -544,6 +545,7 @@ name = "docspec-html-writer"
 version = "1.9.0"
 dependencies = [
  "docspec-core",
+ "docspec-test-utils",
  "html5ever",
 ]
 
@@ -595,6 +597,7 @@ version = "1.9.0"
 dependencies = [
  "docspec-core",
  "docspec-json",
+ "docspec-test-utils",
  "serde_json",
 ]
 
@@ -603,12 +606,14 @@ name = "docspec-pandoc-native-writer"
 version = "1.9.0"
 dependencies = [
  "docspec-core",
+ "docspec-test-utils",
 ]
 
 [[package]]
 name = "docspec-test-utils"
 version = "1.9.0"
 dependencies = [
+ "docspec-core",
  "zip",
 ]
 

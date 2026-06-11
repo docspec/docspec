@@ -28,21 +28,15 @@ mod tests {
 
     fn run(events: impl IntoIterator<Item = Event>) -> String {
         let mut buf: Vec<u8> = Vec::new();
-        let mut writer = PandocNativeWriter::new(&mut buf);
-        for event in events {
-            writer.handle_event(event).unwrap();
-        }
-        writer.finish().unwrap();
+        let writer = PandocNativeWriter::new(&mut buf);
+        docspec_test_utils::drive(writer, events);
         String::from_utf8(buf).unwrap()
     }
 
     fn try_run(events: impl IntoIterator<Item = Event>) -> docspec_core::Result<String> {
         let mut buf: Vec<u8> = Vec::new();
-        let mut writer = PandocNativeWriter::new(&mut buf);
-        for event in events {
-            writer.handle_event(event)?;
-        }
-        writer.finish()?;
+        let writer = PandocNativeWriter::new(&mut buf);
+        docspec_test_utils::try_drive(writer, events)?;
         Ok(String::from_utf8(buf).unwrap())
     }
 

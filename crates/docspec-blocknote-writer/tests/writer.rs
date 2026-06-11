@@ -103,35 +103,22 @@ mod tests {
 
     fn run_events_with_assets(events: &[Event], provider: &dyn AssetProvider) -> String {
         let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::with_assets(&mut buf, provider));
-        for event in events {
-            writer
-                .handle_event(event.clone())
-                .expect("handle_event should accept fixture event");
-        }
-        writer.finish().expect("writer should finish fixture");
+        let writer = StackTrackingSink::new(BlockNoteWriter::with_assets(&mut buf, provider));
+        docspec_test_utils::drive(writer, events.iter().cloned());
         String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8")
     }
 
     fn run_events(events: &[Event]) -> String {
         let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
-        for event in events {
-            writer
-                .handle_event(event.clone())
-                .expect("handle_event should accept fixture event");
-        }
-        writer.finish().expect("writer should finish fixture");
+        let writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+        docspec_test_utils::drive(writer, events.iter().cloned());
         String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8")
     }
 
     fn run_events_result(events: &[Event]) -> docspec_core::Result<String> {
         let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
-        for event in events {
-            writer.handle_event(event.clone())?;
-        }
-        writer.finish()?;
+        let writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+        docspec_test_utils::try_drive(writer, events.iter().cloned())?;
         String::from_utf8(buf).map_err(|err| docspec_core::Error::Other {
             message: format!("BlockNoteWriter output should be valid UTF-8: {err}"),
         })
@@ -139,13 +126,8 @@ mod tests {
 
     fn run_direct_writer_events(events: &[Event]) -> String {
         let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        for event in events {
-            writer
-                .handle_event(event.clone())
-                .expect("handle_event should accept fixture event");
-        }
-        writer.finish().expect("writer should finish fixture");
+        let writer = BlockNoteWriter::new(&mut buf);
+        docspec_test_utils::drive(writer, events.iter().cloned());
         String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8")
     }
 
