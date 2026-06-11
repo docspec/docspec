@@ -17,23 +17,23 @@ members = [
 ]
 
 [workspace.package]
-version = "1.8.0"
+version = "1.9.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/docspec/docspec"
 
 [workspace.dependencies]
-docspec = { path = "crates/docspec", version = "1.8.0" }
-docspec-core = { path = "crates/docspec-core", version = "1.8.0" }
-docspec-json = { path = "crates/docspec-json", version = "1.8.0" }
-docspec-markdown-reader = { path = "crates/docspec-markdown-reader", version = "1.8.0" }
-docspec-html-reader = { path = "crates/docspec-html-reader", version = "1.8.0" }
-docspec-docx-reader = { path = "crates/docspec-docx-reader", version = "1.8.0" }
-docspec-blocknote-writer = { path = "crates/docspec-blocknote-writer", version = "1.8.0" }
-docspec-html-writer = { path = "crates/docspec-html-writer", version = "1.8.0" }
-docspec-http = { path = "crates/docspec-http", version = "1.8.0" }
-docspec-oxa-writer = { path = "crates/docspec-oxa-writer", version = "1.8.0" }
-docspec-pandoc-native-writer = { path = "crates/docspec-pandoc-native-writer", version = "1.8.0" }
+docspec = { path = "crates/docspec", version = "1.9.0" }
+docspec-core = { path = "crates/docspec-core", version = "1.9.0" }
+docspec-json = { path = "crates/docspec-json", version = "1.9.0" }
+docspec-markdown-reader = { path = "crates/docspec-markdown-reader", version = "1.9.0" }
+docspec-html-reader = { path = "crates/docspec-html-reader", version = "1.9.0" }
+docspec-docx-reader = { path = "crates/docspec-docx-reader", version = "1.9.0" }
+docspec-blocknote-writer = { path = "crates/docspec-blocknote-writer", version = "1.9.0" }
+docspec-html-writer = { path = "crates/docspec-html-writer", version = "1.9.0" }
+docspec-http = { path = "crates/docspec-http", version = "1.9.0" }
+docspec-oxa-writer = { path = "crates/docspec-oxa-writer", version = "1.9.0" }
+docspec-pandoc-native-writer = { path = "crates/docspec-pandoc-native-writer", version = "1.9.0" }
 self_cell = "1.2"
 
 [workspace.lints.rust]

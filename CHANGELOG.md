@@ -12,6 +12,14 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.9.0](https://github.com/docspec/docspec/compare/v1.8.0...v1.9.0) - 2026-06-11
+
+### Added
+
+- *(docx-reader)* minimal list support
+- *(docx-reader)* StartLink/EndLink for w:hyperlink
+- *(pandoc-native-writer)* CodeBlock, Code
+
 ## [1.8.0](https://github.com/docspec/docspec/compare/v1.7.1...v1.8.0) - 2026-06-10
 
 ### Added
