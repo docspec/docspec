@@ -30,7 +30,9 @@ assert_cmd = "2"
 predicates = "3"
 tempfile = "3"
 serde_json = "1"
-reqwest = { version = "0.13", default-features = false, features = ["blocking"] }
+reqwest = { version = "0.13", default-features = false, features = [
+  "blocking",
+] }
 docspec-test-utils = { workspace = true }
 
 [build-dependencies]

@@ -1,0 +1,16 @@
+[package]
+name = "docspec-markdown-writer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+description = "Streaming Markdown (CommonMark) writer for DocSpec events — paragraphs and headings only"
+keywords = ["markdown", "commonmark", "writer", "streaming", "document"]
+categories = ["text-processing"]
+
+[dependencies]
+docspec-core = { workspace = true }
+
+[lints]
+workspace = true

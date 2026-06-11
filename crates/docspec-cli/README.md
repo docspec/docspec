@@ -28,7 +28,7 @@ docspec convert [OPTIONS] [INPUT]
 
 - `-o, --output <FILE>` — Output file (stdout if omitted)
 - `-f, --from <FORMAT>` — Input format (auto-detected from extension if omitted). Valid values: `markdown`, `html`, `docx`
-- `-t, --to <FORMAT>` — Output format (auto-detected from extension if omitted). Valid values: `blocknote`, `html`, `oxa`, `pandoc-native`
+- `-t, --to <FORMAT>` — Output format (auto-detected from extension if omitted). Valid values: `blocknote`, `html`, `markdown`, `oxa`, `pandoc-native`
 - `--color <WHEN>` — When to use colors: `auto`, `always`, `never` (default: `auto`)
 - `-h, --help` — Print help
 - `-V, --version` — Print version
@@ -107,6 +107,12 @@ Convert Markdown to Pandoc native syntax:
 echo "Hello" | docspec convert --from markdown --to pandoc-native
 ```
 
+Convert Markdown to Markdown (round-trip, paragraphs and headings only):
+
+```bash
+echo "# Hello" | docspec convert --from markdown --to markdown
+```
+
 Start the HTTP API server on a custom port:
 
 ```bash
@@ -116,4 +122,5 @@ docspec http --port 8080
 `--to oxa` selects the [oxa.dev](https://oxa.dev/) JSON writer in place of BlockNote. The `.json`
 extension is ambiguous, so `--to oxa` must be explicit. HTML output is selected by `--to html`
 or auto-detected from `.html` and `.htm` output paths. Pandoc native output is selected by
-`--to pandoc-native` or auto-detected from `.native` output paths.
+`--to pandoc-native` or auto-detected from `.native` output paths. Markdown output is selected
+by `--to markdown` or auto-detected from `.md` output paths.

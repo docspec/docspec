@@ -37,6 +37,10 @@ pub enum OutputFormat {
     /// Pandoc native block-list syntax. Available when the `pandoc-native` feature is enabled.
     #[cfg(feature = "pandoc-native-writer")]
     PandocNative,
+    /// Markdown (`CommonMark`, paragraphs and headings only).
+    /// Available when the `markdown-writer` feature is enabled.
+    #[cfg(feature = "markdown-writer")]
+    Markdown,
 }
 
 /// Detect the input format from a file path's extension.
@@ -77,6 +81,8 @@ pub fn detect_output_format(path: &Path) -> Option<OutputFormat> {
         "json" => Some(OutputFormat::Blocknote),
         #[cfg(feature = "pandoc-native-writer")]
         "native" => Some(OutputFormat::PandocNative),
+        #[cfg(feature = "markdown-writer")]
+        "md" | "markdown" => Some(OutputFormat::Markdown),
         _ => None,
     }
 }
@@ -130,6 +136,42 @@ mod tests {
         assert_eq!(
             detect_input_format(Path::new("a.DocX")),
             Some(InputFormat::Docx)
+        );
+    }
+
+    #[cfg(feature = "markdown-writer")]
+    #[test]
+    fn detect_output_format_md_returns_markdown() {
+        assert_eq!(
+            detect_output_format(Path::new("foo.md")),
+            Some(OutputFormat::Markdown)
+        );
+    }
+
+    #[cfg(feature = "markdown-writer")]
+    #[test]
+    fn detect_output_format_markdown_returns_markdown() {
+        assert_eq!(
+            detect_output_format(Path::new("foo.markdown")),
+            Some(OutputFormat::Markdown)
+        );
+    }
+
+    #[cfg(feature = "markdown-writer")]
+    #[test]
+    fn detect_output_format_md_uppercase_returns_markdown() {
+        assert_eq!(
+            detect_output_format(Path::new("foo.MD")),
+            Some(OutputFormat::Markdown)
+        );
+    }
+
+    #[cfg(feature = "markdown")]
+    #[test]
+    fn detect_input_format_md_still_works() {
+        assert_eq!(
+            detect_input_format(Path::new("foo.md")),
+            Some(InputFormat::Markdown)
         );
     }
 }

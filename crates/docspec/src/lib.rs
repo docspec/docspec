@@ -31,6 +31,7 @@
 //! | `oxa-writer`        | `oxa.dev` JSON          | `writers::OxaWriter`          |
 //! | `html-writer`       | HTML (paragraphs only)  | `writers::HtmlWriter`         |
 //! | `pandoc-native-writer` | Pandoc native block list | `writers::PandocNativeWriter` |
+//! | `markdown-writer`   | Markdown (paragraphs and headings only) | `writers::MarkdownWriter` |
 //!
 //! ## Primitives
 //!
@@ -157,6 +158,12 @@ pub mod writers {
     #[cfg(feature = "pandoc-native-writer")]
     #[cfg_attr(docsrs, doc(cfg(feature = "pandoc-native-writer")))]
     pub use docspec_pandoc_native_writer::PandocNativeWriter;
+
+    /// Streaming Markdown (`CommonMark`) writer — paragraphs and headings only.
+    /// Available when the `markdown-writer` feature is enabled.
+    #[cfg(feature = "markdown-writer")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "markdown-writer")))]
+    pub use docspec_markdown_writer::MarkdownWriter;
 }
 
 /// Format detection and conversion helpers.

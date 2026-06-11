@@ -117,6 +117,9 @@ pub enum CliOutputFormat {
     /// Pandoc native block-list syntax.
     #[value(name = "pandoc-native")]
     PandocNative,
+    /// Markdown format (paragraphs and headings only).
+    #[value(name = "markdown")]
+    Markdown,
 }
 
 #[cfg(test)]
@@ -133,11 +136,23 @@ mod tests {
     }
 
     #[test]
-    fn clap_rejects_markdown_as_output() {
+    fn clap_accepts_markdown_as_output() {
         let result = Cli::try_parse_from(["docspec", "convert", "--to", "markdown", "x.md"]);
         assert!(
-            result.is_err(),
-            "markdown should not be a valid output format"
+            result.is_ok(),
+            "markdown should be a valid output format, got error: {:?}",
+            result.as_ref().err()
+        );
+        let cli = result.unwrap_or_else(|_| std::process::abort());
+        let args = match cli.command {
+            Commands::Convert(args) => args,
+            #[cfg(feature = "http")]
+            Commands::Http(_) => std::process::abort(),
+        };
+        assert!(
+            matches!(args.to, Some(CliOutputFormat::Markdown)),
+            "expected CliOutputFormat::Markdown, got {:?}",
+            args.to
         );
     }
 
