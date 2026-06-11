@@ -475,6 +475,7 @@ dependencies = [
  "docspec-html-writer",
  "docspec-json",
  "docspec-markdown-reader",
+ "docspec-markdown-writer",
  "docspec-oxa-writer",
  "docspec-pandoc-native-writer",
  "docspec-test-utils",
@@ -590,6 +591,13 @@ dependencies = [
  "docspec-test-utils",
  "pulldown-cmark",
  "self_cell",
+]
+
+[[package]]
+name = "docspec-markdown-writer"
+version = "1.9.0"
+dependencies = [
+ "docspec-core",
 ]
 
 [[package]]

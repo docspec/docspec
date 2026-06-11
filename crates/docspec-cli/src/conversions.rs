@@ -23,6 +23,7 @@ impl From<CliOutputFormat> for OutputFormat {
             CliOutputFormat::Html => Self::Html,
             CliOutputFormat::Oxa => Self::Oxa,
             CliOutputFormat::PandocNative => Self::PandocNative,
+            CliOutputFormat::Markdown => Self::Markdown,
         }
     }
 }
@@ -75,6 +76,14 @@ mod tests {
         assert_eq!(
             OutputFormat::from(CliOutputFormat::PandocNative),
             OutputFormat::PandocNative
+        );
+    }
+
+    #[test]
+    fn from_markdown_output_converts_to_facade_markdown() {
+        assert_eq!(
+            OutputFormat::from(CliOutputFormat::Markdown),
+            OutputFormat::Markdown
         );
     }
 }

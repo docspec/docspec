@@ -441,13 +441,13 @@ mod tests {
     }
 
     #[test]
-    fn clap_rejects_markdown_output_with_exit_code_2() {
+    fn clap_accepts_markdown_output_format() {
         docspec_cmd()
             .args(["convert", "--to", "markdown", "x.md"])
             .assert()
             .failure()
-            .code(2)
-            .stderr(contains("invalid value 'markdown'"));
+            .code(1)
+            .stderr(contains("No such file or directory"));
     }
 
     #[test]

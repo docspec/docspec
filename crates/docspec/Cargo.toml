@@ -23,6 +23,7 @@ blocknote-writer = ["dep:docspec-blocknote-writer"]
 oxa-writer = ["dep:docspec-oxa-writer"]
 html-writer = ["dep:docspec-html-writer"]
 pandoc-native-writer = ["dep:docspec-pandoc-native-writer"]
+markdown-writer = ["dep:docspec-markdown-writer"]
 
 # Lower-level primitives for implementing custom writers.
 json = ["dep:docspec-json"]
@@ -34,7 +35,13 @@ blocknote = ["blocknote-writer"]
 oxa = ["oxa-writer"]
 pandoc-native = ["pandoc-native-writer"]
 all-readers = ["markdown", "html", "docx"]
-all-writers = ["blocknote-writer", "oxa-writer", "html-writer", "pandoc-native-writer"]
+all-writers = [
+  "blocknote-writer",
+  "oxa-writer",
+  "html-writer",
+  "pandoc-native-writer",
+  "markdown-writer",
+]
 all-libs = ["json"]
 full = ["all-readers", "all-writers", "all-libs"]
 
@@ -48,6 +55,7 @@ docspec-docx-reader = { workspace = true, optional = true }
 docspec-oxa-writer = { workspace = true, optional = true }
 docspec-html-writer = { workspace = true, optional = true }
 docspec-pandoc-native-writer = { workspace = true, optional = true }
+docspec-markdown-writer = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json = "1"

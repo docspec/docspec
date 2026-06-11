@@ -61,6 +61,7 @@ let reader = AnyReader::from_path(InputFormat::Docx, "document.docx")?;
 | `oxa-writer`       | oxa.dev JSON           | `docspec-oxa-writer`       |
 | `html-writer`      | HTML (paragraphs only) | `docspec-html-writer`      |
 | `pandoc-native-writer` | Pandoc native block list | `docspec-pandoc-native-writer` |
+| `markdown-writer` | Markdown (paragraphs and headings only) | `docspec-markdown-writer` |
 
 ### Primitives
 
@@ -79,6 +80,8 @@ let reader = AnyReader::from_path(InputFormat::Docx, "document.docx")?;
 | `all-writers` | All writer features                                           |
 | `all-libs`    | All primitive/library features (currently `json`)             |
 | `full`        | Everything (`all-readers` + `all-writers` + `all-libs`)       |
+
+There is no `markdown` convenience feature for the writer. The name `markdown` is already taken by the reader feature, so `markdown-writer` must be enabled explicitly — there is no shorthand that enables both directions at once.
 
 Default features are `markdown`, `blocknote`, and `pandoc-native`; disable default features when you need the smallest possible dependency footprint.
 

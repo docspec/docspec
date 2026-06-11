@@ -8,6 +8,8 @@ use docspec_core::{AssetProvider, Event, EventSink, Result, StackTrackingSink};
 use docspec_blocknote_writer::BlockNoteWriter;
 #[cfg(feature = "html-writer")]
 use docspec_html_writer::HtmlWriter;
+#[cfg(feature = "markdown-writer")]
+use docspec_markdown_writer::MarkdownWriter;
 #[cfg(feature = "oxa-writer")]
 use docspec_oxa_writer::OxaWriter;
 #[cfg(feature = "pandoc-native-writer")]
@@ -33,6 +35,8 @@ enum AnyWriterInner<'a, W: Write> {
     Oxa(OxaWriter<W>),
     #[cfg(feature = "pandoc-native-writer")]
     PandocNative(PandocNativeWriter<W>),
+    #[cfg(feature = "markdown-writer")]
+    Markdown(MarkdownWriter<W>),
     #[cfg(not(feature = "blocknote-writer"))]
     _Phantom(std::marker::PhantomData<&'a W>),
 }
@@ -46,7 +50,8 @@ impl<'a, W: Write> AnyWriter<'a, W> {
             feature = "blocknote-writer",
             feature = "oxa-writer",
             feature = "html-writer",
-            feature = "pandoc-native-writer"
+            feature = "pandoc-native-writer",
+            feature = "markdown-writer"
         )))]
         {
             drop(writer);
@@ -56,7 +61,8 @@ impl<'a, W: Write> AnyWriter<'a, W> {
             feature = "blocknote-writer",
             feature = "oxa-writer",
             feature = "html-writer",
-            feature = "pandoc-native-writer"
+            feature = "pandoc-native-writer",
+            feature = "markdown-writer"
         ))]
         {
             let inner = match format {
@@ -70,6 +76,8 @@ impl<'a, W: Write> AnyWriter<'a, W> {
                 OutputFormat::PandocNative => {
                     AnyWriterInner::PandocNative(PandocNativeWriter::new(writer))
                 }
+                #[cfg(feature = "markdown-writer")]
+                OutputFormat::Markdown => AnyWriterInner::Markdown(MarkdownWriter::new(writer)),
             };
             Self {
                 inner: StackTrackingSink::new(inner),
@@ -90,7 +98,8 @@ impl<'a, W: Write> AnyWriter<'a, W> {
             feature = "blocknote-writer",
             feature = "oxa-writer",
             feature = "html-writer",
-            feature = "pandoc-native-writer"
+            feature = "pandoc-native-writer",
+            feature = "markdown-writer"
         )))]
         {
             drop(writer);
@@ -101,7 +110,8 @@ impl<'a, W: Write> AnyWriter<'a, W> {
             feature = "blocknote-writer",
             feature = "oxa-writer",
             feature = "html-writer",
-            feature = "pandoc-native-writer"
+            feature = "pandoc-native-writer",
+            feature = "markdown-writer"
         ))]
         {
             let inner = match format {
@@ -124,6 +134,11 @@ impl<'a, W: Write> AnyWriter<'a, W> {
                     let _ = assets;
                     AnyWriterInner::PandocNative(PandocNativeWriter::new(writer))
                 }
+                #[cfg(feature = "markdown-writer")]
+                OutputFormat::Markdown => {
+                    let _ = assets;
+                    AnyWriterInner::Markdown(MarkdownWriter::new(writer))
+                }
             };
             Self {
                 inner: StackTrackingSink::new(inner),
@@ -143,6 +158,8 @@ impl<W: Write> EventSink for AnyWriterInner<'_, W> {
             Self::Oxa(w) => w.finish(),
             #[cfg(feature = "pandoc-native-writer")]
             Self::PandocNative(w) => w.finish(),
+            #[cfg(feature = "markdown-writer")]
+            Self::Markdown(w) => w.finish(),
             #[cfg(not(feature = "blocknote-writer"))]
             Self::_Phantom(_) => Ok(()),
         }
@@ -158,6 +175,8 @@ impl<W: Write> EventSink for AnyWriterInner<'_, W> {
             Self::Oxa(w) => w.handle_event(event),
             #[cfg(feature = "pandoc-native-writer")]
             Self::PandocNative(w) => w.handle_event(event),
+            #[cfg(feature = "markdown-writer")]
+            Self::Markdown(w) => w.handle_event(event),
             #[cfg(not(feature = "blocknote-writer"))]
             Self::_Phantom(_) => {
                 let _ = event;
@@ -189,7 +208,8 @@ mod tests {
         feature = "blocknote-writer",
         feature = "html-writer",
         feature = "oxa-writer",
-        feature = "pandoc-native-writer"
+        feature = "pandoc-native-writer",
+        feature = "markdown-writer"
     ))]
     use docspec_core::{Event, EventSink as _};
 
@@ -197,7 +217,8 @@ mod tests {
         feature = "blocknote-writer",
         feature = "html-writer",
         feature = "oxa-writer",
-        feature = "pandoc-native-writer"
+        feature = "pandoc-native-writer",
+        feature = "markdown-writer"
     ))]
     use super::{AnyWriter, OutputFormat};
 
@@ -289,5 +310,35 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         assert!(writer.finish().is_ok());
         assert_eq!(buf, b"[]");
+    }
+
+    #[cfg(feature = "markdown-writer")]
+    #[test]
+    fn with_assets_ignores_provider_for_markdown_writer() {
+        let assets = NullAssets;
+        let mut buf = Vec::new();
+        let mut writer = AnyWriter::with_assets(OutputFormat::Markdown, &mut buf, &assets);
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartParagraph {
+                alignment: None,
+                id: None
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::Text {
+                content: "Hi".to_string()
+            })
+            .is_ok());
+        assert!(writer.handle_event(Event::EndParagraph).is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+        assert_eq!(buf, b"Hi\n\n");
     }
 }
