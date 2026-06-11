@@ -7357,7 +7357,7 @@ mod cross_feature_lists {
     }
 
     #[test]
-    fn same_num_id_reused_after_break_emits_start_none_second_time() {
+    fn same_num_id_continuation_paragraph_attaches_and_second_item_keeps_start_none() {
         let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
@@ -7377,10 +7377,10 @@ mod cross_feature_lists {
                 start_para(),
                 text("one"),
                 Event::EndParagraph,
-                Event::EndOrderedListItem,
                 start_para(),
                 text("break"),
                 Event::EndParagraph,
+                Event::EndOrderedListItem,
                 start_ordered("1", None),
                 start_para(),
                 text("two"),
