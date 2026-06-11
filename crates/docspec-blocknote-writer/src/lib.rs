@@ -8,9 +8,9 @@
 //!
 //! The writer emits JSON tokens directly to the underlying `Write` as events arrive using
 //! `docspec-json` for streaming JSON output. For text and URI-based images, memory usage is
-//! constant regardless of document size. Asset-based images (`ImageSource::Asset`) are
-//! base64-encoded into an in-memory data URI before writing, so memory scales with individual
-//! asset size.
+//! constant regardless of document size. Local buffering is used only for bounded conversion
+//! details such as asset-based image data URI encoding and lifting nested table event substreams
+//! after their enclosing table closes.
 //!
 //! # Supported Events
 //!
@@ -39,12 +39,16 @@
 //!
 //! - **Preserved**: [`StartTextStyle`](docspec_core::Event::StartTextStyle) / [`EndTextStyle`](docspec_core::Event::EndTextStyle), [`Text`](docspec_core::Event::Text) (with currently open inline styles), [`LineBreak`](docspec_core::Event::LineBreak), [`SoftBreak`](docspec_core::Event::SoftBreak)
 //! - **Absorbed silently**: [`StartParagraph`](docspec_core::Event::StartParagraph) / [`EndParagraph`](docspec_core::Event::EndParagraph) (paragraph boundaries are dropped — adjacent paragraphs concatenate without separator)
-//! - **Dropped**: [`Image`](docspec_core::Event::Image), [`StartBlockQuote`](docspec_core::Event::StartBlockQuote), [`StartPreformatted`](docspec_core::Event::StartPreformatted), [`StartHeading`](docspec_core::Event::StartHeading), [`ThematicBreak`](docspec_core::Event::ThematicBreak), nested [`StartTable`](docspec_core::Event::StartTable) and their children — silently discarded
+//! - **Dropped**: [`Image`](docspec_core::Event::Image), [`StartBlockQuote`](docspec_core::Event::StartBlockQuote), [`StartPreformatted`](docspec_core::Event::StartPreformatted), [`StartHeading`](docspec_core::Event::StartHeading), [`ThematicBreak`](docspec_core::Event::ThematicBreak) — silently discarded
+//! - **Lifted**: nested [`StartTable`](docspec_core::Event::StartTable) and its children — buffered and replayed as top-level sibling blocks after the enclosing outermost table closes
 //!
-//! Nested tables (a `StartTable` inside a cell) are entirely dropped: their rows, cells, text,
-//! and closing events are all absorbed. Only the outer table is emitted. The current markdown
-//! reader never produces multi-block cell content or nested tables — these guards exist for
-//! future DOCX/ODT readers.
+//! Nested tables (a `StartTable` inside a cell) are buffered between the first nested
+//! `StartTable` and its matching `EndTable`, then replayed through the writer after the
+//! enclosing outermost table closes. Each lifted nested table emits as a top-level sibling
+//! block in document order. The buffer empties on every outer `EndTable`, so nesting any
+//! number of levels deep collapses to a flat top-level sequence: `A` containing `B`
+//! containing `C` emits as `A, B, C`. Inline text adjacent to a nested table in the same
+//! outer cell stays in that outer cell.
 //!
 //! # List Support
 //!
@@ -261,6 +265,8 @@ pub struct BlockNoteWriter<'a, W: Write> {
     json: JsonEmitter<StrusonBackend<W>>,
     /// Whether at least one `StyledText` has been emitted into the current link's content array.
     link_emitted_styled_text: bool,
+    /// Events from nested tables, replayed at the outermost `EndTable` to lift them to top level.
+    lifted_nested_events: Vec<Event>,
     list_stack: Vec<ListStackEntry>,
     open_styles: Vec<TextStyleKind>,
     table_depth: Depth,
@@ -467,10 +473,6 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if self.table_depth.is_zero() {
             return Ok(());
         }
-        if self.table_depth.get() > 1 {
-            self.table_depth.dec();
-            return Ok(());
-        }
         self.json.close_array()?;
         self.json.close_object()?;
         self.json.key("children").array(|_| Ok(()))?;
@@ -480,7 +482,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_end_table_cell(&mut self) -> Result<()> {
-        if self.drop_inside_list_depth.is_positive() || self.table_depth.get() > 1 {
+        if self.drop_inside_list_depth.is_positive() {
             return Ok(());
         }
         self.close_open_link_if_any()?;
@@ -491,7 +493,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_end_table_row(&mut self) -> Result<()> {
-        if self.drop_inside_list_depth.is_positive() || self.table_depth.get() > 1 {
+        if self.drop_inside_list_depth.is_positive() {
             return Ok(());
         }
         self.json.close_array()?;
@@ -565,9 +567,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         if self.drop_inside_list_depth.is_positive() {
             return Ok(());
         }
-        if (self.context.in_text_block || self.context.in_table_cell || self.in_list_item_content())
-            && self.table_depth.get() <= 1
-        {
+        if self.context.in_text_block || self.context.in_table_cell || self.in_list_item_content() {
             self.handle_text("\n")
         } else {
             Ok(())
@@ -670,10 +670,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     ///
     /// Drops `title` and `id` — `BlockNote`'s inline link schema has no slot for these.
     fn handle_start_link(&mut self, href: &str) -> Result<()> {
-        if self.drop_inside_list_depth.is_positive()
-            || self.dropped_list_depth.is_positive()
-            || self.table_depth.get() > 1
-        {
+        if self.drop_inside_list_depth.is_positive() || self.dropped_list_depth.is_positive() {
             return Ok(());
         }
         if self.list_stack.last().is_some_and(|entry| {
@@ -725,10 +722,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         level: u32,
         start: Option<u64>,
     ) -> Result<()> {
-        if self.context.in_table_cell
-            || self.table_depth.get() > 1
-            || self.drop_inside_list_depth.is_positive()
-        {
+        if self.context.in_table_cell || self.drop_inside_list_depth.is_positive() {
             self.dropped_list_depth.inc();
             return Ok(());
         }
@@ -783,10 +777,6 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
 
     fn handle_start_table(&mut self, id: Option<&String>) -> Result<()> {
         drop_block_in_list_start!(self);
-        if self.table_depth.is_positive() {
-            self.table_depth.inc();
-            return Ok(());
-        }
         self.close_for_block_sibling()?;
         self.json.open_object()?;
         self.json.key("type").value("table")?;
@@ -801,7 +791,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_start_table_row(&mut self, id: Option<&String>) -> Result<()> {
-        if self.drop_inside_list_depth.is_positive() || self.table_depth.get() > 1 {
+        if self.drop_inside_list_depth.is_positive() {
             return Ok(());
         }
         self.json.open_object()?;
@@ -810,7 +800,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_table_cell(&mut self, id: Option<&String>) -> Result<()> {
-        if self.drop_inside_list_depth.is_positive() || self.table_depth.get() > 1 {
+        if self.drop_inside_list_depth.is_positive() {
             return Ok(());
         }
         self.json.open_object()?;
@@ -828,7 +818,6 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             || (!self.context.in_text_block
                 && !self.context.in_table_cell
                 && !self.in_list_item_content())
-            || self.table_depth.get() > 1
         {
             return Ok(());
         }
@@ -902,10 +891,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 
     fn handle_text_event(&mut self, content: &str) -> Result<()> {
-        if self.drop_inside_list_depth.is_positive()
-            || self.dropped_list_depth.is_positive()
-            || self.table_depth.get() > 1
-        {
+        if self.drop_inside_list_depth.is_positive() || self.dropped_list_depth.is_positive() {
             return Ok(());
         }
         // Auto-open paragraph for orphan text (e.g., text after image closed paragraph)
@@ -958,6 +944,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             dropped_list_depth: Depth::default(),
             in_link: false,
             json: JsonEmitter::new(StrusonBackend::new(writer)),
+            lifted_nested_events: Vec::new(),
             link_emitted_styled_text: false,
             list_stack: Vec::new(),
             open_styles: Vec::new(),
@@ -1085,6 +1072,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             dropped_list_depth: Depth::default(),
             in_link: false,
             json: JsonEmitter::new(StrusonBackend::new(writer)),
+            lifted_nested_events: Vec::new(),
             link_emitted_styled_text: false,
             list_stack: Vec::new(),
             open_styles: Vec::new(),
@@ -1109,6 +1097,33 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     fn omit_unsupported_text_style(_style_name: &str) {}
 
     fn omit_future_text_style(_style: &TextStyleKind) {}
+
+    fn should_buffer_for_lift(&self, event: &Event) -> bool {
+        match event {
+            Event::StartTable { .. } => self.table_depth.is_positive(),
+            _ => self.table_depth.get() >= 2,
+        }
+    }
+
+    fn update_lift_depth(&mut self, event: &Event) {
+        match event {
+            Event::StartTable { .. } => self.table_depth.inc(),
+            Event::EndTable => self.table_depth.dec(),
+            _ => {}
+        }
+    }
+
+    fn is_outermost_table_close(&self, event: &Event) -> bool {
+        matches!(event, Event::EndTable) && self.table_depth.get() == 1
+    }
+
+    fn drain_lifted_nested_events(&mut self) -> Result<()> {
+        let buffered = core::mem::take(&mut self.lifted_nested_events);
+        for ev in buffered {
+            self.handle_event(ev)?;
+        }
+        Ok(())
+    }
 }
 
 impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
@@ -1119,7 +1134,13 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
 
     #[inline]
     fn handle_event(&mut self, event: Event) -> Result<()> {
-        match event {
+        if self.should_buffer_for_lift(&event) {
+            self.update_lift_depth(&event);
+            self.lifted_nested_events.push(event);
+            return Ok(());
+        }
+        let is_outermost_table_close = self.is_outermost_table_close(&event);
+        let result = match event {
             Event::StartDocument { .. } => self.json.open_array(),
             Event::EndDocument => self.handle_end_document(),
             Event::StartHeading { level, id, .. } => {
@@ -1204,7 +1225,12 @@ impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
             | Event::StartDefinitionTerm { .. }
             | Event::StartFootnote { .. }
             | _ => Ok(()),
+        };
+        if is_outermost_table_close {
+            result?;
+            return self.drain_lifted_nested_events();
         }
+        result
     }
 }
 
