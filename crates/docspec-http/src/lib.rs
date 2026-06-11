@@ -9,6 +9,7 @@ pub mod error;
 pub mod format;
 pub mod handlers;
 pub mod metrics;
+pub mod mime;
 pub mod mime_parser;
 pub mod router;
 pub mod server;
