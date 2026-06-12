@@ -66,20 +66,30 @@ pub enum Color {
 }
 
 /// A reference to an image asset, either embedded or external.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum ImageSource {
-    /// An embedded asset resolved through [`crate::AssetProvider`].
-    Asset {
-        /// The asset identifier.
-        asset_id: String,
-    },
+    /// An embedded asset handle.
+    Asset(std::sync::Arc<dyn crate::traits::AssetHandle>),
     /// An external URI.
     Uri {
         /// The external resource URI.
         uri: String,
     },
 }
+
+impl PartialEq for ImageSource {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Asset(a), Self::Asset(b)) => a.asset_id() == b.asset_id(),
+            (Self::Uri { uri: a }, Self::Uri { uri: b }) => a == b,
+            _ => false,
+        }
+    }
+}
+// Note: Eq is intentionally NOT derived — Arc<dyn> cannot guarantee
+// reflexivity for arbitrary handle implementations.
 
 /// An author with a name and optional email address.
 #[derive(Debug, Clone, PartialEq, Eq)]

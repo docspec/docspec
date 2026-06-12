@@ -13,7 +13,7 @@ use predicates::prelude::PredicateBooleanExt as _;
 use predicates::str::contains;
 use tempfile::NamedTempFile;
 
-use docspec_test_utils::synth_docx;
+use docspec_test_utils::{synth_docx, synth_docx_with_image_png};
 
 fn docspec_cmd() -> Command {
     let result = Command::cargo_bin("docspec");
@@ -64,6 +64,20 @@ fn read_output(path: &std::path::Path) -> String {
 }
 
 const SIMPLE_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+
+fn find_image_node(value: &serde_json::Value) -> Option<&serde_json::Value> {
+    match value {
+        serde_json::Value::Array(arr) => arr.iter().find_map(find_image_node),
+        serde_json::Value::Object(obj) => {
+            if obj.get("type").and_then(|t| t.as_str()) == Some("image") {
+                Some(value)
+            } else {
+                obj.values().find_map(find_image_node)
+            }
+        }
+        _ => None,
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -646,5 +660,68 @@ mod tests {
             .assert()
             .failure()
             .stderr(contains("pdf"));
+    }
+
+    #[test]
+    fn convert_docx_with_image_via_file_path_emits_data_uri() {
+        let bytes = synth_docx_with_image_png();
+        let input = markdown_tempfile(&bytes, ".docx");
+
+        let assert = docspec_cmd()
+            .arg("convert")
+            .arg(input.path())
+            .assert()
+            .success();
+
+        let stdout = assert.get_output().stdout.clone();
+        let json: serde_json::Value =
+            serde_json::from_slice(&stdout).unwrap_or_else(|_| std::process::abort());
+
+        let image_node = find_image_node(&json);
+        assert!(
+            image_node.is_some(),
+            "expected at least one image node in output: {json}"
+        );
+        let url = image_node
+            .unwrap_or_else(|| std::process::abort())
+            .get("props")
+            .and_then(|p| p.get("url"))
+            .and_then(|u| u.as_str())
+            .unwrap_or("");
+        assert!(
+            url.starts_with("data:image/png;base64,"),
+            "expected data URI starting with 'data:image/png;base64,', got: {url:?}"
+        );
+    }
+
+    #[test]
+    fn convert_docx_with_image_via_stdin_emits_data_uri() {
+        let bytes = synth_docx_with_image_png();
+
+        let assert = docspec_cmd()
+            .args(["convert", "--from", "docx"])
+            .write_stdin(bytes)
+            .assert()
+            .success();
+
+        let stdout = assert.get_output().stdout.clone();
+        let json: serde_json::Value =
+            serde_json::from_slice(&stdout).unwrap_or_else(|_| std::process::abort());
+
+        let image_node = find_image_node(&json);
+        assert!(
+            image_node.is_some(),
+            "expected at least one image node in output: {json}"
+        );
+        let url = image_node
+            .unwrap_or_else(|| std::process::abort())
+            .get("props")
+            .and_then(|p| p.get("url"))
+            .and_then(|u| u.as_str())
+            .unwrap_or("");
+        assert!(
+            url.starts_with("data:image/png;base64,"),
+            "expected data URI starting with 'data:image/png;base64,', got: {url:?}"
+        );
     }
 }

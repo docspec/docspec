@@ -11,5 +11,8 @@ description = "Internal test fixtures shared across the docspec workspace. Not p
 docspec-core = { workspace = true }
 zip = { version = "8", default-features = false, features = ["deflate"] }
 
+[dev-dependencies]
+docspec-docx-reader = { workspace = true }
+
 [lints]
 workspace = true

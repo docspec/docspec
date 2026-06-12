@@ -260,6 +260,27 @@ impl<B: JsonBackend> KeyedEmitter<'_, B> {
         v.write_to(&mut emitter.backend)?;
         emitter.stack.mark_value_written()
     }
+
+    /// Consume the key and write a string value via streaming closure.
+    ///
+    /// Best-effort scope guard: if the closure returns `Err`, the value mark is
+    /// still attempted; the closure's error takes precedence.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if a key is not allowed here, or if the closure or backend errors.
+    #[inline]
+    pub fn string_value_streaming<F>(self, f: F) -> Result<()>
+    where
+        F: FnOnce(&mut dyn std::io::Write) -> std::io::Result<()>,
+    {
+        let emitter = self.emitter;
+        let name = self.name;
+        emitter.write_key(name)?;
+        let inner = emitter.backend.write_string_streaming(f);
+        let mark = emitter.stack.mark_value_written();
+        inner.and(mark)
+    }
 }
 
 #[cfg(test)]
@@ -835,6 +856,71 @@ mod tests {
                     Token::StringValue("2".to_string()),
                     Token::EndObject,
                     Token::EndArray,
+                ]
+            );
+        }
+
+        #[test]
+        fn keyed_streaming_value_writes_correct_json() {
+            let mut e = make();
+            assert!(e.open_object().is_ok());
+            assert!(e
+                .key("url")
+                .string_value_streaming(|w| w.write_all(b"hello"))
+                .is_ok());
+            assert!(e.close_object().is_ok());
+            let t = finish_tokens(e);
+            assert_eq!(
+                t,
+                vec![
+                    Token::BeginObject,
+                    Token::Name("url".to_string()),
+                    Token::StringValue("hello".to_string()),
+                    Token::EndObject,
+                ]
+            );
+        }
+
+        #[test]
+        fn keyed_streaming_value_consumes_key_on_error_then_allows_next_key() {
+            let mut e = make();
+            assert!(e.open_object().is_ok());
+            let err_result = e
+                .key("first")
+                .string_value_streaming(|_w| Err(std::io::Error::other("test error")));
+            assert!(err_result.is_err());
+            assert!(e.key("other").value("x").is_ok());
+            assert!(e.close_object().is_ok());
+            let t = finish_tokens(e);
+            assert_eq!(
+                t,
+                vec![
+                    Token::BeginObject,
+                    Token::Name("first".to_string()),
+                    Token::Name("other".to_string()),
+                    Token::StringValue("x".to_string()),
+                    Token::EndObject,
+                ]
+            );
+        }
+
+        #[test]
+        fn keyed_streaming_value_with_base64_chars() {
+            let mut e = make();
+            assert!(e.open_object().is_ok());
+            assert!(e
+                .key("data")
+                .string_value_streaming(|w| w.write_all(b"data:image/png;base64,iVBORw=="))
+                .is_ok());
+            assert!(e.close_object().is_ok());
+            let t = finish_tokens(e);
+            assert_eq!(
+                t,
+                vec![
+                    Token::BeginObject,
+                    Token::Name("data".to_string()),
+                    Token::StringValue("data:image/png;base64,iVBORw==".to_string()),
+                    Token::EndObject,
                 ]
             );
         }

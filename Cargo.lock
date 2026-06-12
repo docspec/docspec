@@ -627,6 +627,7 @@ name = "docspec-test-utils"
 version = "1.10.0"
 dependencies = [
  "docspec-core",
+ "docspec-docx-reader",
  "zip",
 ]
 

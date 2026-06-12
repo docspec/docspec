@@ -2,7 +2,7 @@
 //!
 //! `DocSpec` converts documents through a streaming event pipeline. This crate defines
 //! the [`Event`] enum, supporting types, error types, and the [`EventSource`],
-//! [`EventSink`], and [`AssetProvider`] traits that decouple readers from writers.
+//! [`EventSink`], and [`AssetHandle`] traits that decouple readers from writers.
 //!
 //! # Quick Start
 //!
@@ -31,7 +31,7 @@ pub use error::{Error, Position, Result};
 pub use event::{Event, TextStyleKind};
 pub use pipeline::pipe;
 pub use stack::{block_kind_for_end, block_kind_for_start, BlockKind, StackTrackingSink};
-pub use traits::{AssetProvider, EventSink, EventSource};
+pub use traits::{AssetHandle, EventSink, EventSource};
 pub use types::{
     Author, Color, DocumentMeta, ImageSource, ListStyleType, TableHeaderScope, TextAlignment,
 };

@@ -1,9 +1,11 @@
 //! ZIP/OPC package navigation for DOCX archives.
 
-use std::io::{Read, Seek};
+use std::io::{Cursor, Read, Seek};
+use std::sync::{Arc, Mutex};
 
 use docspec_core::{Error, Result};
 use zip::result::ZipError;
+use zip::ZipArchive;
 
 use crate::content_types;
 use crate::content_types::ContentTypes;
@@ -11,12 +13,17 @@ use crate::rels;
 use crate::rels::{HyperlinkMap, ImageMap};
 use crate::styles::StyleList;
 
+/// Object-safe alias combining [`Read`], [`Seek`], and [`Send`] for use in trait objects.
+pub(crate) trait ReadSeek: Read + Seek + Send {}
+impl<T: Read + Seek + Send> ReadSeek for T {}
+
 type PackageContents = (
     StyleList,
     crate::numbering::MinimalNumbering,
     HyperlinkMap,
     ImageMap,
-    ContentTypes,
+    Arc<ContentTypes>,
+    Arc<Mutex<ZipArchive<Box<dyn ReadSeek + 'static>>>>,
     Box<dyn Read + Send>,
 );
 
@@ -24,8 +31,9 @@ type PackageContents = (
 /// relationships, locates `document.xml`, reads `[Content_Types].xml`, and returns
 /// a [`PackageContents`] tuple with all parsed data and a streaming reader for the
 /// main document part.
-pub fn open_package<R: Read + Seek + Send + 'static>(mut reader: R) -> Result<PackageContents> {
-    let mut archive = zip::ZipArchive::new(&mut reader).map_err(|err| match err {
+pub fn open_package<R: Read + Seek + Send + 'static>(reader: R) -> Result<PackageContents> {
+    let boxed: Box<dyn ReadSeek + 'static> = Box::new(reader);
+    let mut archive = ZipArchive::new(boxed).map_err(|err| match err {
         ZipError::InvalidArchive(_) | ZipError::UnsupportedArchive(_) => Error::Parse {
             message: "not a valid ZIP archive".to_string(),
             position: None,
@@ -63,49 +71,32 @@ pub fn open_package<R: Read + Seek + Send + 'static>(mut reader: R) -> Result<Pa
         None => ContentTypes::default(),
     };
 
-    let (data_start, compressed_size, method) = {
-        let entry = archive
-            .by_name(&document_path)
-            .map_err(|_err| Error::Parse {
-                message: format!("document target not found: {document_path}"),
-                position: None,
-            })?;
-        let data_start = entry
-            .data_start()
-            .ok_or_else(|| parse_error("document.xml has no data offset".to_string()))?;
-        (data_start, entry.compressed_size(), entry.compression())
-    };
-    drop(archive);
-
-    reader
-        .seek(std::io::SeekFrom::Start(data_start))
+    let mut document_xml_bytes = Vec::new();
+    archive
+        .by_name(&document_path)
+        .map_err(|_err| Error::Parse {
+            message: format!("document target not found: {document_path}"),
+            position: None,
+        })?
+        .read_to_end(&mut document_xml_bytes)
         .map_err(Error::from)?;
 
-    let limited = reader.take(compressed_size);
-
-    let stream: Box<dyn Read + Send> = if method == zip::CompressionMethod::Stored {
-        Box::new(limited)
-    } else if method == zip::CompressionMethod::Deflated {
-        Box::new(flate2::read::DeflateDecoder::new(limited))
-    } else {
-        return Err(Error::Parse {
-            message: format!("unsupported compression: {method:?}"),
-            position: None,
-        });
-    };
+    let content_types_arc = Arc::new(content_types);
+    let archive_arc = Arc::new(Mutex::new(archive));
 
     Ok((
         style_list,
         numbering,
         hyperlink_map,
         image_map,
-        content_types,
-        stream,
+        content_types_arc,
+        archive_arc,
+        Box::new(Cursor::new(document_xml_bytes)),
     ))
 }
 
 fn load_style_list_and_hyperlink_map<R: Read + Seek>(
-    archive: &mut zip::ZipArchive<&mut R>,
+    archive: &mut ZipArchive<R>,
     document_path: &str,
 ) -> Result<(StyleList, HyperlinkMap, ImageMap)> {
     let doc_rels_path = rels::derive_part_rels_path(document_path);
@@ -156,7 +147,7 @@ fn load_style_list_and_hyperlink_map<R: Read + Seek>(
 }
 
 fn read_optional_entry<R: Read + Seek>(
-    archive: &mut zip::ZipArchive<&mut R>,
+    archive: &mut ZipArchive<R>,
     path: &str,
 ) -> Result<Option<Vec<u8>>> {
     match archive.by_name(path) {
@@ -171,7 +162,7 @@ fn read_optional_entry<R: Read + Seek>(
 }
 
 fn load_numbering<R: Read + Seek>(
-    archive: &mut zip::ZipArchive<&mut R>,
+    archive: &mut ZipArchive<R>,
     document_path: &str,
 ) -> Result<crate::numbering::MinimalNumbering> {
     let doc_rels_path = rels::derive_part_rels_path(document_path);
@@ -503,6 +494,7 @@ mod tests {
                 _hyperlink_map,
                 _image_map,
                 _content_types,
+                _archive,
                 mut stream,
             )) => {
                 assert!(style_list.get_by_id("Normal").is_some());
@@ -529,7 +521,15 @@ mod tests {
         });
 
         match result {
-            Ok((style_list, _numbering, _hyperlink_map, _image_map, _content_types, _stream)) => {
+            Ok((
+                style_list,
+                _numbering,
+                _hyperlink_map,
+                _image_map,
+                _content_types,
+                _archive,
+                _stream,
+            )) => {
                 assert_eq!(style_list, StyleList::default());
             }
             Err(err) => assert_eq!(format!("{err:?}"), "expected default StyleList"),
@@ -552,7 +552,15 @@ mod tests {
         });
 
         match result {
-            Ok((style_list, _numbering, _hyperlink_map, _image_map, _content_types, _stream)) => {
+            Ok((
+                style_list,
+                _numbering,
+                _hyperlink_map,
+                _image_map,
+                _content_types,
+                _archive,
+                _stream,
+            )) => {
                 assert_eq!(style_list, StyleList::default());
             }
             Err(err) => assert_eq!(format!("{err:?}"), "expected default StyleList"),
@@ -610,7 +618,15 @@ mod tests {
         });
 
         match result {
-            Ok((_style_list, numbering, _hyperlink_map, _image_map, _content_types, _stream)) => {
+            Ok((
+                _style_list,
+                numbering,
+                _hyperlink_map,
+                _image_map,
+                _content_types,
+                _archive,
+                _stream,
+            )) => {
                 assert!(numbering.resolve(1, 0).is_list);
             }
             Err(err) => assert_eq!(format!("{err:?}"), "expected numbering and document stream"),
@@ -631,7 +647,15 @@ mod tests {
         });
 
         match result {
-            Ok((_style_list, numbering, _hyperlink_map, _image_map, _content_types, _stream)) => {
+            Ok((
+                _style_list,
+                numbering,
+                _hyperlink_map,
+                _image_map,
+                _content_types,
+                _archive,
+                _stream,
+            )) => {
                 assert!(!numbering.resolve(1, 0).is_list);
             }
             Err(err) => assert_eq!(format!("{err:?}"), "expected empty numbering"),
@@ -655,7 +679,15 @@ mod tests {
         });
 
         match result {
-            Ok((_style_list, numbering, _hyperlink_map, _image_map, _content_types, _stream)) => {
+            Ok((
+                _style_list,
+                numbering,
+                _hyperlink_map,
+                _image_map,
+                _content_types,
+                _archive,
+                _stream,
+            )) => {
                 assert!(!numbering.resolve(1, 0).is_list);
             }
             Err(err) => assert_eq!(format!("{err:?}"), "expected empty numbering"),
@@ -705,7 +737,15 @@ mod tests {
         });
 
         match result {
-            Ok((_style_list, _numbering, _hyperlink_map, image_map, _content_types, _stream)) => {
+            Ok((
+                _style_list,
+                _numbering,
+                _hyperlink_map,
+                image_map,
+                _content_types,
+                _archive,
+                _stream,
+            )) => {
                 assert_eq!(image_map.len(), 1);
                 let rel = &image_map["rId5"];
                 assert_eq!(rel.target, "word/media/image1.png");
@@ -729,7 +769,15 @@ mod tests {
         });
 
         match result {
-            Ok((_style_list, _numbering, _hyperlink_map, _image_map, content_types, _stream)) => {
+            Ok((
+                _style_list,
+                _numbering,
+                _hyperlink_map,
+                _image_map,
+                content_types,
+                _archive,
+                _stream,
+            )) => {
                 assert_eq!(content_types.lookup("word/document.xml"), None);
                 assert_eq!(content_types.lookup("word/media/image1.png"), None);
             }
@@ -757,7 +805,15 @@ mod tests {
         });
 
         match result {
-            Ok((_style_list, _numbering, _hyperlink_map, _image_map, content_types, _stream)) => {
+            Ok((
+                _style_list,
+                _numbering,
+                _hyperlink_map,
+                _image_map,
+                content_types,
+                _archive,
+                _stream,
+            )) => {
                 assert_eq!(
                     content_types.lookup("word/media/image1.png"),
                     Some("image/png")

@@ -150,11 +150,8 @@ pub mod palette;
 
 use std::io::Write;
 
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use base64::write::EncoderWriter as Base64Encoder;
 use docspec_core::{
-    AssetProvider, Depth, Error, Event, EventSink, ImageSource, Result, TextAlignment,
-    TextStyleKind,
+    Depth, Error, Event, EventSink, ImageSource, Result, TextAlignment, TextStyleKind,
 };
 use docspec_json::{JsonEmitter, Null, StrusonBackend};
 
@@ -247,14 +244,10 @@ fn non_default_alignment_value(alignment: Option<&TextAlignment>) -> Option<&'st
 /// Writes JSON tokens directly to the underlying `Write` as events arrive using `docspec-json`.
 /// Implements [`EventSink`] for integration with the `DocSpec` pipeline.
 ///
-/// Use [`BlockNoteWriter::with_assets`] to provide an [`AssetProvider`] for resolving
-/// embedded asset images as base64 data URIs.
-///
 /// # Type Parameters
 ///
 /// * `W` - Any type implementing [`Write`]
-pub struct BlockNoteWriter<'a, W: Write> {
-    assets: Option<&'a dyn AssetProvider>,
+pub struct BlockNoteWriter<W: Write> {
     blockquote_depth: Depth,
     blockquote_force_closed_count: Depth,
     context: BlockContext,
@@ -272,7 +265,7 @@ pub struct BlockNoteWriter<'a, W: Write> {
     table_depth: Depth,
 }
 
-impl<'a, W: Write> BlockNoteWriter<'a, W> {
+impl<W: Write> BlockNoteWriter<W> {
     fn close_blockquote_for_sibling(&mut self) -> Result<()> {
         self.close_open_link_if_any()?;
         self.close_content_block()?;
@@ -344,39 +337,6 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             self.close_current_list_item_object()?;
         }
         Ok(())
-    }
-
-    /// Resolves `asset_id` through the configured provider and encodes the asset bytes
-    /// as a `data:<content-type>;base64,…` URI.
-    ///
-    /// Returns `Err` if no `AssetProvider` is configured, the asset cannot be found,
-    /// or the underlying I/O fails while streaming the asset bytes through the
-    /// base64 encoder.
-    fn encode_asset_as_data_uri(&self, asset_id: &str) -> Result<String> {
-        let provider = self.assets.ok_or_else(|| Error::Other {
-            message: "no AssetProvider configured".to_string(),
-        })?;
-        let content_type = provider
-            .content_type(asset_id)
-            .ok_or_else(|| Error::Other {
-                message: format!("asset not found: {asset_id}"),
-            })?;
-        let prefix = format!("data:{content_type};base64,");
-        let mut data_uri = Vec::with_capacity(prefix.len());
-        data_uri.extend_from_slice(prefix.as_bytes());
-        {
-            let mut enc = Base64Encoder::new(&mut data_uri, &BASE64_STANDARD);
-            provider
-                .stream_to(asset_id, &mut enc)
-                .ok_or_else(|| Error::Other {
-                    message: format!("asset not found: {asset_id}"),
-                })?
-                .map_err(Error::from)?;
-            enc.finish().map_err(Error::from)?
-        };
-        String::from_utf8(data_uri).map_err(|e| Error::Other {
-            message: format!("base64 encoding produced invalid UTF-8: {e}"),
-        })
     }
 
     fn handle_blockquote(&mut self, id: Option<&String>) -> Result<()> {
@@ -542,25 +502,53 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
             return Ok(());
         }
         self.close_for_block_sibling()?;
-        let url = match source {
-            ImageSource::Uri { uri } => uri,
-            ImageSource::Asset { asset_id } => self.encode_asset_as_data_uri(&asset_id)?,
-            _ => return Ok(()),
-        };
         let caption = alt.unwrap_or_default();
 
-        self.json.object(|j| {
-            if let Some(id_val) = id {
-                j.key("id").value(id_val.as_str())?;
+        match source {
+            ImageSource::Uri { uri } => self.json.object(|j| {
+                if let Some(id_val) = id {
+                    j.key("id").value(id_val.as_str())?;
+                }
+                j.key("type").value("image")?;
+                j.key("props").object(|p| {
+                    p.key("url").value(uri.as_str())?;
+                    p.key("caption").value(caption.as_str())
+                })?;
+                j.key("content").value(Null)?;
+                j.key("children").array(|_| Ok(()))
+            }),
+            ImageSource::Asset(handle) => {
+                let content_type = handle
+                    .content_type()
+                    .ok_or_else(|| Error::Other {
+                        message: format!("asset not found: {}", handle.asset_id()),
+                    })?
+                    .into_owned();
+
+                self.json.object(|j| {
+                    if let Some(id_val) = id {
+                        j.key("id").value(id_val.as_str())?;
+                    }
+                    j.key("type").value("image")?;
+                    j.key("props").object(|p| {
+                        p.key("url").string_value_streaming(|w| {
+                            write!(w, "data:{content_type};base64,")?;
+                            let mut enc = base64::write::EncoderWriter::new(
+                                w,
+                                &base64::engine::general_purpose::STANDARD,
+                            );
+                            handle.stream_to(&mut enc)?;
+                            enc.finish()?;
+                            Ok(())
+                        })?;
+                        p.key("caption").value(caption.as_str())
+                    })?;
+                    j.key("content").value(Null)?;
+                    j.key("children").array(|_| Ok(()))
+                })
             }
-            j.key("type").value("image")?;
-            j.key("props").object(|p| {
-                p.key("url").value(url.as_str())?;
-                p.key("caption").value(caption.as_str())
-            })?;
-            j.key("content").value(Null)?;
-            j.key("children").array(|_| Ok(()))
-        })
+            _ => Ok(()),
+        }
     }
 
     fn handle_line_break(&mut self) -> Result<()> {
@@ -936,7 +924,6 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     #[must_use]
     pub fn new(writer: W) -> Self {
         Self {
-            assets: None,
             blockquote_depth: Depth::default(),
             blockquote_force_closed_count: Depth::default(),
             context: BlockContext::default(),
@@ -1050,36 +1037,6 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
         Ok(())
     }
 
-    /// Creates a new `BlockNoteWriter` with an [`AssetProvider`] for resolving embedded assets.
-    ///
-    /// When an [`Event::Image`] with [`ImageSource::Asset`] is encountered, the provider is called
-    /// to resolve the asset bytes. The bytes are base64-encoded and written as a data URI
-    /// (`data:{content_type};base64,{encoded}`) in the `BlockNote` JSON `url` field.
-    ///
-    /// # Arguments
-    ///
-    /// * `writer` - The underlying writer to emit JSON to
-    /// * `assets` - The asset provider for resolving embedded asset references
-    #[inline]
-    #[must_use]
-    pub fn with_assets(writer: W, assets: &'a dyn AssetProvider) -> Self {
-        Self {
-            assets: Some(assets),
-            blockquote_depth: Depth::default(),
-            blockquote_force_closed_count: Depth::default(),
-            context: BlockContext::default(),
-            drop_inside_list_depth: Depth::default(),
-            dropped_list_depth: Depth::default(),
-            in_link: false,
-            json: JsonEmitter::new(StrusonBackend::new(writer)),
-            lifted_nested_events: Vec::new(),
-            link_emitted_styled_text: false,
-            list_stack: Vec::new(),
-            open_styles: Vec::new(),
-            table_depth: Depth::default(),
-        }
-    }
-
     fn handle_end_document(&mut self) -> Result<()> {
         while !self.list_stack.is_empty() {
             self.close_current_list_item_object()?;
@@ -1126,7 +1083,7 @@ impl<'a, W: Write> BlockNoteWriter<'a, W> {
     }
 }
 
-impl<W: Write> EventSink for BlockNoteWriter<'_, W> {
+impl<W: Write> EventSink for BlockNoteWriter<W> {
     #[inline]
     fn finish(self) -> Result<()> {
         self.json.finish().map(|_| ())

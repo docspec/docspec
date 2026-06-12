@@ -150,6 +150,7 @@ pub async fn post_conversion(
 ///
 /// Body size is recorded here because it is only known after header validation
 /// succeeds and the body is confirmed non-empty.
+#[allow(clippy::too_many_lines)]
 async fn do_conversion(
     input_mime_label: &'static str,
     headers: HeaderMap,
@@ -198,13 +199,16 @@ async fn do_conversion(
 
     let join_result = tokio::task::spawn_blocking(move || -> Result<(Vec<u8>, u64), HttpError> {
         let mut output_buffer = Vec::new();
-        let mut reader = docspec::AnyReader::from_reader(input_format, std::io::Cursor::new(body))
-            .map_err(|error| {
-                tracing::debug!(error = %error, "reader construction failed");
-                HttpError::Unprocessable {
-                    detail: error.to_string(),
-                }
-            })?;
+        let body_vec: Vec<u8> = body.into();
+        let mut reader =
+            docspec::AnyReader::from_reader(input_format, std::io::Cursor::new(body_vec)).map_err(
+                |error| {
+                    tracing::debug!(error = %error, "reader construction failed");
+                    HttpError::Unprocessable {
+                        detail: error.to_string(),
+                    }
+                },
+            )?;
         let mut sink = docspec::AnyWriter::new(output_format, &mut output_buffer);
 
         loop {

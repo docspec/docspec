@@ -17,8 +17,8 @@
 //!
 //! # Asset References
 //!
-//! [`Event::Image`] carries an [`crate::ImageSource`] (asset id or URI), not bytes.
-//! Writers resolve bytes lazily via [`crate::AssetProvider`]; assets must remain
+//! [`Event::Image`] carries an [`crate::ImageSource`] (asset handle or URI), not bytes.
+//! Writers resolve bytes lazily via [`crate::AssetHandle`]; assets must remain
 //! accessible until [`Event::EndDocument`].
 //!
 //! # Well-Formedness Rules
@@ -170,7 +170,7 @@ pub enum Event {
 
     /// An image reference.
     ///
-    /// Asset bytes resolve lazily via [`crate::AssetProvider`]. `decorative` means
+    /// Asset bytes resolve lazily via [`crate::AssetHandle`]. `decorative` means
     /// purely visual — no alt text is needed for accessibility. Images may appear
     /// inline within paragraphs/headings or directly in block containers.
     Image {

@@ -150,94 +150,9 @@ mod tests {
         }
     }
 
-    extern crate alloc;
-
-    use alloc::borrow::Cow;
-    use docspec_core::*;
-    use std::collections::HashMap;
-    use std::io::{self, Write};
-
-    /// Mock `AssetProvider` for testing.
-    struct MockAssetProvider {
-        assets: HashMap<String, (String, Vec<u8>)>,
-    }
-
-    impl MockAssetProvider {
-        fn new() -> Self {
-            let mut assets = HashMap::new();
-            assets.insert(
-                "image1".to_string(),
-                ("image/png".to_string(), vec![0x89, 0x50, 0x4E, 0x47]),
-            );
-            assets.insert(
-                "doc1".to_string(),
-                ("application/pdf".to_string(), vec![0x25, 0x50, 0x44, 0x46]),
-            );
-            Self { assets }
-        }
-    }
-
-    impl AssetProvider for MockAssetProvider {
-        fn content_type(&self, asset_id: &str) -> Option<Cow<'_, str>> {
-            self.assets
-                .get(asset_id)
-                .map(|(mime, _)| Cow::Borrowed(mime.as_str()))
-        }
-
-        fn stream_to(&self, asset_id: &str, writer: &mut dyn Write) -> Option<io::Result<u64>> {
-            self.assets.get(asset_id).map(|(_, bytes)| {
-                writer
-                    .write_all(bytes)
-                    .map(|()| u64::try_from(bytes.len()).unwrap_or(u64::MAX))
-            })
-        }
-    }
-
     #[test]
-    fn content_type_known_asset() {
-        let provider = MockAssetProvider::new();
-        let mime = provider.content_type("image1");
-        assert_eq!(mime, Some(Cow::Borrowed("image/png")));
-    }
-
-    #[test]
-    fn content_type_unknown_asset() {
-        let provider = MockAssetProvider::new();
-        let mime = provider.content_type("unknown");
-        assert_eq!(mime, None);
-    }
-
-    #[test]
-    fn stream_to_known_asset() {
-        let provider = MockAssetProvider::new();
-        let mut buffer = Vec::new();
-        let result = provider.stream_to("image1", &mut buffer);
-        assert!(matches!(result, Some(Ok(4))));
-        assert_eq!(buffer, vec![0x89, 0x50, 0x4E, 0x47]);
-    }
-
-    #[test]
-    fn stream_to_multiple_assets() {
-        let provider = MockAssetProvider::new();
-        let mut buffer1 = Vec::new();
-        let mut buffer2 = Vec::new();
-
-        let result1 = provider.stream_to("image1", &mut buffer1);
-        let result2 = provider.stream_to("doc1", &mut buffer2);
-
-        assert!(matches!(result1, Some(Ok(4))));
-        assert_eq!(buffer1, vec![0x89, 0x50, 0x4E, 0x47]);
-
-        assert!(matches!(result2, Some(Ok(4))));
-        assert_eq!(buffer2, vec![0x25, 0x50, 0x44, 0x46]);
-    }
-
-    #[test]
-    fn stream_to_unknown_asset() {
-        let provider = MockAssetProvider::new();
-        let mut buffer = Vec::new();
-        let result = provider.stream_to("unknown", &mut buffer);
-        assert!(result.is_none());
-        assert_eq!(buffer, Vec::<u8>::new());
+    fn asset_handle_is_dyn_compatible_send_sync() {
+        fn assert_send_sync_static<T: Send + Sync + 'static>() {}
+        assert_send_sync_static::<std::sync::Arc<dyn docspec_core::AssetHandle>>();
     }
 }

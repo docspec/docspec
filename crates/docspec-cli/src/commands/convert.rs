@@ -9,7 +9,6 @@ use crate::args::ConvertArgs;
 use crate::error::{CliError, Result};
 use crate::format;
 
-/// Runs the streaming conversion pipeline.
 fn run_pipeline<W: Write>(
     reader: AnyReader,
     output_format: docspec::OutputFormat,
@@ -39,7 +38,6 @@ pub fn run(args: ConvertArgs) -> Result<()> {
         }
     }
 
-    // Resolve formats BEFORE reading input (fail-fast)
     let input_format = format::resolve_input_format(
         from,
         input_path.as_deref(),
@@ -51,8 +49,7 @@ pub fn run(args: ConvertArgs) -> Result<()> {
         "cannot detect output format: use --to",
     )?;
 
-    // Read input AFTER format validation
-    let reader = match input_path.as_ref() {
+    let reader: AnyReader = match input_path.as_ref() {
         Some(path) if path.as_os_str() != "-" => AnyReader::from_path(input_format, path)?,
         _ => {
             let mut buf = Vec::new();

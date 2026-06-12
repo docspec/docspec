@@ -2,84 +2,72 @@
 
 #![allow(clippy::expect_used, clippy::redundant_test_prefix)]
 
-extern crate alloc;
-
 #[cfg(test)]
 mod tests {
-    use alloc::borrow::Cow;
-    use std::collections::HashMap;
-    use std::io;
     use std::io::Write;
+    use std::sync::Arc;
 
     use docspec_blocknote_writer::BlockNoteWriter;
     use docspec_core::{
-        AssetProvider, Color, Event, EventSink as _, ImageSource, StackTrackingSink, TextAlignment,
+        AssetHandle, Color, Event, EventSink as _, ImageSource, StackTrackingSink, TextAlignment,
         TextStyleKind,
     };
     use docspec_test_utils::builders::text;
     use docspec_test_utils::FailingWriter;
 
-    struct MockAssetProvider {
-        assets: HashMap<String, (String, Vec<u8>)>,
-        content_type_only: HashMap<String, String>,
+    #[derive(Debug)]
+    struct MockAssetHandle {
+        asset_id: String,
+        content_type: Option<String>,
+        bytes: Vec<u8>,
         fail_stream: bool,
     }
 
-    impl MockAssetProvider {
-        fn new() -> Self {
+    impl MockAssetHandle {
+        fn new(asset_id: &str, content_type: &str, bytes: &[u8]) -> Self {
             Self {
-                assets: HashMap::new(),
-                content_type_only: HashMap::new(),
+                asset_id: asset_id.to_string(),
+                content_type: Some(content_type.to_string()),
+                bytes: bytes.to_vec(),
                 fail_stream: false,
             }
         }
 
-        fn with_asset(mut self, id: &str, content_type: &str, data: &[u8]) -> Self {
-            self.assets
-                .insert(id.to_string(), (content_type.to_string(), data.to_vec()));
-            self
-        }
-
-        fn with_content_type_only(mut self, id: &str, content_type: &str) -> Self {
-            self.content_type_only
-                .insert(id.to_string(), content_type.to_string());
-            self
-        }
-
-        fn with_failing_stream(mut self) -> Self {
-            self.fail_stream = true;
-            self
-        }
-    }
-
-    impl AssetProvider for MockAssetProvider {
-        fn content_type(&self, asset_id: &str) -> Option<Cow<'_, str>> {
-            self.assets
-                .get(asset_id)
-                .map(|(ct, _)| Cow::Borrowed(ct.as_str()))
-                .or_else(|| {
-                    self.content_type_only
-                        .get(asset_id)
-                        .map(|ct| Cow::Borrowed(ct.as_str()))
-                })
-        }
-
-        fn stream_to(&self, asset_id: &str, writer: &mut dyn Write) -> Option<io::Result<u64>> {
-            if self.fail_stream {
-                return Some(Err(io::Error::other("simulated stream failure")));
+        fn unknown_content_type(asset_id: &str) -> Self {
+            Self {
+                asset_id: asset_id.to_string(),
+                content_type: None,
+                bytes: Vec::new(),
+                fail_stream: false,
             }
-            self.assets.get(asset_id).map(|(_, data)| {
-                writer.write_all(data)?;
-                Ok(u64::try_from(data.len()).unwrap_or(0))
-            })
+        }
+
+        fn failing(asset_id: &str, content_type: &str) -> Self {
+            Self {
+                asset_id: asset_id.to_string(),
+                content_type: Some(content_type.to_string()),
+                bytes: Vec::new(),
+                fail_stream: true,
+            }
         }
     }
 
-    fn run_events_with_assets(events: &[Event], provider: &dyn AssetProvider) -> String {
-        let mut buf = Vec::<u8>::new();
-        let writer = StackTrackingSink::new(BlockNoteWriter::with_assets(&mut buf, provider));
-        docspec_test_utils::drive(writer, events.iter().cloned());
-        String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8")
+    impl AssetHandle for MockAssetHandle {
+        fn content_type(&self) -> Option<std::borrow::Cow<'_, str>> {
+            self.content_type.as_deref().map(std::borrow::Cow::Borrowed)
+        }
+
+        fn stream_to(&self, writer: &mut dyn Write) -> std::io::Result<u64> {
+            if self.fail_stream {
+                return Err(std::io::Error::other("mock stream failure"));
+            }
+            writer.write_all(&self.bytes)?;
+            Ok(u64::try_from(self.bytes.len()).unwrap_or(u64::MAX))
+        }
+
+        fn asset_id(&self) -> &str {
+            &self.asset_id
+        }
     }
 
     fn run_events(events: &[Event]) -> String {
@@ -523,29 +511,6 @@ mod tests {
             json,
             r#"[{"type":"image","props":{"url":"https://example.com/img.png","caption":""},"content":null,"children":[]}]"#
         );
-    }
-
-    #[test]
-    fn image_with_asset_source_without_provider_errors() {
-        let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
-        let start_result = writer.handle_event(Event::StartDocument {
-            id: None,
-            language: None,
-            metadata: None,
-        });
-        assert!(start_result.is_ok(), "start document should succeed");
-        let result = writer.handle_event(Event::Image {
-            source: ImageSource::Asset {
-                asset_id: "img1".to_string(),
-            },
-            alt: None,
-            title: None,
-            decorative: false,
-            id: None,
-        });
-        let err = result.expect_err("Image with asset source requires a provider");
-        assert_eq!(err.to_string(), "no AssetProvider configured");
     }
 
     #[test]
@@ -1435,10 +1400,13 @@ mod tests {
 
     #[test]
     fn image_with_asset_provider_success() {
-        let provider =
-            MockAssetProvider::new().with_asset("img1", "image/png", &[0x89, 0x50, 0x4E, 0x47]);
+        let handle = Arc::new(MockAssetHandle::new(
+            "img1",
+            "image/png",
+            &[0x89, 0x50, 0x4E, 0x47],
+        ));
         let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::with_assets(&mut buf, &provider));
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
         let start_result = writer.handle_event(Event::StartDocument {
             id: None,
             language: None,
@@ -1446,9 +1414,7 @@ mod tests {
         });
         assert!(start_result.is_ok(), "start should succeed");
         let img_result = writer.handle_event(Event::Image {
-            source: ImageSource::Asset {
-                asset_id: "img1".to_string(),
-            },
+            source: ImageSource::Asset(handle),
             alt: Some("Test image".to_string()),
             title: None,
             decorative: false,
@@ -1468,9 +1434,9 @@ mod tests {
 
     #[test]
     fn image_with_asset_not_found_content_type() {
-        let provider = MockAssetProvider::new();
+        let handle = Arc::new(MockAssetHandle::unknown_content_type("missing"));
         let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::with_assets(&mut buf, &provider));
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
         let start_result = writer.handle_event(Event::StartDocument {
             id: None,
             language: None,
@@ -1478,9 +1444,7 @@ mod tests {
         });
         assert!(start_result.is_ok(), "start should succeed");
         let result = writer.handle_event(Event::Image {
-            source: ImageSource::Asset {
-                asset_id: "missing".to_string(),
-            },
+            source: ImageSource::Asset(handle),
             alt: None,
             title: None,
             decorative: false,
@@ -1492,11 +1456,9 @@ mod tests {
 
     #[test]
     fn image_with_asset_stream_io_error() {
-        let provider = MockAssetProvider::new()
-            .with_asset("img1", "image/png", &[0x89])
-            .with_failing_stream();
+        let handle = Arc::new(MockAssetHandle::failing("img1", "image/png"));
         let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::with_assets(&mut buf, &provider));
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
         let start_result = writer.handle_event(Event::StartDocument {
             id: None,
             language: None,
@@ -1504,38 +1466,64 @@ mod tests {
         });
         assert!(start_result.is_ok(), "start should succeed");
         let result = writer.handle_event(Event::Image {
-            source: ImageSource::Asset {
-                asset_id: "img1".to_string(),
-            },
+            source: ImageSource::Asset(handle),
             alt: None,
             title: None,
             decorative: false,
             id: None,
         });
         let err = result.expect_err("image with failing stream must fail");
-        assert_eq!(err.to_string(), "I/O error: simulated stream failure");
+        assert_eq!(err.to_string(), "I/O error: mock stream failure");
+    }
+
+    #[test]
+    fn writer_not_poisoned_after_mid_stream_error() {
+        use docspec_core::{Event, EventSink as _, ImageSource};
+
+        let handle = Arc::new(MockAssetHandle::failing("img1", "image/png"));
+        let mut buf = Vec::<u8>::new();
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+        let start_result = writer.handle_event(Event::StartDocument {
+            id: None,
+            language: None,
+            metadata: None,
+        });
+        assert!(start_result.is_ok(), "start should succeed");
+
+        let img_result = writer.handle_event(Event::Image {
+            source: ImageSource::Asset(handle),
+            alt: None,
+            title: None,
+            decorative: false,
+            id: None,
+        });
+        assert!(img_result.is_err(), "image with failing stream must fail");
+
+        let end_result = writer.handle_event(Event::EndDocument);
+        drop(end_result);
+
+        let finish_result = writer.finish();
+        drop(finish_result);
     }
 
     #[test]
     fn asset_image_jpeg() {
-        let provider =
-            MockAssetProvider::new().with_asset("photo", "image/jpeg", &[0xFF, 0xD8, 0xFF]);
-        let json = run_events_with_assets(
-            &[
-                start_document(),
-                Event::Image {
-                    source: ImageSource::Asset {
-                        asset_id: "photo".to_string(),
-                    },
-                    alt: None,
-                    title: None,
-                    decorative: false,
-                    id: None,
-                },
-                Event::EndDocument,
-            ],
-            &provider,
-        );
+        let json = run_events(&[
+            start_document(),
+            Event::Image {
+                source: ImageSource::Asset(Arc::new(MockAssetHandle::new(
+                    "photo",
+                    "image/jpeg",
+                    &[0xFF, 0xD8, 0xFF],
+                ))),
+                alt: None,
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndDocument,
+        ]);
         assert_eq!(
             json,
             r#"[{"type":"image","props":{"url":"data:image/jpeg;base64,/9j/","caption":""},"content":null,"children":[]}]"#
@@ -1544,23 +1532,21 @@ mod tests {
 
     #[test]
     fn asset_image_empty_bytes() {
-        let provider = MockAssetProvider::new().with_asset("empty", "image/png", &[]);
-        let json = run_events_with_assets(
-            &[
-                start_document(),
-                Event::Image {
-                    source: ImageSource::Asset {
-                        asset_id: "empty".to_string(),
-                    },
-                    alt: None,
-                    title: None,
-                    decorative: false,
-                    id: None,
-                },
-                Event::EndDocument,
-            ],
-            &provider,
-        );
+        let json = run_events(&[
+            start_document(),
+            Event::Image {
+                source: ImageSource::Asset(Arc::new(MockAssetHandle::new(
+                    "empty",
+                    "image/png",
+                    &[],
+                ))),
+                alt: None,
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndDocument,
+        ]);
         assert_eq!(
             json,
             r#"[{"type":"image","props":{"url":"data:image/png;base64,","caption":""},"content":null,"children":[]}]"#
@@ -1569,33 +1555,30 @@ mod tests {
 
     #[test]
     fn asset_and_uri_images_mixed() {
-        let provider =
-            MockAssetProvider::new().with_asset("img1", "image/png", &[0x89, 0x50, 0x4E, 0x47]);
-        let json = run_events_with_assets(
-            &[
-                start_document(),
-                Event::Image {
-                    source: ImageSource::Asset {
-                        asset_id: "img1".to_string(),
-                    },
-                    alt: None,
-                    title: None,
-                    decorative: false,
-                    id: None,
+        let json = run_events(&[
+            start_document(),
+            Event::Image {
+                source: ImageSource::Asset(Arc::new(MockAssetHandle::new(
+                    "img1",
+                    "image/png",
+                    &[0x89, 0x50, 0x4E, 0x47],
+                ))),
+                alt: None,
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/img.png".to_string(),
                 },
-                Event::Image {
-                    source: ImageSource::Uri {
-                        uri: "https://example.com/img.png".to_string(),
-                    },
-                    alt: None,
-                    title: None,
-                    decorative: false,
-                    id: None,
-                },
-                Event::EndDocument,
-            ],
-            &provider,
-        );
+                alt: None,
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndDocument,
+        ]);
         assert_eq!(
             json,
             r#"[{"type":"image","props":{"url":"data:image/png;base64,iVBORw==","caption":""},"content":null,"children":[]},{"type":"image","props":{"url":"https://example.com/img.png","caption":""},"content":null,"children":[]}]"#
@@ -1604,33 +1587,29 @@ mod tests {
 
     #[test]
     fn asset_image_same_id_twice() {
-        let provider =
-            MockAssetProvider::new().with_asset("img1", "image/png", &[0x89, 0x50, 0x4E, 0x47]);
-        let json = run_events_with_assets(
-            &[
-                start_document(),
-                Event::Image {
-                    source: ImageSource::Asset {
-                        asset_id: "img1".to_string(),
-                    },
-                    alt: None,
-                    title: None,
-                    decorative: false,
-                    id: None,
-                },
-                Event::Image {
-                    source: ImageSource::Asset {
-                        asset_id: "img1".to_string(),
-                    },
-                    alt: None,
-                    title: None,
-                    decorative: false,
-                    id: None,
-                },
-                Event::EndDocument,
-            ],
-            &provider,
-        );
+        let handle: Arc<dyn AssetHandle> = Arc::new(MockAssetHandle::new(
+            "img1",
+            "image/png",
+            &[0x89, 0x50, 0x4E, 0x47],
+        ));
+        let json = run_events(&[
+            start_document(),
+            Event::Image {
+                source: ImageSource::Asset(Arc::clone(&handle)),
+                alt: None,
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::Image {
+                source: ImageSource::Asset(Arc::clone(&handle)),
+                alt: None,
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndDocument,
+        ]);
         assert_eq!(
             json,
             r#"[{"type":"image","props":{"url":"data:image/png;base64,iVBORw==","caption":""},"content":null,"children":[]},{"type":"image","props":{"url":"data:image/png;base64,iVBORw==","caption":""},"content":null,"children":[]}]"#
@@ -1639,27 +1618,24 @@ mod tests {
 
     #[test]
     fn asset_image_in_paragraph() {
-        let provider =
-            MockAssetProvider::new().with_asset("img1", "image/png", &[0x89, 0x50, 0x4E, 0x47]);
-        let json = run_events_with_assets(
-            &[
-                start_document(),
-                start_paragraph(),
-                text("Before"),
-                Event::EndParagraph,
-                Event::Image {
-                    source: ImageSource::Asset {
-                        asset_id: "img1".to_string(),
-                    },
-                    alt: None,
-                    title: None,
-                    decorative: false,
-                    id: None,
-                },
-                Event::EndDocument,
-            ],
-            &provider,
-        );
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            text("Before"),
+            Event::EndParagraph,
+            Event::Image {
+                source: ImageSource::Asset(Arc::new(MockAssetHandle::new(
+                    "img1",
+                    "image/png",
+                    &[0x89, 0x50, 0x4E, 0x47],
+                ))),
+                alt: None,
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndDocument,
+        ]);
         assert_eq!(
             json,
             r#"[{"type":"paragraph","content":[{"type":"text","text":"Before","styles":{}}],"children":[]},{"type":"image","props":{"url":"data:image/png;base64,iVBORw==","caption":""},"content":null,"children":[]}]"#
@@ -1675,9 +1651,9 @@ mod tests {
 
     #[test]
     fn image_with_asset_stream_not_found() {
-        let provider = MockAssetProvider::new().with_content_type_only("img1", "image/png");
+        let handle = Arc::new(MockAssetHandle::unknown_content_type("img1"));
         let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::with_assets(&mut buf, &provider));
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
         let start_result = writer.handle_event(Event::StartDocument {
             id: None,
             language: None,
@@ -1685,9 +1661,7 @@ mod tests {
         });
         assert!(start_result.is_ok(), "start should succeed");
         let result = writer.handle_event(Event::Image {
-            source: ImageSource::Asset {
-                asset_id: "img1".to_string(),
-            },
+            source: ImageSource::Asset(handle),
             alt: None,
             title: None,
             decorative: false,
@@ -3978,25 +3952,6 @@ mod tests {
     }
 
     #[test]
-    fn with_assets_constructor_accepts_asset_provider() {
-        // Drives BlockNoteWriter::with_assets constructor body (line 804).
-        let provider = MockAssetProvider::new();
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::with_assets(&mut buf, &provider);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_paragraph()).is_ok());
-        assert!(writer.handle_event(text("hello")).is_ok());
-        assert!(writer.handle_event(Event::EndParagraph).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{}}],"children":[]}]"#
-        );
-    }
-
-    #[test]
     fn level_down_to_nested_parent_breaks_loop() {
         // Drives the break statement (line 592) in the level-down while-loop of
         // handle_start_list_item: level-0 → level-1 → level-2 → back to level-1.
@@ -4942,6 +4897,74 @@ mod tests {
         assert_eq!(
             json,
             r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn streaming_writes_never_exceed_8kb() {
+        use docspec_core::{Event, EventSink as _, ImageSource};
+        use std::io::Write;
+
+        struct CountingWriter {
+            inner: Vec<u8>,
+            max_single_write: usize,
+            total_writes: usize,
+        }
+        impl Write for CountingWriter {
+            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                self.max_single_write = self.max_single_write.max(buf.len());
+                self.total_writes += 1;
+                self.inner.extend_from_slice(buf);
+                Ok(buf.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let payload: Vec<u8> = (0..(1024 * 1024))
+            .map(|i: usize| u8::try_from(i.rem_euclid(256)).unwrap_or(0))
+            .collect();
+        let payload_len = payload.len();
+        let handle = Arc::new(MockAssetHandle::new("big", "image/png", &payload));
+        let mut counting = CountingWriter {
+            inner: Vec::new(),
+            max_single_write: 0,
+            total_writes: 0,
+        };
+
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut counting));
+        let start_result = writer.handle_event(Event::StartDocument {
+            id: None,
+            language: None,
+            metadata: None,
+        });
+        assert!(start_result.is_ok(), "start should succeed");
+
+        let img_result = writer.handle_event(Event::Image {
+            source: ImageSource::Asset(handle),
+            alt: Some("Large image".to_string()),
+            title: None,
+            decorative: false,
+            id: None,
+        });
+        assert!(img_result.is_ok(), "image should succeed");
+
+        let end_result = writer.handle_event(Event::EndDocument);
+        assert!(end_result.is_ok(), "end should succeed");
+
+        let finish_result = writer.finish();
+        assert!(finish_result.is_ok(), "finish should succeed");
+
+        assert!(
+             counting.max_single_write < 16 * 1024,
+             "expected streaming (max write < 16KB), got max single write of {} bytes (total payload {})",
+             counting.max_single_write, payload_len
+         );
+        assert!(
+            counting.total_writes > 64,
+            "expected many small writes for 1MB payload; got {} writes",
+            counting.total_writes
         );
     }
 }

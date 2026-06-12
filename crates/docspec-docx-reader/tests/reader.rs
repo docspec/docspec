@@ -234,26 +234,28 @@ mod constructor {
     }
 
     #[test]
-    fn from_reader_errors_on_unsupported_compression() {
+    fn from_reader_opens_bzip2_compressed_document() {
         let bytes = fixture::synth_docx_with_entries(&[
             (
                 "_rels/.rels",
                 zip::CompressionMethod::Deflated,
                 r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#.as_bytes(),
             ),
-            ("word/document.xml", zip::CompressionMethod::Bzip2, b"<doc/>"),
+            (
+                "word/document.xml",
+                zip::CompressionMethod::Bzip2,
+                b"<?xml version=\"1.0\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body></w:body></w:document>",
+            ),
         ]);
         let result = DocxReader::from_reader(Cursor::new(bytes));
-        match result {
-            Err(Error::Parse { message, .. }) => {
-                assert_eq!(message, "unsupported compression: Bzip2");
-            }
-            other => panic!("expected Error::Parse, got: {other:?}"),
-        }
+        assert!(
+            result.is_ok(),
+            "bzip2-compressed document should open: {result:?}"
+        );
     }
 
     #[test]
-    fn next_event_passes_through_mid_parse_io_error() {
+    fn document_xml_buffered_at_open_time_so_reader_failure_after_open_is_harmless() {
         let bytes = fixture::synth_docx_with_entries(&[
             (
                 "_rels/.rels",
@@ -271,23 +273,25 @@ mod constructor {
         let fail_enabled = Arc::new(AtomicBool::new(false));
         let failing_reader = FailingReader::new(bytes, fail_at, Arc::clone(&fail_enabled));
         let mut reader = DocxReader::from_reader(failing_reader).expect("from_reader");
+
         fail_enabled.store(true, Ordering::SeqCst);
 
-        assert_eq!(
-            reader.next_event().expect("start document"),
-            Some(Event::StartDocument {
+        let mut events = Vec::new();
+        loop {
+            match reader.next_event() {
+                Ok(Some(ev)) => events.push(ev),
+                Ok(None) => break,
+                Err(e) => panic!("unexpected error after buffered open: {e:?}"),
+            }
+        }
+        assert!(
+            events.contains(&Event::StartDocument {
                 id: None,
                 language: None,
-                metadata: None,
-            })
+                metadata: None
+            }),
+            "expected at least StartDocument event"
         );
-        match reader.next_event() {
-            Err(Error::Io { source }) => {
-                assert_eq!(source.kind(), std::io::ErrorKind::Other);
-                assert_eq!(source.to_string(), "forced read failure");
-            }
-            other => panic!("expected Error::Io, got: {other:?}"),
-        }
     }
 
     fn document_data_start(bytes: &[u8]) -> u64 {
@@ -1811,7 +1815,7 @@ mod events {
 
         assert_eq!(
             format!("{reader:?}"),
-            "DocxReader { inner: DocumentReader { buf: [], denied_stack: [], in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, pending_paragraph_classification: None, current_paragraph_block: Paragraph, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, pending_run_font: None, frozen_run_font: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, data: \"<DocxData>\", hyperlink_map: {}, hyperlink_depth: 0, pending_link: None, list_stack: [], seen_lists: {}, pending_paragraph_list: None, in_numpr: false, pending_num_pr_id: None, pending_num_pr_ilvl: None, xml: \"<quick_xml::Reader>\" } }"
+            "DocxReader { inner: DocumentReader { buf: [], denied_stack: [], in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, pending_paragraph_classification: None, current_paragraph_block: Paragraph, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, pending_run_font: None, frozen_run_font: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, data: \"<DocxData>\", hyperlink_map: {}, hyperlink_depth: 0, pending_link: None, list_stack: [], seen_lists: {}, pending_paragraph_list: None, in_numpr: false, pending_num_pr_id: None, pending_num_pr_ilvl: None, xml: \"<quick_xml::Reader>\", archive: \"<Arc<Mutex<ZipArchive>>>\", content_types: \"<Arc<ContentTypes>>\" } }"
         );
     }
 
