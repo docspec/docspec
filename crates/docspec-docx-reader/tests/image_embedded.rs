@@ -13,14 +13,32 @@
 mod fixture;
 
 use std::io::Cursor;
+use std::sync::Arc;
 
 use docspec_blocknote_writer::BlockNoteWriter;
 use docspec_core::StackTrackingSink;
-use docspec_core::{AssetProvider as _, Event, EventSink as _, EventSource as _, ImageSource};
-use docspec_docx_reader::{DocxAssetProvider, DocxReader};
+use docspec_core::{AssetHandle, Event, EventSink as _, EventSource as _, ImageSource};
+use docspec_docx_reader::DocxReader;
 use zip::CompressionMethod;
 
 const PNG_SIGNATURE: [u8; 8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+
+#[derive(Debug)]
+struct StubHandle(String);
+impl AssetHandle for StubHandle {
+    fn asset_id(&self) -> &str {
+        &self.0
+    }
+    fn content_type(&self) -> Option<std::borrow::Cow<'_, str>> {
+        None
+    }
+    fn stream_to(&self, _: &mut dyn std::io::Write) -> std::io::Result<u64> {
+        Ok(0)
+    }
+}
+fn asset_source(id: &str) -> ImageSource {
+    ImageSource::Asset(Arc::new(StubHandle(id.to_string())))
+}
 
 fn root_rels() -> &'static str {
     r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -119,9 +137,7 @@ fn docx_reader_emits_exact_image_event() {
     assert_eq!(
         *image_event,
         Event::Image {
-            source: ImageSource::Asset {
-                asset_id: "zip://word/media/image1.png".to_string(),
-            },
+            source: asset_source("zip://word/media/image1.png"),
             alt: Some("alt text".to_string()),
             decorative: false,
             title: None,
@@ -131,32 +147,38 @@ fn docx_reader_emits_exact_image_event() {
 }
 
 #[test]
-fn docx_asset_provider_streams_exact_bytes() {
+fn docx_reader_handle_streams_exact_bytes() {
     let bytes = synth_image_docx();
-    let provider = DocxAssetProvider::from_reader(Cursor::new(bytes)).unwrap();
-    let mut buf = Vec::new();
+    let events = collect_events(bytes);
 
-    let result = provider.stream_to("zip://word/media/image1.png", &mut buf);
+    let image_event = events
+        .iter()
+        .find(|e| matches!(e, Event::Image { .. }))
+        .expect("expected at least one Image event");
 
-    // io::Error does not impl PartialEq — unpack with expect instead of assert_eq!
-    assert_eq!(
-        result
-            .expect("stream_to should return Some")
-            .expect("stream_to should return Ok"),
-        8u64
-    );
-    assert_eq!(buf.as_slice(), PNG_SIGNATURE.as_ref());
+    if let Event::Image {
+        source: ImageSource::Asset(handle),
+        ..
+    } = image_event
+    {
+        let mut buf = Vec::new();
+        let n = handle
+            .stream_to(&mut buf)
+            .expect("stream_to should succeed");
+        assert_eq!(n, 8u64);
+        assert_eq!(buf.as_slice(), PNG_SIGNATURE.as_ref());
+    } else {
+        panic!("expected ImageSource::Asset, got: {image_event:?}");
+    }
 }
 
 #[test]
-fn blocknote_writer_with_assets_produces_exact_data_uri() {
+fn blocknote_writer_produces_data_uri_from_handle() {
     let bytes = synth_image_docx();
-
-    let mut reader = DocxReader::from_reader(Cursor::new(bytes.clone())).unwrap();
-    let provider = DocxAssetProvider::from_reader(Cursor::new(bytes)).unwrap();
+    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).unwrap();
 
     let mut out = Vec::<u8>::new();
-    let mut writer = StackTrackingSink::new(BlockNoteWriter::with_assets(&mut out, &provider));
+    let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut out));
 
     loop {
         match reader.next_event() {

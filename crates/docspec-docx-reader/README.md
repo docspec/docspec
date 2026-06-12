@@ -77,43 +77,37 @@ The following list features are intentionally out of scope for V1:
 
 `<w:drawing>` elements are parsed and emit `Event::Image`. The `source` field is one of two variants:
 
-- **Embedded image** (`r:embed`): `ImageSource::Asset { asset_id: "zip://word/media/image1.png" }`. The `asset_id` is the resolved ZIP entry path with a `zip://` scheme prefix. Use [`DocxAssetProvider`] to stream the raw bytes.
+- **Embedded image** (`r:embed`): `ImageSource::Asset(handle)` where `handle.asset_id()` returns `"zip://word/media/image1.png"`. The asset ID is the resolved ZIP entry path with a `zip://` scheme prefix. Call `handle.stream_to(&mut buf)` to stream the raw bytes, or `handle.content_type()` to get the MIME type.
 - **External image** (`r:link`): `ImageSource::Uri { uri: "<url>" }`. The URL is passed through verbatim from the relationship target.
 
 When both `r:embed` and `r:link` appear on the same blip, `r:embed` wins.
 
 A relationship marked `TargetMode="External"` is honored even when referenced via `r:embed` — the reader emits `ImageSource::Uri` in that case, matching Word and LibreOffice behavior.
 
-If the relationship ID cannot be resolved (missing or malformed rels), the reader emits `ImageSource::Asset { asset_id: "<rId>" }` using the raw relationship ID with no `zip://` prefix. Writers should apply their own missing-asset policy.
+If the relationship ID cannot be resolved (missing or malformed rels), the reader emits `ImageSource::Asset(handle)` where `handle.asset_id()` returns the raw relationship ID with no `zip://` prefix. Writers should apply their own missing-asset policy.
 
 `wp:docPr/@descr` maps to `Event::Image.alt`. The `title` field is always `None` in this release.
 
 VML images (`<w:pict>`) are not supported in this release — their subtree is silently dropped.
 
-### DocxAssetProvider
+### Asset Handles
 
-[`DocxAssetProvider`] implements the `AssetProvider` trait and streams asset bytes from the DOCX ZIP archive on demand. Open it independently from [`DocxReader`] using the same file path or an in-memory buffer.
+Each `ImageSource::Asset(handle)` carries an `Arc<dyn AssetHandle>` that holds everything needed to resolve the asset. Call methods directly on the handle:
 
 ```rust,no_run
-use docspec_docx_reader::{DocxReader, DocxAssetProvider, EventSource};
-use docspec_core::{AssetProvider, Event, ImageSource};
+use docspec_docx_reader::{DocxReader, EventSource};
+use docspec_core::{Event, ImageSource};
 
 let mut reader = DocxReader::from_path("document.docx")?;
-let provider = DocxAssetProvider::from_path("document.docx")?;
-
 while let Some(event) = reader.next_event()? {
-    if let Event::Image { source: ImageSource::Asset { asset_id }, .. } = &event {
+    if let Event::Image { source: ImageSource::Asset(handle), .. } = &event {
         let mut buf = Vec::new();
-        if let Some(result) = provider.stream_to(asset_id, &mut buf) {
-            result?;
-        }
-        // buf now contains the raw image bytes (or is empty if the asset was missing)
+        handle.stream_to(&mut buf)?;
+        // buf now contains the raw image bytes
     }
 }
 # Ok::<(), docspec_core::Error>(())
 ```
-
-For in-memory DOCX data, use `DocxAssetProvider::from_reader` with a `Cursor<Vec<u8>>`.
 
 ## Streaming Guarantee
 

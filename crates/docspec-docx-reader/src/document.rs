@@ -3,6 +3,7 @@
 use alloc::collections::VecDeque;
 use core::fmt;
 use std::io::{BufReader, Read};
+use std::sync::{Arc, Mutex};
 
 use docspec_core::{
     Color, Error, Event, ImageSource, Result, TableHeaderScope, TextAlignment, TextStyleKind,
@@ -238,6 +239,10 @@ pub struct DocumentReader {
     pending_num_pr_ilvl: Option<u32>,
     /// The quick-xml reader streaming from the document entry.
     xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
+    /// Shared DOCX ZIP archive — used to stream embedded asset bytes on demand.
+    archive: Arc<Mutex<zip::ZipArchive<Box<dyn crate::package::ReadSeek + 'static>>>>,
+    /// Content-type lookup table — used by `DocxAssetHandle` to resolve MIME types.
+    content_types: Arc<crate::content_types::ContentTypes>,
 }
 
 impl fmt::Debug for DocumentReader {
@@ -304,14 +309,18 @@ impl fmt::Debug for DocumentReader {
                 .field("header_band_open", &self.header_band_open);
         }
         debug.field("xml", &"<quick_xml::Reader>");
+        debug.field("archive", &"<Arc<Mutex<ZipArchive>>>");
+        debug.field("content_types", &"<Arc<ContentTypes>>");
         debug.finish()
     }
 }
 
 impl DocumentReader {
-    pub fn from_xml_reader(
+    pub fn from_xml_reader_and_archive(
         mut xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
         data: DocxData,
+        archive: Arc<Mutex<zip::ZipArchive<Box<dyn crate::package::ReadSeek + 'static>>>>,
+        content_types: Arc<crate::content_types::ContentTypes>,
     ) -> Self {
         xml.config_mut().check_end_names = false;
         let DocxData {
@@ -372,7 +381,33 @@ impl DocumentReader {
             pending_num_pr_id: None,
             pending_num_pr_ilvl: None,
             xml,
+            archive,
+            content_types,
         }
+    }
+
+    #[cfg(test)]
+    #[cfg(test)]
+    #[allow(clippy::expect_used, clippy::as_conversions)]
+    pub(crate) fn from_xml_reader(
+        xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
+        data: DocxData,
+    ) -> Self {
+        use std::io::Cursor;
+        const EMPTY_ZIP: &[u8] = &[
+            0x50, 0x4B, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let archive = zip::ZipArchive::new(
+            Box::new(Cursor::new(EMPTY_ZIP)) as Box<dyn crate::package::ReadSeek + 'static>
+        )
+        .expect("minimal empty zip must be valid");
+        Self::from_xml_reader_and_archive(
+            xml,
+            data,
+            Arc::new(Mutex::new(archive)),
+            Arc::new(crate::content_types::ContentTypes::default()),
+        )
     }
 }
 
@@ -1147,17 +1182,20 @@ impl DocumentReader {
     }
 
     fn image_source_for_rid(&self, rid: &str) -> ImageSource {
-        match self.data.image_map.get(rid) {
-            Some(rel) if rel.is_external => ImageSource::Uri {
-                uri: rel.target.clone(),
-            },
-            Some(rel) => ImageSource::Asset {
-                asset_id: format!("zip://{}", rel.target),
-            },
-            None => ImageSource::Asset {
-                asset_id: rid.to_string(),
-            },
-        }
+        let asset_id = match self.data.image_map.get(rid) {
+            Some(rel) if rel.is_external => {
+                return ImageSource::Uri {
+                    uri: rel.target.clone(),
+                }
+            }
+            Some(rel) => format!("zip://{}", rel.target),
+            None => rid.to_string(),
+        };
+        ImageSource::Asset(Arc::new(crate::asset_provider::DocxAssetHandle::new(
+            Arc::clone(&self.archive),
+            Arc::clone(&self.content_types),
+            asset_id,
+        )))
     }
 
     fn handle_hyperlink_start(&mut self, tag: &BytesStart<'_>) {
@@ -1636,10 +1674,28 @@ mod tests {
     )]
     use core::fmt::Write as _;
     use std::io::{Cursor, Read};
+    use std::sync::Arc;
 
-    use docspec_core::{ImageSource, ListStyleType};
+    use docspec_core::{AssetHandle, ImageSource, ListStyleType};
 
     use super::*;
+
+    fn asset_source(id: &str) -> ImageSource {
+        #[derive(Debug)]
+        struct StubHandle(String);
+        impl AssetHandle for StubHandle {
+            fn asset_id(&self) -> &str {
+                &self.0
+            }
+            fn content_type(&self) -> Option<std::borrow::Cow<'_, str>> {
+                None
+            }
+            fn stream_to(&self, _: &mut dyn std::io::Write) -> std::io::Result<u64> {
+                Ok(0)
+            }
+        }
+        ImageSource::Asset(Arc::new(StubHandle(id.to_string())))
+    }
 
     fn styles_xml(body: &str) -> String {
         format!(
@@ -1842,9 +1898,7 @@ mod tests {
                 start_doc(),
                 start_para(),
                 image_event(
-                    ImageSource::Asset {
-                        asset_id: "zip://word/media/image1.png".to_string(),
-                    },
+                    asset_source("zip://word/media/image1.png"),
                     Some("alt text"),
                 ),
                 Event::EndParagraph,
@@ -1893,12 +1947,7 @@ mod tests {
             vec![
                 start_doc(),
                 start_para(),
-                image_event(
-                    ImageSource::Asset {
-                        asset_id: "rId99".to_string(),
-                    },
-                    Some("missing rel"),
-                ),
+                image_event(asset_source("rId99"), Some("missing rel"),),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -1944,9 +1993,7 @@ mod tests {
                 start_doc(),
                 start_para(),
                 image_event(
-                    ImageSource::Asset {
-                        asset_id: "zip://word/media/embed.png".to_string(),
-                    },
+                    asset_source("zip://word/media/embed.png"),
                     Some("embed wins"),
                 ),
                 Event::EndParagraph,
@@ -2025,18 +2072,8 @@ mod tests {
             vec![
                 start_doc(),
                 start_para(),
-                image_event(
-                    ImageSource::Asset {
-                        asset_id: "zip://word/media/one.png".to_string(),
-                    },
-                    Some("one"),
-                ),
-                image_event(
-                    ImageSource::Asset {
-                        asset_id: "zip://word/media/two.png".to_string(),
-                    },
-                    Some("two"),
-                ),
+                image_event(asset_source("zip://word/media/one.png"), Some("one"),),
+                image_event(asset_source("zip://word/media/two.png"), Some("two"),),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -2062,9 +2099,7 @@ mod tests {
                 start_doc(),
                 start_para(),
                 image_event(
-                    ImageSource::Asset {
-                        asset_id: "zip://word/media/image1.png".to_string(),
-                    },
+                    asset_source("zip://word/media/image1.png"),
                     Some("start tag"),
                 ),
                 Event::EndParagraph,

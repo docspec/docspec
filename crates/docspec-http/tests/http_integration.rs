@@ -214,6 +214,46 @@ async fn post_conversion_missing_content_type() {
     );
 }
 
+fn find_image_url(blocks: &[Value]) -> Option<String> {
+    for block in blocks {
+        if block.get("type").and_then(Value::as_str) == Some("image") {
+            if let Some(url) = block
+                .get("props")
+                .and_then(|p| p.get("url"))
+                .and_then(Value::as_str)
+            {
+                return Some(url.to_owned());
+            }
+        }
+        if let Some(children) = block.get("children").and_then(Value::as_array) {
+            if let Some(url) = find_image_url(children) {
+                return Some(url);
+            }
+        }
+    }
+    None
+}
+
+#[tokio::test]
+async fn http_convert_docx_with_image() {
+    let docx_bytes = docspec_test_utils::synth_docx_with_image_png();
+    let response = app()
+        .oneshot(common::docx_request(docx_bytes))
+        .await
+        .expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response_body_json(response.into_body()).await;
+    let blocks = body.as_array().expect("response is a JSON array");
+
+    let image_url = find_image_url(blocks).expect("at least one image block with a url");
+    assert!(
+        image_url.starts_with("data:image/png;base64,"),
+        "expected data URI but got: {image_url}"
+    );
+}
+
 const DOCX_MIME: &str = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 fn hello_docx_bytes() -> Vec<u8> {

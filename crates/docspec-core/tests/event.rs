@@ -7,6 +7,26 @@ mod tests {
         Author, Color, DocumentMeta, ImageSource, ListStyleType, TableHeaderScope, TextAlignment,
     };
 
+    #[derive(Debug)]
+    struct TestAssetHandle {
+        asset_id: String,
+        content_type: Option<String>,
+    }
+
+    impl docspec_core::AssetHandle for TestAssetHandle {
+        fn content_type(&self) -> Option<std::borrow::Cow<'_, str>> {
+            self.content_type.as_deref().map(std::borrow::Cow::Borrowed)
+        }
+
+        fn stream_to(&self, _w: &mut dyn std::io::Write) -> std::io::Result<u64> {
+            Ok(0)
+        }
+
+        fn asset_id(&self) -> &str {
+            &self.asset_id
+        }
+    }
+
     #[test]
     fn end_block_quote() {
         let event = Event::EndBlockQuote;
@@ -144,9 +164,10 @@ mod tests {
     #[test]
     fn image_asset() {
         let event = Event::Image {
-            source: ImageSource::Asset {
+            source: ImageSource::Asset(std::sync::Arc::new(TestAssetHandle {
                 asset_id: "img_001".to_string(),
-            },
+                content_type: None,
+            })),
             alt: Some("A picture".to_string()),
             title: Some("Image Title".to_string()),
             decorative: false,

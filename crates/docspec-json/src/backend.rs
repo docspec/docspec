@@ -1,6 +1,6 @@
 //! Backend trait for JSON token emission.
 
-use docspec_core::Result;
+use docspec_core::{Error, Result};
 
 /// Low-level JSON token emitter. Implementations write JSON tokens to an
 /// underlying sink. State validation is performed by [`crate::JsonEmitter`],
@@ -69,6 +69,27 @@ pub trait JsonBackend {
     ///
     /// Returns any error produced by the underlying backend.
     fn write_string(&mut self, s: &str) -> Result<()>;
+    /// Write a string value by streaming bytes through a closure.
+    ///
+    /// The default implementation buffers the bytes into a `Vec<u8>`, converts
+    /// to a `&str`, and delegates to [`write_string`](Self::write_string).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the closure returns an I/O error, or if the buffered
+    /// bytes are not valid UTF-8.
+    #[allow(clippy::missing_inline_in_public_items)]
+    fn write_string_streaming<F>(&mut self, f: F) -> Result<()>
+    where
+        F: FnOnce(&mut dyn std::io::Write) -> std::io::Result<()>,
+    {
+        let mut buf: Vec<u8> = Vec::new();
+        f(&mut buf).map_err(Error::from)?;
+        let s = core::str::from_utf8(&buf).map_err(|e| Error::Other {
+            message: format!("write_string_streaming produced invalid UTF-8: {e}"),
+        })?;
+        self.write_string(s)
+    }
 }
 
 /// A token captured by [`CapturingBackend`].
@@ -181,11 +202,97 @@ impl JsonBackend for CapturingBackend {
         self.tokens.push(Token::StringValue(s.to_string()));
         Ok(())
     }
+
+    #[inline]
+    fn write_string_streaming<F>(&mut self, f: F) -> Result<()>
+    where
+        F: FnOnce(&mut dyn std::io::Write) -> std::io::Result<()>,
+    {
+        let mut buf: Vec<u8> = Vec::new();
+        f(&mut buf).map_err(Error::from)?;
+        let s = core::str::from_utf8(&buf).map_err(|e| Error::Other {
+            message: format!("write_string_streaming produced invalid UTF-8: {e}"),
+        })?;
+        self.tokens.push(Token::StringValue(s.to_string()));
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Mock backend that records `write_string` calls for testing the default impl.
+    #[derive(Debug, Default)]
+    struct MockBackend {
+        write_string_calls: Vec<String>,
+    }
+
+    impl JsonBackend for MockBackend {
+        type Output = ();
+
+        fn begin_array(&mut self) -> Result<()> {
+            Ok(())
+        }
+
+        fn begin_object(&mut self) -> Result<()> {
+            Ok(())
+        }
+
+        fn end_array(&mut self) -> Result<()> {
+            Ok(())
+        }
+
+        fn end_object(&mut self) -> Result<()> {
+            Ok(())
+        }
+
+        fn finish(self) -> Result<()> {
+            Ok(())
+        }
+
+        fn write_bool(&mut self, _b: bool) -> Result<()> {
+            Ok(())
+        }
+
+        fn write_name(&mut self, _name: &str) -> Result<()> {
+            Ok(())
+        }
+
+        fn write_null(&mut self) -> Result<()> {
+            Ok(())
+        }
+
+        fn write_number(&mut self, _n: u32) -> Result<()> {
+            Ok(())
+        }
+
+        fn write_string(&mut self, s: &str) -> Result<()> {
+            self.write_string_calls.push(s.to_string());
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn default_impl_buffers_and_delegates_to_write_string() {
+        let mut mock = MockBackend::default();
+        let result = mock.write_string_streaming(|w| {
+            w.write_all(b"hello world")?;
+            Ok(())
+        });
+        assert!(result.is_ok());
+        assert_eq!(mock.write_string_calls, vec!["hello world"]);
+    }
+
+    #[test]
+    fn default_impl_errors_on_invalid_utf8() {
+        let mut mock = MockBackend::default();
+        let result = mock.write_string_streaming(|w| {
+            w.write_all(&[0xFF, 0xFE, 0x00])?;
+            Ok(())
+        });
+        assert!(result.is_err());
+    }
 
     #[test]
     fn capturing_backend_starts_empty() {
@@ -237,5 +344,34 @@ mod tests {
         assert!(result.is_ok());
         let tokens = result.unwrap_or_default();
         assert!(tokens == vec![Token::BeginObject, Token::EndObject]);
+    }
+
+    #[test]
+    fn capturing_streaming_pushes_single_token() {
+        let mut b = CapturingBackend::new();
+        let result = b.write_string_streaming(|w| w.write_all(b"hello"));
+        assert!(result.is_ok());
+        assert_eq!(b.tokens(), &[Token::StringValue("hello".to_string())]);
+    }
+
+    #[test]
+    fn capturing_streaming_multi_chunk_concatenates() {
+        let mut b = CapturingBackend::new();
+        let result = b.write_string_streaming(|w| {
+            w.write_all(b"hello")?;
+            w.write_all(b" ")?;
+            w.write_all(b"world")?;
+            Ok(())
+        });
+        assert!(result.is_ok());
+        assert_eq!(b.tokens(), &[Token::StringValue("hello world".to_string())]);
+    }
+
+    #[test]
+    fn capturing_streaming_error_does_not_push_token() {
+        let mut b = CapturingBackend::new();
+        let result = b.write_string_streaming(|_w| Err(std::io::Error::other("test error")));
+        assert!(result.is_err());
+        assert!(b.tokens().is_empty());
     }
 }

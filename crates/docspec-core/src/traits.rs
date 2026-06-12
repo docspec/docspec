@@ -1,23 +1,24 @@
-//! Core traits for event sources, sinks, and asset providers.
+//! Core traits for event sources, sinks, and asset handles.
 
-use alloc::borrow::Cow;
-use std::io;
-use std::io::Write;
-
-/// Provides access to binary assets referenced in the event stream.
+/// A self-contained handle to a single embedded asset.
 ///
-/// Readers register assets as they are encountered. Writers call [`AssetProvider::stream_to`]
-/// on demand — bytes stream through, never buffer. Assets must remain accessible until
-/// the `EndDocument` event is processed.
-pub trait AssetProvider: Send + Sync {
-    /// Returns the MIME content type for the given asset ID, or `None` if the asset is not found.
-    fn content_type(&self, asset_id: &str) -> Option<Cow<'_, str>>;
+/// Returned by readers inside `ImageSource::Asset(Arc<dyn AssetHandle>)`.
+/// The handle carries everything needed to resolve content type and stream
+/// bytes — no external provider lookup is required.
+pub trait AssetHandle: Send + Sync + core::fmt::Debug {
+    /// MIME content type (e.g. `"image/png"`). `None` means unknown.
+    fn content_type(&self) -> Option<std::borrow::Cow<'_, str>>;
 
-    /// Streams the asset bytes to the given writer.
+    /// Stream the asset bytes to `writer`. Returns total bytes written.
     ///
-    /// Returns `Some(Ok(bytes_written))` on success, `Some(Err(_))` on write error,
-    /// or `None` if the asset is not found.
-    fn stream_to(&self, asset_id: &str, writer: &mut dyn Write) -> Option<io::Result<u64>>;
+    /// # Errors
+    /// Returns `io::Error` if the underlying source fails or the asset is
+    /// no longer accessible (e.g. ZIP entry vanished, mutex poisoned).
+    fn stream_to(&self, writer: &mut dyn std::io::Write) -> std::io::Result<u64>;
+
+    /// Opaque identifier used for `Debug` formatting and `PartialEq` on
+    /// `ImageSource::Asset`. Format is reader-defined (e.g. `"zip://word/media/image1.png"`).
+    fn asset_id(&self) -> &str;
 }
 
 /// Consumes a stream of [`crate::Event`]s to produce output.

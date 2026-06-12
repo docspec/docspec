@@ -4,6 +4,26 @@
 mod tests {
     use docspec_core::*;
 
+    #[derive(Debug)]
+    struct TestAssetHandle {
+        asset_id: String,
+        content_type: Option<String>,
+    }
+
+    impl docspec_core::AssetHandle for TestAssetHandle {
+        fn content_type(&self) -> Option<std::borrow::Cow<'_, str>> {
+            self.content_type.as_deref().map(std::borrow::Cow::Borrowed)
+        }
+
+        fn stream_to(&self, _w: &mut dyn std::io::Write) -> std::io::Result<u64> {
+            Ok(0)
+        }
+
+        fn asset_id(&self) -> &str {
+            &self.asset_id
+        }
+    }
+
     #[test]
     fn author_clone() {
         let author = Author {
@@ -142,11 +162,37 @@ mod tests {
 
     #[test]
     fn image_source_asset_clone() {
-        let source = ImageSource::Asset {
+        let source = ImageSource::Asset(std::sync::Arc::new(TestAssetHandle {
             asset_id: "img_001".to_string(),
-        };
+            content_type: None,
+        }));
         let cloned = source.clone();
         assert_eq!(source, cloned);
+    }
+
+    #[test]
+    fn image_source_partial_eq_via_asset_id() {
+        use std::sync::Arc;
+        #[derive(Debug)]
+        struct H(String);
+        impl docspec_core::AssetHandle for H {
+            fn content_type(&self) -> Option<std::borrow::Cow<'_, str>> {
+                None
+            }
+            fn stream_to(&self, _: &mut dyn std::io::Write) -> std::io::Result<u64> {
+                Ok(0)
+            }
+            fn asset_id(&self) -> &str {
+                &self.0
+            }
+        }
+        let a = ImageSource::Asset(Arc::new(H("x".into())));
+        let b = ImageSource::Asset(Arc::new(H("x".into())));
+        let c = ImageSource::Asset(Arc::new(H("y".into())));
+        let u = ImageSource::Uri { uri: "x".into() };
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+        assert_ne!(a, u);
     }
 
     #[test]
@@ -160,9 +206,10 @@ mod tests {
 
     #[test]
     fn image_source_variants() {
-        let asset = ImageSource::Asset {
+        let asset = ImageSource::Asset(std::sync::Arc::new(TestAssetHandle {
             asset_id: "id1".to_string(),
-        };
+            content_type: None,
+        }));
         let uri = ImageSource::Uri {
             uri: "http://example.com".to_string(),
         };

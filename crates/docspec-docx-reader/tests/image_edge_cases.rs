@@ -15,9 +15,10 @@
 mod fixture;
 
 use std::io::Cursor;
+use std::sync::Arc;
 
-use docspec_core::{AssetProvider as _, Event, EventSource as _, ImageSource};
-use docspec_docx_reader::{DocxAssetProvider, DocxReader};
+use docspec_core::{AssetHandle, Event, EventSource as _, ImageSource};
+use docspec_docx_reader::DocxReader;
 use zip::CompressionMethod;
 
 const ROOT_RELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -29,6 +30,23 @@ const ROOT_RELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 
 const IMAGE_REL_TYPE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+
+#[derive(Debug)]
+struct StubHandle(String);
+impl AssetHandle for StubHandle {
+    fn asset_id(&self) -> &str {
+        &self.0
+    }
+    fn content_type(&self) -> Option<std::borrow::Cow<'_, str>> {
+        None
+    }
+    fn stream_to(&self, _: &mut dyn std::io::Write) -> std::io::Result<u64> {
+        Ok(0)
+    }
+}
+fn asset_source(id: &str) -> ImageSource {
+    ImageSource::Asset(Arc::new(StubHandle(id.to_string())))
+}
 
 fn doc_rels(body: &str) -> String {
     format!(
@@ -75,21 +93,6 @@ fn build_docx(doc_rels_xml: &str, document_xml: &str) -> Vec<u8> {
             "word/document.xml",
             CompressionMethod::Deflated,
             document_xml.as_bytes(),
-        ),
-    ])
-}
-
-fn build_provider_docx() -> Vec<u8> {
-    fixture::synth_docx_with_entries(&[
-        (
-            "[Content_Types].xml",
-            CompressionMethod::Deflated,
-            br#"<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="png" ContentType="image/png"/></Types>"#,
-        ),
-        (
-            "word/media/image1.png",
-            CompressionMethod::Stored,
-            &[0x89u8, 0x50, 0x4E, 0x47],
         ),
     ])
 }
@@ -191,12 +194,7 @@ fn missing_rel_emits_raw_rid() {
         vec![
             start_doc(),
             start_para(),
-            image_event(
-                ImageSource::Asset {
-                    asset_id: "rId99".to_string(),
-                },
-                None,
-            ),
+            image_event(asset_source("rId99"), None),
             Event::EndParagraph,
             Event::EndDocument,
         ]
@@ -236,12 +234,7 @@ fn embed_wins_over_link() {
         vec![
             start_doc(),
             start_para(),
-            image_event(
-                ImageSource::Asset {
-                    asset_id: "zip://word/media/embed.png".to_string(),
-                },
-                None,
-            ),
+            image_event(asset_source("zip://word/media/embed.png"), None),
             Event::EndParagraph,
             Event::EndDocument,
         ]
@@ -290,7 +283,6 @@ fn smartart_blip_ignored() {
     let rels = doc_rels(&format!(
         r#"<Relationship Id="rIdSmart" Type="{IMAGE_REL_TYPE}" Target="word/media/smart.png"/>"#
     ));
-    // blip is at a:graphicData/a:blip — NOT inside pic:pic/pic:blipFill
     let drawing = r#"<wp:inline><a:graphic><a:graphicData><a:blip r:embed="rIdSmart"/></a:graphicData></a:graphic></wp:inline>"#;
     let doc = drawing_doc(drawing);
     let bytes = build_docx(&rels, &doc);
@@ -325,42 +317,12 @@ fn multiple_pics_multiple_events() {
         vec![
             start_doc(),
             start_para(),
-            image_event(
-                ImageSource::Asset {
-                    asset_id: "zip://word/media/one.png".to_string(),
-                },
-                None,
-            ),
-            image_event(
-                ImageSource::Asset {
-                    asset_id: "zip://word/media/two.png".to_string(),
-                },
-                None,
-            ),
+            image_event(asset_source("zip://word/media/one.png"), None),
+            image_event(asset_source("zip://word/media/two.png"), None),
             Event::EndParagraph,
             Event::EndDocument,
         ]
     );
-}
-
-#[test]
-fn provider_non_zip_scheme_returns_none() {
-    let bytes = build_provider_docx();
-    let provider = DocxAssetProvider::from_reader(Cursor::new(bytes)).expect("from_reader");
-    let ct = provider.content_type("rId99");
-    assert_eq!(ct, None);
-    let mut buf = Vec::new();
-    let result = provider.stream_to("rId99", &mut buf);
-    assert!(result.is_none());
-}
-
-#[test]
-fn provider_unknown_internal_path_returns_none() {
-    let bytes = build_provider_docx();
-    let provider = DocxAssetProvider::from_reader(Cursor::new(bytes)).expect("from_reader");
-    let mut buf = Vec::new();
-    let result = provider.stream_to("zip://word/media/nonexistent.png", &mut buf);
-    assert!(result.is_none());
 }
 
 const HYPERLINK_REL_TYPE: &str =
@@ -403,12 +365,7 @@ fn hyperlink_wrapping_only_a_drawing_emits_start_and_end_link_around_image() {
                 id: None,
                 title: None,
             },
-            image_event(
-                ImageSource::Asset {
-                    asset_id: "zip://word/media/image1.png".to_string(),
-                },
-                None,
-            ),
+            image_event(asset_source("zip://word/media/image1.png"), None),
             Event::EndLink,
             Event::EndParagraph,
             Event::EndDocument,
@@ -445,20 +402,10 @@ fn sibling_drawing_without_docpr_does_not_inherit_alt() {
         vec![
             start_doc(),
             start_para(),
-            image_event(
-                ImageSource::Asset {
-                    asset_id: "zip://word/media/one.png".to_string(),
-                },
-                Some("first"),
-            ),
+            image_event(asset_source("zip://word/media/one.png"), Some("first")),
             Event::EndParagraph,
             start_para(),
-            image_event(
-                ImageSource::Asset {
-                    asset_id: "zip://word/media/two.png".to_string(),
-                },
-                None,
-            ),
+            image_event(asset_source("zip://word/media/two.png"), None),
             Event::EndParagraph,
             Event::EndDocument,
         ]

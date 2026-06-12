@@ -2,7 +2,7 @@
 
 use std::io::Write;
 
-use docspec_core::{AssetProvider, Event, EventSink, Result, StackTrackingSink};
+use docspec_core::{Event, EventSink, Result, StackTrackingSink};
 
 #[cfg(feature = "blocknote-writer")]
 use docspec_blocknote_writer::BlockNoteWriter;
@@ -21,14 +21,14 @@ use crate::format::OutputFormat;
 ///
 /// Internally wraps the chosen writer in [`StackTrackingSink`] so callers
 /// never need to compose normalization manually. Constructed via
-/// [`AnyWriter::new`] or [`AnyWriter::with_assets`].
-pub struct AnyWriter<'a, W: Write> {
-    inner: StackTrackingSink<AnyWriterInner<'a, W>>,
+/// [`AnyWriter::new`].
+pub struct AnyWriter<W: Write> {
+    inner: StackTrackingSink<AnyWriterInner<W>>,
 }
 
-enum AnyWriterInner<'a, W: Write> {
+enum AnyWriterInner<W: Write> {
     #[cfg(feature = "blocknote-writer")]
-    BlockNote(BlockNoteWriter<'a, W>),
+    BlockNote(BlockNoteWriter<W>),
     #[cfg(feature = "html-writer")]
     Html(HtmlWriter<W>),
     #[cfg(feature = "oxa-writer")]
@@ -37,11 +37,9 @@ enum AnyWriterInner<'a, W: Write> {
     PandocNative(PandocNativeWriter<W>),
     #[cfg(feature = "markdown-writer")]
     Markdown(MarkdownWriter<W>),
-    #[cfg(not(feature = "blocknote-writer"))]
-    _Phantom(std::marker::PhantomData<&'a W>),
 }
 
-impl<'a, W: Write> AnyWriter<'a, W> {
+impl<W: Write> AnyWriter<W> {
     /// Construct a writer for the given format.
     #[inline]
     #[must_use]
@@ -84,70 +82,9 @@ impl<'a, W: Write> AnyWriter<'a, W> {
             }
         }
     }
-
-    /// Construct a writer with an asset provider, where supported.
-    ///
-    /// Writers that do not consume an [`AssetProvider`] (currently `OxaWriter`,
-    /// `HtmlWriter`, and `PandocNativeWriter`) silently ignore the `assets` argument;
-    /// the resulting
-    /// writer behaves identically to [`AnyWriter::new`].
-    #[inline]
-    #[must_use]
-    pub fn with_assets(format: OutputFormat, writer: W, assets: &'a dyn AssetProvider) -> Self {
-        #[cfg(not(any(
-            feature = "blocknote-writer",
-            feature = "oxa-writer",
-            feature = "html-writer",
-            feature = "pandoc-native-writer",
-            feature = "markdown-writer"
-        )))]
-        {
-            drop(writer);
-            let _ = assets;
-            match format {}
-        }
-        #[cfg(any(
-            feature = "blocknote-writer",
-            feature = "oxa-writer",
-            feature = "html-writer",
-            feature = "pandoc-native-writer",
-            feature = "markdown-writer"
-        ))]
-        {
-            let inner = match format {
-                #[cfg(feature = "blocknote-writer")]
-                OutputFormat::Blocknote => {
-                    AnyWriterInner::BlockNote(BlockNoteWriter::with_assets(writer, assets))
-                }
-                #[cfg(feature = "html-writer")]
-                OutputFormat::Html => {
-                    let _ = assets;
-                    AnyWriterInner::Html(HtmlWriter::new(writer))
-                }
-                #[cfg(feature = "oxa-writer")]
-                OutputFormat::Oxa => {
-                    let _ = assets;
-                    AnyWriterInner::Oxa(OxaWriter::new(writer))
-                }
-                #[cfg(feature = "pandoc-native-writer")]
-                OutputFormat::PandocNative => {
-                    let _ = assets;
-                    AnyWriterInner::PandocNative(PandocNativeWriter::new(writer))
-                }
-                #[cfg(feature = "markdown-writer")]
-                OutputFormat::Markdown => {
-                    let _ = assets;
-                    AnyWriterInner::Markdown(MarkdownWriter::new(writer))
-                }
-            };
-            Self {
-                inner: StackTrackingSink::new(inner),
-            }
-        }
-    }
 }
 
-impl<W: Write> EventSink for AnyWriterInner<'_, W> {
+impl<W: Write> EventSink for AnyWriterInner<W> {
     fn finish(self) -> Result<()> {
         match self {
             #[cfg(feature = "blocknote-writer")]
@@ -186,7 +123,7 @@ impl<W: Write> EventSink for AnyWriterInner<'_, W> {
     }
 }
 
-impl<W: Write> EventSink for AnyWriter<'_, W> {
+impl<W: Write> EventSink for AnyWriter<W> {
     #[inline]
     fn finish(self) -> Result<()> {
         self.inner.finish()
@@ -195,150 +132,5 @@ impl<W: Write> EventSink for AnyWriter<'_, W> {
     #[inline]
     fn handle_event(&mut self, event: Event) -> Result<()> {
         self.inner.handle_event(event)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::borrow::Cow;
-    use std::io::Write;
-
-    use docspec_core::AssetProvider;
-    #[cfg(any(
-        feature = "blocknote-writer",
-        feature = "html-writer",
-        feature = "oxa-writer",
-        feature = "pandoc-native-writer",
-        feature = "markdown-writer"
-    ))]
-    use docspec_core::{Event, EventSink as _};
-
-    #[cfg(any(
-        feature = "blocknote-writer",
-        feature = "html-writer",
-        feature = "oxa-writer",
-        feature = "pandoc-native-writer",
-        feature = "markdown-writer"
-    ))]
-    use super::{AnyWriter, OutputFormat};
-
-    struct NullAssets;
-
-    impl AssetProvider for NullAssets {
-        fn content_type(&self, _asset_id: &str) -> Option<Cow<'_, str>> {
-            None
-        }
-
-        fn stream_to(
-            &self,
-            _asset_id: &str,
-            _writer: &mut dyn Write,
-        ) -> Option<std::io::Result<u64>> {
-            None
-        }
-    }
-
-    #[cfg(feature = "blocknote-writer")]
-    #[test]
-    fn with_assets_constructs_writer_for_blocknote() {
-        let assets = NullAssets;
-        assert!(assets.content_type("any-id").is_none());
-        assert!(assets.stream_to("any-id", &mut std::io::sink()).is_none());
-        let mut buf = Vec::new();
-        let mut writer = AnyWriter::with_assets(OutputFormat::Blocknote, &mut buf, &assets);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-        assert!(!buf.is_empty());
-    }
-
-    #[cfg(feature = "oxa-writer")]
-    #[test]
-    fn with_assets_constructs_writer_for_oxa() {
-        let assets = NullAssets;
-        let mut buf = Vec::new();
-        let mut writer = AnyWriter::with_assets(OutputFormat::Oxa, &mut buf, &assets);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-        assert_eq!(buf, br#"{"type":"Document","children":[]}"#);
-    }
-
-    #[cfg(feature = "html-writer")]
-    #[test]
-    fn with_assets_ignores_provider_for_html_writer() {
-        let assets = NullAssets;
-        let mut buf = Vec::new();
-        let mut writer = AnyWriter::with_assets(OutputFormat::Html, &mut buf, &assets);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-        assert_eq!(buf, b"<html><body></body></html>");
-    }
-
-    #[cfg(feature = "pandoc-native-writer")]
-    #[test]
-    fn with_assets_ignores_provider_for_pandoc_native_writer() {
-        let assets = NullAssets;
-        let mut buf = Vec::new();
-        let mut writer = AnyWriter::with_assets(OutputFormat::PandocNative, &mut buf, &assets);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-        assert_eq!(buf, b"[]");
-    }
-
-    #[cfg(feature = "markdown-writer")]
-    #[test]
-    fn with_assets_ignores_provider_for_markdown_writer() {
-        let assets = NullAssets;
-        let mut buf = Vec::new();
-        let mut writer = AnyWriter::with_assets(OutputFormat::Markdown, &mut buf, &assets);
-        assert!(writer
-            .handle_event(Event::StartDocument {
-                id: None,
-                language: None,
-                metadata: None,
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::StartParagraph {
-                alignment: None,
-                id: None
-            })
-            .is_ok());
-        assert!(writer
-            .handle_event(Event::Text {
-                content: "Hi".to_string()
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::EndParagraph).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-        assert_eq!(buf, b"Hi\n\n");
     }
 }
