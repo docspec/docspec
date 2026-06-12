@@ -12,6 +12,12 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.10.1](https://github.com/docspec/docspec/compare/v1.10.0...v1.10.1) - 2026-06-12
+
+### Fixed
+
+- embed asset access in ImageSource::Asset via AssetHandle trait
+
 ## [1.10.0](https://github.com/docspec/docspec/compare/v1.9.0...v1.10.0) - 2026-06-11
 
 ### Added
