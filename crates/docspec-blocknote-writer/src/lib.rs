@@ -339,7 +339,7 @@ impl<W: Write> BlockNoteWriter<W> {
         Ok(())
     }
 
-    fn handle_blockquote(&mut self, id: Option<&String>) -> Result<()> {
+    fn handle_blockquote(&mut self, id: Option<&str>) -> Result<()> {
         self.json.open_object()?;
         self.json.key("type").value("quote")?;
         self.write_id(id)?;
@@ -350,11 +350,11 @@ impl<W: Write> BlockNoteWriter<W> {
         Ok(())
     }
 
-    fn handle_divider(&mut self, id: Option<&String>) -> Result<()> {
+    fn handle_divider(&mut self, id: Option<&str>) -> Result<()> {
         self.json.object(|j| {
             j.key("type").value("divider")?;
             if let Some(id_val) = id {
-                j.key("id").value(id_val.as_str())?;
+                j.key("id").value(id_val)?;
             }
             Ok(())
         })
@@ -477,7 +477,7 @@ impl<W: Write> BlockNoteWriter<W> {
         Ok(())
     }
 
-    fn handle_heading(&mut self, level: u8, id: Option<&String>) -> Result<()> {
+    fn handle_heading(&mut self, level: u8, id: Option<&str>) -> Result<()> {
         self.json.open_object()?;
         self.json.key("type").value("heading")?;
         self.write_id(id)?;
@@ -493,7 +493,7 @@ impl<W: Write> BlockNoteWriter<W> {
         &mut self,
         source: ImageSource,
         alt: Option<String>,
-        id: Option<&String>,
+        id: Option<&str>,
     ) -> Result<()> {
         if self.context.in_table_cell || self.drop_inside_list_depth.is_positive() {
             return Ok(());
@@ -507,7 +507,7 @@ impl<W: Write> BlockNoteWriter<W> {
         match source {
             ImageSource::Uri { uri } => self.json.object(|j| {
                 if let Some(id_val) = id {
-                    j.key("id").value(id_val.as_str())?;
+                    j.key("id").value(id_val)?;
                 }
                 j.key("type").value("image")?;
                 j.key("props").object(|p| {
@@ -527,7 +527,7 @@ impl<W: Write> BlockNoteWriter<W> {
 
                 self.json.object(|j| {
                     if let Some(id_val) = id {
-                        j.key("id").value(id_val.as_str())?;
+                        j.key("id").value(id_val)?;
                     }
                     j.key("type").value("image")?;
                     j.key("props").object(|p| {
@@ -564,7 +564,7 @@ impl<W: Write> BlockNoteWriter<W> {
 
     fn handle_paragraph(
         &mut self,
-        id: Option<&String>,
+        id: Option<&str>,
         alignment: Option<&TextAlignment>,
     ) -> Result<()> {
         // Inside a table cell, BlockNote's content type is InlineContent[] — block-level events are dropped.
@@ -640,14 +640,14 @@ impl<W: Write> BlockNoteWriter<W> {
         Ok(())
     }
 
-    fn handle_preformatted(&mut self, id: Option<&String>, syntax: Option<&String>) -> Result<()> {
+    fn handle_preformatted(&mut self, id: Option<&str>, syntax: Option<&str>) -> Result<()> {
         self.json.open_object()?;
         self.json.key("type").value("codeBlock")?;
         self.write_id(id)?;
         if let Some(lang) = syntax {
             self.json
                 .key("props")
-                .object(|j| j.key("language").value(lang.as_str()))?;
+                .object(|j| j.key("language").value(lang))?;
         }
         self.json.key("content").open_array()?;
         self.context.in_text_block = true;
@@ -706,7 +706,7 @@ impl<W: Write> BlockNoteWriter<W> {
     fn handle_start_list_item(
         &mut self,
         kind: ListKind,
-        id: Option<&String>,
+        id: Option<&str>,
         level: u32,
         start: Option<u64>,
     ) -> Result<()> {
@@ -763,7 +763,7 @@ impl<W: Write> BlockNoteWriter<W> {
         Ok(())
     }
 
-    fn handle_start_table(&mut self, id: Option<&String>) -> Result<()> {
+    fn handle_start_table(&mut self, id: Option<&str>) -> Result<()> {
         drop_block_in_list_start!(self);
         self.close_for_block_sibling()?;
         self.json.open_object()?;
@@ -778,7 +778,7 @@ impl<W: Write> BlockNoteWriter<W> {
         Ok(())
     }
 
-    fn handle_start_table_row(&mut self, id: Option<&String>) -> Result<()> {
+    fn handle_start_table_row(&mut self, id: Option<&str>) -> Result<()> {
         if self.drop_inside_list_depth.is_positive() {
             return Ok(());
         }
@@ -787,7 +787,7 @@ impl<W: Write> BlockNoteWriter<W> {
         self.json.key("cells").open_array()
     }
 
-    fn handle_table_cell(&mut self, id: Option<&String>) -> Result<()> {
+    fn handle_table_cell(&mut self, id: Option<&str>) -> Result<()> {
         if self.drop_inside_list_depth.is_positive() {
             return Ok(());
         }
@@ -1008,7 +1008,7 @@ impl<W: Write> BlockNoteWriter<W> {
     fn open_list_item_object(
         &mut self,
         kind: ListKind,
-        id: Option<&String>,
+        id: Option<&str>,
         level: u32,
         start: Option<u64>,
     ) -> Result<()> {
@@ -1044,9 +1044,9 @@ impl<W: Write> BlockNoteWriter<W> {
         self.json.close_array()
     }
 
-    fn write_id(&mut self, id: Option<&String>) -> Result<()> {
+    fn write_id(&mut self, id: Option<&str>) -> Result<()> {
         if let Some(id_val) = id {
-            self.json.key("id").value(id_val.as_str())?;
+            self.json.key("id").value(id_val)?;
         }
         Ok(())
     }
@@ -1104,7 +1104,7 @@ impl<W: Write> EventSink for BlockNoteWriter<W> {
                 return_if_table_cell!(self);
                 drop_block_in_list_start!(self);
                 self.close_for_block_sibling()?;
-                self.handle_heading(level, id.as_ref())
+                self.handle_heading(level, id.as_deref())
             }
             Event::EndHeading => {
                 drop_block_in_list_end!(self);
@@ -1122,21 +1122,21 @@ impl<W: Write> EventSink for BlockNoteWriter<W> {
                 close_text_block!(self)
             }
             Event::StartParagraph { alignment, id } => {
-                self.handle_paragraph(id.as_ref(), alignment.as_ref())
+                self.handle_paragraph(id.as_deref(), alignment.as_ref())
             }
             Event::EndParagraph => self.handle_end_paragraph(),
             Event::StartBlockQuote { id, .. } => {
                 return_if_table_cell!(self);
                 drop_block_in_list_start!(self);
                 self.close_for_block_sibling()?;
-                self.handle_blockquote(id.as_ref())
+                self.handle_blockquote(id.as_deref())
             }
             Event::EndBlockQuote => self.handle_end_blockquote(),
             Event::StartPreformatted { id, syntax, .. } => {
                 return_if_table_cell!(self);
                 drop_block_in_list_start!(self);
                 self.close_for_block_sibling()?;
-                self.handle_preformatted(id.as_ref(), syntax.as_ref())
+                self.handle_preformatted(id.as_deref(), syntax.as_deref())
             }
             Event::ThematicBreak { id, .. } => {
                 return_if_table_cell!(self);
@@ -1144,28 +1144,28 @@ impl<W: Write> EventSink for BlockNoteWriter<W> {
                     return Ok(());
                 }
                 self.close_for_block_sibling()?;
-                self.handle_divider(id.as_ref())
+                self.handle_divider(id.as_deref())
             }
             Event::Text { content } => self.handle_text_event(&content),
             Event::StartTextStyle { kind, .. } => self.handle_start_text_style(kind),
             Event::EndTextStyle => self.handle_end_text_style(),
             Event::Image {
                 source, alt, id, ..
-            } => self.handle_image(source, alt, id.as_ref()),
+            } => self.handle_image(source, alt, id.as_deref()),
             Event::LineBreak | Event::SoftBreak => self.handle_line_break(),
             Event::StartOrderedListItem {
                 id, level, start, ..
-            } => self.handle_start_list_item(ListKind::Ordered, id.as_ref(), level, start),
+            } => self.handle_start_list_item(ListKind::Ordered, id.as_deref(), level, start),
             Event::StartUnorderedListItem { id, level, .. } => {
-                self.handle_start_list_item(ListKind::Unordered, id.as_ref(), level, None)
+                self.handle_start_list_item(ListKind::Unordered, id.as_deref(), level, None)
             }
             Event::EndOrderedListItem | Event::EndUnorderedListItem => self.handle_end_list_item(),
-            Event::StartTable { id, .. } => self.handle_start_table(id.as_ref()),
+            Event::StartTable { id, .. } => self.handle_start_table(id.as_deref()),
             Event::EndTable => self.handle_end_table(),
-            Event::StartTableRow { id, .. } => self.handle_start_table_row(id.as_ref()),
+            Event::StartTableRow { id, .. } => self.handle_start_table_row(id.as_deref()),
             Event::EndTableRow => self.handle_end_table_row(),
             Event::StartTableCell { id, .. } | Event::StartTableHeader { id, .. } => {
-                self.handle_table_cell(id.as_ref())
+                self.handle_table_cell(id.as_deref())
             }
             Event::EndTableCell | Event::EndTableHeader => self.handle_end_table_cell(),
             Event::StartLink { href, .. } => self.handle_start_link(&href),
