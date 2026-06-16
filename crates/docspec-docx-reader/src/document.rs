@@ -730,6 +730,55 @@ impl DocumentReader {
         true
     }
 
+    fn handle_paragraph_property_leaf(&mut self, local: &[u8], tag: &BytesStart<'_>) -> bool {
+        match local {
+            b"jc" if self.in_ppr => {
+                let val = read_val_attribute(tag);
+                self.pending_paragraph_alignment =
+                    val.as_deref().and_then(properties::parse_alignment);
+            }
+            b"pStyle" if self.in_ppr && !self.paragraph_started_emitted => {
+                self.pending_paragraph_classification = read_val_attribute(tag)
+                    .filter(|s| !s.is_empty())
+                    .and_then(|s| self.data.style_list.classify(&s));
+            }
+            b"numId" if self.in_numpr => {
+                if let Some(val) = read_val_attribute(tag) {
+                    if let Ok(n) = val.parse::<u32>() {
+                        self.pending_num_pr_id = Some(n);
+                    }
+                }
+            }
+            b"ilvl" if self.in_numpr => {
+                if let Some(val) = read_val_attribute(tag) {
+                    if let Ok(n) = val.parse::<u32>() {
+                        self.pending_num_pr_ilvl = Some(n);
+                    }
+                }
+            }
+            _ => return false,
+        }
+        true
+    }
+
+    fn handle_inline_atom(&mut self, local: &[u8]) -> bool {
+        if !self.in_paragraph {
+            return false;
+        }
+        match local {
+            b"br" => {
+                self.ensure_cell_started();
+                self.emit_line_break();
+            }
+            b"tab" => {
+                self.ensure_cell_started();
+                self.emit_tab();
+            }
+            _ => return false,
+        }
+        true
+    }
+
     fn handle_cdata(&mut self, cdata: BytesCData<'_>) -> Result<()> {
         if self.can_collect_text() {
             let bytes = cdata.into_inner();
@@ -749,20 +798,16 @@ impl DocumentReader {
         if self.handle_rpr_property(local, tag) {
             return;
         }
+        if self.handle_paragraph_property_leaf(local, tag) {
+            return;
+        }
+        if self.handle_inline_atom(local) {
+            return;
+        }
         match local {
             value if !self.denied_stack.is_empty() || is_denied_container(value).is_some() => {}
             b"pPr" if self.in_paragraph && !self.paragraph_started_emitted => {
                 self.ensure_paragraph_started();
-            }
-            b"jc" if self.in_ppr => {
-                let val = read_val_attribute(tag);
-                self.pending_paragraph_alignment =
-                    val.as_deref().and_then(properties::parse_alignment);
-            }
-            b"pStyle" if self.in_ppr && !self.paragraph_started_emitted => {
-                self.pending_paragraph_classification = read_val_attribute(tag)
-                    .filter(|s| !s.is_empty())
-                    .and_then(|s| self.data.style_list.classify(&s));
             }
             b"gridSpan" if self.in_tcpr => {
                 let val = read_val_attribute(tag);
@@ -771,20 +816,6 @@ impl DocumentReader {
             b"tblHeader" if self.in_trpr => {
                 self.pending_row_is_header =
                     properties::parse_on_off(read_val_attribute(tag).as_deref());
-            }
-            b"numId" if self.in_numpr => {
-                if let Some(val) = read_val_attribute(tag) {
-                    if let Ok(n) = val.parse::<u32>() {
-                        self.pending_num_pr_id = Some(n);
-                    }
-                }
-            }
-            b"ilvl" if self.in_numpr => {
-                if let Some(val) = read_val_attribute(tag) {
-                    if let Ok(n) = val.parse::<u32>() {
-                        self.pending_num_pr_ilvl = Some(n);
-                    }
-                }
             }
             b"vMerge" if self.in_tcpr => {
                 // vMerge (rowspan) deferred — requires event model change or table buffering, out of scope
@@ -815,14 +846,6 @@ impl DocumentReader {
                 self.ensure_cell_started();
                 self.start_paragraph();
                 self.end_paragraph();
-            }
-            b"br" if self.in_paragraph => {
-                self.ensure_cell_started();
-                self.emit_line_break();
-            }
-            b"tab" if self.in_paragraph => {
-                self.ensure_cell_started();
-                self.emit_tab();
             }
             b"hyperlink" => Self::handle_empty_hyperlink(),
             _ => {}
@@ -978,6 +1001,12 @@ impl DocumentReader {
         if self.handle_rpr_property(local, tag) {
             return Ok(());
         }
+        if self.handle_paragraph_property_leaf(local, tag) {
+            return Ok(());
+        }
+        if self.handle_inline_atom(local) {
+            return Ok(());
+        }
 
         let denied_container = is_denied_container(local);
         match (local, denied_container) {
@@ -990,16 +1019,6 @@ impl DocumentReader {
                     self.in_ppr = true;
                     self.pending_paragraph_alignment = None;
                 }
-            }
-            (b"jc", _) if self.in_ppr => {
-                let val = read_val_attribute(tag);
-                self.pending_paragraph_alignment =
-                    val.as_deref().and_then(properties::parse_alignment);
-            }
-            (b"pStyle", _) if self.in_ppr && !self.paragraph_started_emitted => {
-                self.pending_paragraph_classification = read_val_attribute(tag)
-                    .filter(|s| !s.is_empty())
-                    .and_then(|s| self.data.style_list.classify(&s));
             }
             (b"numPr", _) if self.in_ppr && !self.paragraph_started_emitted => {
                 self.in_numpr = true;
@@ -1036,14 +1055,6 @@ impl DocumentReader {
                 self.in_text = true;
                 self.pending_text.clear();
                 self.run_content_emitted = true;
-            }
-            (b"br", _) if self.in_paragraph => {
-                self.ensure_cell_started();
-                self.emit_line_break();
-            }
-            (b"tab", _) if self.in_paragraph => {
-                self.ensure_cell_started();
-                self.emit_tab();
             }
             (b"hyperlink", _) if !self.in_paragraph => {
                 self.hyperlink_depth = self.hyperlink_depth.saturating_add(1);
