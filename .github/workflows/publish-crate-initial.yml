@@ -61,7 +61,7 @@ jobs:
     # required reviewers without touching the workflow file.
     environment: release
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
