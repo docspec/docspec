@@ -446,15 +446,7 @@ impl DocumentReader {
         while self.open_styles.pop().is_some() {
             self.queue.push_back(Event::EndTextStyle);
         }
-        self.frozen_run_kinds.clear();
-        self.pending_run_kinds.clear();
-        self.frozen_run_text_color = None;
-        self.frozen_run_mark = None;
-        self.pending_run_font = None;
-        self.frozen_run_font = None;
-        self.pending_run_text_color = None;
-        self.pending_run_mark = None;
-        self.pending_run_shade = None;
+        self.reset_run_state();
         if let Some(link) = self.pending_link.take() {
             if link.link_started {
                 self.queue.push_back(Event::EndLink);
@@ -632,35 +624,37 @@ impl DocumentReader {
         }
     }
 
+    fn reset_run_state(&mut self) {
+        self.frozen_run_kinds.clear();
+        self.pending_run_kinds.clear();
+        self.frozen_run_text_color = None;
+        self.frozen_run_mark = None;
+        self.pending_run_font = None;
+        self.frozen_run_font = None;
+        self.pending_run_text_color = None;
+        self.pending_run_mark = None;
+        self.pending_run_shade = None;
+    }
+
+    fn emit_style_if_not_open(&mut self, kind: TextStyleKind) {
+        if !self.open_styles.contains(&kind) {
+            self.queue.push_back(Event::StartTextStyle {
+                kind: kind.clone(),
+                id: None,
+            });
+            self.open_styles.push(kind);
+        }
+    }
+
     fn emit_deferred_starts(&mut self) {
-        for kind in &self.frozen_run_kinds {
-            if !self.open_styles.contains(kind) {
-                self.queue.push_back(Event::StartTextStyle {
-                    kind: kind.clone(),
-                    id: None,
-                });
-                self.open_styles.push(kind.clone());
-            }
+        for kind in self.frozen_run_kinds.clone() {
+            self.emit_style_if_not_open(kind);
         }
-        if let Some(color) = self.frozen_run_text_color.clone() {
-            let kind = TextStyleKind::TextColor(color);
-            if !self.open_styles.contains(&kind) {
-                self.queue.push_back(Event::StartTextStyle {
-                    kind: kind.clone(),
-                    id: None,
-                });
-                self.open_styles.push(kind);
-            }
+        if let Some(color) = self.frozen_run_text_color {
+            self.emit_style_if_not_open(TextStyleKind::TextColor(color));
         }
-        if let Some(color) = self.frozen_run_mark.clone() {
-            let kind = TextStyleKind::Mark(color);
-            if !self.open_styles.contains(&kind) {
-                self.queue.push_back(Event::StartTextStyle {
-                    kind: kind.clone(),
-                    id: None,
-                });
-                self.open_styles.push(kind);
-            }
+        if let Some(color) = self.frozen_run_mark {
+            self.emit_style_if_not_open(TextStyleKind::Mark(color));
         }
     }
 
@@ -909,15 +903,7 @@ impl DocumentReader {
                 while self.open_styles.pop().is_some() {
                     self.queue.push_back(Event::EndTextStyle);
                 }
-                self.frozen_run_kinds.clear();
-                self.pending_run_kinds.clear();
-                self.frozen_run_text_color = None;
-                self.frozen_run_mark = None;
-                self.pending_run_font = None;
-                self.frozen_run_font = None;
-                self.pending_run_text_color = None;
-                self.pending_run_mark = None;
-                self.pending_run_shade = None;
+                self.reset_run_state();
                 self.run_content_emitted = false;
                 self.in_rpr = false;
             }
@@ -1470,7 +1456,7 @@ impl DocumentReader {
                 start,
                 style_type,
             } => {
-                self.emit_list_item_start_ordered(*num_id, *ilvl, *start, style_type.clone());
+                self.emit_list_item_start_ordered(*num_id, *ilvl, *start, *style_type);
                 self.queue.push_back(Event::StartParagraph {
                     alignment: self.pending_paragraph_alignment.clone(),
                     id: None,
@@ -1481,7 +1467,7 @@ impl DocumentReader {
                 ilvl,
                 style_type,
             } => {
-                self.emit_list_item_start_unordered(*num_id, *ilvl, style_type.clone());
+                self.emit_list_item_start_unordered(*num_id, *ilvl, *style_type);
                 self.queue.push_back(Event::StartParagraph {
                     alignment: self.pending_paragraph_alignment.clone(),
                     id: None,

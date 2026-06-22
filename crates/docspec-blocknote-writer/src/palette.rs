@@ -10,7 +10,7 @@
 #[inline]
 #[must_use]
 pub fn nearest_text_color(color: &docspec_core::Color) -> Option<&'static str> {
-    nearest(color, TEXT_PALETTE)
+    nearest(*color, TEXT_PALETTE)
 }
 
 /// Snaps an RGB color to the nearest `BlockNote` background-color palette entry.
@@ -19,17 +19,17 @@ pub fn nearest_text_color(color: &docspec_core::Color) -> Option<&'static str> {
 #[inline]
 #[must_use]
 pub fn nearest_background_color(color: &docspec_core::Color) -> Option<&'static str> {
-    nearest(color, BACKGROUND_PALETTE)
+    nearest(*color, BACKGROUND_PALETTE)
 }
 
 fn nearest(
-    color: &docspec_core::Color,
+    color: docspec_core::Color,
     palette: &[(&'static str, u8, u8, u8)],
 ) -> Option<&'static str> {
     let docspec_core::Color::Rgb { r, g, b } = color else {
         return None;
     };
-    if (*r, *g, *b) == (0, 0, 0) {
+    if (r, g, b) == (0, 0, 0) {
         return None;
     }
     palette

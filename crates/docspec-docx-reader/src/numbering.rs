@@ -114,7 +114,7 @@ impl MinimalNumbering {
                 ListLookupResult {
                     is_list: true,
                     is_ordered,
-                    style_type: style.clone(),
+                    style_type: *style,
                 }
             }
         }
@@ -407,7 +407,7 @@ mod tests {
             let mut numbering = MinimalNumbering::new();
             numbering.num_to_abstract.insert(1, 1);
             let mut levels = core::array::from_fn(|_| None);
-            levels[0] = Some(LevelOutcome::List(style.clone()));
+            levels[0] = Some(LevelOutcome::List(style));
             numbering.abstract_levels.insert(1, levels);
 
             let result = numbering.resolve(1, 0);

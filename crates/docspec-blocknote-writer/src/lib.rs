@@ -835,8 +835,8 @@ impl<W: Write> BlockNoteWriter<W> {
                     // Intentionally not rendered: BlockNote's default schema has no superscript representation.
                     Self::omit_unsupported_text_style("superscript");
                 }
-                TextStyleKind::TextColor(color) => text_color = Some(color.clone()),
-                TextStyleKind::Mark(color) => background_color = Some(color.clone()),
+                TextStyleKind::TextColor(color) => text_color = Some(*color),
+                TextStyleKind::Mark(color) => background_color = Some(*color),
                 future_kind => {
                     // Future text styles are accepted and omitted until BlockNote has a mapped representation.
                     Self::omit_future_text_style(future_kind);
