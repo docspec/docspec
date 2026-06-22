@@ -12,6 +12,27 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.11.0](https://github.com/docspec/docspec/compare/v1.10.1...v1.11.0) - 2026-06-22
+
+### Added
+
+- *(docx-reader)* stream document XML from path
+
+### Fixed
+
+- *(deps)* update rust crate tower-http to 0.7
+
+### Other
+
+- correct DOCX capability claims
+- *(core)* promote StyleStack from markdown-reader::html to docspec-core (no behavior change yet)
+- simplify docx run state and copy value types
+- *(blocknote-writer)* document highlight color name divergences
+- *(blocknote-writer)* switch handler params to Option<&str>
+- *(docx-reader)* introduce pandoc DOCX corpus snapshots
+- *(docx-reader)* extract ensure_inline_context and emit_list_item_* helpers
+- *(docx-reader)* extract shared paragraph-property-leaf and inline-atom helpers
+
 ## [1.10.1](https://github.com/docspec/docspec/compare/v1.10.0...v1.10.1) - 2026-06-12
 
 ### Fixed
