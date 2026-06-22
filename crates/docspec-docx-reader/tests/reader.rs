@@ -1802,6 +1802,33 @@ mod events {
     }
 
     #[test]
+    fn skip_empty_blocks_drops_empty_heading_paragraph_from_docx() {
+        // Integration test: the DocxReader emits StartParagraph + EndParagraph for a
+        // heading-styled paragraph per its documented emit-when-empty contract.
+        // (Headings via <w:pStyle> are out of scope for the reader — they are emitted
+        // as regular StartParagraph/EndParagraph pairs. See `empty_paragraph_still_emits_start_end`
+        // and siblings for the reader's emit-when-empty behavior.)
+        //
+        // When wrapped in `docspec_core::SkipEmptyBlocks`, the empty paragraph pair is
+        // suppressed, proving that the adapter is the policy layer while the reader
+        // remains honest about its contract (reader = faithful, adapter = policy).
+        let document_xml = concat!(
+            r#"<?xml version="1.0"?>"#,
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#,
+            r#"<w:body>"#,
+            r#"<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr></w:p>"#,
+            r#"</w:body></w:document>"#,
+        );
+        let reader = make_reader(document_xml);
+        let mut filtered = docspec_core::SkipEmptyBlocks::new(reader);
+        let mut events = Vec::new();
+        while let Some(event) = filtered.next_event().expect("filter error") {
+            events.push(event);
+        }
+        assert_eq!(events, vec![start_document(), Event::EndDocument,]);
+    }
+
+    #[test]
     fn self_closing_drawing_emits_no_events() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:drawing/></w:body></w:document>"#,
