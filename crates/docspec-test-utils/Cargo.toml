@@ -9,7 +9,7 @@ description = "Internal test fixtures shared across the docspec workspace. Not p
 
 [dependencies]
 docspec-core = { workspace = true }
-sha2 = "0.10"
+sha2 = "0.11"
 zip = { version = "8", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]

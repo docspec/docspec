@@ -163,6 +163,24 @@ fn event_to_snapshot(ev: &Event) -> EventSnapshot {
     }
 }
 
+fn digest_to_hex(digest: &[u8]) -> String {
+    digest
+        .iter()
+        .flat_map(|byte| {
+            let byte = *byte;
+            [hex_digit(byte >> 4), hex_digit(byte & 0x0f)]
+        })
+        .collect()
+}
+
+fn hex_digit(nibble: u8) -> char {
+    const HEX: [char; 16] = [
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
+    ];
+
+    HEX.get(usize::from(nibble)).copied().unwrap_or('0')
+}
+
 fn describe_asset(source: &ImageSource) -> AssetDescriptor {
     match source {
         ImageSource::Asset(handle) => {
@@ -171,7 +189,7 @@ fn describe_asset(source: &ImageSource) -> AssetDescriptor {
                 .stream_to(&mut buf)
                 .unwrap_or_else(|e| panic!("failed to stream asset {}: {e}", handle.asset_id()));
             let digest = Sha256::new().chain_update(&buf).finalize();
-            let sha256 = format!("{digest:x}");
+            let sha256 = digest_to_hex(&digest);
             AssetDescriptor {
                 asset_id: handle.asset_id().to_owned(),
                 content_type: handle
