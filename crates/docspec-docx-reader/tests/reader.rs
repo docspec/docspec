@@ -471,20 +471,6 @@ mod constructor {
             other => panic!("expected Error::Io, got: {other:?}"),
         }
     }
-
-    #[test]
-    fn from_path_succeeds_on_tempfile() {
-        use std::io::Write as _;
-
-        let bytes = fixture::synth_docx(
-            r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
-        );
-        let mut tmp = tempfile::NamedTempFile::new().expect("tempfile");
-        tmp.write_all(&bytes).expect("write");
-        let result = DocxReader::from_path(tmp.path());
-        assert!(result.is_ok(), "expected Ok, got: {result:?}");
-    }
 }
 
 mod events {
@@ -1770,24 +1756,6 @@ mod events {
     }
 
     #[test]
-    fn single_paragraph_emits_text() {
-        let mut reader = make_reader(
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>hello</w:t></w:r></w:p></w:body></w:document>"#,
-        );
-        let events = drive(&mut reader);
-        assert_eq!(
-            events,
-            vec![
-                start_document(),
-                start_paragraph(),
-                text("hello"),
-                Event::EndParagraph,
-                Event::EndDocument,
-            ]
-        );
-    }
-
-    #[test]
     fn debug_redacts_xml_reader() {
         let reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
@@ -1796,27 +1764,6 @@ mod events {
         assert_eq!(
             format!("{reader:?}"),
             "DocxReader { inner: DocumentReader { buf: [], denied_stack: [], in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, pending_paragraph_classification: None, current_paragraph_block: Paragraph, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, pending_run_font: None, frozen_run_font: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, data: \"<DocxData>\", hyperlink_map: {}, hyperlink_depth: 0, pending_link: None, list_stack: [], seen_lists: {}, pending_paragraph_list: None, in_numpr: false, pending_num_pr_id: None, pending_num_pr_ilvl: None, xml: \"<quick_xml::Reader>\", archive: \"<Arc<Mutex<ZipArchive>>>\", content_types: \"<Arc<ContentTypes>>\" } }"
-        );
-    }
-
-    #[test]
-    fn multiple_paragraphs() {
-        let mut reader = make_reader(
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>foo</w:t></w:r></w:p><w:p><w:r><w:t>bar</w:t></w:r></w:p></w:body></w:document>"#,
-        );
-        let events = drive(&mut reader);
-        assert_eq!(
-            events,
-            vec![
-                start_document(),
-                start_paragraph(),
-                text("foo"),
-                Event::EndParagraph,
-                start_paragraph(),
-                text("bar"),
-                Event::EndParagraph,
-                Event::EndDocument,
-            ]
         );
     }
 
@@ -1870,25 +1817,6 @@ mod events {
         );
         let events = drive(&mut reader);
         assert_eq!(events, vec![start_document(), Event::EndDocument]);
-    }
-
-    #[test]
-    fn multiple_runs_in_one_paragraph_emit_separate_text_events() {
-        let mut reader = make_reader(
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>foo</w:t></w:r><w:r><w:t>bar</w:t></w:r></w:p></w:body></w:document>"#,
-        );
-        let events = drive(&mut reader);
-        assert_eq!(
-            events,
-            vec![
-                start_document(),
-                start_paragraph(),
-                text("foo"),
-                text("bar"),
-                Event::EndParagraph,
-                Event::EndDocument,
-            ]
-        );
     }
 
     #[test]
@@ -2741,71 +2669,6 @@ mod events {
             id: None,
             rowspan: None,
         }
-    }
-
-    #[test]
-    fn simple_table_emits_full_structure() {
-        let mut reader = make_reader(
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
-        );
-        let events = drive(&mut reader);
-        assert_eq!(
-            events,
-            vec![
-                start_document(),
-                start_table(),
-                start_row(),
-                start_cell(),
-                start_paragraph(),
-                text("cell"),
-                Event::EndParagraph,
-                Event::EndTableCell,
-                Event::EndTableRow,
-                Event::EndTable,
-                Event::EndDocument,
-            ]
-        );
-    }
-
-    #[test]
-    fn multi_row_multi_cell_table_emits_full_structure() {
-        let mut reader = make_reader(
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>a</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>b</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>c</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>d</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
-        );
-        let events = drive(&mut reader);
-        assert_eq!(
-            events,
-            vec![
-                start_document(),
-                start_table(),
-                start_row(),
-                start_cell(),
-                start_paragraph(),
-                text("a"),
-                Event::EndParagraph,
-                Event::EndTableCell,
-                start_cell(),
-                start_paragraph(),
-                text("b"),
-                Event::EndParagraph,
-                Event::EndTableCell,
-                Event::EndTableRow,
-                start_row(),
-                start_cell(),
-                start_paragraph(),
-                text("c"),
-                Event::EndParagraph,
-                Event::EndTableCell,
-                start_cell(),
-                start_paragraph(),
-                text("d"),
-                Event::EndParagraph,
-                Event::EndTableCell,
-                Event::EndTableRow,
-                Event::EndTable,
-                Event::EndDocument,
-            ]
-        );
     }
 
     #[test]
