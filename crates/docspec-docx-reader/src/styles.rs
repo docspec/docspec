@@ -48,14 +48,16 @@ pub enum StyleClassification {
 
 const HEADING_NAME_PREFIX: &str = "heading ";
 
-fn classify_name(name: &str) -> Option<StyleClassification> {
+fn classify_name(name: &str, kind: StyleType) -> Option<StyleClassification> {
     match name {
         "Title" => Some(StyleClassification::Heading { level: 1 }),
         "Quote" | "Block Text" | "Block Quote" | "Block Quotation" | "Intense Quote" => {
             Some(StyleClassification::BlockQuote)
         }
-        "Plain Text" | "HTML Code" | "HTML Preformatted" | "HTML Sample" | "Source Code"
-        | "Codeblock" | "Verbatim Char" => Some(StyleClassification::Code),
+        "Source Code" | "SourceCode" | "Codeblock" if kind == StyleType::Paragraph => {
+            Some(StyleClassification::Code)
+        }
+        "Verbatim Char" if kind == StyleType::Character => Some(StyleClassification::Code),
         n if n.starts_with(HEADING_NAME_PREFIX) => {
             let rest = n.strip_prefix(HEADING_NAME_PREFIX)?;
             let level = match rest.parse::<u8>() {
@@ -110,12 +112,13 @@ impl StyleList {
     pub fn classify(&self, id: &str) -> Option<StyleClassification> {
         let mut visited: std::collections::HashSet<&str> = std::collections::HashSet::new();
         let mut current = self.get_by_id(id)?;
+        let kind = current.kind;
         loop {
             if !visited.insert(current.id.as_str()) {
                 return None;
             }
             if let Some(name) = current.name.as_deref() {
-                if let Some(classification) = classify_name(name) {
+                if let Some(classification) = classify_name(name, kind) {
                     return Some(classification);
                 }
             }
@@ -312,10 +315,19 @@ mod tests {
         }
     }
 
+    fn character(id: &str, name: Option<&str>, based_on: Option<&str>) -> Style {
+        Style {
+            id: id.to_string(),
+            kind: StyleType::Character,
+            name: name.map(str::to_string),
+            based_on: based_on.map(str::to_string),
+        }
+    }
+
     #[test]
     fn classify_name_recognizes_title() {
         assert_eq!(
-            classify_name("Title"),
+            classify_name("Title", StyleType::Paragraph),
             Some(StyleClassification::Heading { level: 1 })
         );
     }
@@ -323,31 +335,62 @@ mod tests {
     #[test]
     fn classify_name_recognizes_block_quote_aliases() {
         assert_eq!(
-            classify_name("Block Quote"),
+            classify_name("Block Quote", StyleType::Paragraph),
             Some(StyleClassification::BlockQuote)
         );
         assert_eq!(
-            classify_name("Intense Quote"),
+            classify_name("Intense Quote", StyleType::Paragraph),
             Some(StyleClassification::BlockQuote)
         );
     }
 
     #[test]
-    fn classify_name_recognizes_code_aliases() {
+    fn classify_name_recognizes_source_code_paragraph_aliases() {
         assert_eq!(
-            classify_name("Source Code"),
+            classify_name("Source Code", StyleType::Paragraph),
             Some(StyleClassification::Code)
         );
         assert_eq!(
-            classify_name("HTML Preformatted"),
+            classify_name("SourceCode", StyleType::Paragraph),
             Some(StyleClassification::Code)
         );
+        assert_eq!(
+            classify_name("Codeblock", StyleType::Paragraph),
+            Some(StyleClassification::Code)
+        );
+    }
+
+    #[test]
+    fn classify_name_rejects_html_family_and_plain_text_for_paragraph() {
+        assert_eq!(
+            classify_name("HTML Preformatted", StyleType::Paragraph),
+            None
+        );
+        assert_eq!(classify_name("HTML Code", StyleType::Paragraph), None);
+        assert_eq!(classify_name("HTML Sample", StyleType::Paragraph), None);
+        assert_eq!(classify_name("Plain Text", StyleType::Paragraph), None);
+    }
+
+    #[test]
+    fn classify_name_recognizes_verbatim_char_only_for_character_style() {
+        assert_eq!(
+            classify_name("Verbatim Char", StyleType::Character),
+            Some(StyleClassification::Code)
+        );
+        assert_eq!(classify_name("Verbatim Char", StyleType::Paragraph), None);
+    }
+
+    #[test]
+    fn classify_name_rejects_source_code_for_character_style() {
+        assert_eq!(classify_name("Source Code", StyleType::Character), None);
+        assert_eq!(classify_name("SourceCode", StyleType::Character), None);
+        assert_eq!(classify_name("Codeblock", StyleType::Character), None);
     }
 
     #[test]
     fn classify_name_parses_heading_level() {
         assert_eq!(
-            classify_name("heading 3"),
+            classify_name("heading 3", StyleType::Paragraph),
             Some(StyleClassification::Heading { level: 3 })
         );
     }
@@ -355,24 +398,27 @@ mod tests {
     #[test]
     fn classify_name_saturates_heading_level_above_u8_max() {
         assert_eq!(
-            classify_name("heading 999"),
+            classify_name("heading 999", StyleType::Paragraph),
             Some(StyleClassification::Heading { level: 255 })
         );
     }
 
     #[test]
     fn classify_name_rejects_zero_heading_level() {
-        assert_eq!(classify_name("heading 0"), None);
+        assert_eq!(classify_name("heading 0", StyleType::Paragraph), None);
     }
 
     #[test]
     fn classify_name_rejects_non_numeric_heading() {
-        assert_eq!(classify_name("heading abc"), None);
+        assert_eq!(classify_name("heading abc", StyleType::Paragraph), None);
     }
 
     #[test]
     fn classify_name_returns_none_for_unknown_name() {
-        assert_eq!(classify_name("Some Random Style"), None);
+        assert_eq!(
+            classify_name("Some Random Style", StyleType::Paragraph),
+            None
+        );
     }
 
     #[test]
@@ -464,6 +510,49 @@ mod tests {
     #[test]
     fn classify_returns_none_for_missing_id() {
         assert_eq!(StyleList::default().classify("Missing"), None);
+    }
+
+    #[test]
+    fn classify_returns_code_for_character_style_named_verbatim_char() {
+        let list = StyleList {
+            styles: vec![character("VerbatimChar", Some("Verbatim Char"), None)],
+        };
+
+        assert_eq!(
+            list.classify("VerbatimChar"),
+            Some(StyleClassification::Code)
+        );
+    }
+
+    #[test]
+    fn classify_returns_none_for_paragraph_style_named_verbatim_char() {
+        let list = StyleList {
+            styles: vec![paragraph("VerbatimPara", Some("Verbatim Char"), None)],
+        };
+
+        assert_eq!(list.classify("VerbatimPara"), None);
+    }
+
+    #[test]
+    fn classify_returns_none_for_paragraph_style_named_html_preformatted() {
+        let list = StyleList {
+            styles: vec![paragraph(
+                "HTMLSudahDiformat",
+                Some("HTML Preformatted"),
+                Some("Normal"),
+            )],
+        };
+
+        assert_eq!(list.classify("HTMLSudahDiformat"), None);
+    }
+
+    #[test]
+    fn classify_returns_code_for_paragraph_style_named_sourcecode() {
+        let list = StyleList {
+            styles: vec![paragraph("SourceCode", Some("SourceCode"), None)],
+        };
+
+        assert_eq!(list.classify("SourceCode"), Some(StyleClassification::Code));
     }
 
     #[test]
