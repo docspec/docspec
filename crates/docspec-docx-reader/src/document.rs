@@ -416,20 +416,25 @@ impl DocumentReader {
         self.denied_stack.is_empty() && self.in_paragraph && self.in_text
     }
 
-    fn emit_line_break(&mut self) {
+    /// Prepare the queue for the next inline event: open every structural ancestor
+    /// (cell, paragraph) and flush every deferred start (text, link, run styles).
+    /// Each underlying call is idempotent.
+    fn ensure_inline_context(&mut self) {
+        self.ensure_cell_started();
         self.ensure_paragraph_started();
         self.flush_pending_text();
         self.flush_pending_link_start();
         self.emit_deferred_starts();
+    }
+
+    fn emit_line_break(&mut self) {
+        self.ensure_inline_context();
         self.run_content_emitted = true;
         self.queue.push_back(Event::LineBreak);
     }
 
     fn emit_tab(&mut self) {
-        self.ensure_paragraph_started();
-        self.flush_pending_text();
-        self.flush_pending_link_start();
-        self.emit_deferred_starts();
+        self.ensure_inline_context();
         self.run_content_emitted = true;
         self.queue.push_back(Event::Text {
             content: "\t".to_string(),
@@ -480,12 +485,7 @@ impl DocumentReader {
 
     fn flush_list_stack(&mut self) {
         while let Some(entry) = self.list_stack.pop() {
-            let event = if entry.is_ordered {
-                Event::EndOrderedListItem
-            } else {
-                Event::EndUnorderedListItem
-            };
-            self.queue.push_back(event);
+            self.emit_list_item_end(entry.is_ordered);
         }
     }
 
@@ -498,21 +498,11 @@ impl DocumentReader {
             match top.ilvl.cmp(&ilvl) {
                 core::cmp::Ordering::Greater => {
                     self.list_stack.pop();
-                    let end = if top.is_ordered {
-                        Event::EndOrderedListItem
-                    } else {
-                        Event::EndUnorderedListItem
-                    };
-                    self.queue.push_back(end);
+                    self.emit_list_item_end(top.is_ordered);
                 }
                 core::cmp::Ordering::Equal => {
                     self.list_stack.pop();
-                    let end = if top.is_ordered {
-                        Event::EndOrderedListItem
-                    } else {
-                        Event::EndUnorderedListItem
-                    };
-                    self.queue.push_back(end);
+                    self.emit_list_item_end(top.is_ordered);
                     break;
                 }
                 core::cmp::Ordering::Less => break,
@@ -527,32 +517,58 @@ impl DocumentReader {
             } else {
                 docspec_core::ListStyleType::Disc
             };
-            let start_event = if is_ordered {
-                Event::StartOrderedListItem {
-                    id: Some(num_id.to_string()),
-                    level: phantom_ilvl,
-                    start: None,
-                    style_type: phantom_style,
-                }
-            } else {
-                Event::StartUnorderedListItem {
-                    id: Some(num_id.to_string()),
-                    level: phantom_ilvl,
-                    style_type: phantom_style,
-                }
-            };
             self.list_stack.push(ListStackEntry {
                 num_id,
                 ilvl: phantom_ilvl,
                 is_ordered,
             });
-            self.queue.push_back(start_event);
+            if is_ordered {
+                self.emit_list_item_start_ordered(num_id, phantom_ilvl, None, phantom_style);
+            } else {
+                self.emit_list_item_start_unordered(num_id, phantom_ilvl, phantom_style);
+            }
         }
 
         self.list_stack.push(ListStackEntry {
             num_id,
             ilvl,
             is_ordered,
+        });
+    }
+
+    fn emit_list_item_start_ordered(
+        &mut self,
+        num_id: u32,
+        ilvl: u32,
+        start: Option<u64>,
+        style_type: docspec_core::ListStyleType,
+    ) {
+        self.queue.push_back(Event::StartOrderedListItem {
+            id: Some(num_id.to_string()),
+            level: ilvl,
+            start,
+            style_type,
+        });
+    }
+
+    fn emit_list_item_start_unordered(
+        &mut self,
+        num_id: u32,
+        ilvl: u32,
+        style_type: docspec_core::ListStyleType,
+    ) {
+        self.queue.push_back(Event::StartUnorderedListItem {
+            id: Some(num_id.to_string()),
+            level: ilvl,
+            style_type,
+        });
+    }
+
+    fn emit_list_item_end(&mut self, is_ordered: bool) {
+        self.queue.push_back(if is_ordered {
+            Event::EndOrderedListItem
+        } else {
+            Event::EndUnorderedListItem
         });
     }
 
@@ -766,14 +782,8 @@ impl DocumentReader {
             return false;
         }
         match local {
-            b"br" => {
-                self.ensure_cell_started();
-                self.emit_line_break();
-            }
-            b"tab" => {
-                self.ensure_cell_started();
-                self.emit_tab();
-            }
+            b"br" => self.emit_line_break(),
+            b"tab" => self.emit_tab(),
             _ => return false,
         }
         true
@@ -1460,12 +1470,7 @@ impl DocumentReader {
                 start,
                 style_type,
             } => {
-                self.queue.push_back(Event::StartOrderedListItem {
-                    id: Some(num_id.to_string()),
-                    level: *ilvl,
-                    start: *start,
-                    style_type: style_type.clone(),
-                });
+                self.emit_list_item_start_ordered(*num_id, *ilvl, *start, style_type.clone());
                 self.queue.push_back(Event::StartParagraph {
                     alignment: self.pending_paragraph_alignment.clone(),
                     id: None,
@@ -1476,11 +1481,7 @@ impl DocumentReader {
                 ilvl,
                 style_type,
             } => {
-                self.queue.push_back(Event::StartUnorderedListItem {
-                    id: Some(num_id.to_string()),
-                    level: *ilvl,
-                    style_type: style_type.clone(),
-                });
+                self.emit_list_item_start_unordered(*num_id, *ilvl, style_type.clone());
                 self.queue.push_back(Event::StartParagraph {
                     alignment: self.pending_paragraph_alignment.clone(),
                     id: None,
