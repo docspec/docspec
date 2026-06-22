@@ -1,6 +1,8 @@
 //! ZIP/OPC package navigation for DOCX archives.
 
+use std::fs::File;
 use std::io::{Cursor, Read, Seek};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use docspec_core::{Error, Result};
@@ -33,43 +35,14 @@ type PackageContents = (
 /// main document part.
 pub fn open_package<R: Read + Seek + Send + 'static>(reader: R) -> Result<PackageContents> {
     let boxed: Box<dyn ReadSeek + 'static> = Box::new(reader);
-    let mut archive = ZipArchive::new(boxed).map_err(|err| match err {
-        ZipError::InvalidArchive(_) | ZipError::UnsupportedArchive(_) => Error::Parse {
-            message: "not a valid ZIP archive".to_string(),
-            position: None,
-        },
-        ZipError::Io(source) => Error::Io { source },
-        ZipError::FileNotFound
-        | ZipError::InvalidPassword
-        | ZipError::CompressionMethodNotSupported(_)
-        | _ => parse_error(format!("not a valid ZIP archive: {err}")),
-    })?;
+    let mut archive = ZipArchive::new(boxed).map_err(map_zip_open_error)?;
 
-    let rels_bytes = {
-        let mut rels_entry = archive.by_name("_rels/.rels").map_err(|err| {
-            if matches!(err, ZipError::FileNotFound) {
-                Error::Parse {
-                    message: "missing _rels/.rels".to_string(),
-                    position: None,
-                }
-            } else {
-                parse_error(format!("malformed ZIP: {err}"))
-            }
-        })?;
-        let mut bytes = Vec::new();
-        rels_entry.read_to_end(&mut bytes).map_err(Error::from)?;
-        bytes
-    };
+    let rels_bytes = read_root_rels_bytes(&mut archive)?;
 
     let document_path = rels::find_document_target(std::io::Cursor::new(rels_bytes))?;
-    let (style_list, hyperlink_map, image_map) =
-        load_style_list_and_hyperlink_map(&mut archive, &document_path)?;
-    let numbering = load_numbering(&mut archive, &document_path)?;
 
-    let content_types = match read_optional_entry(&mut archive, "[Content_Types].xml")? {
-        Some(bytes) => content_types::parse(&bytes)?,
-        None => ContentTypes::default(),
-    };
+    let (style_list, numbering, hyperlink_map, image_map, content_types) =
+        load_small_package_parts(&mut archive, &document_path)?;
 
     let mut document_xml_bytes = Vec::new();
     archive
@@ -92,6 +65,90 @@ pub fn open_package<R: Read + Seek + Send + 'static>(reader: R) -> Result<Packag
         content_types_arc,
         archive_arc,
         Box::new(Cursor::new(document_xml_bytes)),
+    ))
+}
+
+pub(crate) fn open_package_from_path(path: &Path) -> Result<PackageContents> {
+    let asset_file = File::open(path).map_err(Error::from)?;
+    let boxed: Box<dyn ReadSeek + 'static> = Box::new(asset_file);
+    let mut asset_archive = ZipArchive::new(boxed).map_err(map_zip_open_error)?;
+
+    let rels_bytes = read_root_rels_bytes(&mut asset_archive)?;
+
+    let document_path = rels::find_document_target(std::io::Cursor::new(rels_bytes))?;
+
+    let (style_list, numbering, hyperlink_map, image_map, content_types) =
+        load_small_package_parts(&mut asset_archive, &document_path)?;
+
+    let streaming = crate::streaming_archive::StreamingArchive::open(path, &document_path)?;
+
+    let content_types_arc = Arc::new(content_types);
+    let archive_arc = Arc::new(Mutex::new(asset_archive));
+
+    Ok((
+        style_list,
+        numbering,
+        hyperlink_map,
+        image_map,
+        content_types_arc,
+        archive_arc,
+        Box::new(streaming),
+    ))
+}
+
+fn map_zip_open_error(err: ZipError) -> Error {
+    match err {
+        ZipError::InvalidArchive(_) | ZipError::UnsupportedArchive(_) => Error::Parse {
+            message: "not a valid ZIP archive".to_string(),
+            position: None,
+        },
+        ZipError::Io(source) => Error::Io { source },
+        ZipError::FileNotFound
+        | ZipError::InvalidPassword
+        | ZipError::CompressionMethodNotSupported(_)
+        | _ => parse_error(format!("not a valid ZIP archive: {err}")),
+    }
+}
+
+fn read_root_rels_bytes<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<Vec<u8>> {
+    let mut rels_entry = archive.by_name("_rels/.rels").map_err(|err| {
+        if matches!(err, ZipError::FileNotFound) {
+            Error::Parse {
+                message: "missing _rels/.rels".to_string(),
+                position: None,
+            }
+        } else {
+            parse_error(format!("malformed ZIP: {err}"))
+        }
+    })?;
+    let mut bytes = Vec::new();
+    rels_entry.read_to_end(&mut bytes).map_err(Error::from)?;
+    Ok(bytes)
+}
+
+fn load_small_package_parts<R: Read + Seek>(
+    archive: &mut ZipArchive<R>,
+    document_path: &str,
+) -> Result<(
+    StyleList,
+    crate::numbering::MinimalNumbering,
+    HyperlinkMap,
+    ImageMap,
+    ContentTypes,
+)> {
+    let (style_list, hyperlink_map, image_map) =
+        load_style_list_and_hyperlink_map(archive, document_path)?;
+    let numbering = load_numbering(archive, document_path)?;
+    let content_types = match read_optional_entry(archive, "[Content_Types].xml")? {
+        Some(bytes) => content_types::parse(&bytes)?,
+        None => ContentTypes::default(),
+    };
+    Ok((
+        style_list,
+        numbering,
+        hyperlink_map,
+        image_map,
+        content_types,
     ))
 }
 
