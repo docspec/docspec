@@ -7,7 +7,7 @@
 - **Upstream**: <https://github.com/jgm/pandoc>, `test/docx/`
 - **Mirror**: <https://github.com/docspec/documents>, `documents/docx/pandoc/`
 - **License**: GPL-2.0-or-later — SPDX identifier `GPL-2.0-or-later`; canonical text at <https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt>
-- **Imported**: 2026-06-16 @ 50c5c831
+- **Imported**: 2026-06-16
 
 ## License Compatibility
 
