@@ -153,7 +153,7 @@ use std::io::Write;
 use docspec_core::{
     Depth, Error, Event, EventSink, ImageSource, Result, TextAlignment, TextStyleKind,
 };
-use docspec_json::{JsonEmitter, Null, StrusonBackend};
+use docspec_json::{JsonWriter, Null};
 
 macro_rules! close_text_block {
     ($writer:expr) => {{
@@ -255,7 +255,7 @@ pub struct BlockNoteWriter<W: Write> {
     dropped_list_depth: Depth,
     /// Whether the writer is currently inside an open link inline container.
     in_link: bool,
-    json: JsonEmitter<StrusonBackend<W>>,
+    json: JsonWriter<W>,
     /// Whether at least one `StyledText` has been emitted into the current link's content array.
     link_emitted_styled_text: bool,
     /// Events from nested tables, replayed at the outermost `EndTable` to lift them to top level.
@@ -930,7 +930,7 @@ impl<W: Write> BlockNoteWriter<W> {
             drop_inside_list_depth: Depth::default(),
             dropped_list_depth: Depth::default(),
             in_link: false,
-            json: JsonEmitter::new(StrusonBackend::new(writer)),
+            json: JsonWriter::new(writer),
             lifted_nested_events: Vec::new(),
             link_emitted_styled_text: false,
             list_stack: Vec::new(),
@@ -1086,7 +1086,7 @@ impl<W: Write> BlockNoteWriter<W> {
 impl<W: Write> EventSink for BlockNoteWriter<W> {
     #[inline]
     fn finish(self) -> Result<()> {
-        self.json.finish().map(|_| ())
+        self.json.finish()
     }
 
     #[inline]
