@@ -1,0 +1,2899 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartTable { id: None }
+       2: StartTableRow { id: None }
+       3: StartTableCell { colspan: None, id: None, rowspan: None }
+       4: StartTable { id: None }
+       5: StartTableRow { id: None }
+       6: StartTableCell { colspan: None, id: None, rowspan: None }
+       7: StartTable { id: None }
+       8: StartTableRow { id: None }
+       9: StartTableCell { colspan: None, id: None, rowspan: None }
+      10: StartParagraph { alignment: None, id: None }
+      11: Image { alt: Some("Veterans Health Administration"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image1.png", content_type: "image/png", bytes: 3024, sha256: "7d3e3dd024026a2519ef7ee4aaa5358e8290e14062d0d95a55219bfa1f42e359" } }
+      12: EndParagraph
+      13: StartTable { id: None }
+      14: StartTableRow { id: None }
+      15: StartTableCell { colspan: None, id: None, rowspan: None }
+      16: StartParagraph { alignment: None, id: None }
+      17: StartTextStyle { kind: Bold, id: None }
+      18: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 102, r: 102 }), id: None }
+      19: Text { content: "Department:" }
+      20: EndTextStyle
+      21: EndTextStyle
+      22: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      23: Text { content: " " }
+      24: EndTextStyle
+      25: StartTextStyle { kind: Bold, id: None }
+      26: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      27: Text { content: "Department Of Veterans Affairs" }
+      28: EndTextStyle
+      29: EndTextStyle
+      30: EndParagraph
+      31: EndTableCell
+      32: EndTableRow
+      33: StartTableRow { id: None }
+      34: StartTableCell { colspan: None, id: None, rowspan: None }
+      35: StartParagraph { alignment: None, id: None }
+      36: StartTextStyle { kind: Bold, id: None }
+      37: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 102, r: 102 }), id: None }
+      38: Text { content: "Agency:" }
+      39: EndTextStyle
+      40: EndTextStyle
+      41: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      42: Text { content: " " }
+      43: EndTextStyle
+      44: StartTextStyle { kind: Bold, id: None }
+      45: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      46: Text { content: "Veterans Health Administration" }
+      47: EndTextStyle
+      48: EndTextStyle
+      49: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      50: Text { content: " " }
+      51: EndTextStyle
+      52: EndParagraph
+      53: EndTableCell
+      54: EndTableRow
+      55: StartTableRow { id: None }
+      56: StartTableCell { colspan: None, id: None, rowspan: None }
+      57: StartTable { id: None }
+      58: StartTableRow { id: None }
+      59: StartTableCell { colspan: None, id: None, rowspan: None }
+      60: StartParagraph { alignment: None, id: None }
+      61: StartTextStyle { kind: Bold, id: None }
+      62: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 102, r: 102 }), id: None }
+      63: Text { content: "Job Announcement Number:" }
+      64: EndTextStyle
+      65: EndTextStyle
+      66: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      67: LineBreak
+      68: EndTextStyle
+      69: StartTextStyle { kind: Bold, id: None }
+      70: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      71: Text { content: "VN-08-AKn-201385" }
+      72: EndTextStyle
+      73: EndTextStyle
+      74: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      75: Text { content: " " }
+      76: EndTextStyle
+      77: EndParagraph
+      78: EndTableCell
+      79: EndTableRow
+      80: EndTable
+      81: StartParagraph { alignment: None, id: None }
+      82: EndParagraph
+      83: EndTableCell
+      84: EndTableRow
+      85: EndTable
+      86: StartParagraph { alignment: None, id: None }
+      87: EndParagraph
+      88: EndTableCell
+      89: EndTableRow
+      90: EndTable
+      91: StartParagraph { alignment: None, id: None }
+      92: EndParagraph
+      93: EndTableCell
+      94: EndTableRow
+      95: EndTable
+      96: StartParagraph { alignment: None, id: None }
+      97: EndParagraph
+      98: EndTableCell
+      99: EndTableRow
+     100: StartTableRow { id: None }
+     101: StartTableCell { colspan: None, id: None, rowspan: None }
+     102: StartTable { id: None }
+     103: StartTableRow { id: None }
+     104: StartTableCell { colspan: None, id: None, rowspan: None }
+     105: StartParagraph { alignment: None, id: None }
+     106: EndParagraph
+     107: EndTableCell
+     108: EndTableRow
+     109: EndTable
+     110: StartParagraph { alignment: Some(Center), id: None }
+     111: EndParagraph
+     112: EndTableCell
+     113: EndTableRow
+     114: StartTableRow { id: None }
+     115: StartTableCell { colspan: None, id: None, rowspan: None }
+     116: StartTable { id: None }
+     117: StartTableRow { id: None }
+     118: StartTableCell { colspan: None, id: None, rowspan: None }
+     119: StartParagraph { alignment: None, id: None }
+     120: EndParagraph
+     121: StartTable { id: None }
+     122: StartTableRow { id: None }
+     123: StartTableCell { colspan: None, id: None, rowspan: None }
+     124: StartTable { id: None }
+     125: StartTableRow { id: None }
+     126: StartTableCell { colspan: None, id: None, rowspan: None }
+     127: StartParagraph { alignment: None, id: None }
+     128: Image { alt: Some("Overview"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image2.png", content_type: "image/png", bytes: 401, sha256: "307962f1f016b850067af341702a173205d80c589463d6334e57548a606a4a84" } }
+     129: EndParagraph
+     130: EndTableCell
+     131: StartTableCell { colspan: None, id: None, rowspan: None }
+     132: StartTable { id: None }
+     133: StartTableRow { id: None }
+     134: StartTableCell { colspan: None, id: None, rowspan: None }
+     135: StartParagraph { alignment: None, id: None }
+     136: StartLink { href: "https://recruiter.usajobs.gov/sourcing/?hd=www%2Eusajobs%2Egov&jobID=74066498&jsd=jobsearch%2Eusajobs%2Egov&TabNum=7&rc=3", id: None, title: None }
+     137: Image { alt: Some("Detailed Version"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image3.png", content_type: "image/png", bytes: 1052, sha256: "6334f603cedeeec89549c85623c627041b02ea887b94ee1648d5700abb5b5321" } }
+     138: EndLink
+     139: EndParagraph
+     140: EndTableCell
+     141: StartTableCell { colspan: None, id: None, rowspan: None }
+     142: StartParagraph { alignment: None, id: None }
+     143: StartLink { href: "javascript:window.close()", id: None, title: None }
+     144: Image { alt: Some("Close Window"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image4.png", content_type: "image/png", bytes: 843, sha256: "f3cdc80b7e24e444c4fc906600a36323556fd468c1e030aa326dc786e0efaccc" } }
+     145: EndLink
+     146: EndParagraph
+     147: EndTableCell
+     148: StartTableCell { colspan: None, id: None, rowspan: None }
+     149: StartParagraph { alignment: None, id: None }
+     150: StartLink { href: "javascript:window.print()", id: None, title: None }
+     151: Image { alt: Some("Print"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image5.png", content_type: "image/png", bytes: 685, sha256: "36aefd9eb7d7ac5610d443712e327b4d788aa5192c1717db5c22fa011fa322f6" } }
+     152: EndLink
+     153: EndParagraph
+     154: EndTableCell
+     155: EndTableRow
+     156: StartTableRow { id: None }
+     157: StartTableCell { colspan: Some(3), id: None, rowspan: None }
+     158: StartParagraph { alignment: None, id: None }
+     159: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+     160: EndParagraph
+     161: EndTableCell
+     162: EndTableRow
+     163: EndTable
+     164: StartParagraph { alignment: Some(Center), id: None }
+     165: EndParagraph
+     166: EndTableCell
+     167: EndTableRow
+     168: StartTableRow { id: None }
+     169: StartTableCell { colspan: None, id: None, rowspan: None }
+     170: StartParagraph { alignment: None, id: None }
+     171: EndParagraph
+     172: EndTableCell
+     173: StartTableCell { colspan: None, id: None, rowspan: None }
+     174: StartParagraph { alignment: None, id: None }
+     175: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image7.png", content_type: "image/png", bytes: 140, sha256: "267e1f08e13266860a9be24747b4cf9304d6af8f93fd5e7127fcb05526b8273a" } }
+     176: EndParagraph
+     177: EndTableCell
+     178: EndTableRow
+     179: EndTable
+     180: StartParagraph { alignment: None, id: None }
+     181: EndParagraph
+     182: EndTableCell
+     183: EndTableRow
+     184: EndTable
+     185: StartParagraph { alignment: None, id: None }
+     186: EndParagraph
+     187: StartTable { id: None }
+     188: StartTableRow { id: None }
+     189: StartTableCell { colspan: None, id: None, rowspan: None }
+     190: StartParagraph { alignment: None, id: None }
+     191: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+     192: EndParagraph
+     193: EndTableCell
+     194: StartTableCell { colspan: None, id: None, rowspan: None }
+     195: StartParagraph { alignment: None, id: None }
+     196: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+     197: EndParagraph
+     198: EndTableCell
+     199: StartTableCell { colspan: None, id: None, rowspan: None }
+     200: StartParagraph { alignment: None, id: None }
+     201: LineBreak
+     202: LineBreak
+     203: StartTextStyle { kind: Bold, id: None }
+     204: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     205: Text { content: "Program Support Assistant (Office Automation)" }
+     206: EndTextStyle
+     207: EndTextStyle
+     208: EndParagraph
+     209: StartTable { id: None }
+     210: StartTableRow { id: None }
+     211: StartTableCell { colspan: None, id: None, rowspan: None }
+     212: StartParagraph { alignment: None, id: None }
+     213: StartTextStyle { kind: Bold, id: None }
+     214: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     215: Text { content: "Salary" }
+     216: EndTextStyle
+     217: EndTextStyle
+     218: StartTextStyle { kind: Bold, id: None }
+     219: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     220: Text { content: " " }
+     221: EndTextStyle
+     222: EndTextStyle
+     223: StartTextStyle { kind: Bold, id: None }
+     224: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     225: Text { content: "Range" }
+     226: EndTextStyle
+     227: EndTextStyle
+     228: StartTextStyle { kind: Bold, id: None }
+     229: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     230: Text { content: ":" }
+     231: EndTextStyle
+     232: EndTextStyle
+     233: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     234: Text { content: "\u{a0}32,534.00 - 42,290.00 USD per year" }
+     235: EndTextStyle
+     236: EndParagraph
+     237: EndTableCell
+     238: StartTableCell { colspan: None, id: None, rowspan: None }
+     239: StartParagraph { alignment: None, id: None }
+     240: StartTextStyle { kind: Bold, id: None }
+     241: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     242: Text { content: "Open Period:" }
+     243: EndTextStyle
+     244: EndTextStyle
+     245: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     246: Text { content: "\u{a0}Thursday, July 24, 2008" }
+     247: EndTextStyle
+     248: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     249: LineBreak
+     250: Text { content: "to Wednesday, July 30, 2008" }
+     251: EndTextStyle
+     252: EndParagraph
+     253: EndTableCell
+     254: EndTableRow
+     255: StartTableRow { id: None }
+     256: StartTableCell { colspan: None, id: None, rowspan: None }
+     257: StartParagraph { alignment: None, id: None }
+     258: StartTextStyle { kind: Bold, id: None }
+     259: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     260: Text { content: "Series & Grade:\u{a0}" }
+     261: EndTextStyle
+     262: EndTextStyle
+     263: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     264: Text { content: "GS-0303-07" }
+     265: EndTextStyle
+     266: EndParagraph
+     267: EndTableCell
+     268: StartTableCell { colspan: None, id: None, rowspan: None }
+     269: StartParagraph { alignment: None, id: None }
+     270: StartTextStyle { kind: Bold, id: None }
+     271: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     272: Text { content: "Position Information:" }
+     273: EndTextStyle
+     274: EndTextStyle
+     275: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     276: Text { content: "\u{a0}Full Time\u{a0}Career/Career Conditional" }
+     277: EndTextStyle
+     278: EndParagraph
+     279: EndTableCell
+     280: EndTableRow
+     281: StartTableRow { id: None }
+     282: StartTableCell { colspan: None, id: None, rowspan: None }
+     283: StartParagraph { alignment: None, id: None }
+     284: EndParagraph
+     285: EndTableCell
+     286: StartTableCell { colspan: None, id: None, rowspan: None }
+     287: StartParagraph { alignment: None, id: None }
+     288: StartTextStyle { kind: Bold, id: None }
+     289: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     290: Text { content: "Duty Locations:" }
+     291: EndTextStyle
+     292: EndTextStyle
+     293: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     294: Text { content: "\u{a0}1 vacancy - Buffalo, NY " }
+     295: EndTextStyle
+     296: EndParagraph
+     297: EndTableCell
+     298: EndTableRow
+     299: EndTable
+     300: StartParagraph { alignment: None, id: None }
+     301: EndParagraph
+     302: StartTable { id: None }
+     303: StartTableRow { id: None }
+     304: StartTableCell { colspan: Some(2), id: None, rowspan: None }
+     305: StartParagraph { alignment: None, id: None }
+     306: StartTextStyle { kind: Bold, id: None }
+     307: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     308: Text { content: "Who May Be Considered:" }
+     309: EndTextStyle
+     310: EndTextStyle
+     311: EndParagraph
+     312: EndTableCell
+     313: EndTableRow
+     314: StartTableRow { id: None }
+     315: StartTableCell { colspan: Some(2), id: None, rowspan: None }
+     316: StartParagraph { alignment: None, id: None }
+     317: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     318: Text { content: "United States Citizens" }
+     319: EndTextStyle
+     320: EndParagraph
+     321: EndTableCell
+     322: EndTableRow
+     323: StartTableRow { id: None }
+     324: StartTableCell { colspan: None, id: None, rowspan: None }
+     325: StartParagraph { alignment: None, id: None }
+     326: StartTextStyle { kind: Bold, id: None }
+     327: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     328: Text { content: "Job Summary:" }
+     329: EndTextStyle
+     330: EndTextStyle
+     331: EndParagraph
+     332: EndTableCell
+     333: StartTableCell { colspan: None, id: None, rowspan: None }
+     334: StartParagraph { alignment: None, id: None }
+     335: EndParagraph
+     336: EndTableCell
+     337: EndTableRow
+     338: StartTableRow { id: None }
+     339: StartTableCell { colspan: None, id: None, rowspan: None }
+     340: StartParagraph { alignment: None, id: None }
+     341: Text { content: "\u{a0}" }
+     342: EndParagraph
+     343: StartParagraph { alignment: None, id: None }
+     344: StartTextStyle { kind: Bold, id: None }
+     345: Text { content: "Vacancy Identification Number (VIN):\u{a0}" }
+     346: EndTextStyle
+     347: StartTextStyle { kind: Bold, id: None }
+     348: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 255 }), id: None }
+     349: Text { content: " " }
+     350: EndTextStyle
+     351: EndTextStyle
+     352: Text { content: "VN201385" }
+     353: StartTextStyle { kind: Bold, id: None }
+     354: Text { content: "\u{a0}" }
+     355: EndTextStyle
+     356: Text { content: "(Include on all documents)" }
+     357: EndParagraph
+     358: StartParagraph { alignment: None, id: None }
+     359: Text { content: "\u{a0}" }
+     360: EndParagraph
+     361: StartParagraph { alignment: None, id: None }
+     362: EndParagraph
+     363: StartParagraph { alignment: Some(Center), id: None }
+     364: StartTextStyle { kind: Bold, id: None }
+     365: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 192 }), id: None }
+     366: Text { content: "Be a member of a team providing compassionate healthcare to veterans." }
+     367: EndTextStyle
+     368: EndTextStyle
+     369: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 192 }), id: None }
+     370: Text { content: "\u{a0}\u{a0}\u{a0}" }
+     371: EndTextStyle
+     372: EndParagraph
+     373: StartParagraph { alignment: None, id: None }
+     374: Text { content: "The " }
+     375: StartTextStyle { kind: Bold, id: None }
+     376: Text { content: "Department of Veterans Affairs" }
+     377: EndTextStyle
+     378: Text { content: " is an employer of choice as a center of excellence in patient care, education and research.\u{a0} We value trust, respect, commitment, compassion, and excellence; we value\u{a0}you.\u{a0}\u{a0}For more information on the Department of Veterans Affairs, go to " }
+     379: StartLink { href: "http://www.va.gov/", id: None, title: None }
+     380: StartTextStyle { kind: Underline, id: None }
+     381: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+     382: Text { content: "http://www.va.gov" }
+     383: EndTextStyle
+     384: EndTextStyle
+     385: EndLink
+     386: Text { content: "\u{a0}.\u{a0} " }
+     387: EndParagraph
+     388: StartTable { id: None }
+     389: StartTableRow { id: None }
+     390: StartTableCell { colspan: None, id: None, rowspan: None }
+     391: StartParagraph { alignment: None, id: None }
+     392: StartTextStyle { kind: TextColor(Rgb { b: 128, g: 0, r: 0 }), id: None }
+     393: Text { content: "NOTE:\u{a0} In order to view and/or print the entire announcement, please scroll to the bottom of this page and click on\u{a0}\"Print Preview\"; then \"Print\".\u{a0} Otherwise, you may miss important instructions on how to apply for this position." }
+     394: EndTextStyle
+     395: EndParagraph
+     396: EndTableCell
+     397: EndTableRow
+     398: EndTable
+     399: StartParagraph { alignment: None, id: None }
+     400: StartTextStyle { kind: Bold, id: None }
+     401: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     402: Text { content: "APPLICANT\u{a0}CHECKLIST:\u{a0} " }
+     403: EndTextStyle
+     404: EndTextStyle
+     405: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     406: Text { content: "Please use this checklist to ensure compliance with all application requirements.\u{a0} " }
+     407: EndTextStyle
+     408: StartTextStyle { kind: Italic, id: None }
+     409: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 255 }), id: None }
+     410: Text { content: "We recommend that you print a copy of this checklist for reference while completing your application package." }
+     411: EndTextStyle
+     412: EndTextStyle
+     413: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     414: Text { content: "\u{a0} Detailed instructions of the application process are included after the checklist.\u{a0} Be sure to read and follow the instructions carefully." }
+     415: EndTextStyle
+     416: EndParagraph
+     417: StartParagraph { alignment: None, id: None }
+     418: StartTextStyle { kind: Bold, id: None }
+     419: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     420: Text { content: "_____\u{a0}" }
+     421: EndTextStyle
+     422: EndTextStyle
+     423: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     424: Text { content: "Responses to the Assessment Questionnaire. (see Step 1)" }
+     425: EndTextStyle
+     426: EndParagraph
+     427: StartParagraph { alignment: None, id: None }
+     428: StartTextStyle { kind: Bold, id: None }
+     429: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     430: Text { content: "_____" }
+     431: EndTextStyle
+     432: EndTextStyle
+     433: StartTextStyle { kind: Bold, id: None }
+     434: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 255 }), id: None }
+     435: Text { content: " " }
+     436: EndTextStyle
+     437: EndTextStyle
+     438: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     439: Text { content: "Resume (see Step 2 for the information\u{a0}you should include on your resume) or " }
+     440: EndTextStyle
+     441: StartLink { href: "http://www.opm.gov/forms/pdf_fill/of612.pdf", id: None, title: None }
+     442: StartTextStyle { kind: Underline, id: None }
+     443: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+     444: Text { content: "Optional Application for Federal Employment (OF-612)" }
+     445: EndTextStyle
+     446: EndTextStyle
+     447: EndLink
+     448: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     449: Text { content: "." }
+     450: EndTextStyle
+     451: EndParagraph
+     452: StartParagraph { alignment: None, id: None }
+     453: StartTextStyle { kind: Bold, id: None }
+     454: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     455: Text { content: "_____\u{a0}" }
+     456: EndTextStyle
+     457: EndTextStyle
+     458: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     459: Text { content: "If you are " }
+     460: EndTextStyle
+     461: StartTextStyle { kind: Bold, id: None }
+     462: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     463: Text { content: "faxing" }
+     464: EndTextStyle
+     465: EndTextStyle
+     466: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     467: Text { content: " your documentation, the\u{a0}" }
+     468: EndTextStyle
+     469: StartLink { href: "http://staffing.opm.gov/pdf/usascover.pdf", id: None, title: None }
+     470: StartTextStyle { kind: Underline, id: None }
+     471: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+     472: Text { content: "United States Application\u{a0}Cover Page" }
+     473: EndTextStyle
+     474: EndTextStyle
+     475: EndLink
+     476: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     477: Text { content: " " }
+     478: EndTextStyle
+     479: StartTextStyle { kind: Bold, id: None }
+     480: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 255 }), id: None }
+     481: Text { content: "must" }
+     482: EndTextStyle
+     483: EndTextStyle
+     484: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     485: Text { content: " be used in order to link your documents with your on-line questionnaire.\u{a0} Failure to provide\u{a0}this cover page - or the use of a different cover page - will prohibit your documentation from being processed.\u{a0} (see Step 3 for url)" }
+     486: EndTextStyle
+     487: EndParagraph
+     488: StartParagraph { alignment: None, id: None }
+     489: StartTextStyle { kind: Bold, id: None }
+     490: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     491: Text { content: "_____" }
+     492: EndTextStyle
+     493: EndTextStyle
+     494: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     495: Text { content: " If a particular level of education/certification is required OR if you are asking us to qualify you based upon your education, you must submit a copy of your college transcript or an appropriate course listing. (see Step 3)" }
+     496: EndTextStyle
+     497: EndParagraph
+     498: StartParagraph { alignment: None, id: None }
+     499: StartTextStyle { kind: Bold, id: None }
+     500: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     501: Text { content: "_____" }
+     502: EndTextStyle
+     503: EndTextStyle
+     504: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     505: Text { content: " Veterans must provide a\u{a0}" }
+     506: EndTextStyle
+     507: StartTextStyle { kind: Italic, id: None }
+     508: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     509: Text { content: "legible" }
+     510: EndTextStyle
+     511: EndTextStyle
+     512: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     513: Text { content: "\u{a0}copy of\u{a0}DD-214(s) showing all dates of service as well as character of service (honorable, general, etc.).\u{a0} Note:\u{a0} More than one DD-214 may be needed to show all dates of service. (see Step 3)" }
+     514: EndTextStyle
+     515: EndParagraph
+     516: StartParagraph { alignment: None, id: None }
+     517: StartTextStyle { kind: Bold, id: None }
+     518: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     519: Text { content: "_____" }
+     520: EndTextStyle
+     521: EndTextStyle
+     522: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     523: Text { content: "\u{a0} Disabled veterans and other veterans eligible for 10-point preference must also submit an SF-15 (version December 2004) with required proof as stated on the form. (see Step 3)" }
+     524: EndTextStyle
+     525: EndParagraph
+     526: StartParagraph { alignment: None, id: None }
+     527: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     528: Text { content: "_____\u{a0} An OF-306, Declaration for Federal Employment (version dated January 2001 or later) must be submitted prior to appointment.\u{a0} You may include this form as part of your application documents.\u{a0} It is available at " }
+     529: EndTextStyle
+     530: StartLink { href: "http://www.opm.gov/forms/pdf_fill_of0306.pdf", id: None, title: None }
+     531: StartTextStyle { kind: Underline, id: None }
+     532: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+     533: Text { content: "www.opm.gov/forms/pdf_fill_of0306.pdf" }
+     534: EndTextStyle
+     535: EndTextStyle
+     536: EndLink
+     537: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     538: Text { content: " ." }
+     539: EndTextStyle
+     540: EndParagraph
+     541: StartParagraph { alignment: None, id: None }
+     542: EndParagraph
+     543: EndTableCell
+     544: StartTableCell { colspan: None, id: None, rowspan: None }
+     545: StartParagraph { alignment: None, id: None }
+     546: EndParagraph
+     547: EndTableCell
+     548: EndTableRow
+     549: StartTableRow { id: None }
+     550: StartTableCell { colspan: None, id: None, rowspan: None }
+     551: StartParagraph { alignment: None, id: None }
+     552: StartTextStyle { kind: Bold, id: None }
+     553: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     554: Text { content: "Key Requirements:" }
+     555: EndTextStyle
+     556: EndTextStyle
+     557: EndParagraph
+     558: EndTableCell
+     559: StartTableCell { colspan: None, id: None, rowspan: None }
+     560: StartParagraph { alignment: None, id: None }
+     561: EndParagraph
+     562: EndTableCell
+     563: EndTableRow
+     564: StartTableRow { id: None }
+     565: StartTableCell { colspan: None, id: None, rowspan: None }
+     566: StartUnorderedListItem { id: Some("2"), level: 0, style_type: Disc }
+     567: StartParagraph { alignment: None, id: None }
+     568: Text { content: "Please refer to the \"Qualifications\" section of this vacancy announcement. " }
+     569: EndParagraph
+     570: EndUnorderedListItem
+     571: EndTableCell
+     572: StartTableCell { colspan: None, id: None, rowspan: None }
+     573: StartParagraph { alignment: None, id: None }
+     574: EndParagraph
+     575: EndTableCell
+     576: EndTableRow
+     577: EndTable
+     578: StartParagraph { alignment: None, id: None }
+     579: EndParagraph
+     580: EndTableCell
+     581: StartTableCell { colspan: None, id: None, rowspan: None }
+     582: StartParagraph { alignment: None, id: None }
+     583: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+     584: EndParagraph
+     585: EndTableCell
+     586: StartTableCell { colspan: None, id: None, rowspan: None }
+     587: StartParagraph { alignment: None, id: None }
+     588: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+     589: EndParagraph
+     590: EndTableCell
+     591: EndTableRow
+     592: StartTableRow { id: None }
+     593: StartTableCell { colspan: Some(5), id: None, rowspan: None }
+     594: StartParagraph { alignment: None, id: None }
+     595: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+     596: EndParagraph
+     597: EndTableCell
+     598: EndTableRow
+     599: EndTable
+     600: StartParagraph { alignment: None, id: None }
+     601: EndParagraph
+     602: StartTable { id: None }
+     603: StartTableRow { id: None }
+     604: StartTableCell { colspan: None, id: None, rowspan: None }
+     605: StartTable { id: None }
+     606: StartTableRow { id: None }
+     607: StartTableCell { colspan: None, id: None, rowspan: None }
+     608: StartParagraph { alignment: None, id: None }
+     609: Image { alt: Some("Duties"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image8.png", content_type: "image/png", bytes: 342, sha256: "418eeb24e08bbc16fd715b27b08b4dd51793f643a3a87b945aaa0537f629d8de" } }
+     610: EndParagraph
+     611: EndTableCell
+     612: StartTableCell { colspan: None, id: None, rowspan: None }
+     613: StartTable { id: None }
+     614: StartTableRow { id: None }
+     615: StartTableCell { colspan: None, id: None, rowspan: None }
+     616: StartParagraph { alignment: None, id: None }
+     617: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+     618: EndParagraph
+     619: EndTableCell
+     620: EndTableRow
+     621: EndTable
+     622: StartParagraph { alignment: None, id: None }
+     623: EndParagraph
+     624: EndTableCell
+     625: EndTableRow
+     626: StartTableRow { id: None }
+     627: StartTableCell { colspan: None, id: None, rowspan: None }
+     628: StartParagraph { alignment: None, id: None }
+     629: EndParagraph
+     630: EndTableCell
+     631: StartTableCell { colspan: None, id: None, rowspan: None }
+     632: StartParagraph { alignment: None, id: None }
+     633: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image7.png", content_type: "image/png", bytes: 140, sha256: "267e1f08e13266860a9be24747b4cf9304d6af8f93fd5e7127fcb05526b8273a" } }
+     634: EndParagraph
+     635: EndTableCell
+     636: EndTableRow
+     637: EndTable
+     638: StartParagraph { alignment: None, id: None }
+     639: EndParagraph
+     640: EndTableCell
+     641: EndTableRow
+     642: EndTable
+     643: StartParagraph { alignment: None, id: None }
+     644: EndParagraph
+     645: StartTable { id: None }
+     646: StartTableRow { id: None }
+     647: StartTableCell { colspan: None, id: None, rowspan: None }
+     648: StartParagraph { alignment: None, id: None }
+     649: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+     650: EndParagraph
+     651: EndTableCell
+     652: StartTableCell { colspan: None, id: None, rowspan: None }
+     653: StartParagraph { alignment: None, id: None }
+     654: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+     655: EndParagraph
+     656: EndTableCell
+     657: StartTableCell { colspan: None, id: None, rowspan: None }
+     658: StartTable { id: None }
+     659: StartTableRow { id: None }
+     660: StartTableCell { colspan: None, id: None, rowspan: None }
+     661: StartParagraph { alignment: None, id: None }
+     662: LineBreak
+     663: StartTextStyle { kind: Bold, id: None }
+     664: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     665: Text { content: "Major Duties:" }
+     666: EndTextStyle
+     667: EndTextStyle
+     668: EndParagraph
+     669: EndTableCell
+     670: EndTableRow
+     671: StartTableRow { id: None }
+     672: StartTableCell { colspan: None, id: None, rowspan: None }
+     673: StartParagraph { alignment: None, id: None }
+     674: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     675: Text { content: "The Program Support Assistant (Office Automation) facilitates the flow of information concerning research projects among the many elements of the Medical Research Service, e.g., the individual investigator, reviewers and/or collaborators, the Research and Development Committee and subcommittees, the ACOS for R&D and his staff, VA Central Office and its adjuncts such as the Biomedical Engineering and Computing Center, Sepulveda, and non-VA facilities such as SUNYAB." }
+     676: EndTextStyle
+     677: EndParagraph
+     678: StartParagraph { alignment: None, id: None }
+     679: Text { content: "\t" }
+     680: EndParagraph
+     681: StartParagraph { alignment: None, id: None }
+     682: Text { content: "The majority of this information flow pertains to research grant applications, but a large fraction involves progress reports, R&D Committee communications and computer entries into the national Research and Development Information System (RDIS).  The major duties and responsibilities include: " }
+     683: EndParagraph
+     684: StartParagraph { alignment: None, id: None }
+     685: EndParagraph
+     686: StartParagraph { alignment: None, id: None }
+     687: Text { content: "\t" }
+     688: Text { content: "\t" }
+     689: Text { content: "\u{f0b7}" }
+     690: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     691: Text { content: "\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0} " }
+     692: EndTextStyle
+     693: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     694: Text { content: "Helps investigators prepare proposal forms, monitors each research proposal from its initial submission for consideration by committees of the Research and Development Service through its annual progress reports up to the point the project is completed; reviews each proposal for conformance with policies, regulations, format, completeness and accuracy; " }
+     695: EndTextStyle
+     696: EndParagraph
+     697: StartParagraph { alignment: None, id: None }
+     698: Text { content: "\t" }
+     699: Text { content: "\t" }
+     700: Text { content: "\u{f0b7}" }
+     701: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     702: Text { content: "\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0} " }
+     703: EndTextStyle
+     704: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     705: Text { content: "Establishes agendas for the Research and Development Committee, the Human Studies Subcommittee and the Animal Studies Subcommittee meetings; " }
+     706: EndTextStyle
+     707: EndParagraph
+     708: StartParagraph { alignment: None, id: None }
+     709: Text { content: "\t" }
+     710: Text { content: "\t" }
+     711: Text { content: "\u{f0b7}" }
+     712: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     713: Text { content: "\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0} " }
+     714: EndTextStyle
+     715: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     716: Text { content: "Prepares or coordinates preparation of monthly packages for all members of the committees; schedules meetings of these committees; takes notes of the proceedings; converts the notes into formal minutes; prepares these minutes for the chairperson’s review and signature; and distributes them;" }
+     717: EndTextStyle
+     718: EndParagraph
+     719: StartParagraph { alignment: None, id: None }
+     720: Text { content: "\t" }
+     721: Text { content: "\t" }
+     722: Text { content: "\u{f0b7}" }
+     723: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     724: Text { content: "\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0} " }
+     725: EndTextStyle
+     726: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     727: Text { content: "Monitors each project for the required initial, progress and final reports; notifies the investigators of the need for such reports, incorporates these reports into the project package; initiates and maintains a file of all abstracts and publications resulting from work on each proposal; obtains reviews of these items and prepares copies of them for distribution;" }
+     728: EndTextStyle
+     729: EndParagraph
+     730: StartParagraph { alignment: None, id: None }
+     731: Text { content: "\t" }
+     732: Text { content: "\t" }
+     733: Text { content: "\u{f0b7}" }
+     734: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     735: Text { content: "\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0} " }
+     736: EndTextStyle
+     737: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     738: Text { content: "Manages all project data activities utilizing the PROMISE system;" }
+     739: EndTextStyle
+     740: EndParagraph
+     741: StartParagraph { alignment: None, id: None }
+     742: Text { content: "\t" }
+     743: Text { content: "\t" }
+     744: Text { content: "\u{f0b7}" }
+     745: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     746: Text { content: "\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0} " }
+     747: EndTextStyle
+     748: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     749: Text { content: "Acts on requests for information from potential grant applicants by answering questions related to procedure, providing copies of application forms and instructions, and reviewing with them the major requirements that need emphasis (after verifying that they are eligible to apply);" }
+     750: EndTextStyle
+     751: EndParagraph
+     752: StartParagraph { alignment: None, id: None }
+     753: Text { content: "\t" }
+     754: Text { content: "\t" }
+     755: Text { content: "\u{f0b7}" }
+     756: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     757: Text { content: "\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0} " }
+     758: EndTextStyle
+     759: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     760: Text { content: "Establishes and maintains a personal calendar as a reminder of various grant deadlines both local and national as well as notation of action dates for initial submission of material or follow-up; and" }
+     761: EndTextStyle
+     762: EndParagraph
+     763: StartParagraph { alignment: None, id: None }
+     764: Text { content: "\t" }
+     765: Text { content: "\t" }
+     766: Text { content: "\u{f0b7}" }
+     767: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     768: Text { content: "\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0}\u{a0} " }
+     769: EndTextStyle
+     770: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     771: Text { content: "Performs other duties as assigned." }
+     772: EndTextStyle
+     773: EndParagraph
+     774: StartParagraph { alignment: None, id: None }
+     775: Text { content: "\t" }
+     776: Text { content: "\t" }
+     777: Text { content: "\u{a0}" }
+     778: EndParagraph
+     779: StartParagraph { alignment: None, id: None }
+     780: Text { content: "\u{a0}" }
+     781: StartTextStyle { kind: Bold, id: None }
+     782: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 255 }), id: None }
+     783: Text { content: "***RELOCATION EXPENSES AND/OR INCENTIVES ARE NOT AUTHORIZED***\u{a0}" }
+     784: EndTextStyle
+     785: EndTextStyle
+     786: EndParagraph
+     787: EndTableCell
+     788: EndTableRow
+     789: EndTable
+     790: StartParagraph { alignment: None, id: None }
+     791: EndParagraph
+     792: EndTableCell
+     793: StartTableCell { colspan: None, id: None, rowspan: None }
+     794: StartParagraph { alignment: None, id: None }
+     795: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+     796: EndParagraph
+     797: EndTableCell
+     798: StartTableCell { colspan: None, id: None, rowspan: None }
+     799: StartParagraph { alignment: None, id: None }
+     800: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+     801: EndParagraph
+     802: EndTableCell
+     803: EndTableRow
+     804: StartTableRow { id: None }
+     805: StartTableCell { colspan: Some(5), id: None, rowspan: None }
+     806: StartParagraph { alignment: None, id: None }
+     807: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+     808: EndParagraph
+     809: EndTableCell
+     810: EndTableRow
+     811: EndTable
+     812: StartParagraph { alignment: None, id: None }
+     813: EndParagraph
+     814: StartTable { id: None }
+     815: StartTableRow { id: None }
+     816: StartTableCell { colspan: None, id: None, rowspan: None }
+     817: StartTable { id: None }
+     818: StartTableRow { id: None }
+     819: StartTableCell { colspan: None, id: None, rowspan: None }
+     820: StartParagraph { alignment: None, id: None }
+     821: Image { alt: Some("Qualifications"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image9.png", content_type: "image/png", bytes: 627, sha256: "ebbc7ca51e3843f98df986831cd508d6a3fc48caa29bd3d1a5ffbc74c6b75928" } }
+     822: EndParagraph
+     823: EndTableCell
+     824: StartTableCell { colspan: None, id: None, rowspan: None }
+     825: StartTable { id: None }
+     826: StartTableRow { id: None }
+     827: StartTableCell { colspan: None, id: None, rowspan: None }
+     828: StartParagraph { alignment: None, id: None }
+     829: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+     830: EndParagraph
+     831: EndTableCell
+     832: EndTableRow
+     833: EndTable
+     834: StartParagraph { alignment: None, id: None }
+     835: EndParagraph
+     836: EndTableCell
+     837: EndTableRow
+     838: StartTableRow { id: None }
+     839: StartTableCell { colspan: None, id: None, rowspan: None }
+     840: StartParagraph { alignment: None, id: None }
+     841: EndParagraph
+     842: EndTableCell
+     843: StartTableCell { colspan: None, id: None, rowspan: None }
+     844: StartParagraph { alignment: None, id: None }
+     845: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image7.png", content_type: "image/png", bytes: 140, sha256: "267e1f08e13266860a9be24747b4cf9304d6af8f93fd5e7127fcb05526b8273a" } }
+     846: EndParagraph
+     847: EndTableCell
+     848: EndTableRow
+     849: EndTable
+     850: StartParagraph { alignment: None, id: None }
+     851: EndParagraph
+     852: EndTableCell
+     853: EndTableRow
+     854: EndTable
+     855: StartParagraph { alignment: None, id: None }
+     856: EndParagraph
+     857: StartTable { id: None }
+     858: StartTableRow { id: None }
+     859: StartTableCell { colspan: None, id: None, rowspan: None }
+     860: StartParagraph { alignment: None, id: None }
+     861: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+     862: EndParagraph
+     863: EndTableCell
+     864: StartTableCell { colspan: None, id: None, rowspan: None }
+     865: StartParagraph { alignment: None, id: None }
+     866: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+     867: EndParagraph
+     868: EndTableCell
+     869: StartTableCell { colspan: None, id: None, rowspan: None }
+     870: StartTable { id: None }
+     871: StartTableRow { id: None }
+     872: StartTableCell { colspan: None, id: None, rowspan: None }
+     873: StartParagraph { alignment: None, id: None }
+     874: LineBreak
+     875: StartTextStyle { kind: Bold, id: None }
+     876: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     877: Text { content: "Qualifications:" }
+     878: EndTextStyle
+     879: EndTextStyle
+     880: EndParagraph
+     881: EndTableCell
+     882: EndTableRow
+     883: StartTableRow { id: None }
+     884: StartTableCell { colspan: None, id: None, rowspan: None }
+     885: StartParagraph { alignment: None, id: None }
+     886: StartTextStyle { kind: Bold, id: None }
+     887: StartTextStyle { kind: TextColor(Rgb { b: 255, g: 0, r: 0 }), id: None }
+     888: Text { content: "To qualify for this position:" }
+     889: EndTextStyle
+     890: EndTextStyle
+     891: EndParagraph
+     892: StartParagraph { alignment: None, id: None }
+     893: StartTextStyle { kind: Bold, id: None }
+     894: StartTextStyle { kind: TextColor(Rgb { b: 37, g: 37, r: 37 }), id: None }
+     895: Text { content: "BASIC REQUIREMENT: Must type 40 words per minute" }
+     896: EndTextStyle
+     897: EndTextStyle
+     898: EndParagraph
+     899: StartParagraph { alignment: Some(Center), id: None }
+     900: StartTextStyle { kind: Bold, id: None }
+     901: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 96, r: 255 }), id: None }
+     902: Text { content: "~PLUS~" }
+     903: EndTextStyle
+     904: EndTextStyle
+     905: EndParagraph
+     906: StartParagraph { alignment: None, id: None }
+     907: Text { content: "You must have one full\u{a0}year\u{a0}" }
+     908: StartTextStyle { kind: Bold, id: None }
+     909: Text { content: "specialized experience" }
+     910: EndTextStyle
+     911: Text { content: " equivalent to at least the GS-6 level.\u{a0} This experience must be close to the work of this job and has given you the particular knowledge, skills, and abilities required to successfully perform the duties of a Program Support Assistant (Office Automation).\u{a0} Examples of specialized experience may be working in a\u{a0}research setting, physician's office or health care facility where you were responsible for administrative support\u{a0}to\u{a0}clinical and/or administrative staff,\u{a0}compiling information for computer generated reports, taking meeting minutes, preparing proposals, managing the clerical processes of an office, etc.\u{a0} " }
+     912: EndParagraph
+     913: StartParagraph { alignment: None, id: None }
+     914: StartTextStyle { kind: Italic, id: None }
+     915: StartTextStyle { kind: TextColor(Rgb { b: 127, g: 0, r: 0 }), id: None }
+     916: Text { content: "NOTE:\u{a0} A full year of\u{a0}work is considered to be 35-40 hours of work per week.\u{a0} Part-time experience will be credited on the basis of time actually spent in appropriate activities.\u{a0} Applicants wishing to receive credit for such experience must indicate clearly the nature of their duties and responsibilities in each position and the number of hours a week spent in such employment." }
+     917: EndTextStyle
+     918: EndTextStyle
+     919: EndParagraph
+     920: StartParagraph { alignment: None, id: None }
+     921: Text { content: "Additional information on the qualification requirements is outlined in the OPM Qualifications Standards Handbook of General Schedule Positions.\u{a0} It is available for your review on OPM's web site at " }
+     922: StartLink { href: "http://www.opm.gov/qualifications", id: None, title: None }
+     923: StartTextStyle { kind: Underline, id: None }
+     924: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+     925: Text { content: "http://www.opm.gov/qualifications" }
+     926: EndTextStyle
+     927: EndTextStyle
+     928: EndLink
+     929: Text { content: " ." }
+     930: EndParagraph
+     931: StartParagraph { alignment: None, id: None }
+     932: StartTextStyle { kind: Bold, id: None }
+     933: Text { content: "Foreign Education" }
+     934: EndTextStyle
+     935: Text { content: ":\u{a0} To receive credit for education completed outside the United States, you must show proof that the education has been submitted to a private organization that specializes in the interpretation of foreign educational credentials and such education has been deemed at least equivalent to that gained in conventional U.S. education programs." }
+     936: EndParagraph
+     937: StartParagraph { alignment: None, id: None }
+     938: StartTextStyle { kind: Bold, id: None }
+     939: Text { content: "REQUIREMENTS" }
+     940: EndTextStyle
+     941: Text { content: " (Failure to comply may be grounds for withdrawal of an offer of employment, or dismissal after appointment):\u{a0} " }
+     942: EndParagraph
+     943: StartUnorderedListItem { id: Some("3"), level: 0, style_type: Disc }
+     944: StartParagraph { alignment: None, id: None }
+     945: Text { content: "Applicants must meet any physical, language, license or degree requirements. " }
+     946: EndParagraph
+     947: EndUnorderedListItem
+     948: StartUnorderedListItem { id: Some("3"), level: 0, style_type: Disc }
+     949: StartParagraph { alignment: None, id: None }
+     950: Text { content: "Applicants must be citizens of the United States. " }
+     951: EndParagraph
+     952: EndUnorderedListItem
+     953: StartUnorderedListItem { id: Some("3"), level: 0, style_type: Disc }
+     954: StartParagraph { alignment: None, id: None }
+     955: Text { content: "Applicants tentatively selected for certain designated positions may be subject to a random drug screening for illegal drug use.\u{a0} Applicants who refuse to be tested will be denied employment. " }
+     956: EndParagraph
+     957: EndUnorderedListItem
+     958: StartUnorderedListItem { id: Some("3"), level: 0, style_type: Disc }
+     959: StartParagraph { alignment: None, id: None }
+     960: Text { content: "New Appointees may be subject to a probationary period. " }
+     961: EndParagraph
+     962: EndUnorderedListItem
+     963: StartUnorderedListItem { id: Some("3"), level: 0, style_type: Disc }
+     964: StartParagraph { alignment: None, id: None }
+     965: Text { content: "New Appointees will be subject to a background investigation to determine suitability. " }
+     966: EndParagraph
+     967: EndUnorderedListItem
+     968: StartUnorderedListItem { id: Some("3"), level: 0, style_type: Disc }
+     969: StartParagraph { alignment: None, id: None }
+     970: Text { content: "An\u{a0}OF-306, Declaration for Federal Employment (version dated January 2001),\u{a0}" }
+     971: StartTextStyle { kind: Bold, id: None }
+     972: StartTextStyle { kind: Italic, id: None }
+     973: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 255 }), id: None }
+     974: Text { content: "must be submitted prior to appointment.\u{a0}\u{a0} " }
+     975: EndTextStyle
+     976: EndTextStyle
+     977: EndTextStyle
+     978: StartTextStyle { kind: Italic, id: None }
+     979: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     980: Text { content: "This form is available at " }
+     981: EndTextStyle
+     982: EndTextStyle
+     983: StartLink { href: "http://www.opm.gov/forms/pdf_fill/of0306.pdf", id: None, title: None }
+     984: StartTextStyle { kind: Italic, id: None }
+     985: StartTextStyle { kind: Underline, id: None }
+     986: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+     987: Text { content: "www.opm.gov/forms/pdf_fill/of0306.pdf" }
+     988: EndTextStyle
+     989: EndTextStyle
+     990: EndTextStyle
+     991: EndLink
+     992: StartTextStyle { kind: Italic, id: None }
+     993: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+     994: Text { content: ".\u{a0} " }
+     995: EndTextStyle
+     996: EndTextStyle
+     997: EndParagraph
+     998: EndUnorderedListItem
+     999: EndTableCell
+    1000: EndTableRow
+    1001: StartTableRow { id: None }
+    1002: StartTableCell { colspan: None, id: None, rowspan: None }
+    1003: StartParagraph { alignment: None, id: None }
+    1004: LineBreak
+    1005: StartTextStyle { kind: Bold, id: None }
+    1006: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+    1007: Text { content: "How You Will Be Evaluated:" }
+    1008: EndTextStyle
+    1009: EndTextStyle
+    1010: EndParagraph
+    1011: EndTableCell
+    1012: EndTableRow
+    1013: StartTableRow { id: None }
+    1014: StartTableCell { colspan: None, id: None, rowspan: None }
+    1015: StartParagraph { alignment: None, id: None }
+    1016: Text { content: "Please ensure you answer all questions and follow all instructions carefully.\u{a0} Errors or omissions may affect your evaluation.\u{a0} When answering the questionnaire, remember that your experience and education are subject to verification by investigation.\u{a0} You may be asked to provide specific examples or documentation of experience or education as proof to support your answers, or you may be required to verify a response by a practical demonstration of your claimed ability to perform a task." }
+    1017: EndParagraph
+    1018: EndTableCell
+    1019: EndTableRow
+    1020: EndTable
+    1021: StartParagraph { alignment: None, id: None }
+    1022: EndParagraph
+    1023: EndTableCell
+    1024: StartTableCell { colspan: None, id: None, rowspan: None }
+    1025: StartParagraph { alignment: None, id: None }
+    1026: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    1027: EndParagraph
+    1028: EndTableCell
+    1029: StartTableCell { colspan: None, id: None, rowspan: None }
+    1030: StartParagraph { alignment: None, id: None }
+    1031: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    1032: EndParagraph
+    1033: EndTableCell
+    1034: EndTableRow
+    1035: StartTableRow { id: None }
+    1036: StartTableCell { colspan: Some(5), id: None, rowspan: None }
+    1037: StartParagraph { alignment: None, id: None }
+    1038: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    1039: EndParagraph
+    1040: EndTableCell
+    1041: EndTableRow
+    1042: EndTable
+    1043: StartParagraph { alignment: None, id: None }
+    1044: EndParagraph
+    1045: StartTable { id: None }
+    1046: StartTableRow { id: None }
+    1047: StartTableCell { colspan: None, id: None, rowspan: None }
+    1048: StartTable { id: None }
+    1049: StartTableRow { id: None }
+    1050: StartTableCell { colspan: None, id: None, rowspan: None }
+    1051: StartParagraph { alignment: None, id: None }
+    1052: Image { alt: Some("Benefits"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image10.png", content_type: "image/png", bytes: 644, sha256: "05d2b7501f9632a38f1f6b28cdb741c92b39edff313a64a836fe4e2dd3e37d67" } }
+    1053: EndParagraph
+    1054: EndTableCell
+    1055: StartTableCell { colspan: None, id: None, rowspan: None }
+    1056: StartTable { id: None }
+    1057: StartTableRow { id: None }
+    1058: StartTableCell { colspan: None, id: None, rowspan: None }
+    1059: StartParagraph { alignment: None, id: None }
+    1060: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    1061: EndParagraph
+    1062: EndTableCell
+    1063: EndTableRow
+    1064: EndTable
+    1065: StartParagraph { alignment: None, id: None }
+    1066: EndParagraph
+    1067: EndTableCell
+    1068: EndTableRow
+    1069: StartTableRow { id: None }
+    1070: StartTableCell { colspan: None, id: None, rowspan: None }
+    1071: StartParagraph { alignment: None, id: None }
+    1072: EndParagraph
+    1073: EndTableCell
+    1074: StartTableCell { colspan: None, id: None, rowspan: None }
+    1075: StartParagraph { alignment: None, id: None }
+    1076: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image7.png", content_type: "image/png", bytes: 140, sha256: "267e1f08e13266860a9be24747b4cf9304d6af8f93fd5e7127fcb05526b8273a" } }
+    1077: EndParagraph
+    1078: EndTableCell
+    1079: EndTableRow
+    1080: EndTable
+    1081: StartParagraph { alignment: None, id: None }
+    1082: EndParagraph
+    1083: EndTableCell
+    1084: EndTableRow
+    1085: EndTable
+    1086: StartParagraph { alignment: None, id: None }
+    1087: EndParagraph
+    1088: StartTable { id: None }
+    1089: StartTableRow { id: None }
+    1090: StartTableCell { colspan: None, id: None, rowspan: None }
+    1091: StartParagraph { alignment: None, id: None }
+    1092: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    1093: EndParagraph
+    1094: EndTableCell
+    1095: StartTableCell { colspan: None, id: None, rowspan: None }
+    1096: StartParagraph { alignment: None, id: None }
+    1097: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    1098: EndParagraph
+    1099: EndTableCell
+    1100: StartTableCell { colspan: None, id: None, rowspan: None }
+    1101: StartTable { id: None }
+    1102: StartTableRow { id: None }
+    1103: StartTableCell { colspan: None, id: None, rowspan: None }
+    1104: StartParagraph { alignment: None, id: None }
+    1105: LineBreak
+    1106: StartTextStyle { kind: Bold, id: None }
+    1107: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+    1108: Text { content: "Benefits:" }
+    1109: EndTextStyle
+    1110: EndTextStyle
+    1111: EndParagraph
+    1112: EndTableCell
+    1113: EndTableRow
+    1114: StartTableRow { id: None }
+    1115: StartTableCell { colspan: None, id: None, rowspan: None }
+    1116: StartParagraph { alignment: None, id: None }
+    1117: Text { content: "The Department of Veterans Affairs offers a comprehensive benefits program that you can customize for your individual medical and financial needs.\u{a0} In addition to traditional \"dollars and cents\" benefits, we offer a range of benefits to help you balance life with the VA to life outside of work.\u{a0}\u{a0}For additional information about the many benefits of a career with the VA, please visit our \"" }
+    1118: StartTextStyle { kind: Bold, id: None }
+    1119: StartTextStyle { kind: Italic, id: None }
+    1120: Text { content: "Benefits at a Glance" }
+    1121: EndTextStyle
+    1122: EndTextStyle
+    1123: Text { content: "\" webpage at " }
+    1124: StartLink { href: "http://www.va.gov/jobs/job_benefits/benefits.asp", id: None, title: None }
+    1125: StartTextStyle { kind: Underline, id: None }
+    1126: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    1127: Text { content: "http://www.va.gov/jobs/job_benefits/benefits.asp" }
+    1128: EndTextStyle
+    1129: EndTextStyle
+    1130: EndLink
+    1131: Text { content: "\u{a0}." }
+    1132: EndParagraph
+    1133: EndTableCell
+    1134: EndTableRow
+    1135: StartTableRow { id: None }
+    1136: StartTableCell { colspan: None, id: None, rowspan: None }
+    1137: StartParagraph { alignment: None, id: None }
+    1138: LineBreak
+    1139: StartTextStyle { kind: Bold, id: None }
+    1140: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+    1141: Text { content: "Other Information:" }
+    1142: EndTextStyle
+    1143: EndTextStyle
+    1144: EndParagraph
+    1145: EndTableCell
+    1146: EndTableRow
+    1147: StartTableRow { id: None }
+    1148: StartTableCell { colspan: None, id: None, rowspan: None }
+    1149: StartParagraph { alignment: None, id: None }
+    1150: StartTextStyle { kind: Bold, id: None }
+    1151: StartTextStyle { kind: Underline, id: None }
+    1152: Text { content: "Area of Consideration" }
+    1153: EndTextStyle
+    1154: EndTextStyle
+    1155: Text { content: ":\u{a0} All citizens of the United States of America.\u{a0} Applications received under this announcement will be rated under competitive procedures in accordance with Office of Personnel Management examining regulations.\u{a0} [The Human Resources (HR) Office for the facility with this vacancy may be accepting applications separately under one or more special employment authorities, such as:\u{a0} Veterans Recruitment Appointment (VRA); Veterans Employment Opportunity Act (VEOA); hiring compensably disabled veterans with ratings of 30% or greater; hiring persons with disabilities; or reinstatement to, or transfer within, the Federal government.\u{a0} If so, you may find a\u{a0}separate announcement covering one or more of these special authorities\u{a0}on " }
+    1156: StartLink { href: "http://www.usajobs.opm.gov/", id: None, title: None }
+    1157: StartTextStyle { kind: Underline, id: None }
+    1158: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    1159: Text { content: "http://www.usajobs.opm.gov/" }
+    1160: EndTextStyle
+    1161: EndTextStyle
+    1162: EndLink
+    1163: Text { content: ". \u{a0}You may also contact the facility's HR Office directly to inquire if applications are being accepted under any of the special authorities for which you are eligible.]\u{a0} " }
+    1164: EndParagraph
+    1165: StartParagraph { alignment: None, id: None }
+    1166: Text { content: "\u{a0}" }
+    1167: EndParagraph
+    1168: StartParagraph { alignment: None, id: None }
+    1169: Text { content: "For a fact sheet explaining how Federal jobs are filled, click on " }
+    1170: StartLink { href: "http://www.usajobs.opm.gov/EI55.asp", id: None, title: None }
+    1171: StartTextStyle { kind: Underline, id: None }
+    1172: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    1173: Text { content: "http://www.usajobs.opm.gov/EI55.asp" }
+    1174: EndTextStyle
+    1175: EndTextStyle
+    1176: EndLink
+    1177: Text { content: ". " }
+    1178: EndParagraph
+    1179: StartParagraph { alignment: None, id: None }
+    1180: Text { content: "\u{a0}" }
+    1181: EndParagraph
+    1182: StartParagraph { alignment: None, id: None }
+    1183: StartTextStyle { kind: Bold, id: None }
+    1184: StartTextStyle { kind: Underline, id: None }
+    1185: Text { content: "Priority Consideration" }
+    1186: EndTextStyle
+    1187: EndTextStyle
+    1188: Text { content: ":\u{a0} Individuals who have special priority selection rights under the Agency Career Transition Assistance Program (CTAP) or the Interagency Career Transition Assistance Program (ICTAP) must be well qualified for the position to receive consideration for special priority selection.\u{a0} CTAP and ICTAP eligibles will be considered well qualified if they attain an eligibility rating of 90.0 or higher, not including points for veterans' preference, from the facility with the vacancy." }
+    1189: EndParagraph
+    1190: StartParagraph { alignment: None, id: None }
+    1191: Text { content: "\u{a0}" }
+    1192: EndParagraph
+    1193: StartParagraph { alignment: None, id: None }
+    1194: Text { content: "Federal employees seeking CTAP/ICTAP eligibility must submit proof that they meet the requirements of 5 CFR 330.605 (a) for CTAP and 5 CFR 330.704 for ICTAP.\u{a0} This includes a copy of the agency notice, a copy of their most recent Performance Rating and a copy of their most recent SF-50 noting current position, grade level, and duty location.\u{a0} Please annotate your application to reflect that you are applying as a CTAP or ICTAP eligible." }
+    1195: EndParagraph
+    1196: EndTableCell
+    1197: EndTableRow
+    1198: EndTable
+    1199: StartParagraph { alignment: None, id: None }
+    1200: EndParagraph
+    1201: EndTableCell
+    1202: StartTableCell { colspan: None, id: None, rowspan: None }
+    1203: StartParagraph { alignment: None, id: None }
+    1204: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    1205: EndParagraph
+    1206: EndTableCell
+    1207: StartTableCell { colspan: None, id: None, rowspan: None }
+    1208: StartParagraph { alignment: None, id: None }
+    1209: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    1210: EndParagraph
+    1211: EndTableCell
+    1212: EndTableRow
+    1213: StartTableRow { id: None }
+    1214: StartTableCell { colspan: Some(5), id: None, rowspan: None }
+    1215: StartParagraph { alignment: None, id: None }
+    1216: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    1217: EndParagraph
+    1218: EndTableCell
+    1219: EndTableRow
+    1220: EndTable
+    1221: StartParagraph { alignment: None, id: None }
+    1222: EndParagraph
+    1223: StartTable { id: None }
+    1224: StartTableRow { id: None }
+    1225: StartTableCell { colspan: None, id: None, rowspan: None }
+    1226: StartTable { id: None }
+    1227: StartTableRow { id: None }
+    1228: StartTableCell { colspan: None, id: None, rowspan: None }
+    1229: StartParagraph { alignment: None, id: None }
+    1230: Image { alt: Some("How To Apply"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image11.png", content_type: "image/png", bytes: 463, sha256: "78155b43308af28c88f26e17e13be96f5877639150e1f203f22a8e63c884ec74" } }
+    1231: EndParagraph
+    1232: EndTableCell
+    1233: StartTableCell { colspan: None, id: None, rowspan: None }
+    1234: StartTable { id: None }
+    1235: StartTableRow { id: None }
+    1236: StartTableCell { colspan: None, id: None, rowspan: None }
+    1237: StartParagraph { alignment: None, id: None }
+    1238: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    1239: EndParagraph
+    1240: EndTableCell
+    1241: EndTableRow
+    1242: EndTable
+    1243: StartParagraph { alignment: None, id: None }
+    1244: EndParagraph
+    1245: EndTableCell
+    1246: EndTableRow
+    1247: StartTableRow { id: None }
+    1248: StartTableCell { colspan: None, id: None, rowspan: None }
+    1249: StartParagraph { alignment: None, id: None }
+    1250: EndParagraph
+    1251: EndTableCell
+    1252: StartTableCell { colspan: None, id: None, rowspan: None }
+    1253: StartParagraph { alignment: None, id: None }
+    1254: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image7.png", content_type: "image/png", bytes: 140, sha256: "267e1f08e13266860a9be24747b4cf9304d6af8f93fd5e7127fcb05526b8273a" } }
+    1255: EndParagraph
+    1256: EndTableCell
+    1257: EndTableRow
+    1258: EndTable
+    1259: StartParagraph { alignment: None, id: None }
+    1260: EndParagraph
+    1261: EndTableCell
+    1262: EndTableRow
+    1263: EndTable
+    1264: StartParagraph { alignment: None, id: None }
+    1265: EndParagraph
+    1266: StartTable { id: None }
+    1267: StartTableRow { id: None }
+    1268: StartTableCell { colspan: None, id: None, rowspan: None }
+    1269: StartParagraph { alignment: None, id: None }
+    1270: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    1271: EndParagraph
+    1272: EndTableCell
+    1273: StartTableCell { colspan: None, id: None, rowspan: None }
+    1274: StartParagraph { alignment: None, id: None }
+    1275: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    1276: EndParagraph
+    1277: EndTableCell
+    1278: StartTableCell { colspan: None, id: None, rowspan: None }
+    1279: StartTable { id: None }
+    1280: StartTableRow { id: None }
+    1281: StartTableCell { colspan: None, id: None, rowspan: None }
+    1282: StartParagraph { alignment: None, id: None }
+    1283: LineBreak
+    1284: StartTextStyle { kind: Bold, id: None }
+    1285: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+    1286: Text { content: "How To Apply:" }
+    1287: EndTextStyle
+    1288: EndTextStyle
+    1289: EndParagraph
+    1290: EndTableCell
+    1291: EndTableRow
+    1292: StartTableRow { id: None }
+    1293: StartTableCell { colspan: None, id: None, rowspan: None }
+    1294: StartParagraph { alignment: None, id: None }
+    1295: StartTextStyle { kind: Bold, id: None }
+    1296: Text { content: "PLEASE NOTE:\u{a0} " }
+    1297: EndTextStyle
+    1298: EndParagraph
+    1299: StartUnorderedListItem { id: Some("4"), level: 0, style_type: Disc }
+    1300: StartParagraph { alignment: None, id: None }
+    1301: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+    1302: Text { content: "It is " }
+    1303: EndTextStyle
+    1304: StartTextStyle { kind: Italic, id: None }
+    1305: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 255 }), id: None }
+    1306: Text { content: "your responsibility " }
+    1307: EndTextStyle
+    1308: EndTextStyle
+    1309: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+    1310: Text { content: "to insure that all application materials are " }
+    1311: EndTextStyle
+    1312: StartTextStyle { kind: Bold, id: None }
+    1313: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+    1314: Text { content: "RECEIVED" }
+    1315: EndTextStyle
+    1316: EndTextStyle
+    1317: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+    1318: Text { content: "\u{a0}by 11:59 p.m. Eastern Standard Time on the closing date of the announcement\u{a0}(Wednesday, July 30, 2008) in order to be considered.\u{a0} We cannot be responsible for incompatible software, illegible fax transmissions, interruptions in internet service, etc.\u{a0} " }
+    1319: EndTextStyle
+    1320: EndParagraph
+    1321: EndUnorderedListItem
+    1322: StartUnorderedListItem { id: Some("4"), level: 0, style_type: Disc }
+    1323: StartParagraph { alignment: None, id: None }
+    1324: Text { content: "You must submit a complete application package.\u{a0} Failure to provide complete information may result in your not receiving consideration for this position. " }
+    1325: EndParagraph
+    1326: EndUnorderedListItem
+    1327: StartUnorderedListItem { id: Some("4"), level: 0, style_type: Disc }
+    1328: StartParagraph { alignment: None, id: None }
+    1329: Text { content: "You must submit your assessment questionnaire online (through Application Manager) " }
+    1330: StartTextStyle { kind: Bold, id: None }
+    1331: StartTextStyle { kind: Underline, id: None }
+    1332: Text { content: "or" }
+    1333: EndTextStyle
+    1334: EndTextStyle
+    1335: Text { content: "\u{a0} on " }
+    1336: StartLink { href: "http://www.opm.gov/forms/pdf_fill/opm1203fx.pdf", id: None, title: None }
+    1337: StartTextStyle { kind: Underline, id: None }
+    1338: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    1339: Text { content: "OPM Form 1203-FX" }
+    1340: EndTextStyle
+    1341: EndTextStyle
+    1342: EndLink
+    1343: Text { content: " (and faxed).\u{a0} " }
+    1344: StartTextStyle { kind: Bold, id: None }
+    1345: StartTextStyle { kind: Italic, id: None }
+    1346: Text { content: "Do not\u{a0}send printouts of your Application Manager Questionnaire Answers" }
+    1347: EndTextStyle
+    1348: EndTextStyle
+    1349: Text { content: ".\u{a0} If you fax your application and/or documentation, please keep a copy of your fax transmittal receipt for future verification, if necessary. " }
+    1350: EndParagraph
+    1351: EndUnorderedListItem
+    1352: StartUnorderedListItem { id: Some("4"), level: 0, style_type: Disc }
+    1353: StartParagraph { alignment: None, id: None }
+    1354: Text { content: "If you upload your documents using Application Manager, " }
+    1355: StartTextStyle { kind: Bold, id: None }
+    1356: Text { content: "DO NOT FAX" }
+    1357: EndTextStyle
+    1358: Text { content: " the same documents.\u{a0} To verify\u{a0}that your uploaded\u{a0}documents have been processed, please wait one hour to ensure they have cleared the virus scan.\u{a0} You can then verify that your uploaded documents are attached to your application by\u{a0}checking the \"" }
+    1359: StartTextStyle { kind: Bold, id: None }
+    1360: StartTextStyle { kind: Italic, id: None }
+    1361: Text { content: "Details" }
+    1362: EndTextStyle
+    1363: EndTextStyle
+    1364: Text { content: "\" tab of your Application Manager account (" }
+    1365: StartLink { href: "https://applicationmanager.org/", id: None, title: None }
+    1366: StartTextStyle { kind: Underline, id: None }
+    1367: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    1368: Text { content: "https://applicationmanager.org" }
+    1369: EndTextStyle
+    1370: EndTextStyle
+    1371: EndLink
+    1372: Text { content: " ) for this vacancy announcement.\u{a0} Your documents will display under the \"" }
+    1373: StartTextStyle { kind: Bold, id: None }
+    1374: StartTextStyle { kind: Italic, id: None }
+    1375: Text { content: "Details" }
+    1376: EndTextStyle
+    1377: EndTextStyle
+    1378: Text { content: "\" tab in the Document area.\u{a0} " }
+    1379: EndParagraph
+    1380: EndUnorderedListItem
+    1381: StartUnorderedListItem { id: Some("4"), level: 0, style_type: Disc }
+    1382: StartParagraph { alignment: None, id: None }
+    1383: Text { content: "You will not be contacted for additional information.\u{a0} " }
+    1384: StartTextStyle { kind: Bold, id: None }
+    1385: Text { content: "DO NOT" }
+    1386: EndTextStyle
+    1387: Text { content: " contact our offices for verification of receipt or status reports - we do not provide this information. " }
+    1388: EndParagraph
+    1389: EndUnorderedListItem
+    1390: StartUnorderedListItem { id: Some("4"), level: 0, style_type: Disc }
+    1391: StartParagraph { alignment: None, id: None }
+    1392: Text { content: "Your application materials will not be returned.\u{a0} Do not submit original documents that you may need in the future. " }
+    1393: EndParagraph
+    1394: EndUnorderedListItem
+    1395: StartUnorderedListItem { id: Some("4"), level: 0, style_type: Disc }
+    1396: StartParagraph { alignment: None, id: None }
+    1397: Text { content: "Your application must be completed on-line or faxed. " }
+    1398: StartTextStyle { kind: Bold, id: None }
+    1399: Text { content: "This\u{a0}office does not accept applications by electronic mail (e-mail), regular mail, or in person." }
+    1400: EndTextStyle
+    1401: Text { content: "\u{a0} " }
+    1402: EndParagraph
+    1403: StartParagraph { alignment: None, id: None }
+    1404: EndParagraph
+    1405: StartParagraph { alignment: None, id: None }
+    1406: StartTextStyle { kind: Bold, id: None }
+    1407: Text { content: "Applying for this position is as easy as 1, 2, 3..." }
+    1408: EndTextStyle
+    1409: EndParagraph
+    1410: StartParagraph { alignment: None, id: None }
+    1411: Text { content: "Just by following three steps, you will submit a complete application package and receive consideration for this position.\u{a0} Be sure to follow the steps carefully and complete all three.\u{a0} Each\u{a0}step is described in detail below." }
+    1412: EndParagraph
+    1413: EndUnorderedListItem
+    1414: StartOrderedListItem { id: Some("5"), level: 0, start: Some(1), style_type: Decimal }
+    1415: StartParagraph { alignment: None, id: None }
+    1416: Text { content: "Your responses to the" }
+    1417: StartTextStyle { kind: Bold, id: None }
+    1418: Text { content: " Assessment Questionnaire, " }
+    1419: EndTextStyle
+    1420: StartTextStyle { kind: Italic, id: None }
+    1421: Text { content: "(which may be completed\u{a0}electronically or on the " }
+    1422: EndTextStyle
+    1423: StartLink { href: "http://www.opm.gov/forms/pdf_fill/opm1203fx.pdf", id: None, title: None }
+    1424: StartTextStyle { kind: Italic, id: None }
+    1425: StartTextStyle { kind: Underline, id: None }
+    1426: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    1427: Text { content: "OPM Form 1203FX" }
+    1428: EndTextStyle
+    1429: EndTextStyle
+    1430: EndTextStyle
+    1431: EndLink
+    1432: StartTextStyle { kind: Italic, id: None }
+    1433: Text { content: " and faxed)," }
+    1434: EndTextStyle
+    1435: Text { content: "\u{a0} " }
+    1436: EndParagraph
+    1437: EndOrderedListItem
+    1438: StartOrderedListItem { id: Some("5"), level: 0, start: None, style_type: Decimal }
+    1439: StartParagraph { alignment: None, id: None }
+    1440: Text { content: "Your" }
+    1441: StartTextStyle { kind: Bold, id: None }
+    1442: Text { content: " resume\u{a0}" }
+    1443: EndTextStyle
+    1444: Text { content: "or" }
+    1445: StartTextStyle { kind: Bold, id: None }
+    1446: Text { content: " OF-612\u{a0} " }
+    1447: EndTextStyle
+    1448: Text { content: "(" }
+    1449: StartTextStyle { kind: Italic, id: None }
+    1450: Text { content: "which may be completed\u{a0}electronically, uploaded, or faxed), and" }
+    1451: EndTextStyle
+    1452: EndParagraph
+    1453: EndOrderedListItem
+    1454: StartOrderedListItem { id: Some("5"), level: 0, start: None, style_type: Decimal }
+    1455: StartParagraph { alignment: None, id: None }
+    1456: StartTextStyle { kind: Bold, id: None }
+    1457: Text { content: "Other documents" }
+    1458: EndTextStyle
+    1459: Text { content: " specified in this job announcement (" }
+    1460: StartTextStyle { kind: Italic, id: None }
+    1461: Text { content: "which may be uploaded or faxed" }
+    1462: EndTextStyle
+    1463: Text { content: ")." }
+    1464: EndParagraph
+    1465: StartParagraph { alignment: None, id: None }
+    1466: Text { content: "Use " }
+    1467: StartTextStyle { kind: Italic, id: None }
+    1468: Text { content: "Application Manager" }
+    1469: EndTextStyle
+    1470: Text { content: " for convenience and quickest processing.\u{a0} Track your progress to a " }
+    1471: StartTextStyle { kind: Italic, id: None }
+    1472: Text { content: "Complete" }
+    1473: EndTextStyle
+    1474: Text { content: " Application Package using " }
+    1475: StartTextStyle { kind: Italic, id: None }
+    1476: Text { content: "My Application Packages" }
+    1477: EndTextStyle
+    1478: Text { content: " checklist and status displays in Application Manager.\u{a0} Your Application Package status must be " }
+    1479: StartTextStyle { kind: Italic, id: None }
+    1480: Text { content: "Complete" }
+    1481: EndTextStyle
+    1482: Text { content: " by 11:59 p.m. EST on Wednesday, July 30, 2008." }
+    1483: EndParagraph
+    1484: StartParagraph { alignment: None, id: None }
+    1485: StartTextStyle { kind: Bold, id: None }
+    1486: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 192 }), id: None }
+    1487: Text { content: "STEP 1:" }
+    1488: EndTextStyle
+    1489: EndTextStyle
+    1490: StartTextStyle { kind: Bold, id: None }
+    1491: Text { content: "\u{a0} " }
+    1492: EndTextStyle
+    1493: EndParagraph
+    1494: StartParagraph { alignment: None, id: None }
+    1495: Text { content: "Complete and submit the\u{a0}" }
+    1496: StartTextStyle { kind: Bold, id: None }
+    1497: Text { content: "Assessment Questionnaire" }
+    1498: EndTextStyle
+    1499: Text { content: ". The questionnaire\u{a0}" }
+    1500: StartTextStyle { kind: Bold, id: None }
+    1501: Text { content: "must" }
+    1502: EndTextStyle
+    1503: Text { content: " be completed and submitted\u{a0}in order to receive consideration for this position." }
+    1504: EndParagraph
+    1505: StartParagraph { alignment: None, id: None }
+    1506: Text { content: "PLEASE NOTE:\u{a0} We highly encourage you to complete the Assessment Questionnaire online as it is the most efficient way to process your responses.\u{a0} Using paper application forms may delay the processing of your application.\u{a0} If you are unable to complete the\u{a0}Assessment Questionnaire online, go to STEP\u{a0}3 of this announcement and refer to the alternatives described under \"" }
+    1507: StartTextStyle { kind: Bold, id: None }
+    1508: Text { content: "Alternative Methods for Completing\u{a0}the Application Package" }
+    1509: EndTextStyle
+    1510: Text { content: "\"\u{a0} " }
+    1511: EndParagraph
+    1512: StartParagraph { alignment: None, id: None }
+    1513: Text { content: "You must provide responses to all required questions. Be sure to double check your application before submission and click on \"" }
+    1514: StartTextStyle { kind: Bold, id: None }
+    1515: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 255 }), id: None }
+    1516: Text { content: "SUBMIT" }
+    1517: EndTextStyle
+    1518: EndTextStyle
+    1519: Text { content: "\" when it is complete.\u{a0} Your application is not transmitted to us until " }
+    1520: StartTextStyle { kind: Bold, id: None }
+    1521: StartTextStyle { kind: Underline, id: None }
+    1522: Text { content: "you" }
+    1523: EndTextStyle
+    1524: EndTextStyle
+    1525: StartTextStyle { kind: Bold, id: None }
+    1526: Text { content: " " }
+    1527: EndTextStyle
+    1528: StartTextStyle { kind: Bold, id: None }
+    1529: StartTextStyle { kind: Underline, id: None }
+    1530: Text { content: "submit" }
+    1531: EndTextStyle
+    1532: EndTextStyle
+    1533: StartTextStyle { kind: Bold, id: None }
+    1534: Text { content: " " }
+    1535: EndTextStyle
+    1536: StartTextStyle { kind: Bold, id: None }
+    1537: StartTextStyle { kind: Underline, id: None }
+    1538: Text { content: "it" }
+    1539: EndTextStyle
+    1540: EndTextStyle
+    1541: Text { content: "." }
+    1542: EndParagraph
+    1543: StartParagraph { alignment: None, id: None }
+    1544: Text { content: "To\u{a0}complete your\u{a0}Assessment Questionnaire online, click the following link:" }
+    1545: EndParagraph
+    1546: StartParagraph { alignment: None, id: None }
+    1547: StartLink { href: "https://ApplicationManager.org/Login.aspx?VacancyID=201385", id: None, title: None }
+    1548: StartTextStyle { kind: Underline, id: None }
+    1549: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    1550: Text { content: "Online Questionnaire" }
+    1551: EndTextStyle
+    1552: EndTextStyle
+    1553: EndLink
+    1554: EndParagraph
+    1555: StartParagraph { alignment: None, id: None }
+    1556: Text { content: "or enter " }
+    1557: StartLink { href: "https://applicationmanager.org/", id: None, title: None }
+    1558: StartTextStyle { kind: Underline, id: None }
+    1559: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    1560: Text { content: "https://ApplicationManager.org" }
+    1561: EndTextStyle
+    1562: EndTextStyle
+    1563: EndLink
+    1564: Text { content: "\u{a0} You can save your work and come back later.\u{a0} To return to Application Manager at any time by simply going back to this web address.\u{a0} " }
+    1565: EndParagraph
+    1566: StartParagraph { alignment: None, id: None }
+    1567: Text { content: "The\u{a0}Assessment Questionnaire must be completed and submitted by 11:59 p.m.\u{a0}EST on Wednesday, July 30, 2008." }
+    1568: EndParagraph
+    1569: StartParagraph { alignment: None, id: None }
+    1570: StartTextStyle { kind: Bold, id: None }
+    1571: Text { content: "ASSESSMENT\u{a0}QUESTIONNAIRE" }
+    1572: EndTextStyle
+    1573: EndParagraph
+    1574: StartParagraph { alignment: None, id: None }
+    1575: StartTextStyle { kind: Bold, id: None }
+    1576: Text { content: "Social Security Number" }
+    1577: EndTextStyle
+    1578: EndParagraph
+    1579: StartParagraph { alignment: None, id: None }
+    1580: Text { content: "Enter your Social Security Number in the space indicated.\u{a0} Providing your Social Security Number is voluntary, however we cannot process your application without it." }
+    1581: EndParagraph
+    1582: StartParagraph { alignment: None, id: None }
+    1583: LineBreak
+    1584: StartTextStyle { kind: Bold, id: None }
+    1585: Text { content: "Vacancy Identification Number" }
+    1586: EndTextStyle
+    1587: EndParagraph
+    1588: StartParagraph { alignment: None, id: None }
+    1589: Text { content: "VN201385" }
+    1590: EndParagraph
+    1591: StartParagraph { alignment: None, id: None }
+    1592: Text { content: "\u{a0}" }
+    1593: EndParagraph
+    1594: StartParagraph { alignment: None, id: None }
+    1595: LineBreak
+    1596: StartTextStyle { kind: Bold, id: None }
+    1597: Text { content: "1. Title of Job" }
+    1598: EndTextStyle
+    1599: EndParagraph
+    1600: StartParagraph { alignment: None, id: None }
+    1601: Text { content: "Program Support Assistant (Office Automation)\u{a0}" }
+    1602: EndParagraph
+    1603: StartParagraph { alignment: None, id: None }
+    1604: Text { content: "\u{a0}" }
+    1605: EndParagraph
+    1606: StartParagraph { alignment: None, id: None }
+    1607: LineBreak
+    1608: StartTextStyle { kind: Bold, id: None }
+    1609: Text { content: "2. Biographic Data" }
+    1610: EndTextStyle
+    1611: LineBreak
+    1612: LineBreak
+    1613: StartTextStyle { kind: Bold, id: None }
+    1614: Text { content: "3. E-Mail Address" }
+    1615: EndTextStyle
+    1616: EndParagraph
+    1617: StartParagraph { alignment: None, id: None }
+    1618: Text { content: "Please enter your e-mail address in the space provided.\u{a0} If you do not provide an e-mail address you may not receive a notice of your results.\u{a0} " }
+    1619: EndParagraph
+    1620: StartParagraph { alignment: None, id: None }
+    1621: LineBreak
+    1622: StartTextStyle { kind: Bold, id: None }
+    1623: Text { content: "4. Work Information" }
+    1624: EndTextStyle
+    1625: LineBreak
+    1626: LineBreak
+    1627: Text { content: "If you are applying by the OPM Form 1203-FX, leave this section blank." }
+    1628: LineBreak
+    1629: LineBreak
+    1630: StartTextStyle { kind: Bold, id: None }
+    1631: Text { content: "5. Employment Availability" }
+    1632: EndTextStyle
+    1633: LineBreak
+    1634: LineBreak
+    1635: Text { content: "If you are applying by the OPM Form 1203-FX, leave this section blank." }
+    1636: LineBreak
+    1637: LineBreak
+    1638: StartTextStyle { kind: Bold, id: None }
+    1639: Text { content: "6. Citizenship" }
+    1640: EndTextStyle
+    1641: EndParagraph
+    1642: StartParagraph { alignment: None, id: None }
+    1643: Text { content: "Are you a citizen of the United States?" }
+    1644: EndParagraph
+    1645: StartParagraph { alignment: None, id: None }
+    1646: LineBreak
+    1647: StartTextStyle { kind: Bold, id: None }
+    1648: Text { content: "7. Background Information" }
+    1649: EndTextStyle
+    1650: LineBreak
+    1651: LineBreak
+    1652: Text { content: "If you are applying by the OPM Form 1203-FX, leave this section blank." }
+    1653: LineBreak
+    1654: LineBreak
+    1655: StartTextStyle { kind: Bold, id: None }
+    1656: Text { content: "8. Other Information" }
+    1657: EndTextStyle
+    1658: LineBreak
+    1659: LineBreak
+    1660: Text { content: "If you are applying by the OPM Form 1203-FX, leave this section blank." }
+    1661: LineBreak
+    1662: LineBreak
+    1663: StartTextStyle { kind: Bold, id: None }
+    1664: Text { content: "9. Languages" }
+    1665: EndTextStyle
+    1666: LineBreak
+    1667: LineBreak
+    1668: Text { content: "If you are applying by the OPM Form 1203-FX, leave this section blank." }
+    1669: LineBreak
+    1670: LineBreak
+    1671: StartTextStyle { kind: Bold, id: None }
+    1672: Text { content: "10. Lowest Grade" }
+    1673: EndTextStyle
+    1674: EndParagraph
+    1675: StartParagraph { alignment: None, id: None }
+    1676: Text { content: "Enter the lowest grade\u{a0}(07) you will accept for this position." }
+    1677: EndParagraph
+    1678: StartParagraph { alignment: None, id: None }
+    1679: LineBreak
+    1680: Text { content: "07" }
+    1681: LineBreak
+    1682: LineBreak
+    1683: StartTextStyle { kind: Bold, id: None }
+    1684: Text { content: "11. Miscellaneous Information" }
+    1685: EndTextStyle
+    1686: LineBreak
+    1687: LineBreak
+    1688: Text { content: "If you are applying by the OPM Form 1203-FX, leave this section blank." }
+    1689: LineBreak
+    1690: LineBreak
+    1691: StartTextStyle { kind: Bold, id: None }
+    1692: Text { content: "12. Special Knowledge" }
+    1693: EndTextStyle
+    1694: LineBreak
+    1695: LineBreak
+    1696: Text { content: "If you are applying by the OPM Form 1203-FX, leave this section blank." }
+    1697: LineBreak
+    1698: LineBreak
+    1699: StartTextStyle { kind: Bold, id: None }
+    1700: Text { content: "13. Test Location" }
+    1701: EndTextStyle
+    1702: LineBreak
+    1703: LineBreak
+    1704: Text { content: "If you are applying by the OPM Form 1203-FX, leave this section blank." }
+    1705: LineBreak
+    1706: LineBreak
+    1707: StartTextStyle { kind: Bold, id: None }
+    1708: Text { content: "14. Veteran Preference Claim" }
+    1709: EndTextStyle
+    1710: LineBreak
+    1711: LineBreak
+    1712: StartTextStyle { kind: Bold, id: None }
+    1713: Text { content: "15. Dates of Active Duty - Military Service" }
+    1714: EndTextStyle
+    1715: LineBreak
+    1716: LineBreak
+    1717: StartTextStyle { kind: Bold, id: None }
+    1718: Text { content: "16. Availability Date" }
+    1719: EndTextStyle
+    1720: LineBreak
+    1721: LineBreak
+    1722: Text { content: "If you are applying by the OPM Form 1203-FX, leave this section blank." }
+    1723: LineBreak
+    1724: LineBreak
+    1725: StartTextStyle { kind: Bold, id: None }
+    1726: Text { content: "17. Service Computation Date" }
+    1727: EndTextStyle
+    1728: LineBreak
+    1729: LineBreak
+    1730: Text { content: "If you are applying by the OPM Form 1203-FX, leave this section blank." }
+    1731: LineBreak
+    1732: LineBreak
+    1733: StartTextStyle { kind: Bold, id: None }
+    1734: Text { content: "18. Other Date Information" }
+    1735: EndTextStyle
+    1736: LineBreak
+    1737: LineBreak
+    1738: Text { content: "If you are applying by the OPM Form 1203-FX, leave this section blank." }
+    1739: LineBreak
+    1740: LineBreak
+    1741: StartTextStyle { kind: Bold, id: None }
+    1742: Text { content: "19. Job Preference" }
+    1743: EndTextStyle
+    1744: LineBreak
+    1745: LineBreak
+    1746: Text { content: "If you are applying by the OPM Form 1203-FX, leave this section blank." }
+    1747: LineBreak
+    1748: LineBreak
+    1749: StartTextStyle { kind: Bold, id: None }
+    1750: Text { content: "20. Occupational Specialties" }
+    1751: EndTextStyle
+    1752: LineBreak
+    1753: LineBreak
+    1754: Text { content: "The specialty code(s) for this position is (are):" }
+    1755: LineBreak
+    1756: Text { content: "001 Program Support Assistant (Office Automation)" }
+    1757: LineBreak
+    1758: LineBreak
+    1759: StartTextStyle { kind: Bold, id: None }
+    1760: Text { content: "21. Geographic Availability" }
+    1761: EndTextStyle
+    1762: EndParagraph
+    1763: StartParagraph { alignment: None, id: None }
+    1764: Text { content: "The location code(s) for this position is (are):" }
+    1765: EndParagraph
+    1766: StartParagraph { alignment: None, id: None }
+    1767: Text { content: "\u{a0}" }
+    1768: EndParagraph
+    1769: StartParagraph { alignment: None, id: None }
+    1770: LineBreak
+    1771: Text { content: "003 Buffalo, NY" }
+    1772: LineBreak
+    1773: LineBreak
+    1774: StartTextStyle { kind: Bold, id: None }
+    1775: Text { content: "22. Transition Assistance Plan" }
+    1776: EndTextStyle
+    1777: LineBreak
+    1778: LineBreak
+    1779: StartTextStyle { kind: Bold, id: None }
+    1780: Text { content: "23. Job Related Experience" }
+    1781: EndTextStyle
+    1782: LineBreak
+    1783: LineBreak
+    1784: Text { content: "If you are applying by the OPM Form 1203-FX, leave this section blank." }
+    1785: LineBreak
+    1786: LineBreak
+    1787: StartTextStyle { kind: Bold, id: None }
+    1788: Text { content: "24. Personal Background Information" }
+    1789: EndTextStyle
+    1790: LineBreak
+    1791: LineBreak
+    1792: Text { content: "If you are applying by the OPM Form 1203-FX, leave this section blank." }
+    1793: LineBreak
+    1794: LineBreak
+    1795: StartTextStyle { kind: Bold, id: None }
+    1796: Text { content: "25. Occupational/Assessment Questions:" }
+    1797: EndTextStyle
+    1798: Text { content: " " }
+    1799: EndParagraph
+    1800: StartParagraph { alignment: None, id: None }
+    1801: Text { content: "1. Select the one statement below that best describes your experience, education or combination of experience and education to meet the basic requirements for this position." }
+    1802: EndParagraph
+    1803: StartParagraph { alignment: None, id: None }
+    1804: Text { content: "A. At least one year of specialized experience equivalent to the next lower grade level (GS-6) with responsibilities close to the work of this position that has given you the particular knowledge, skills, and abilities required to successfully perform the duties of this position." }
+    1805: LineBreak
+    1806: Text { content: "B. General experience in a progressively responsible clerical, office, or other position that indicates your ability to acquire the particular knowledge and skills needed to perform the duties of this position." }
+    1807: LineBreak
+    1808: Text { content: "C. None of the above." }
+    1809: EndParagraph
+    1810: StartParagraph { alignment: None, id: None }
+    1811: Text { content: "2. For the following item, choose the ONE statement from the list below that best describes your typing and office automation abilities." }
+    1812: EndParagraph
+    1813: StartParagraph { alignment: None, id: None }
+    1814: Text { content: "A. I type at least 40 words per minute with no more than three errors." }
+    1815: LineBreak
+    1816: Text { content: "B. I type less than 40 words per minute." }
+    1817: EndParagraph
+    1818: StartParagraph { alignment: None, id: None }
+    1819: Text { content: "Please indicate either Yes or No for the following statement(s). If a narrative response is required, it must be provided in the allotted space, or if you are submitting a hard copy application - on a separate sheet of paper." }
+    1820: EndParagraph
+    1821: StartParagraph { alignment: None, id: None }
+    1822: Text { content: "A- Yes" }
+    1823: LineBreak
+    1824: Text { content: "B- No" }
+    1825: EndParagraph
+    1826: StartParagraph { alignment: None, id: None }
+    1827: Text { content: "3. I have experience and knowledge of the research process and research funding mechanisms requirements." }
+    1828: EndParagraph
+    1829: StartParagraph { alignment: None, id: None }
+    1830: Text { content: "If you answered \"yes\" to the above statement, please give examples of your experience and knowledge of the research process and research funding mechanisms requirements. What was your job title and major job duties?" }
+    1831: EndParagraph
+    1832: StartParagraph { alignment: None, id: None }
+    1833: Text { content: "For the following item(s), choose the ONE statement from the list below that best describes your experience and/or training. Please select only one letter for each item. Some may require additional information or examples which must be provided in the allotted space, or if you are submitting a hard copy application - on a separate sheet of paper." }
+    1834: EndParagraph
+    1835: StartParagraph { alignment: None, id: None }
+    1836: Text { content: "A- I am considered an expert in performing this task." }
+    1837: LineBreak
+    1838: Text { content: "B- I have successfully performed this task as a regular part of a job." }
+    1839: LineBreak
+    1840: Text { content: "C- I have occasionally performed this task as part of a job." }
+    1841: LineBreak
+    1842: Text { content: "D- I have received training in this area, but have not performed it on the job." }
+    1843: LineBreak
+    1844: Text { content: "E- I have not had training or experience in performing this task." }
+    1845: EndParagraph
+    1846: StartParagraph { alignment: None, id: None }
+    1847: Text { content: "4. Ability to transcribe meeting minutes and reports." }
+    1848: EndParagraph
+    1849: StartParagraph { alignment: None, id: None }
+    1850: Text { content: "Please provide details of your transcription experience. What types of reports or meeting were you responsible for transcribing?" }
+    1851: EndParagraph
+    1852: StartParagraph { alignment: None, id: None }
+    1853: Text { content: "5. Utilizing medical and/or scientific terminology." }
+    1854: EndParagraph
+    1855: StartParagraph { alignment: None, id: None }
+    1856: Text { content: "Please provide details about your knowledge and experience using terminology associated with a medical research environment." }
+    1857: EndParagraph
+    1858: StartParagraph { alignment: None, id: None }
+    1859: Text { content: "6. Coordinating grant proposal and report submissions." }
+    1860: EndParagraph
+    1861: StartParagraph { alignment: None, id: None }
+    1862: Text { content: "Please provide information to support your answer including details about the types of grant proposals and reports and your role in preparing and/or submitting them." }
+    1863: EndParagraph
+    1864: StartParagraph { alignment: None, id: None }
+    1865: Text { content: "7. Operating a personal computer and office automation equipment." }
+    1866: EndParagraph
+    1867: StartParagraph { alignment: None, id: None }
+    1868: Text { content: "Please provide information to support your answer. Include examples of the type(s) of software youve used (word processing, spreadsheet, database, etc.), how it was used, and your perceived skill level (expert, highly skilled, average, beginner). Also, list the different office equipment (printers, scanners, fax machine, copier) you have used." }
+    1869: EndParagraph
+    1870: StartParagraph { alignment: None, id: None }
+    1871: Text { content: "8. Communicating with people from varied backgrounds and different levels of an organization." }
+    1872: EndParagraph
+    1873: StartParagraph { alignment: None, id: None }
+    1874: Text { content: "Please provide detailed examples of your experience dealing with individuals from different backgrounds, on the phone and in person, with varying levels of understanding." }
+    1875: EndParagraph
+    1876: StartParagraph { alignment: None, id: None }
+    1877: Text { content: "9. Communicating in writing." }
+    1878: EndParagraph
+    1879: StartParagraph { alignment: None, id: None }
+    1880: Text { content: "Please provide information to support your answer regarding your written communication skills. Describe your experience, if applicable, writing instructions, and preparing reports and correspondence from rough drafts. What steps did you follow to ensure accuracy in grammar, punctuation and spelling?" }
+    1881: EndParagraph
+    1882: StartParagraph { alignment: None, id: None }
+    1883: Text { content: "For the following item(s), choose the ONE statement from the list below that best describes your experience and/or training. Please select only one letter for each item." }
+    1884: EndParagraph
+    1885: StartParagraph { alignment: None, id: None }
+    1886: Text { content: "A- I have not had training or experience in performing this task." }
+    1887: LineBreak
+    1888: Text { content: "B- I have training in this task, but have not performed it on the job." }
+    1889: LineBreak
+    1890: Text { content: "C- I have occasionally performed this task on the job." }
+    1891: LineBreak
+    1892: Text { content: "D- I have performed this task as a regular part of a job" }
+    1893: LineBreak
+    1894: Text { content: "E- I am considered an expert in performing this task." }
+    1895: EndParagraph
+    1896: StartParagraph { alignment: None, id: None }
+    1897: Text { content: "10. Analyze and interpret complex information." }
+    1898: EndParagraph
+    1899: StartParagraph { alignment: None, id: None }
+    1900: Text { content: "11. Use judgment in selecting and utilizing procedural guidelines, such as manuals and agency training correspondence, style manuals, etc." }
+    1901: EndParagraph
+    1902: StartParagraph { alignment: None, id: None }
+    1903: Text { content: "12. Oversee the content, format, and timeliness of grant submissions." }
+    1904: EndParagraph
+    1905: StartParagraph { alignment: None, id: None }
+    1906: Text { content: "13. Coordinate professional meetings." }
+    1907: EndParagraph
+    1908: StartParagraph { alignment: None, id: None }
+    1909: Text { content: "14. Establishes and maintains others calendar." }
+    1910: EndParagraph
+    1911: StartParagraph { alignment: None, id: None }
+    1912: Text { content: "15. Identify and resolve problems with grant submissions." }
+    1913: EndParagraph
+    1914: StartParagraph { alignment: None, id: None }
+    1915: Text { content: "16. Manage several assignments simultaneously." }
+    1916: EndParagraph
+    1917: StartParagraph { alignment: None, id: None }
+    1918: Text { content: "17. Perform data collection." }
+    1919: EndParagraph
+    1920: StartParagraph { alignment: None, id: None }
+    1921: Text { content: "18. Oversee data collection." }
+    1922: EndParagraph
+    1923: StartParagraph { alignment: None, id: None }
+    1924: Text { content: "19. Develop simple databases." }
+    1925: EndParagraph
+    1926: StartParagraph { alignment: None, id: None }
+    1927: Text { content: "20. Produce tables, graphs and/or slides for presentation." }
+    1928: EndParagraph
+    1929: StartParagraph { alignment: None, id: None }
+    1930: Text { content: "21. Search files, documents or other sources for information." }
+    1931: EndParagraph
+    1932: StartParagraph { alignment: None, id: None }
+    1933: Text { content: "22. Explain basic policies or procedures." }
+    1934: EndParagraph
+    1935: StartParagraph { alignment: None, id: None }
+    1936: Text { content: "23. Provide guidance or assistance on policies or procedures." }
+    1937: EndParagraph
+    1938: StartParagraph { alignment: None, id: None }
+    1939: Text { content: "24. Review content of letters or other documents for completeness, correctness, or consistency." }
+    1940: EndParagraph
+    1941: StartParagraph { alignment: None, id: None }
+    1942: Text { content: "You must now complete and submit additional application materials (by Wednesday, July 30, 2008)\u{a0}as required by this vacancy announcement via uploading or faxing this information.\u{a0} To fax application materials, refer to the instructions in Alternative Methods for Completing the Application Package after Step\u{a0}3 of this vacancy announcement.\u{a0} " }
+    1943: EndParagraph
+    1944: StartParagraph { alignment: None, id: None }
+    1945: StartTextStyle { kind: Bold, id: None }
+    1946: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 192 }), id: None }
+    1947: Text { content: "STEP 2:\u{a0}" }
+    1948: EndTextStyle
+    1949: EndTextStyle
+    1950: StartTextStyle { kind: Bold, id: None }
+    1951: Text { content: " " }
+    1952: EndTextStyle
+    1953: EndParagraph
+    1954: StartParagraph { alignment: None, id: None }
+    1955: Text { content: "Submit your\u{a0}choice of a Resume or an\u{a0}OF-612 -\u{a0}Optional Application for Federal Employment\u{a0}available at " }
+    1956: StartLink { href: "http://www.opm.gov/forms/pdf_fill/of612.pdf", id: None, title: None }
+    1957: StartTextStyle { kind: Underline, id: None }
+    1958: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    1959: Text { content: "www.opm.gov/forms/pdf_fill/of612.pdf" }
+    1960: EndTextStyle
+    1961: EndTextStyle
+    1962: EndLink
+    1963: Text { content: "\u{a0}.\u{a0} We must receive a complete resume or OF 612 in order to determine your qualifications for this position." }
+    1964: EndParagraph
+    1965: StartParagraph { alignment: None, id: None }
+    1966: Text { content: "Your " }
+    1967: StartTextStyle { kind: Bold, id: None }
+    1968: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 255 }), id: None }
+    1969: Text { content: "RESUME" }
+    1970: EndTextStyle
+    1971: EndTextStyle
+    1972: Text { content: " must include the following information:" }
+    1973: EndParagraph
+    1974: EndOrderedListItem
+    1975: StartUnorderedListItem { id: Some("6"), level: 0, style_type: Disc }
+    1976: StartParagraph { alignment: None, id: None }
+    1977: StartTextStyle { kind: Bold, id: None }
+    1978: Text { content: "Vacancy Information" }
+    1979: EndTextStyle
+    1980: Text { content: ": Announcement Number (VN201385),\u{a0}Position Title (Program Support Assistant (Office Automation)), and grade (07/07); " }
+    1981: EndParagraph
+    1982: EndUnorderedListItem
+    1983: StartUnorderedListItem { id: Some("6"), level: 0, style_type: Disc }
+    1984: StartParagraph { alignment: None, id: None }
+    1985: StartTextStyle { kind: Bold, id: None }
+    1986: Text { content: "Personal Information:" }
+    1987: EndTextStyle
+    1988: Text { content: " " }
+    1989: EndParagraph
+    1990: StartUnorderedListItem { id: Some("6"), level: 1, style_type: Disc }
+    1991: StartParagraph { alignment: None, id: None }
+    1992: Text { content: "Your full legal name and mailing address" }
+    1993: EndParagraph
+    1994: EndUnorderedListItem
+    1995: StartUnorderedListItem { id: Some("6"), level: 1, style_type: Disc }
+    1996: StartParagraph { alignment: None, id: None }
+    1997: Text { content: "Day and Evening telephone numbers including area code" }
+    1998: EndParagraph
+    1999: EndUnorderedListItem
+    2000: StartUnorderedListItem { id: Some("6"), level: 1, style_type: Disc }
+    2001: StartParagraph { alignment: None, id: None }
+    2002: Text { content: "Country of citizenship" }
+    2003: EndParagraph
+    2004: EndUnorderedListItem
+    2005: StartUnorderedListItem { id: Some("6"), level: 1, style_type: Disc }
+    2006: StartParagraph { alignment: None, id: None }
+    2007: Text { content: "Social Security number" }
+    2008: EndParagraph
+    2009: EndUnorderedListItem
+    2010: EndUnorderedListItem
+    2011: StartUnorderedListItem { id: Some("6"), level: 0, style_type: Disc }
+    2012: StartParagraph { alignment: None, id: None }
+    2013: StartTextStyle { kind: Bold, id: None }
+    2014: Text { content: "Work experience" }
+    2015: EndTextStyle
+    2016: Text { content: " (NOTE:\u{a0} You must include the following information in order to receive credit for your experience):" }
+    2017: EndParagraph
+    2018: StartUnorderedListItem { id: Some("6"), level: 1, style_type: Disc }
+    2019: StartParagraph { alignment: None, id: None }
+    2020: Text { content: "Name and address of employer" }
+    2021: EndParagraph
+    2022: EndUnorderedListItem
+    2023: StartUnorderedListItem { id: Some("6"), level: 1, style_type: Disc }
+    2024: StartParagraph { alignment: None, id: None }
+    2025: Text { content: "Your job title" }
+    2026: EndParagraph
+    2027: EndUnorderedListItem
+    2028: StartUnorderedListItem { id: Some("6"), level: 1, style_type: Disc }
+    2029: StartParagraph { alignment: None, id: None }
+    2030: Text { content: "The beginning and ending month and year of your employment" }
+    2031: EndParagraph
+    2032: EndUnorderedListItem
+    2033: StartUnorderedListItem { id: Some("6"), level: 1, style_type: Disc }
+    2034: StartParagraph { alignment: None, id: None }
+    2035: Text { content: "The\u{a0}average hours worked per week.\u{a0} Full-time work is considered to be 35-40 hours of work per week.\u{a0} Part-time experience will be credited on the basis of time actually spent in appropriate activities.\u{a0} Applicants wishing to receive credit for such experience must indicate clearly the number of hours a week spent in such employment" }
+    2036: EndParagraph
+    2037: EndUnorderedListItem
+    2038: StartUnorderedListItem { id: Some("6"), level: 1, style_type: Disc }
+    2039: StartParagraph { alignment: None, id: None }
+    2040: Text { content: "Your supervisor's name and phone number (indicate if we may call your supervisor);" }
+    2041: EndParagraph
+    2042: EndUnorderedListItem
+    2043: StartUnorderedListItem { id: Some("6"), level: 1, style_type: Disc }
+    2044: StartParagraph { alignment: None, id: None }
+    2045: Text { content: "A description of your duties that is sufficiently detailed to document the level of your experience.\u{a0} If the position is (was) with the Federal government (military\u{a0}or civilian), state the series and grade or pay grade (rank) and the date of last promotion" }
+    2046: EndParagraph
+    2047: EndUnorderedListItem
+    2048: EndUnorderedListItem
+    2049: StartUnorderedListItem { id: Some("6"), level: 0, style_type: Disc }
+    2050: StartParagraph { alignment: None, id: None }
+    2051: StartTextStyle { kind: Bold, id: None }
+    2052: Text { content: "Education:" }
+    2053: EndTextStyle
+    2054: Text { content: "\u{a0} Name, location, and dates of attendance for colleges attended (if required). Type and date of degree received (if any);" }
+    2055: EndParagraph
+    2056: EndUnorderedListItem
+    2057: StartUnorderedListItem { id: Some("6"), level: 0, style_type: Disc }
+    2058: StartParagraph { alignment: None, id: None }
+    2059: StartTextStyle { kind: Bold, id: None }
+    2060: Text { content: "Other" }
+    2061: EndTextStyle
+    2062: Text { content: ":\u{a0} Training, license(s), or certification(s) relevant to the position" }
+    2063: EndParagraph
+    2064: StartParagraph { alignment: None, id: None }
+    2065: StartTextStyle { kind: Bold, id: None }
+    2066: StartTextStyle { kind: Underline, id: None }
+    2067: Text { content: "Do not submit" }
+    2068: EndTextStyle
+    2069: EndTextStyle
+    2070: Text { content: " letters of recommendation, performance appraisals, position descriptions, examples of your work, etc.\u{a0} " }
+    2071: StartTextStyle { kind: Bold, id: None }
+    2072: Text { content: "This additional information will " }
+    2073: EndTextStyle
+    2074: StartTextStyle { kind: Bold, id: None }
+    2075: StartTextStyle { kind: Underline, id: None }
+    2076: Text { content: "not" }
+    2077: EndTextStyle
+    2078: EndTextStyle
+    2079: StartTextStyle { kind: Bold, id: None }
+    2080: Text { content: " be forwarded to the hiring\u{a0}facility." }
+    2081: EndTextStyle
+    2082: EndParagraph
+    2083: StartParagraph { alignment: None, id: None }
+    2084: StartTextStyle { kind: Bold, id: None }
+    2085: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 192 }), id: None }
+    2086: Text { content: "STEP 3:\u{a0}" }
+    2087: EndTextStyle
+    2088: EndTextStyle
+    2089: StartTextStyle { kind: Bold, id: None }
+    2090: Text { content: " " }
+    2091: EndTextStyle
+    2092: EndParagraph
+    2093: StartParagraph { alignment: None, id: None }
+    2094: Text { content: "Submit other required application materials, as applicable." }
+    2095: EndParagraph
+    2096: StartParagraph { alignment: None, id: None }
+    2097: Text { content: "- If you are using " }
+    2098: StartTextStyle { kind: Bold, id: None }
+    2099: Text { content: "education" }
+    2100: EndTextStyle
+    2101: Text { content: " to qualify, you must submit copies of college transcripts or a course listing that identifies " }
+    2102: StartTextStyle { kind: Underline, id: None }
+    2103: Text { content: "for each course completed:" }
+    2104: EndTextStyle
+    2105: Text { content: " the college or university, semester or quarter hours earned, grade, and grade-point average received." }
+    2106: EndParagraph
+    2107: StartParagraph { alignment: None, id: None }
+    2108: Text { content: "- If you are applying for " }
+    2109: StartTextStyle { kind: Bold, id: None }
+    2110: Text { content: "Veterans’ Preference" }
+    2111: EndTextStyle
+    2112: Text { content: ", you must submit evidence of eligibility, such as: DD-214 (Certificate of Release or Discharge from Active Duty), or Standard Form 15 (Application for 10-Point Veterans’ Preference version dated December 2004), and the proof requested on the form.\u{a0}\u{a0} For Access to DD214 and military records click on this link\u{a0}- \u{a0}" }
+    2113: StartLink { href: "http://www.archives.gov/research_room", id: None, title: None }
+    2114: StartTextStyle { kind: Underline, id: None }
+    2115: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    2116: Text { content: "Military Information" }
+    2117: EndTextStyle
+    2118: EndTextStyle
+    2119: EndLink
+    2120: Text { content: ".\u{a0} To print a copy of the SF15 go to " }
+    2121: StartLink { href: "http://www.opm.gov/forms/pdf_fill/sf15.pdf", id: None, title: None }
+    2122: StartTextStyle { kind: Underline, id: None }
+    2123: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    2124: Text { content: "www.opm.gov/forms/pdf_fill/sf15.pdf" }
+    2125: EndTextStyle
+    2126: EndTextStyle
+    2127: EndLink
+    2128: Text { content: " .\u{a0} " }
+    2129: EndParagraph
+    2130: StartParagraph { alignment: None, id: None }
+    2131: StartTextStyle { kind: Bold, id: None }
+    2132: Text { content: "Submitting Documents" }
+    2133: EndTextStyle
+    2134: EndParagraph
+    2135: StartParagraph { alignment: None, id: None }
+    2136: EndParagraph
+    2137: StartParagraph { alignment: None, id: None }
+    2138: Text { content: "If you upload your documents using Application Manager, " }
+    2139: StartTextStyle { kind: Bold, id: None }
+    2140: Text { content: "DO NOT FAX" }
+    2141: EndTextStyle
+    2142: Text { content: " the same documents. To verify uploaded documents have been processed, please wait one hour to ensure they have cleared the virus scan. You can verify that your uploaded documents are attached to your application by checking the \"" }
+    2143: StartTextStyle { kind: Bold, id: None }
+    2144: StartTextStyle { kind: Italic, id: None }
+    2145: Text { content: "Details" }
+    2146: EndTextStyle
+    2147: EndTextStyle
+    2148: Text { content: "\" tab of your Application Manager account " }
+    2149: StartLink { href: "https://applicationmanager.org/", id: None, title: None }
+    2150: StartTextStyle { kind: Underline, id: None }
+    2151: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    2152: Text { content: "https://applicationmanager.org" }
+    2153: EndTextStyle
+    2154: EndTextStyle
+    2155: EndLink
+    2156: Text { content: " for this vacancy announcement. Your documents will display under the \"" }
+    2157: StartTextStyle { kind: Bold, id: None }
+    2158: StartTextStyle { kind: Italic, id: None }
+    2159: Text { content: "Details" }
+    2160: EndTextStyle
+    2161: EndTextStyle
+    2162: Text { content: "\" tab in the Document area. " }
+    2163: EndParagraph
+    2164: StartParagraph { alignment: None, id: None }
+    2165: EndParagraph
+    2166: StartParagraph { alignment: None, id: None }
+    2167: StartTextStyle { kind: Bold, id: None }
+    2168: Text { content: "Faxed documents will take 2-3 business days to process." }
+    2169: EndTextStyle
+    2170: Text { content: " To fax documents, you " }
+    2171: StartTextStyle { kind: Bold, id: None }
+    2172: Text { content: "MUST" }
+    2173: EndTextStyle
+    2174: Text { content: " use the special cover page. Print the pre-populated cover page on the upload documents screen of Application Manager. Or, you may click this link " }
+    2175: StartLink { href: "http://staffing.opm.gov/pdf/usascover.pdf", id: None, title: None }
+    2176: StartTextStyle { kind: Underline, id: None }
+    2177: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    2178: Text { content: "http://staffing.opm.gov/pdf/usascover.pdf" }
+    2179: EndTextStyle
+    2180: EndTextStyle
+    2181: EndLink
+    2182: Text { content: " to print a blank copy of the cover page. When faxing documents, follow the procedures outlined below.   " }
+    2183: EndParagraph
+    2184: StartParagraph { alignment: None, id: None }
+    2185: EndParagraph
+    2186: EndUnorderedListItem
+    2187: StartUnorderedListItem { id: Some("7"), level: 0, style_type: Disc }
+    2188: StartParagraph { alignment: None, id: None }
+    2189: Text { content: "Include the 8-character Vacancy Identification Number " }
+    2190: Text { content: "VN201385" }
+    2191: Text { content: " " }
+    2192: EndParagraph
+    2193: EndUnorderedListItem
+    2194: StartUnorderedListItem { id: Some("7"), level: 0, style_type: Disc }
+    2195: StartParagraph { alignment: None, id: None }
+    2196: Text { content: "Provide your Social Security Number and full name in the spaces provided or we will not be able to associate your document(s) with the rest of your application. " }
+    2197: EndParagraph
+    2198: EndUnorderedListItem
+    2199: StartUnorderedListItem { id: Some("7"), level: 0, style_type: Disc }
+    2200: StartParagraph { alignment: None, id: None }
+    2201: Text { content: "You may submit multiple documents for the same vacancy announcement using one cover page." }
+    2202: Text { content: " " }
+    2203: EndParagraph
+    2204: EndUnorderedListItem
+    2205: StartUnorderedListItem { id: Some("7"), level: 0, style_type: Disc }
+    2206: StartParagraph { alignment: None, id: None }
+    2207: Text { content: "Fax your cover page and documents to " }
+    2208: StartTextStyle { kind: Bold, id: None }
+    2209: Text { content: "1-478-757-3144" }
+    2210: EndTextStyle
+    2211: Text { content: ". " }
+    2212: EndParagraph
+    2213: StartParagraph { alignment: None, id: None }
+    2214: EndParagraph
+    2215: StartParagraph { alignment: None, id: None }
+    2216: StartTextStyle { kind: Bold, id: None }
+    2217: Text { content: "Faxed documents submitted with missing information will not be processed." }
+    2218: EndTextStyle
+    2219: Text { content: " The following will prevent your documents from being processed:  " }
+    2220: EndParagraph
+    2221: StartParagraph { alignment: None, id: None }
+    2222: EndParagraph
+    2223: EndUnorderedListItem
+    2224: StartUnorderedListItem { id: Some("8"), level: 0, style_type: Disc }
+    2225: StartParagraph { alignment: None, id: None }
+    2226: Text { content: "Not using the special cover page mentioned above. " }
+    2227: EndParagraph
+    2228: EndUnorderedListItem
+    2229: StartUnorderedListItem { id: Some("8"), level: 0, style_type: Disc }
+    2230: StartParagraph { alignment: None, id: None }
+    2231: Text { content: "Missing, incomplete, or invalid Vacancy Identification Number " }
+    2232: EndParagraph
+    2233: EndUnorderedListItem
+    2234: StartUnorderedListItem { id: Some("8"), level: 0, style_type: Disc }
+    2235: StartParagraph { alignment: None, id: None }
+    2236: Text { content: "Missing or incomplete Social Security Number or name" }
+    2237: EndParagraph
+    2238: StartParagraph { alignment: None, id: None }
+    2239: EndParagraph
+    2240: StartParagraph { alignment: None, id: None }
+    2241: StartTextStyle { kind: Bold, id: None }
+    2242: Text { content: "Note:" }
+    2243: EndTextStyle
+    2244: Text { content: " If you have documents in your Application Manager account from a previous vacancy announcement they can be opened, copied and saved then reused as an upload file for this vacancy. Uploading your documents will speed the processing of your application for this announcement. " }
+    2245: EndParagraph
+    2246: StartParagraph { alignment: None, id: None }
+    2247: Text { content: "\u{a0}" }
+    2248: EndParagraph
+    2249: StartParagraph { alignment: None, id: None }
+    2250: StartTextStyle { kind: Bold, id: None }
+    2251: Text { content: "Be sure to complete\u{a0}all THREE STEPS of the application\u{a0}process described above in order to submit a complete application package and receive consideration for this position.\u{a0} " }
+    2252: EndTextStyle
+    2253: EndParagraph
+    2254: StartParagraph { alignment: None, id: None }
+    2255: Text { content: "\u{a0}" }
+    2256: EndParagraph
+    2257: StartParagraph { alignment: None, id: None }
+    2258: EndParagraph
+    2259: StartParagraph { alignment: Some(Center), id: None }
+    2260: StartTextStyle { kind: Bold, id: None }
+    2261: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 192 }), id: None }
+    2262: Text { content: "ALTERNATIVE METHODS FOR COMPLETING THE\u{a0}APPLICATION PACKAGE" }
+    2263: EndTextStyle
+    2264: EndTextStyle
+    2265: EndParagraph
+    2266: StartParagraph { alignment: None, id: None }
+    2267: Text { content: "To Complete the\u{a0}Assessment Questionnaire manually, you will need a copy of the answer sheet, referred to as the Occupational Questionnaire\u{a0}- " }
+    2268: StartTextStyle { kind: Bold, id: None }
+    2269: Text { content: "OPM Form 1203-FX" }
+    2270: EndTextStyle
+    2271: Text { content: " which can be obtained electronically at" }
+    2272: EndParagraph
+    2273: StartParagraph { alignment: None, id: None }
+    2274: StartTextStyle { kind: Bold, id: None }
+    2275: Text { content: "Error! Hyperlink reference not valid." }
+    2276: EndTextStyle
+    2277: Text { content: " ;" }
+    2278: EndParagraph
+    2279: StartParagraph { alignment: None, id: None }
+    2280: Text { content: "or by calling USAJOBS at\u{a0}703-724-1850;\u{a0}follow the instructions given;" }
+    2281: EndParagraph
+    2282: StartParagraph { alignment: None, id: None }
+    2283: Text { content: "or by visiting the Human Resources Management Service of the VA Medical Center at the duty location.\u{a0} " }
+    2284: EndParagraph
+    2285: StartParagraph { alignment: None, id: None }
+    2286: Text { content: "You will also need a copy of the\u{a0}vacancy announcement to use as a guide in answering the questions.\u{a0} You " }
+    2287: StartTextStyle { kind: Bold, id: None }
+    2288: Text { content: "must " }
+    2289: EndTextStyle
+    2290: Text { content: "provide responses\u{a0}to all required questions. Some questions may request an additional written response to support your answer, such as " }
+    2291: StartTextStyle { kind: Italic, id: None }
+    2292: Text { content: "\"Please explain or provide additional information to support your response to the above question.\"\u{a0} " }
+    2293: EndTextStyle
+    2294: Text { content: "When additional information is requested, please provide your answer(s) on a separate sheet of paper with the corresponding questionnaire number indicated, and type or print your answers legibly.\u{a0}\u{a0}You may omit any sections marked “optional” and be sure to double check your application before submission.\u{a0} " }
+    2295: StartTextStyle { kind: Bold, id: None }
+    2296: Text { content: "NOTE:\u{a0} The Questionnaire answer sheet\u{a0}is six pages long -- all six pages MUST be submitted\u{a0}even when the number\u{a0}of\u{a0}questions does not exceed page 5.\u{a0} In this case, please complete the top of Page 6 with your social security number and the vacancy ID number.\u{a0} " }
+    2297: EndTextStyle
+    2298: EndParagraph
+    2299: StartParagraph { alignment: None, id: None }
+    2300: Text { content: "You may submit the " }
+    2301: StartLink { href: "http://www.opm.gov/forms/pdf_fill/opm1203fx.pdf", id: None, title: None }
+    2302: StartTextStyle { kind: Underline, id: None }
+    2303: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    2304: Text { content: "Form 1203-FX" }
+    2305: EndTextStyle
+    2306: EndTextStyle
+    2307: EndLink
+    2308: Text { content: ", resume and any supporting documents by fax." }
+    2309: EndParagraph
+    2310: StartParagraph { alignment: None, id: None }
+    2311: Text { content: "If you " }
+    2312: StartTextStyle { kind: Underline, id: None }
+    2313: Text { content: "are" }
+    2314: EndTextStyle
+    2315: Text { content: " faxing a Form 1203-FX, " }
+    2316: StartTextStyle { kind: Underline, id: None }
+    2317: Text { content: "do not use a separate cover sheet" }
+    2318: EndTextStyle
+    2319: Text { content: ".\u{a0} Simply make sure the Form 1203-FX is on top of any other documents you are faxing." }
+    2320: EndParagraph
+    2321: StartParagraph { alignment: None, id: None }
+    2322: StartTextStyle { kind: Bold, id: None }
+    2323: Text { content: "If you are faxing any documents " }
+    2324: EndTextStyle
+    2325: StartTextStyle { kind: Bold, id: None }
+    2326: StartTextStyle { kind: Underline, id: None }
+    2327: Text { content: "without" }
+    2328: EndTextStyle
+    2329: EndTextStyle
+    2330: StartTextStyle { kind: Bold, id: None }
+    2331: Text { content: " the Form 1203-FX" }
+    2332: EndTextStyle
+    2333: Text { content: " on top, you MUST use the special cover page.\u{a0} Print the pre-populated cover page on the upload documents screen of Application Manager, or you may click this link ( " }
+    2334: StartLink { href: "http://staffing.opm.gov/pdf/usascover.pdf", id: None, title: None }
+    2335: StartTextStyle { kind: Underline, id: None }
+    2336: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    2337: Text { content: "http://staffing." }
+    2338: EndTextStyle
+    2339: EndTextStyle
+    2340: EndLink
+    2341: StartLink { href: "http://staffing.opm.gov/pdf/usascover.pdf", id: None, title: None }
+    2342: StartTextStyle { kind: Underline, id: None }
+    2343: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    2344: Text { content: "opm.gov/pdf/usascover.pdf" }
+    2345: EndTextStyle
+    2346: EndTextStyle
+    2347: EndLink
+    2348: Text { content: "\u{a0}) to print a blank copy of the cover page.\u{a0} When faxing documents, follow the\u{a0}procedures outlined below:" }
+    2349: EndParagraph
+    2350: EndUnorderedListItem
+    2351: StartUnorderedListItem { id: Some("9"), level: 0, style_type: Disc }
+    2352: StartParagraph { alignment: None, id: None }
+    2353: Text { content: "Include the 8-character Vacancy Identification Number " }
+    2354: Text { content: "VN201385" }
+    2355: Text { content: " " }
+    2356: EndParagraph
+    2357: EndUnorderedListItem
+    2358: StartUnorderedListItem { id: Some("9"), level: 0, style_type: Disc }
+    2359: StartParagraph { alignment: None, id: None }
+    2360: Text { content: "Provide your Social Security Number and full name in the spaces provided or we will not be able to associate your document(s) with the rest of your application. " }
+    2361: EndParagraph
+    2362: EndUnorderedListItem
+    2363: StartUnorderedListItem { id: Some("9"), level: 0, style_type: Disc }
+    2364: StartParagraph { alignment: None, id: None }
+    2365: Text { content: "You may submit multiple documents for the same vacancy announcement using one cover page." }
+    2366: EndParagraph
+    2367: StartParagraph { alignment: None, id: None }
+    2368: Text { content: "Fax your cover page and documents to " }
+    2369: StartTextStyle { kind: Bold, id: None }
+    2370: Text { content: "1-478-757-3144" }
+    2371: EndTextStyle
+    2372: Text { content: "." }
+    2373: Text { content: "\u{a0}" }
+    2374: EndParagraph
+    2375: StartParagraph { alignment: None, id: None }
+    2376: Text { content: "Be sure to fill it out completely and clearly.\u{a0} Place your documents in the following order:\u{a0}US Government Application Cover Page;\u{a0} Resume or OF 612 (Application for Employment);\u{a0}Other required application materials." }
+    2377: EndParagraph
+    2378: StartParagraph { alignment: None, id: None }
+    2379: Text { content: "The fax number is 1-478-757-3144.\u{a0} Feed all documents into your fax machine top first so that we receive them right-side up.\u{a0} If you fax your documents using any other cover sheet, you\u{a0}may not receive consideration." }
+    2380: EndParagraph
+    2381: StartParagraph { alignment: None, id: None }
+    2382: StartTextStyle { kind: Bold, id: None }
+    2383: Text { content: "Mailed, e-mailed or hand delivered applications will not be accepted." }
+    2384: EndTextStyle
+    2385: Text { content: "\u{a0} If you are unable to upload your documents after completing the Occupational Questionnaire online, you may FAX your documents (resume, transcripts, etc.) as instructed above." }
+    2386: EndParagraph
+    2387: EndUnorderedListItem
+    2388: EndTableCell
+    2389: EndTableRow
+    2390: StartTableRow { id: None }
+    2391: StartTableCell { colspan: None, id: None, rowspan: None }
+    2392: StartParagraph { alignment: None, id: None }
+    2393: LineBreak
+    2394: LineBreak
+    2395: StartTextStyle { kind: Bold, id: None }
+    2396: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+    2397: Text { content: "Required Documents:" }
+    2398: EndTextStyle
+    2399: EndTextStyle
+    2400: EndParagraph
+    2401: EndTableCell
+    2402: EndTableRow
+    2403: StartTableRow { id: None }
+    2404: StartTableCell { colspan: None, id: None, rowspan: None }
+    2405: StartParagraph { alignment: None, id: None }
+    2406: Text { content: "All of the government forms mentioned in the above statements can be downloaded from the following web address:\u{a0} " }
+    2407: StartLink { href: "http://www.opm.gov/forms", id: None, title: None }
+    2408: StartTextStyle { kind: Underline, id: None }
+    2409: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 0, r: 0 }), id: None }
+    2410: Text { content: "www.opm.gov/forms" }
+    2411: EndTextStyle
+    2412: EndTextStyle
+    2413: EndLink
+    2414: Text { content: "\u{a0}or obtained at the Human Resources Management Office of the duty station." }
+    2415: EndParagraph
+    2416: StartParagraph { alignment: None, id: None }
+    2417: EndParagraph
+    2418: EndTableCell
+    2419: EndTableRow
+    2420: StartTableRow { id: None }
+    2421: StartTableCell { colspan: None, id: None, rowspan: None }
+    2422: StartParagraph { alignment: None, id: None }
+    2423: LineBreak
+    2424: LineBreak
+    2425: StartTextStyle { kind: Bold, id: None }
+    2426: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+    2427: Text { content: "Contact Information:" }
+    2428: EndTextStyle
+    2429: EndTextStyle
+    2430: EndParagraph
+    2431: EndTableCell
+    2432: EndTableRow
+    2433: StartTableRow { id: None }
+    2434: StartTableCell { colspan: None, id: None, rowspan: None }
+    2435: StartParagraph { alignment: None, id: None }
+    2436: Text { content: "VHA Nationwide DEU " }
+    2437: LineBreak
+    2438: Text { content: "Phone: (607)664-4940 " }
+    2439: LineBreak
+    2440: Text { content: "Fax: (478)757-3144 " }
+    2441: LineBreak
+    2442: Text { content: "Email: vhabandeu2@va.gov " }
+    2443: LineBreak
+    2444: LineBreak
+    2445: Text { content: "Or write:" }
+    2446: LineBreak
+    2447: Text { content: "WNY Health Care System DEU Bath" }
+    2448: LineBreak
+    2449: Text { content: "PLEASE DO NOT MAIL APPLICATIONS" }
+    2450: LineBreak
+    2451: Text { content: "APPLY ONLINE OR FAX ONLY" }
+    2452: LineBreak
+    2453: Text { content: "Thank you, DE 14810 " }
+    2454: LineBreak
+    2455: Text { content: "USA " }
+    2456: LineBreak
+    2457: Text { content: "Fax: (478)757-3144 " }
+    2458: EndParagraph
+    2459: EndTableCell
+    2460: EndTableRow
+    2461: StartTableRow { id: None }
+    2462: StartTableCell { colspan: None, id: None, rowspan: None }
+    2463: StartParagraph { alignment: None, id: None }
+    2464: LineBreak
+    2465: LineBreak
+    2466: StartTextStyle { kind: Bold, id: None }
+    2467: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+    2468: Text { content: "What To Expect Next:" }
+    2469: EndTextStyle
+    2470: EndTextStyle
+    2471: EndParagraph
+    2472: EndTableCell
+    2473: EndTableRow
+    2474: StartTableRow { id: None }
+    2475: StartTableCell { colspan: None, id: None, rowspan: None }
+    2476: StartParagraph { alignment: None, id: None }
+    2477: StartTextStyle { kind: Bold, id: None }
+    2478: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 255 }), id: None }
+    2479: Text { content: "WHAT HAPPENS NEXT?" }
+    2480: EndTextStyle
+    2481: EndTextStyle
+    2482: EndParagraph
+    2483: StartParagraph { alignment: None, id: None }
+    2484: Text { content: "Your resume and supporting documentation will be compared to your responses to the\u{a0}Assessment Questionnaire.\u{a0} The questionnaire is designed to capture the desired knowledge, skills, and abilities for this position.\u{a0} The evaluation you receive is based on your responses to the questionnaire and is a measure of the degree to which your background matches the knowledge, skills, and abilities required of this position." }
+    2485: EndParagraph
+    2486: StartParagraph { alignment: None, id: None }
+    2487: Text { content: "If your application does not support your responses to the questionnaire, or if you are not able to provide verifying documentation, it may affect your evaluation or result in your name being removed from further consideration." }
+    2488: EndParagraph
+    2489: StartParagraph { alignment: None, id: None }
+    2490: Text { content: "If you are eligible for veterans' preference, you will be given preference based on the documentation you submit.\u{a0} Please see the \"" }
+    2491: StartTextStyle { kind: Bold, id: None }
+    2492: Text { content: "Veterans Information" }
+    2493: EndTextStyle
+    2494: Text { content: "\" section of this announcement for details." }
+    2495: EndParagraph
+    2496: StartParagraph { alignment: None, id: None }
+    2497: Text { content: "This office will " }
+    2498: StartTextStyle { kind: Bold, id: None }
+    2499: Text { content: "not" }
+    2500: EndTextStyle
+    2501: Text { content: " contact\u{a0}you to discuss missing or illegible documents.\u{a0}" }
+    2502: EndParagraph
+    2503: StartParagraph { alignment: None, id: None }
+    2504: Text { content: "Once your qualifications have been evaluated, your application will be assigned a numeric score.\u{a0} Candidates will be ranked in score order with appropriate points added for veterans' preference.\u{a0}" }
+    2505: EndParagraph
+    2506: StartParagraph { alignment: None, id: None }
+    2507: StartTextStyle { kind: Bold, id: None }
+    2508: Text { content: "An ELECTRONIC\u{a0}NOTIFICATION\u{a0}LETTER will be sent to applicants who provide an e-mail address" }
+    2509: EndTextStyle
+    2510: Text { content: ".\u{a0} If you do not provide an e-mail address, you\u{a0}will receive a notification letter via the U.S. Postal Service.\u{a0} Normal processing time is\u{a0}" }
+    2511: StartTextStyle { kind: Bold, id: None }
+    2512: Text { content: "4 - 6 weeks" }
+    2513: EndTextStyle
+    2514: Text { content: ".\u{a0} This office is responsible for initial evaluation " }
+    2515: StartTextStyle { kind: Bold, id: None }
+    2516: Text { content: "ONLY" }
+    2517: EndTextStyle
+    2518: Text { content: ".\u{a0} Facilities are responsible for contacting eligible applicants thereafter." }
+    2519: EndParagraph
+    2520: EndTableCell
+    2521: EndTableRow
+    2522: EndTable
+    2523: StartParagraph { alignment: None, id: None }
+    2524: EndParagraph
+    2525: EndTableCell
+    2526: StartTableCell { colspan: None, id: None, rowspan: None }
+    2527: StartParagraph { alignment: None, id: None }
+    2528: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2529: EndParagraph
+    2530: EndTableCell
+    2531: StartTableCell { colspan: None, id: None, rowspan: None }
+    2532: StartParagraph { alignment: None, id: None }
+    2533: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2534: EndParagraph
+    2535: EndTableCell
+    2536: EndTableRow
+    2537: StartTableRow { id: None }
+    2538: StartTableCell { colspan: Some(5), id: None, rowspan: None }
+    2539: StartParagraph { alignment: None, id: None }
+    2540: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2541: EndParagraph
+    2542: EndTableCell
+    2543: EndTableRow
+    2544: EndTable
+    2545: StartParagraph { alignment: None, id: None }
+    2546: EndParagraph
+    2547: StartTable { id: None }
+    2548: StartTableRow { id: None }
+    2549: StartTableCell { colspan: None, id: None, rowspan: None }
+    2550: StartTable { id: None }
+    2551: StartTableRow { id: None }
+    2552: StartTableCell { colspan: None, id: None, rowspan: None }
+    2553: StartParagraph { alignment: None, id: None }
+    2554: Image { alt: Some("EEO Policy Statement"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image12.png", content_type: "image/png", bytes: 559, sha256: "b214e99a2653c065a4810934e957cdb9dab8791ed896b176cdbea660b6a2f4d5" } }
+    2555: EndParagraph
+    2556: EndTableCell
+    2557: StartTableCell { colspan: None, id: None, rowspan: None }
+    2558: StartTable { id: None }
+    2559: StartTableRow { id: None }
+    2560: StartTableCell { colspan: None, id: None, rowspan: None }
+    2561: StartParagraph { alignment: None, id: None }
+    2562: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2563: EndParagraph
+    2564: EndTableCell
+    2565: EndTableRow
+    2566: EndTable
+    2567: StartParagraph { alignment: None, id: None }
+    2568: EndParagraph
+    2569: EndTableCell
+    2570: EndTableRow
+    2571: StartTableRow { id: None }
+    2572: StartTableCell { colspan: None, id: None, rowspan: None }
+    2573: StartParagraph { alignment: None, id: None }
+    2574: EndParagraph
+    2575: EndTableCell
+    2576: StartTableCell { colspan: None, id: None, rowspan: None }
+    2577: StartParagraph { alignment: None, id: None }
+    2578: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image7.png", content_type: "image/png", bytes: 140, sha256: "267e1f08e13266860a9be24747b4cf9304d6af8f93fd5e7127fcb05526b8273a" } }
+    2579: EndParagraph
+    2580: EndTableCell
+    2581: EndTableRow
+    2582: EndTable
+    2583: StartParagraph { alignment: None, id: None }
+    2584: EndParagraph
+    2585: EndTableCell
+    2586: EndTableRow
+    2587: EndTable
+    2588: StartParagraph { alignment: None, id: None }
+    2589: EndParagraph
+    2590: StartTable { id: None }
+    2591: StartTableRow { id: None }
+    2592: StartTableCell { colspan: None, id: None, rowspan: None }
+    2593: StartParagraph { alignment: None, id: None }
+    2594: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2595: EndParagraph
+    2596: EndTableCell
+    2597: StartTableCell { colspan: None, id: None, rowspan: None }
+    2598: StartParagraph { alignment: None, id: None }
+    2599: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2600: EndParagraph
+    2601: EndTableCell
+    2602: StartTableCell { colspan: None, id: None, rowspan: None }
+    2603: StartParagraph { alignment: None, id: None }
+    2604: LineBreak
+    2605: Text { content: "The United States Government does not discriminate in employment on the basis of race, color, religion, sex, national origin, political affiliation, sexual orientation, marital status, disability, age, membership in an employee organization, or other non-merit factor. " }
+    2606: EndParagraph
+    2607: EndTableCell
+    2608: StartTableCell { colspan: None, id: None, rowspan: None }
+    2609: StartParagraph { alignment: None, id: None }
+    2610: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2611: EndParagraph
+    2612: EndTableCell
+    2613: StartTableCell { colspan: None, id: None, rowspan: None }
+    2614: StartParagraph { alignment: None, id: None }
+    2615: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2616: EndParagraph
+    2617: EndTableCell
+    2618: EndTableRow
+    2619: StartTableRow { id: None }
+    2620: StartTableCell { colspan: Some(5), id: None, rowspan: None }
+    2621: StartParagraph { alignment: None, id: None }
+    2622: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2623: EndParagraph
+    2624: EndTableCell
+    2625: EndTableRow
+    2626: EndTable
+    2627: StartParagraph { alignment: None, id: None }
+    2628: EndParagraph
+    2629: StartTable { id: None }
+    2630: StartTableRow { id: None }
+    2631: StartTableCell { colspan: None, id: None, rowspan: None }
+    2632: StartTable { id: None }
+    2633: StartTableRow { id: None }
+    2634: StartTableCell { colspan: None, id: None, rowspan: None }
+    2635: StartParagraph { alignment: None, id: None }
+    2636: Image { alt: Some("Reasonable Accommodation"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image13.png", content_type: "image/png", bytes: 856, sha256: "5535e2805edbcddb7c6f6934fdbd44c7ef3057060f30f4196b854a8355ede7ff" } }
+    2637: EndParagraph
+    2638: EndTableCell
+    2639: StartTableCell { colspan: None, id: None, rowspan: None }
+    2640: StartTable { id: None }
+    2641: StartTableRow { id: None }
+    2642: StartTableCell { colspan: None, id: None, rowspan: None }
+    2643: StartParagraph { alignment: None, id: None }
+    2644: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2645: EndParagraph
+    2646: EndTableCell
+    2647: EndTableRow
+    2648: EndTable
+    2649: StartParagraph { alignment: None, id: None }
+    2650: EndParagraph
+    2651: EndTableCell
+    2652: EndTableRow
+    2653: StartTableRow { id: None }
+    2654: StartTableCell { colspan: None, id: None, rowspan: None }
+    2655: StartParagraph { alignment: None, id: None }
+    2656: EndParagraph
+    2657: EndTableCell
+    2658: StartTableCell { colspan: None, id: None, rowspan: None }
+    2659: StartParagraph { alignment: None, id: None }
+    2660: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image7.png", content_type: "image/png", bytes: 140, sha256: "267e1f08e13266860a9be24747b4cf9304d6af8f93fd5e7127fcb05526b8273a" } }
+    2661: EndParagraph
+    2662: EndTableCell
+    2663: EndTableRow
+    2664: EndTable
+    2665: StartParagraph { alignment: None, id: None }
+    2666: EndParagraph
+    2667: EndTableCell
+    2668: EndTableRow
+    2669: EndTable
+    2670: StartParagraph { alignment: None, id: None }
+    2671: EndParagraph
+    2672: StartTable { id: None }
+    2673: StartTableRow { id: None }
+    2674: StartTableCell { colspan: None, id: None, rowspan: None }
+    2675: StartParagraph { alignment: None, id: None }
+    2676: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2677: EndParagraph
+    2678: EndTableCell
+    2679: StartTableCell { colspan: None, id: None, rowspan: None }
+    2680: StartParagraph { alignment: None, id: None }
+    2681: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2682: EndParagraph
+    2683: EndTableCell
+    2684: StartTableCell { colspan: None, id: None, rowspan: None }
+    2685: StartParagraph { alignment: None, id: None }
+    2686: LineBreak
+    2687: Text { content: "Federal agencies must provide reasonable accommodation to applicants with disabilities where appropriate. Applicants requiring reasonable accommodation for any part of the application and hiring process should contact the hiring agency directly. Determinations on requests for reasonable accommodation will be made on a case-by-case basis. " }
+    2688: EndParagraph
+    2689: EndTableCell
+    2690: StartTableCell { colspan: None, id: None, rowspan: None }
+    2691: StartParagraph { alignment: None, id: None }
+    2692: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2693: EndParagraph
+    2694: EndTableCell
+    2695: StartTableCell { colspan: None, id: None, rowspan: None }
+    2696: StartParagraph { alignment: None, id: None }
+    2697: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2698: EndParagraph
+    2699: EndTableCell
+    2700: EndTableRow
+    2701: StartTableRow { id: None }
+    2702: StartTableCell { colspan: Some(5), id: None, rowspan: None }
+    2703: StartParagraph { alignment: None, id: None }
+    2704: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2705: EndParagraph
+    2706: EndTableCell
+    2707: EndTableRow
+    2708: EndTable
+    2709: StartParagraph { alignment: None, id: None }
+    2710: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+    2711: LineBreak
+    2712: EndTextStyle
+    2713: EndParagraph
+    2714: StartTable { id: None }
+    2715: StartTableRow { id: None }
+    2716: StartTableCell { colspan: None, id: None, rowspan: None }
+    2717: StartParagraph { alignment: None, id: None }
+    2718: StartLink { href: "https://recruiter.usajobs.gov/sourcing/?hd=www%2Eusajobs%2Egov&jobID=74066498&jsd=jobsearch%2Eusajobs%2Egov&TabNum=7&rc=3", id: None, title: None }
+    2719: Image { alt: Some("Detailed Version"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image3.png", content_type: "image/png", bytes: 1052, sha256: "6334f603cedeeec89549c85623c627041b02ea887b94ee1648d5700abb5b5321" } }
+    2720: EndLink
+    2721: EndParagraph
+    2722: EndTableCell
+    2723: StartTableCell { colspan: None, id: None, rowspan: None }
+    2724: StartParagraph { alignment: None, id: None }
+    2725: StartLink { href: "javascript:window.close()", id: None, title: None }
+    2726: Image { alt: Some("Close Window"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image4.png", content_type: "image/png", bytes: 843, sha256: "f3cdc80b7e24e444c4fc906600a36323556fd468c1e030aa326dc786e0efaccc" } }
+    2727: EndLink
+    2728: EndParagraph
+    2729: EndTableCell
+    2730: StartTableCell { colspan: None, id: None, rowspan: None }
+    2731: StartParagraph { alignment: None, id: None }
+    2732: StartLink { href: "javascript:window.print()", id: None, title: None }
+    2733: Image { alt: Some("Print"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image5.png", content_type: "image/png", bytes: 685, sha256: "36aefd9eb7d7ac5610d443712e327b4d788aa5192c1717db5c22fa011fa322f6" } }
+    2734: EndLink
+    2735: EndParagraph
+    2736: EndTableCell
+    2737: EndTableRow
+    2738: EndTable
+    2739: StartParagraph { alignment: None, id: None }
+    2740: EndParagraph
+    2741: EndTableCell
+    2742: EndTableRow
+    2743: EndTable
+    2744: StartParagraph { alignment: None, id: None }
+    2745: EndParagraph
+    2746: EndTableCell
+    2747: EndTableRow
+    2748: StartTableRow { id: None }
+    2749: StartTableCell { colspan: None, id: None, rowspan: None }
+    2750: StartTable { id: None }
+    2751: StartTableRow { id: None }
+    2752: StartTableCell { colspan: None, id: None, rowspan: None }
+    2753: StartTable { id: None }
+    2754: StartTableRow { id: None }
+    2755: StartTableCell { colspan: None, id: None, rowspan: None }
+    2756: StartParagraph { alignment: None, id: None }
+    2757: Image { alt: Some("Send Mail"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image14.png", content_type: "image/png", bytes: 1516, sha256: "3ec4b5fdc8b27b5de35cd698b42ca98c9a1d3c00355a09e06f3d20f3238cdf3d" } }
+    2758: EndParagraph
+    2759: EndTableCell
+    2760: EndTableRow
+    2761: StartTableRow { id: None }
+    2762: StartTableCell { colspan: None, id: None, rowspan: None }
+    2763: StartTable { id: None }
+    2764: StartTableRow { id: None }
+    2765: StartTableCell { colspan: None, id: None, rowspan: None }
+    2766: StartParagraph { alignment: None, id: None }
+    2767: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2768: EndParagraph
+    2769: EndTableCell
+    2770: StartTableCell { colspan: None, id: None, rowspan: None }
+    2771: StartParagraph { alignment: None, id: None }
+    2772: StartTextStyle { kind: Bold, id: None }
+    2773: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+    2774: Text { content: "Send Mail to:" }
+    2775: EndTextStyle
+    2776: EndTextStyle
+    2777: LineBreak
+    2778: Text { content: "WNY Health Care System DEU Bath" }
+    2779: LineBreak
+    2780: Text { content: "PLEASE DO NOT MAIL APPLICATIONS" }
+    2781: LineBreak
+    2782: Text { content: "APPLY ONLINE OR FAX ONLY" }
+    2783: LineBreak
+    2784: Text { content: "Thank you, DE 14810 " }
+    2785: LineBreak
+    2786: Text { content: "USA " }
+    2787: LineBreak
+    2788: Text { content: "Fax: (478)757-3144 " }
+    2789: EndParagraph
+    2790: EndTableCell
+    2791: EndTableRow
+    2792: EndTable
+    2793: StartParagraph { alignment: None, id: None }
+    2794: EndParagraph
+    2795: EndTableCell
+    2796: EndTableRow
+    2797: EndTable
+    2798: StartParagraph { alignment: Some(Center), id: None }
+    2799: EndParagraph
+    2800: StartTable { id: None }
+    2801: StartTableRow { id: None }
+    2802: StartTableCell { colspan: None, id: None, rowspan: None }
+    2803: StartParagraph { alignment: None, id: None }
+    2804: Image { alt: Some("Questions"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image15.png", content_type: "image/png", bytes: 1476, sha256: "2f77acc277755136064e26689e88512a858aa37b895f76e4f120cda226d35e5d" } }
+    2805: EndParagraph
+    2806: EndTableCell
+    2807: EndTableRow
+    2808: StartTableRow { id: None }
+    2809: StartTableCell { colspan: None, id: None, rowspan: None }
+    2810: StartTable { id: None }
+    2811: StartTableRow { id: None }
+    2812: StartTableCell { colspan: None, id: None, rowspan: None }
+    2813: StartParagraph { alignment: None, id: None }
+    2814: Image { alt: Some(""), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image6.png", content_type: "image/png", bytes: 122, sha256: "4ea80f3af52cd347d37562d2c3e644aa355dad8c4df11e8dd25fbd0119e521ba" } }
+    2815: EndParagraph
+    2816: EndTableCell
+    2817: StartTableCell { colspan: None, id: None, rowspan: None }
+    2818: StartParagraph { alignment: None, id: None }
+    2819: StartTextStyle { kind: Bold, id: None }
+    2820: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+    2821: Text { content: "For questions about this job:" }
+    2822: EndTextStyle
+    2823: EndTextStyle
+    2824: LineBreak
+    2825: Text { content: "VHA Nationwide DEU " }
+    2826: LineBreak
+    2827: Text { content: "Phone: (607)664-4940 " }
+    2828: LineBreak
+    2829: Text { content: "Fax: (478)757-3144 " }
+    2830: LineBreak
+    2831: Text { content: "Email: vhabandeu2@va.gov " }
+    2832: EndParagraph
+    2833: EndTableCell
+    2834: EndTableRow
+    2835: EndTable
+    2836: StartParagraph { alignment: None, id: None }
+    2837: EndParagraph
+    2838: EndTableCell
+    2839: EndTableRow
+    2840: EndTable
+    2841: StartParagraph { alignment: Some(Center), id: None }
+    2842: EndParagraph
+    2843: EndTableCell
+    2844: EndTableRow
+    2845: EndTable
+    2846: StartParagraph { alignment: None, id: None }
+    2847: EndParagraph
+    2848: EndTableCell
+    2849: EndTableRow
+    2850: StartTableRow { id: None }
+    2851: StartTableCell { colspan: None, id: None, rowspan: None }
+    2852: StartParagraph { alignment: Some(Center), id: None }
+    2853: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 102, r: 102 }), id: None }
+    2854: LineBreak
+    2855: EndTextStyle
+    2856: StartTextStyle { kind: Bold, id: None }
+    2857: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 102, r: 102 }), id: None }
+    2858: Text { content: "USAJOBS Control Number:" }
+    2859: EndTextStyle
+    2860: EndTextStyle
+    2861: StartTextStyle { kind: TextColor(Rgb { b: 102, g: 102, r: 102 }), id: None }
+    2862: Text { content: " 1286045 " }
+    2863: EndTextStyle
+    2864: EndParagraph
+    2865: EndTableCell
+    2866: EndTableRow
+    2867: EndTable
+    2868: StartParagraph { alignment: None, id: None }
+    2869: EndParagraph
+    2870: StartTable { id: None }
+    2871: StartTableRow { id: None }
+    2872: StartTableCell { colspan: None, id: None, rowspan: None }
+    2873: StartParagraph { alignment: Some(Center), id: None }
+    2874: StartLink { href: "javascript:printversion=window.print();", id: None, title: None }
+    2875: Image { alt: Some("Print"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image16.png", content_type: "image/png", bytes: 1471, sha256: "7724be7d28f027492cd41c553f4ab4e8899714f4b8d1cd77b229878d94388f99" } }
+    2876: EndLink
+    2877: EndParagraph
+    2878: EndTableCell
+    2879: EndTableRow
+    2880: EndTable
+    2881: StartParagraph { alignment: None, id: None }
+    2882: Text { content: "\t" }
+    2883: Text { content: "\t" }
+    2884: EndParagraph
+    2885: StartParagraph { alignment: None, id: None }
+    2886: Text { content: "\t" }
+    2887: Text { content: "\t" }
+    2888: EndParagraph
+    2889: EndDocument
+  ],
+  terminal: Ok,
+}

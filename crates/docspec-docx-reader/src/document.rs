@@ -76,6 +76,15 @@ struct DrawingScanState {
     emitted_for_current_pic: bool,
 }
 
+/// State machine for parsing a `<w:pict>` VML subtree.
+struct VmlScanState {
+    /// Alt text captured from a parent `<v:shape alt="...">`.
+    /// Cleared when the shape element closes back to depth zero.
+    pending_shape_alt: Option<String>,
+    /// Nesting depth of `<v:shape>` elements for correct alt-text scoping.
+    shape_depth: u32,
+}
+
 /// Bundle of package-level data the document reader consults during streaming.
 ///
 /// Forward-compatible: additional package parts (theme, settings)
@@ -114,7 +123,8 @@ pub(crate) struct PendingLink {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum DeniedKind {
     // 9 doc-level denied containers.
-    Pict,
+    /// `<mc:Fallback>` subtree — deduplicates images that appear in both `<mc:Choice><w:drawing>` and `<mc:Fallback><w:pict>`.
+    McFallback,
     Object,
     Del,
     MoveFrom,
@@ -1018,6 +1028,10 @@ impl DocumentReader {
             self.handle_drawing_start()?;
             return Ok(());
         }
+        if local == b"pict" {
+            self.handle_pict_start()?;
+            return Ok(());
+        }
         if self.handle_table_start(local, tag) {
             return Ok(());
         }
@@ -1140,6 +1154,145 @@ impl DocumentReader {
             }
             self.buf.clear();
         }
+
+        Ok(())
+    }
+
+    /// Handles a `<w:pict>` start tag by preparing inline state and scanning its VML subtree.
+    fn handle_pict_start(&mut self) -> Result<()> {
+        // TODO(vml-headers): <w:pict> inside <w:hdr>/<w:ftr>/<w:footnotes> parts is not processed (those parts are not opened by this reader).
+        if self.in_paragraph {
+            self.ensure_cell_started();
+            self.ensure_paragraph_started();
+            self.flush_pending_text();
+            self.flush_pending_link_start();
+        }
+        self.run_content_emitted = true;
+        self.parse_pict_subtree()
+    }
+
+    /// Parses a `<w:pict>` subtree and emits images for VML `<v:imagedata>` elements.
+    fn parse_pict_subtree(&mut self) -> Result<()> {
+        let mut state = VmlScanState {
+            pending_shape_alt: None,
+            shape_depth: 0,
+        };
+        let mut pict_depth: u32 = 1;
+
+        while pict_depth > 0 {
+            let event = self
+                .xml
+                .read_event_into(&mut self.buf)
+                .map_err(map_quick_xml_error)?
+                .into_owned();
+
+            match event {
+                quick_xml::events::Event::Start(tag) => {
+                    self.handle_pict_child_start(&mut state, &tag)?;
+                    pict_depth = pict_depth.saturating_add(1);
+                }
+                quick_xml::events::Event::Empty(tag) => {
+                    self.handle_pict_child_empty(&mut state, &tag)?;
+                }
+                quick_xml::events::Event::End(tag) => {
+                    if tag.local_name().as_ref() == b"pict" && pict_depth == 1 {
+                        pict_depth = pict_depth.saturating_sub(1);
+                    } else {
+                        Self::handle_pict_child_end(&mut state, tag.local_name().as_ref());
+                        pict_depth = pict_depth.saturating_sub(1);
+                    }
+                }
+                quick_xml::events::Event::Eof => {
+                    self.handle_eof();
+                    pict_depth = 0;
+                }
+                quick_xml::events::Event::Text(_)
+                | quick_xml::events::Event::GeneralRef(_)
+                | quick_xml::events::Event::CData(_)
+                | quick_xml::events::Event::Comment(_)
+                | quick_xml::events::Event::Decl(_)
+                | quick_xml::events::Event::PI(_)
+                | quick_xml::events::Event::DocType(_) => {}
+            }
+            self.buf.clear();
+        }
+
+        Ok(())
+    }
+
+    /// Handles a start tag inside a VML `<w:pict>` subtree.
+    fn handle_pict_child_start(
+        &mut self,
+        state: &mut VmlScanState,
+        tag: &BytesStart<'_>,
+    ) -> Result<()> {
+        let local_name = tag.local_name();
+        let local = local_name.as_ref();
+        match local {
+            b"shape" => {
+                state.shape_depth = state.shape_depth.saturating_add(1);
+                if let Some(alt) = read_decoded_attribute(tag, b"alt") {
+                    state.pending_shape_alt = Some(alt);
+                }
+            }
+            b"imagedata" => self.emit_pict_imagedata(state, tag)?,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handles an empty tag inside a VML `<w:pict>` subtree.
+    fn handle_pict_child_empty(
+        &mut self,
+        state: &mut VmlScanState,
+        tag: &BytesStart<'_>,
+    ) -> Result<()> {
+        let local_name = tag.local_name();
+        let local = local_name.as_ref();
+        if local == b"imagedata" {
+            self.emit_pict_imagedata(state, tag)?;
+        }
+        Ok(())
+    }
+
+    /// Handles an end tag inside a VML `<w:pict>` subtree.
+    fn handle_pict_child_end(state: &mut VmlScanState, local: &[u8]) {
+        if local == b"shape" {
+            if state.shape_depth > 0 {
+                state.shape_depth = state.shape_depth.saturating_sub(1);
+            }
+            if state.shape_depth == 0 {
+                state.pending_shape_alt = None;
+            }
+        }
+    }
+
+    /// Emits an image event for a VML `<v:imagedata>` relationship reference.
+    fn emit_pict_imagedata(
+        &mut self,
+        state: &mut VmlScanState,
+        tag: &BytesStart<'_>,
+    ) -> Result<()> {
+        // TODO(vml-binData): <v:imagedata src="wordml://..."/> (inline w:binData reference) is not supported; the entry naturally degrades to "no rId found" and emits nothing.
+        let image_rid = read_attribute(tag, b"r:id")
+            .or_else(|| read_attribute(tag, b"r:embed"))
+            .or_else(|| read_attribute(tag, b"r:link"));
+        let Some(rid) = image_rid else {
+            return Ok(());
+        };
+
+        let alt = read_decoded_attribute(tag, b"o:title")
+            .filter(|s| !s.is_empty())
+            .or_else(|| state.pending_shape_alt.clone());
+
+        // Note: if the same rId appears in both <w:drawing> and a bare <w:pict> (not inside <mc:AlternateContent>), two Image events are emitted. This is intentional — we faithfully represent what the document contains. AlternateContent-wrapped duplicates are deduped via the mc:Fallback denylist entry.
+        self.queue.push_back(Event::Image {
+            alt,
+            decorative: false,
+            id: None,
+            source: self.image_source_for_rid(&rid),
+            title: None,
+        });
 
         Ok(())
     }
@@ -1614,7 +1767,7 @@ impl DocumentReader {
 /// markers (PPr/RPr/TrPr/TcPr).
 fn is_denied_container(local: &[u8]) -> Option<DeniedKind> {
     match local {
-        b"pict" => Some(DeniedKind::Pict),
+        b"Fallback" => Some(DeniedKind::McFallback),
         b"object" => Some(DeniedKind::Object),
         b"del" => Some(DeniedKind::Del),
         b"moveFrom" => Some(DeniedKind::MoveFrom),
@@ -1631,7 +1784,7 @@ fn is_denied_container(local: &[u8]) -> Option<DeniedKind> {
 /// Superset of `is_denied_container`: adds PPr/RPr/TrPr/TcPr.
 fn denied_kind_for(local: &[u8]) -> Option<DeniedKind> {
     match local {
-        b"pict" => Some(DeniedKind::Pict),
+        b"Fallback" => Some(DeniedKind::McFallback),
         b"object" => Some(DeniedKind::Object),
         b"del" => Some(DeniedKind::Del),
         b"moveFrom" => Some(DeniedKind::MoveFrom),

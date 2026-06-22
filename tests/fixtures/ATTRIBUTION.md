@@ -29,14 +29,26 @@ indicated.
 - **License**: GPL-2.0-or-later — SPDX identifier `GPL-2.0-or-later`; canonical text at <https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt>
 - **Imported**: 2026-06-22
 
+## Apache Tika DOCX Test Documents (`docx/apache-tika/`)
+
+- **Title**: Apache Tika DOCX Test Documents
+- **Author**: The Apache Software Foundation and Apache Tika contributors
+- **Upstream**: <https://github.com/apache/tika>
+- **Mirror**: <https://github.com/docspec/documents>, `documents/docx/apache-tika/`
+- **License**: Apache-2.0 — SPDX identifier `Apache-2.0`; canonical text at <https://www.apache.org/licenses/LICENSE-2.0.txt>
+- **Imported**: 2026-06-22
+
+Selective import — see `docx/apache-tika/README.md` for the fixture list and
+the criterion for adding new ones.
+
 ## License Compatibility
 
-DocSpec is licensed MIT. Both fixture corpora are test data only:
+DocSpec is licensed MIT. All three fixture corpora are test data only:
 
 - They are NOT compiled into any DocSpec binary or library.
 - They are NOT distributed via crates.io (excluded via `Cargo.toml exclude`).
-- They are used solely as test inputs, consistent with GPL Section 0 scope for the Pandoc corpus and unconditionally permitted for the DocSpec corpus under ODC-By-1.0.
-- The verbatim GPL-2.0 and ODC-By-1.0 texts are intentionally not vendored; see the canonical URLs above.
+- They are used solely as test inputs, consistent with GPL Section 0 scope for the Pandoc corpus, the Apache-2.0 permission grant for the Apache Tika corpus, and unconditionally permitted for the DocSpec corpus under ODC-By-1.0.
+- The verbatim GPL-2.0, Apache-2.0, and ODC-By-1.0 texts are intentionally not vendored; see the canonical URLs above.
 
 ## Mirrored Corpus
 

@@ -11,6 +11,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
     println!("cargo::rustc-check-cfg=cfg(coverage)");
     generate_corpus_tests("pandoc", "pandoc_corpus_tests.rs")?;
     generate_corpus_tests("docspec", "docspec_corpus_tests.rs")?;
+    generate_corpus_tests("apache-tika", "apache_tika_corpus_tests.rs")?;
     Ok(())
 }
 
@@ -76,6 +77,7 @@ fn test_name_for_fixture(file_name: &str) -> Result<String, Box<dyn core::error:
 
     let test_name = match stem {
         "0_level_headers" => "_0_level_headers",
+        "017097" => "_017097",
         "compact-style-removal" => "compact_style_removal",
         "custom-style-reference" => "custom_style_reference",
         "german-reference" => "german_reference",
@@ -83,6 +85,7 @@ fn test_name_for_fixture(file_name: &str) -> Result<String, Box<dyn core::error:
         "lists-compact" => "lists_compact",
         "nested_instrText" => "nested_instr_text",
         "preformatted-boundaries" => "preformatted_boundaries",
+        "testInstrLink" => "test_instr_link",
         other => other,
     };
 

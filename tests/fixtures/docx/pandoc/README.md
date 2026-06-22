@@ -13,15 +13,15 @@ emit one test per `.docx` via `build.rs`.
 
 The fixtures cover headings, inline formatting, links, lists, tables, images,
 notes, metadata, tracked changes, structured document tags, and other WordprocessingML
-edge cases represented in Pandoc's regression suite.
+edge cases represented in Pandoc's regression suite. The `image_vml.docx` fixture
+covers an `Image` event from VML `<w:pict>` + `<v:imagedata>` with an
+`AssetDescriptor` + SHA-256 of the asset bytes.
 
 ## Expected Silent Drops
 
 Some Pandoc fixtures produce near-empty snapshots because the current
 `DocxReader` intentionally drops:
 
-- **VML images** (`<w:pict>`) — subtree silently dropped; only DrawingML images
-  (`<w:drawing>`) are supported.
 - **Comments** — dropped entirely.
 - **Track-changes deletions** (`<w:del>`, `<w:moveFrom>`) — dropped (accept-changes
   semantics).
