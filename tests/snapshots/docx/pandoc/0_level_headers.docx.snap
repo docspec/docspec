@@ -1,0 +1,151 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartTable { id: None }
+       2: StartTableRow { id: None }
+       3: StartTableCell { colspan: None, id: None, rowspan: None }
+       4: StartParagraph { alignment: None, id: None }
+       5: EndParagraph
+       6: EndTableCell
+       7: EndTableRow
+       8: StartTableRow { id: None }
+       9: StartTableCell { colspan: None, id: None, rowspan: None }
+      10: StartParagraph { alignment: None, id: None }
+      11: Text { content: "User’s Guide" }
+      12: EndParagraph
+      13: EndTableCell
+      14: EndTableRow
+      15: StartTableRow { id: None }
+      16: StartTableCell { colspan: None, id: None, rowspan: None }
+      17: StartParagraph { alignment: None, id: None }
+      18: Text { content: "\t" }
+      19: Text { content: "\t" }
+      20: Text { content: "\t" }
+      21: EndParagraph
+      22: EndTableCell
+      23: EndTableRow
+      24: StartTableRow { id: None }
+      25: StartTableCell { colspan: None, id: None, rowspan: None }
+      26: StartParagraph { alignment: None, id: None }
+      27: EndParagraph
+      28: EndTableCell
+      29: EndTableRow
+      30: StartTableRow { id: None }
+      31: StartTableCell { colspan: None, id: None, rowspan: None }
+      32: StartParagraph { alignment: None, id: None }
+      33: EndParagraph
+      34: EndTableCell
+      35: EndTableRow
+      36: StartTableRow { id: None }
+      37: StartTableCell { colspan: None, id: None, rowspan: None }
+      38: StartParagraph { alignment: None, id: None }
+      39: Text { content: "11 August 2017" }
+      40: EndParagraph
+      41: EndTableCell
+      42: EndTableRow
+      43: StartTableRow { id: None }
+      44: StartTableCell { colspan: None, id: None, rowspan: None }
+      45: StartParagraph { alignment: None, id: None }
+      46: EndParagraph
+      47: EndTableCell
+      48: EndTableRow
+      49: StartTableRow { id: None }
+      50: StartTableCell { colspan: None, id: None, rowspan: None }
+      51: StartParagraph { alignment: None, id: None }
+      52: EndParagraph
+      53: EndTableCell
+      54: EndTableRow
+      55: StartTableRow { id: None }
+      56: StartTableCell { colspan: None, id: None, rowspan: None }
+      57: StartParagraph { alignment: None, id: None }
+      58: EndParagraph
+      59: EndTableCell
+      60: EndTableRow
+      61: StartTableRow { id: None }
+      62: StartTableCell { colspan: None, id: None, rowspan: None }
+      63: StartParagraph { alignment: None, id: None }
+      64: EndParagraph
+      65: EndTableCell
+      66: EndTableRow
+      67: EndTable
+      68: StartParagraph { alignment: None, id: None }
+      69: EndParagraph
+      70: StartHeading { id: None, level: 1 }
+      71: Text { content: "CONTENTS" }
+      72: EndHeading
+      73: StartParagraph { alignment: None, id: None }
+      74: Text { content: "\t" }
+      75: Text { content: "Section" }
+      76: StartTextStyle { kind: Bold, id: None }
+      77: Text { content: "\t" }
+      78: Text { content: "Page" }
+      79: EndTextStyle
+      80: EndParagraph
+      81: StartParagraph { alignment: None, id: None }
+      82: Text { content: "FIGURES" }
+      83: Text { content: "\t" }
+      84: Text { content: "iv" }
+      85: EndParagraph
+      86: StartParagraph { alignment: None, id: None }
+      87: Text { content: "TABLES" }
+      88: Text { content: "\t" }
+      89: Text { content: "v" }
+      90: EndParagraph
+      91: StartParagraph { alignment: None, id: None }
+      92: Text { content: "\t" }
+      93: Text { content: "SECTION 1" }
+      94: Text { content: "\t" }
+      95: Text { content: "Introduction" }
+      96: Text { content: "\t" }
+      97: Text { content: "2" }
+      98: EndParagraph
+      99: StartParagraph { alignment: None, id: None }
+     100: EndParagraph
+     101: StartHeading { id: None, level: 1 }
+     102: Text { content: "FIGURES" }
+     103: EndHeading
+     104: StartParagraph { alignment: None, id: None }
+     105: Text { content: "\t" }
+     106: Text { content: "Figure" }
+     107: StartTextStyle { kind: Bold, id: None }
+     108: Text { content: "\t" }
+     109: Text { content: "Page" }
+     110: EndTextStyle
+     111: EndParagraph
+     112: StartParagraph { alignment: None, id: None }
+     113: StartTextStyle { kind: Bold, id: None }
+     114: Text { content: "No table of figures entries found." }
+     115: EndTextStyle
+     116: EndParagraph
+     117: StartHeading { id: None, level: 1 }
+     118: Text { content: "TABLES" }
+     119: EndHeading
+     120: StartParagraph { alignment: None, id: None }
+     121: Text { content: "\t" }
+     122: Text { content: "Table" }
+     123: StartTextStyle { kind: Bold, id: None }
+     124: Text { content: "\t" }
+     125: Text { content: "Page" }
+     126: EndTextStyle
+     127: EndParagraph
+     128: StartParagraph { alignment: None, id: None }
+     129: StartTextStyle { kind: Bold, id: None }
+     130: Text { content: "No table of figures entries found." }
+     131: EndTextStyle
+     132: EndParagraph
+     133: StartParagraph { alignment: None, id: None }
+     134: EndParagraph
+     135: StartHeading { id: None, level: 1 }
+     136: Text { content: "Introduction" }
+     137: EndHeading
+     138: StartParagraph { alignment: None, id: None }
+     139: Text { content: "Nothing to introduce, yet." }
+     140: EndParagraph
+     141: EndDocument
+  ],
+  terminal: Ok,
+}

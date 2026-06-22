@@ -1,0 +1,18 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "Turn my " }
+       3: StartTextStyle { kind: Italic, id: None }
+       4: Text { content: "formatting   " }
+       5: EndTextStyle
+       6: Text { content: "off after the spaces." }
+       7: EndParagraph
+       8: EndDocument
+  ],
+  terminal: Ok,
+}

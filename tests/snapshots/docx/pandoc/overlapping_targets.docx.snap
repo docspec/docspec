@@ -1,0 +1,28 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: StartLink { href: "#Fizz", id: None, title: None }
+       3: Text { content: "One link to one target." }
+       4: EndLink
+       5: EndParagraph
+       6: StartParagraph { alignment: None, id: None }
+       7: EndParagraph
+       8: StartParagraph { alignment: None, id: None }
+       9: Text { content: "This is a target with two names." }
+      10: EndParagraph
+      11: StartParagraph { alignment: None, id: None }
+      12: EndParagraph
+      13: StartParagraph { alignment: None, id: None }
+      14: StartLink { href: "#Pop", id: None, title: None }
+      15: Text { content: "Another link to the same target." }
+      16: EndLink
+      17: EndParagraph
+      18: EndDocument
+  ],
+  terminal: Ok,
+}

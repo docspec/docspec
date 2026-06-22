@@ -1,0 +1,30 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "This is some code:" }
+       3: EndParagraph
+       4: StartPreformatted { id: None, syntax: None }
+       5: StartTextStyle { kind: Code, id: None }
+       6: Text { content: "readDocx :: ReaderOptions" }
+       7: EndTextStyle
+       8: LineBreak
+       9: StartTextStyle { kind: Code, id: None }
+      10: Text { content: "         -> B.ByteString" }
+      11: EndTextStyle
+      12: LineBreak
+      13: StartTextStyle { kind: Code, id: None }
+      14: Text { content: "         -> Pandoc" }
+      15: EndTextStyle
+      16: EndPreformatted
+      17: StartParagraph { alignment: None, id: None }
+      18: Text { content: "from the beginning of the docx reader." }
+      19: EndParagraph
+      20: EndDocument
+  ],
+  terminal: Ok,
+}

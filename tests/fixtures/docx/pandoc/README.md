@@ -1,24 +1,21 @@
 # Pandoc DOCX Test Fixtures
 
-This directory contains a curated subset of 5 DOCX test fixtures from the
-[Pandoc](https://github.com/jgm/pandoc) test suite (`test/docx/`),
-tracked via Git LFS. See `ATTRIBUTION.md` for license and source details.
+This directory mirrors the DOCX fixtures from the
+[Pandoc](https://github.com/jgm/pandoc) test suite (`test/docx/`), tracked via
+Git LFS. See `../../ATTRIBUTION.md` for license and source details.
 
-## Curated Subset
+## Corpus Scope
 
-The starter set is chosen to maximise event-type coverage of `DocxReader`
-while keeping the corpus small. Add more fixtures from the upstream Pandoc
-suite as reader features land.
+The corpus is copied from the sibling `documents` mirror at
+`documents/docx/pandoc/`. It intentionally preserves the upstream fixture names
+so `crates/docspec-docx-reader/tests/pandoc_corpus.rs` can discover every
+`.docx` file with a single `insta::glob!`.
 
-| Fixture | Primary event coverage |
-|---------|------------------------|
-| `headers.docx` | `StartDocument` / `StartParagraph` / `Text` / `EndParagraph` / `EndDocument` |
-| `inline_formatting.docx` | `StartTextStyle` / `EndTextStyle` (bold, italic, underline, strikethrough, color, highlight) |
-| `tables.docx` | `StartTable` / `StartTableRow` / `StartTableCell` / `StartTableHeader` and pairs |
-| `lists.docx` | `StartOrderedListItem` / `StartUnorderedListItem` with `level` and `start` |
-| `image.docx` | `Image` event with `AssetDescriptor` + SHA-256 of asset bytes |
+The fixtures cover headings, inline formatting, links, lists, tables, images,
+notes, metadata, tracked changes, structured document tags, and other WordprocessingML
+edge cases represented in Pandoc's regression suite.
 
-## Expected Silent Drops (when adding more fixtures)
+## Expected Silent Drops
 
 Some Pandoc fixtures produce near-empty snapshots because the current
 `DocxReader` intentionally drops:
@@ -32,3 +29,15 @@ Some Pandoc fixtures produce near-empty snapshots because the current
 
 This is expected behaviour, not a bug. When the reader gains support for these
 features, snapshot diffs will surface the new output for review.
+
+## Refreshing the Corpus
+
+To refresh from the sibling `documents` repo:
+
+```bash
+rsync -a ../documents/documents/docx/pandoc/*.docx tests/fixtures/docx/pandoc/
+```
+
+Then run `INSTA_UPDATE=unseen cargo test --test pandoc_corpus -p docspec-docx-reader`
+to generate any new snapshots, review them with `cargo insta review`, and commit.
+Update the **Imported** line in `../../ATTRIBUTION.md` when refreshing en masse.

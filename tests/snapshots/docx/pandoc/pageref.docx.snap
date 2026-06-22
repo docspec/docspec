@@ -1,0 +1,32 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "\t" }
+       3: Text { content: "Title" }
+       4: Text { content: "\t" }
+       5: Text { content: "2" }
+       6: EndParagraph
+       7: StartParagraph { alignment: None, id: None }
+       8: Text { content: "\t" }
+       9: Text { content: "Title2" }
+      10: Text { content: "\t" }
+      11: Text { content: "2" }
+      12: EndParagraph
+      13: StartParagraph { alignment: None, id: None }
+      14: LineBreak
+      15: EndParagraph
+      16: StartHeading { id: None, level: 1 }
+      17: Text { content: "Title" }
+      18: EndHeading
+      19: StartHeading { id: None, level: 1 }
+      20: Text { content: "Title2" }
+      21: EndHeading
+      22: EndDocument
+  ],
+  terminal: Ok,
+}

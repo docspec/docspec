@@ -1,0 +1,46 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartUnorderedListItem { id: Some("1001"), level: 0, style_type: Disc }
+       2: StartParagraph { alignment: None, id: None }
+       3: Text { content: "Unchecked" }
+       4: EndParagraph
+       5: EndUnorderedListItem
+       6: StartUnorderedListItem { id: Some("1002"), level: 0, style_type: Disc }
+       7: StartParagraph { alignment: None, id: None }
+       8: Text { content: "Checked" }
+       9: EndParagraph
+      10: EndUnorderedListItem
+      11: StartUnorderedListItem { id: Some("1000"), level: 0, style_type: Disc }
+      12: StartParagraph { alignment: None, id: None }
+      13: Text { content: "with continuation paragraph" }
+      14: EndParagraph
+      15: EndUnorderedListItem
+      16: StartUnorderedListItem { id: Some("1003"), level: 0, style_type: Disc }
+      17: StartParagraph { alignment: None, id: None }
+      18: Text { content: "Unchecked" }
+      19: EndParagraph
+      20: StartUnorderedListItem { id: Some("1004"), level: 1, style_type: Disc }
+      21: StartParagraph { alignment: None, id: None }
+      22: Text { content: "Checked sublist" }
+      23: EndParagraph
+      24: StartUnorderedListItem { id: Some("1005"), level: 2, style_type: Disc }
+      25: StartParagraph { alignment: None, id: None }
+      26: Text { content: "Unchecked subsublist" }
+      27: EndParagraph
+      28: StartOrderedListItem { id: Some("1006"), level: 3, start: Some(1), style_type: Decimal }
+      29: StartParagraph { alignment: None, id: None }
+      30: Text { content: "Numbered child" }
+      31: EndParagraph
+      32: EndOrderedListItem
+      33: EndUnorderedListItem
+      34: EndUnorderedListItem
+      35: EndUnorderedListItem
+      36: EndDocument
+  ],
+  terminal: Ok,
+}

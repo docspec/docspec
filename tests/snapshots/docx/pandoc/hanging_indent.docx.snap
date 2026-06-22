@@ -1,0 +1,20 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "This is a hanging indent, with the left side set to the left margin, and it wraps around the line." }
+       3: EndParagraph
+       4: StartParagraph { alignment: None, id: None }
+       5: EndParagraph
+       6: StartParagraph { alignment: None, id: None }
+       7: Text { content: "\t" }
+       8: Text { content: "Five years have passed, five summers with the length" }
+       9: EndParagraph
+      10: EndDocument
+  ],
+  terminal: Ok,
+}

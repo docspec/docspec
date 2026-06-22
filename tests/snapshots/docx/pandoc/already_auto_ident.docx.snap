@@ -1,0 +1,21 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "Anchor Header" }
+       3: EndParagraph
+       4: StartParagraph { alignment: None, id: None }
+       5: Text { content: "A" }
+       6: Text { content: " " }
+       7: StartLink { href: "#anchor-header", id: None, title: None }
+       8: Text { content: "link" }
+       9: EndLink
+      10: EndParagraph
+      11: EndDocument
+  ],
+  terminal: Ok,
+}

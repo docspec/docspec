@@ -30,7 +30,7 @@ pub use failing_writer::FailingWriter;
 
 pub mod snapshot;
 pub use snapshot::{
-    capture, is_lfs_pointer, AssetDescriptor, CorpusSnapshot, EventSnapshot, Terminal,
+    capture, is_lfs_pointer, AssetDescriptor, EventSnapshot, ReaderFixtureSnapshot, Terminal,
 };
 
 /// Builds a minimal 2-entry DOCX archive (Deflated) from raw XML strings.

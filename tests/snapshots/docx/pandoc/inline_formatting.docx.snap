@@ -1,0 +1,79 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "Regular text " }
+       3: StartTextStyle { kind: Italic, id: None }
+       4: Text { content: "italics" }
+       5: EndTextStyle
+       6: Text { content: " " }
+       7: StartTextStyle { kind: Bold, id: None }
+       8: Text { content: "bold " }
+       9: EndTextStyle
+      10: StartTextStyle { kind: Bold, id: None }
+      11: StartTextStyle { kind: Italic, id: None }
+      12: Text { content: "bold" }
+      13: EndTextStyle
+      14: EndTextStyle
+      15: StartTextStyle { kind: Bold, id: None }
+      16: StartTextStyle { kind: Italic, id: None }
+      17: Text { content: " italics" }
+      18: EndTextStyle
+      19: EndTextStyle
+      20: Text { content: "." }
+      21: EndParagraph
+      22: StartParagraph { alignment: None, id: None }
+      23: EndParagraph
+      24: StartParagraph { alignment: None, id: None }
+      25: Text { content: "This is " }
+      26: Text { content: "Small Caps" }
+      27: Text { content: ", and this is " }
+      28: StartTextStyle { kind: Strikethrough, id: None }
+      29: Text { content: "strikethrough" }
+      30: EndTextStyle
+      31: Text { content: "." }
+      32: EndParagraph
+      33: StartParagraph { alignment: None, id: None }
+      34: EndParagraph
+      35: StartParagraph { alignment: None, id: None }
+      36: Text { content: "Some people use " }
+      37: StartTextStyle { kind: Underline, id: None }
+      38: Text { content: "single underlines for " }
+      39: EndTextStyle
+      40: StartTextStyle { kind: Italic, id: None }
+      41: StartTextStyle { kind: Underline, id: None }
+      42: Text { content: "emphasis" }
+      43: EndTextStyle
+      44: EndTextStyle
+      45: Text { content: "." }
+      46: EndParagraph
+      47: StartParagraph { alignment: None, id: None }
+      48: EndParagraph
+      49: StartParagraph { alignment: None, id: None }
+      50: Text { content: "Above the line is " }
+      51: StartTextStyle { kind: Superscript, id: None }
+      52: Text { content: "superscript" }
+      53: EndTextStyle
+      54: Text { content: " and below the line is " }
+      55: StartTextStyle { kind: Subscript, id: None }
+      56: Text { content: "subscript" }
+      57: EndTextStyle
+      58: Text { content: "." }
+      59: EndParagraph
+      60: StartParagraph { alignment: None, id: None }
+      61: EndParagraph
+      62: StartParagraph { alignment: None, id: None }
+      63: Text { content: "A line" }
+      64: LineBreak
+      65: Text { content: "break." }
+      66: EndParagraph
+      67: StartParagraph { alignment: None, id: None }
+      68: EndParagraph
+      69: EndDocument
+  ],
+  terminal: Ok,
+}

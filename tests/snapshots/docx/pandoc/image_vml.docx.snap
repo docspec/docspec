@@ -1,0 +1,21 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: StartTextStyle { kind: Bold, id: None }
+       3: Text { content: "VML Image" }
+       4: EndTextStyle
+       5: EndParagraph
+       6: StartParagraph { alignment: None, id: None }
+       7: Text { content: "It should follow below:" }
+       8: EndParagraph
+       9: StartParagraph { alignment: None, id: None }
+      10: EndParagraph
+      11: EndDocument
+  ],
+  terminal: Ok,
+}

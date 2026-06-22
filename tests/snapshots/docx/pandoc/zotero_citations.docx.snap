@@ -1,0 +1,65 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "This is a citation " }
+       3: Text { content: "(Smith et al., 2013)" }
+       4: EndParagraph
+       5: StartParagraph { alignment: None, id: None }
+       6: Text { content: "This is a citation with two sources " }
+       7: Text { content: "(Boer et al., 2016; Smith et al., 2013)" }
+       8: Text { content: "." }
+       9: EndParagraph
+      10: StartParagraph { alignment: None, id: None }
+      11: Text { content: "This is a citation with additional prefix,  suffix and a page number " }
+      12: Text { content: "(prefix Bellomo et al., 2016, p. 2 suffix)" }
+      13: Text { content: "." }
+      14: EndParagraph
+      15: StartParagraph { alignment: None, id: None }
+      16: EndParagraph
+      17: StartHeading { id: None, level: 1 }
+      18: Text { content: "Reference list" }
+      19: EndHeading
+      20: StartParagraph { alignment: None, id: None }
+      21: Text { content: "Bellomo, K., Clement, A. C., Murphy, L. N., Polvani, L. M., & Cane, M. A. (2016). New observational evidence for a positive cloud feedback that amplifies the Atlantic Multidecadal Oscillation. " }
+      22: StartTextStyle { kind: Italic, id: None }
+      23: Text { content: "Geophys. Res. Lett." }
+      24: EndTextStyle
+      25: Text { content: ", " }
+      26: StartTextStyle { kind: Italic, id: None }
+      27: Text { content: "43" }
+      28: EndTextStyle
+      29: Text { content: "(18), 9852–9859. https://doi.org/10.1002/2016GL069961" }
+      30: EndParagraph
+      31: StartParagraph { alignment: None, id: None }
+      32: Text { content: "Boer, G. J., Smith, D. M., Cassou, C., Doblas-Reyes, F., Danabasoglu, G., Kirtman, B., Kushnir, Y., Kimoto, M., Meehl, G. A., Msadek, R., Müller, W. A., Taylor, K. E., Zwiers, F., Rixen, M., Ruprich-Robert, Y., & Eade, R. (2016). The Decadal Climate Prediction Project (DCPP). " }
+      33: StartTextStyle { kind: Italic, id: None }
+      34: Text { content: "Geoscientific Model Development" }
+      35: EndTextStyle
+      36: Text { content: ", " }
+      37: StartTextStyle { kind: Italic, id: None }
+      38: Text { content: "9" }
+      39: EndTextStyle
+      40: Text { content: ", 3751–3777. https://doi.org/10.5194/gmd-9-3751-2016" }
+      41: EndParagraph
+      42: StartParagraph { alignment: None, id: None }
+      43: Text { content: "Smith, D. M., Eade, R., & Pohlmann, H. (2013). A comparison of full-field and anomaly initialization for seasonal to decadal climate prediction. " }
+      44: StartTextStyle { kind: Italic, id: None }
+      45: Text { content: "Climate Dynamics" }
+      46: EndTextStyle
+      47: Text { content: ", " }
+      48: StartTextStyle { kind: Italic, id: None }
+      49: Text { content: "41" }
+      50: EndTextStyle
+      51: Text { content: "(11–12), 3325–3338. https://doi.org/10.1007/s00382-013-1683-2" }
+      52: EndParagraph
+      53: StartParagraph { alignment: None, id: None }
+      54: EndParagraph
+      55: EndDocument
+  ],
+  terminal: Ok,
+}

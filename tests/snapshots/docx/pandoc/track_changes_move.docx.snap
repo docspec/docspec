@@ -1,0 +1,32 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "Here is some text." }
+       3: EndParagraph
+       4: StartParagraph { alignment: None, id: None }
+       5: EndParagraph
+       6: StartParagraph { alignment: None, id: None }
+       7: Text { content: "Here is the text to be moved." }
+       8: EndParagraph
+       9: StartParagraph { alignment: None, id: None }
+      10: EndParagraph
+      11: StartParagraph { alignment: None, id: None }
+      12: Text { content: "Here is some more text." }
+      13: EndParagraph
+      14: StartParagraph { alignment: None, id: None }
+      15: EndParagraph
+      16: StartParagraph { alignment: None, id: None }
+      17: EndParagraph
+      18: StartParagraph { alignment: None, id: None }
+      19: EndParagraph
+      20: StartParagraph { alignment: None, id: None }
+      21: EndParagraph
+      22: EndDocument
+  ],
+  terminal: Ok,
+}

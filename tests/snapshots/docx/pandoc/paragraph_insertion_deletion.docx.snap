@@ -1,0 +1,21 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "This is a" }
+       3: EndParagraph
+       4: StartParagraph { alignment: None, id: None }
+       5: Text { content: " " }
+       6: Text { content: "split" }
+       7: EndParagraph
+       8: StartParagraph { alignment: None, id: None }
+       9: Text { content: "Paragraph." }
+      10: EndParagraph
+      11: EndDocument
+  ],
+  terminal: Ok,
+}

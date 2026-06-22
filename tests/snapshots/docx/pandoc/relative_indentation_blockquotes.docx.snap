@@ -1,0 +1,31 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartHeading { id: None, level: 1 }
+       2: Text { content: "Indentation blockquotes" }
+       3: EndHeading
+       4: StartParagraph { alignment: None, id: None }
+       5: Text { content: "Foobar" }
+       6: EndParagraph
+       7: StartParagraph { alignment: None, id: None }
+       8: Text { content: "First line indented." }
+       9: EndParagraph
+      10: StartParagraph { alignment: None, id: None }
+      11: EndParagraph
+      12: StartParagraph { alignment: None, id: None }
+      13: Text { content: "Normal list paragraph" }
+      14: EndParagraph
+      15: StartParagraph { alignment: None, id: None }
+      16: Text { content: "List paragraph with less indent" }
+      17: EndParagraph
+      18: StartParagraph { alignment: None, id: None }
+      19: Text { content: "List paragraph with more indent " }
+      20: EndParagraph
+      21: EndDocument
+  ],
+  terminal: Ok,
+}
