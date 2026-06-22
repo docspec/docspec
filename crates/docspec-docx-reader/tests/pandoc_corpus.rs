@@ -1,7 +1,12 @@
 //! Snapshot regression tests for the pandoc DOCX corpus.
 //!
-//! Runs every `.docx` file in `tests/fixtures/docx/pandoc/` through
-//! `DocxReader` and compares the event stream against committed snapshots.
+//! Runs every `.docx` file in `tests/fixtures/docx/pandoc/` through both
+//! `DocxReader::from_reader` and `DocxReader::from_path`, asserts that the two
+//! constructors emit identical event streams, and compares against a single
+//! committed snapshot per fixture. Exercising both constructors from the
+//! corpus is the canonical way to keep the `StreamingArchive` (`from_path`)
+//! and in-memory (`from_reader`) paths in lockstep — a divergence anywhere in
+//! the 80-fixture corpus fails fast.
 //!
 //! See TESTING.md § Snapshot Review for first-run and CI-mode workflow.
 #![allow(
@@ -29,12 +34,20 @@ fn fixture_path(file_name: &str) -> PathBuf {
 
 fn assert_fixture_snapshot(file_name: &str) {
     let path = fixture_path(file_name);
-    let snapshot = capture(&path, |bytes| DocxReader::from_reader(Cursor::new(bytes)));
+
+    let from_reader_snapshot = capture(&path, |bytes| DocxReader::from_reader(Cursor::new(bytes)));
+    let from_path_snapshot = capture(&path, |_bytes| DocxReader::from_path(&path));
+
+    assert_eq!(
+        from_reader_snapshot, from_path_snapshot,
+        "from_reader and from_path produced divergent event streams for {file_name}"
+    );
+
     insta::with_settings!({
         snapshot_path => "../../../tests/snapshots/docx/pandoc",
         prepend_module_to_snapshot => false,
     }, {
-        insta::assert_debug_snapshot!(file_name, snapshot);
+        insta::assert_debug_snapshot!(file_name, from_reader_snapshot);
     });
 }
 

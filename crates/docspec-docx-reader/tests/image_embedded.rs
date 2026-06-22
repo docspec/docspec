@@ -1,4 +1,11 @@
-//! Integration tests for the embedded image happy path end-to-end pipeline.
+//! Cross-crate integration test: an embedded `DocxReader` image asset must
+//! flow through `BlockNoteWriter` as a base64 data URI.
+//!
+//! Reader-only assertions for embedded images (event shape, asset bytes,
+//! content type) are exercised by the pandoc snapshot corpus through the
+//! `AssetDescriptor` recorded in `tests/snapshots/docx/pandoc/image.docx.snap`;
+//! this file covers only the multi-crate pipeline contract that snapshots
+//! cannot express.
 #![allow(
     clippy::expect_used,
     clippy::indexing_slicing,
@@ -13,32 +20,14 @@
 mod fixture;
 
 use std::io::Cursor;
-use std::sync::Arc;
 
 use docspec_blocknote_writer::BlockNoteWriter;
 use docspec_core::StackTrackingSink;
-use docspec_core::{AssetHandle, Event, EventSink as _, EventSource as _, ImageSource};
+use docspec_core::{EventSink as _, EventSource as _};
 use docspec_docx_reader::DocxReader;
 use zip::CompressionMethod;
 
 const PNG_SIGNATURE: [u8; 8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-
-#[derive(Debug)]
-struct StubHandle(String);
-impl AssetHandle for StubHandle {
-    fn asset_id(&self) -> &str {
-        &self.0
-    }
-    fn content_type(&self) -> Option<std::borrow::Cow<'_, str>> {
-        None
-    }
-    fn stream_to(&self, _: &mut dyn std::io::Write) -> std::io::Result<u64> {
-        Ok(0)
-    }
-}
-fn asset_source(id: &str) -> ImageSource {
-    ImageSource::Asset(Arc::new(StubHandle(id.to_string())))
-}
 
 fn root_rels() -> &'static str {
     r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -109,67 +98,6 @@ fn synth_image_docx() -> Vec<u8> {
             &PNG_SIGNATURE,
         ),
     ])
-}
-
-fn collect_events(bytes: Vec<u8>) -> Vec<Event> {
-    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).unwrap();
-    let mut events = Vec::new();
-    loop {
-        match reader.next_event() {
-            Ok(Some(event)) => events.push(event),
-            Ok(None) => break,
-            Err(e) => panic!("reader error: {e:?}"),
-        }
-    }
-    events
-}
-
-#[test]
-fn docx_reader_emits_exact_image_event() {
-    let bytes = synth_image_docx();
-    let events = collect_events(bytes);
-
-    let image_event = events
-        .iter()
-        .find(|e| matches!(e, Event::Image { .. }))
-        .expect("expected at least one Image event");
-
-    assert_eq!(
-        *image_event,
-        Event::Image {
-            source: asset_source("zip://word/media/image1.png"),
-            alt: Some("alt text".to_string()),
-            decorative: false,
-            title: None,
-            id: None,
-        }
-    );
-}
-
-#[test]
-fn docx_reader_handle_streams_exact_bytes() {
-    let bytes = synth_image_docx();
-    let events = collect_events(bytes);
-
-    let image_event = events
-        .iter()
-        .find(|e| matches!(e, Event::Image { .. }))
-        .expect("expected at least one Image event");
-
-    if let Event::Image {
-        source: ImageSource::Asset(handle),
-        ..
-    } = image_event
-    {
-        let mut buf = Vec::new();
-        let n = handle
-            .stream_to(&mut buf)
-            .expect("stream_to should succeed");
-        assert_eq!(n, 8u64);
-        assert_eq!(buf.as_slice(), PNG_SIGNATURE.as_ref());
-    } else {
-        panic!("expected ImageSource::Asset, got: {image_event:?}");
-    }
 }
 
 #[test]
