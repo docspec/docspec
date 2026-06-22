@@ -17,7 +17,7 @@ mod fixture;
 use std::io::Cursor;
 use std::sync::Arc;
 
-use docspec_core::{AssetHandle, Event, EventSource as _, ImageSource};
+use docspec_core::{AssetHandle, Error, Event, EventSource as _, ImageSource};
 use docspec_docx_reader::DocxReader;
 use zip::CompressionMethod;
 
@@ -416,6 +416,93 @@ fn pict_empty_o_title_falls_back_to_shape_alt() {
             Event::EndDocument,
         ]
     );
+}
+
+#[test]
+fn pict_nested_shape_restores_parent_alt_after_child_closes() {
+    let xml = pict_doc(
+        r#"<v:shape alt="Parent Alt"><v:shape alt="Child Alt"><v:imagedata r:id="rId2"/></v:shape><v:imagedata r:id="rId3"/></v:shape>"#,
+    );
+    let rels = doc_rels(&format!(
+        r#"<Relationship Id="rId2" Type="{IMAGE_REL_TYPE}" Target="media/child.png"/>
+<Relationship Id="rId3" Type="{IMAGE_REL_TYPE}" Target="media/parent.png"/>"#
+    ));
+    let bytes = build_docx(&rels, &xml);
+    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+    assert_eq!(
+        drive(&mut reader),
+        vec![
+            start_doc(),
+            start_para(),
+            image_event(
+                asset_source("zip://word/media/child.png"),
+                Some("Child Alt")
+            ),
+            image_event(
+                asset_source("zip://word/media/parent.png"),
+                Some("Parent Alt")
+            ),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]
+    );
+}
+
+#[test]
+fn pict_nested_shape_without_alt_falls_back_to_parent_alt() {
+    let xml = pict_doc(
+        r#"<v:shape alt="Parent Alt"><v:shape><v:imagedata r:id="rId2"/></v:shape></v:shape>"#,
+    );
+    let rels = doc_rels(&format!(
+        r#"<Relationship Id="rId2" Type="{IMAGE_REL_TYPE}" Target="media/image1.png"/>"#
+    ));
+    let bytes = build_docx(&rels, &xml);
+    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+    assert_eq!(
+        drive(&mut reader),
+        vec![
+            start_doc(),
+            start_para(),
+            image_event(
+                asset_source("zip://word/media/image1.png"),
+                Some("Parent Alt")
+            ),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]
+    );
+}
+
+#[test]
+fn unclosed_pict_returns_parse_error() {
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:v="urn:schemas-microsoft-com:vml"
+  xmlns:o="urn:schemas-microsoft-com:office:office"
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:r><w:pict><v:shape><v:imagedata r:id="rId2"/></v:shape>"#;
+    let rels = doc_rels(&format!(
+        r#"<Relationship Id="rId2" Type="{IMAGE_REL_TYPE}" Target="media/image1.png"/>"#
+    ));
+    let bytes = build_docx(&rels, xml);
+    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+
+    for _ in 0..10 {
+        match reader.next_event() {
+            Ok(Some(_)) => {}
+            Ok(None) => panic!("expected Error::Parse, got clean EOF"),
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "malformed document.xml: unexpected EOF inside <w:pict>"
+                );
+                assert_eq!(position, None);
+                return;
+            }
+            Err(other) => panic!("expected Error::Parse, got: {other:?}"),
+        }
+    }
+    panic!("expected Error::Parse before iteration limit");
 }
 
 #[test]

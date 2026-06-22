@@ -78,11 +78,8 @@ struct DrawingScanState {
 
 /// State machine for parsing a `<w:pict>` VML subtree.
 struct VmlScanState {
-    /// Alt text captured from a parent `<v:shape alt="...">`.
-    /// Cleared when the shape element closes back to depth zero.
-    pending_shape_alt: Option<String>,
-    /// Nesting depth of `<v:shape>` elements for correct alt-text scoping.
-    shape_depth: u32,
+    /// Alt text stack for nested `<v:shape alt="...">` scopes.
+    shape_alt_stack: Vec<Option<String>>,
 }
 
 /// Bundle of package-level data the document reader consults during streaming.
@@ -1174,8 +1171,7 @@ impl DocumentReader {
     /// Parses a `<w:pict>` subtree and emits images for VML `<v:imagedata>` elements.
     fn parse_pict_subtree(&mut self) -> Result<()> {
         let mut state = VmlScanState {
-            pending_shape_alt: None,
-            shape_depth: 0,
+            shape_alt_stack: Vec::new(),
         };
         let mut pict_depth: u32 = 1;
 
@@ -1203,8 +1199,9 @@ impl DocumentReader {
                     }
                 }
                 quick_xml::events::Event::Eof => {
-                    self.handle_eof();
-                    pict_depth = 0;
+                    return Err(parse_error(
+                        "malformed document.xml: unexpected EOF inside <w:pict>".to_string(),
+                    ));
                 }
                 quick_xml::events::Event::Text(_)
                 | quick_xml::events::Event::GeneralRef(_)
@@ -1230,10 +1227,9 @@ impl DocumentReader {
         let local = local_name.as_ref();
         match local {
             b"shape" => {
-                state.shape_depth = state.shape_depth.saturating_add(1);
-                if let Some(alt) = read_decoded_attribute(tag, b"alt") {
-                    state.pending_shape_alt = Some(alt);
-                }
+                state
+                    .shape_alt_stack
+                    .push(read_decoded_attribute(tag, b"alt"));
             }
             b"imagedata" => self.emit_pict_imagedata(state, tag)?,
             _ => {}
@@ -1258,12 +1254,7 @@ impl DocumentReader {
     /// Handles an end tag inside a VML `<w:pict>` subtree.
     fn handle_pict_child_end(state: &mut VmlScanState, local: &[u8]) {
         if local == b"shape" {
-            if state.shape_depth > 0 {
-                state.shape_depth = state.shape_depth.saturating_sub(1);
-            }
-            if state.shape_depth == 0 {
-                state.pending_shape_alt = None;
-            }
+            let _ = state.shape_alt_stack.pop();
         }
     }
 
@@ -1283,7 +1274,13 @@ impl DocumentReader {
 
         let alt = read_decoded_attribute(tag, b"o:title")
             .filter(|s| !s.is_empty())
-            .or_else(|| state.pending_shape_alt.clone());
+            .or_else(|| {
+                state
+                    .shape_alt_stack
+                    .iter()
+                    .rev()
+                    .find_map(core::clone::Clone::clone)
+            });
 
         // Note: if the same rId appears in both <w:drawing> and a bare <w:pict> (not inside <mc:AlternateContent>), two Image events are emitted. This is intentional — we faithfully represent what the document contains. AlternateContent-wrapped duplicates are deduped via the mc:Fallback denylist entry.
         self.queue.push_back(Event::Image {
