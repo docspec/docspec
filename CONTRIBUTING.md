@@ -8,6 +8,7 @@ Thank you for considering a contribution. DocSpec is a memory-conscious streamin
 
 - Rust stable toolchain (latest stable version)
 - Git with your user name and email configured
+- [Git LFS](https://git-lfs.com/) for large binary test fixtures — run `git lfs install` once per machine after installing; run `git lfs pull` after clone to fetch the `.docx` test fixtures
 - [pre-commit](https://pre-commit.com/) for running pre-commit hooks
 - [taplo](https://taplo.tamasfe.dev/) for TOML formatting (`cargo install taplo-cli`)
 
