@@ -5,22 +5,29 @@ expression: from_reader_snapshot
 ReaderFixtureSnapshot {
   events: [
        0: StartDocument { id: None, language: None, metadata: None }
-       1: StartPreformatted { id: None, syntax: None }
+       1: StartParagraph { alignment: None, id: None }
        2: Text { content: "Here is the " }
        3: Text { content: "pdf" }
        4: Text { content: " file:" }
-       5: LineBreak
-       6: LineBreak
-       7: LineBreak
-       8: Text { content: "Bye " }
-       9: Text { content: "Bye" }
-      10: LineBreak
-      11: LineBreak
-      12: LineBreak
-      13: LineBreak
-      14: Text { content: "Bye for real." }
-      15: EndPreformatted
-      16: EndDocument
+       5: EndParagraph
+       6: StartParagraph { alignment: None, id: None }
+       7: EndParagraph
+       8: StartParagraph { alignment: None, id: None }
+       9: EndParagraph
+      10: StartParagraph { alignment: None, id: None }
+      11: Text { content: "Bye " }
+      12: Text { content: "Bye" }
+      13: EndParagraph
+      14: StartParagraph { alignment: None, id: None }
+      15: EndParagraph
+      16: StartParagraph { alignment: None, id: None }
+      17: EndParagraph
+      18: StartParagraph { alignment: None, id: None }
+      19: EndParagraph
+      20: StartParagraph { alignment: None, id: None }
+      21: Text { content: "Bye for real." }
+      22: EndParagraph
+      23: EndDocument
   ],
   terminal: Ok,
 }
