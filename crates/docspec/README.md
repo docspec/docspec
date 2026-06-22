@@ -38,7 +38,13 @@ writer.finish()?;
 | ---------- | ------------------------------------------------ | ------------------------- |
 | `markdown` | Markdown (CommonMark + GFM tables/strikethrough) | `docspec-markdown-reader` |
 | `html`     | HTML (paragraphs only)                           | `docspec-html-reader`     |
-| `docx`     | DOCX (paragraphs, text, color, highlight, shading) | `docspec-docx-reader`   |
+| `docx`     | DOCX (paragraphs, tables, lists, hyperlinks, embedded images, run styles, color/highlight) | `docspec-docx-reader`   |
+
+`DocxReader` covers paragraphs, line breaks, tabs, tables, ordered/unordered lists,
+hyperlinks, embedded images (streamed via `AssetHandle`), and run styles (bold, italic,
+underline, strikethrough, sub/superscript) with text color, highlight, and shading.
+See [`docspec-docx-reader`](https://docs.rs/docspec-docx-reader) for the authoritative
+list of supported and out-of-scope OOXML elements.
 
 `DocxReader` is dispatched through `AnyReader::from_reader` and `AnyReader::from_path`.
 Use `AnyReader::from_path(InputFormat::Docx, path)` to open a DOCX file, or

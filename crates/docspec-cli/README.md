@@ -61,13 +61,14 @@ The resulting binary will only support `docspec convert`; running `docspec http`
 
 - `markdown` — Full Markdown support including headings, lists, tables, and inline formatting
 - `html` — HTML input (see note below)
-- `docx` — DOCX input (paragraphs and text only)
+- `docx` — DOCX input including paragraphs, tables, ordered/unordered lists, hyperlinks, embedded images, line breaks, tabs, and run styles (bold, italic, underline, strikethrough, sub/superscript, color, highlight). Embedded images stream as base64 data URLs in BlockNote output. See [`docspec-docx-reader`](https://docs.rs/docspec-docx-reader) for the authoritative list of supported and out-of-scope OOXML elements.
 
-> **Note:** HTML and DOCX input currently preserve only paragraph text. Other HTML input
-> elements and non-paragraph output events (headings, lists, tables, formatting tags, etc.)
-> are silently dropped. DOCX input preserves only paragraphs and text; styles, tables, lists,
-> images, headers/footers, and tracked changes are silently dropped. For fuller feature
-> coverage, use Markdown input with BlockNote JSON output.
+> **Note:** HTML input is paragraph-only — the HTML reader currently parses `<p>` elements only,
+> and other HTML elements are silently dropped. DOCX input is considerably richer (see above);
+> known DOCX elements outside scope (headings via `<w:pStyle>`, vertical cell merges, VML images,
+> comments, footnotes, headers/footers, document metadata) are silently dropped per the
+> [DOCX reader denylist](https://docs.rs/docspec-docx-reader). For HTML, use Markdown input or
+> DOCX input with BlockNote JSON output for fuller feature coverage.
 
 ## Examples
 
@@ -83,7 +84,7 @@ Convert an HTML file to BlockNote JSON (paragraphs only):
 docspec convert --from html --to blocknote input.html --output output.json
 ```
 
-Convert a DOCX file to BlockNote JSON (paragraphs only):
+Convert a DOCX file to BlockNote JSON (preserves paragraphs, tables, lists, hyperlinks, images, and run styles):
 
 ```bash
 docspec --from docx --to blocknote input.docx --output output.json
