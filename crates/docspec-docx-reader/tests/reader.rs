@@ -485,26 +485,6 @@ mod constructor {
         let result = DocxReader::from_path(tmp.path());
         assert!(result.is_ok(), "expected Ok, got: {result:?}");
     }
-
-    #[test]
-    fn from_reader_does_not_buffer_document_xml() {
-        let big_doc = {
-            let mut doc = String::from(
-                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>"#,
-            );
-            for _ in 0..1000 {
-                doc.push_str("<w:p><w:r><w:t>hello world</w:t></w:r></w:p>");
-            }
-            doc.push_str("</w:body></w:document>");
-            doc
-        };
-        let bytes = fixture::synth_docx(
-            r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
-            &big_doc,
-        );
-        let result = DocxReader::from_reader(Cursor::new(bytes));
-        assert!(result.is_ok(), "expected Ok, got: {result:?}");
-    }
 }
 
 mod events {

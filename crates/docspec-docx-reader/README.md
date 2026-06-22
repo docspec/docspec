@@ -111,10 +111,15 @@ while let Some(event) = reader.next_event()? {
 
 ## Streaming Guarantee
 
-`DocxReader` streams `document.xml` event by event using constant memory regardless
-of document size. `_rels/.rels` and `word/_rels/document.xml.rels` are both fully
-read into memory at package-open time (typical combined size < 10 KB even for large
-documents). `word/document.xml` is consumed in streaming fashion via `quick-xml`.
+Memory use depends on which constructor you call:
+
+- **`from_path`**: streams `word/document.xml` in constant memory — O(1) regardless
+  of document size. Use this when processing large files or when memory is constrained.
+- **`from_reader`**: buffers `word/document.xml` into memory — O(N) in document size.
+  Use `from_path` when constant memory is required.
+
+In both cases, `_rels/.rels` and `word/_rels/document.xml.rels` are fully read into
+memory at package-open time (typical combined size < 10 KB even for large documents).
 The internal event queue remains bounded regardless of document size or hyperlink count.
 
 ## Quick Start

@@ -56,13 +56,17 @@
 //!
 //! # Streaming Guarantee
 //!
-//! `DocxReader` streams `document.xml` event by event using constant memory
-//! regardless of document size. `_rels/.rels` and
-//! `word/_rels/document.xml.rels` are both fully read into memory at
-//! package-open time (typical combined size < 10 KB even for large documents).
-//! `word/document.xml` is consumed in streaming fashion via `quick-xml`. The
-//! internal event queue remains bounded regardless of document size or
-//! hyperlink count.
+//! Memory use depends on which constructor you call:
+//!
+//! - **`from_path`**: streams `word/document.xml` in constant memory — O(1)
+//!   regardless of document size. This is the recommended path for large files.
+//! - **`from_reader`**: buffers `word/document.xml` into memory — O(N) in
+//!   document size. Use `from_path` when constant memory is required.
+//!
+//! In both cases, `_rels/.rels` and `word/_rels/document.xml.rels` are fully
+//! read into memory at package-open time (typical combined size < 10 KB even
+//! for large documents). The internal event queue remains bounded regardless
+//! of document size or hyperlink count.
 //!
 //! # Quick Start
 //!
@@ -85,6 +89,7 @@ mod numbering;
 mod package;
 mod properties;
 mod rels;
+mod streaming_archive;
 mod styles;
 mod symbol_fonts;
 
@@ -93,7 +98,7 @@ use std::path::Path;
 
 pub use docspec_core::EventSource;
 
-use docspec_core::{Error, Result};
+use docspec_core::Result;
 
 const _: for<'a> fn(&'a content_types::ContentTypes, &str) -> Option<&'a str> =
     content_types::ContentTypes::lookup;
@@ -111,10 +116,12 @@ const _: for<'a> fn(&'a rels::ImageRel) -> (&'a str, bool) = _image_rel_fields;
 ///
 /// # Streaming
 ///
-/// The reader streams `document.xml` event by event using constant memory.
-/// `_rels/.rels` and `word/_rels/document.xml.rels` are both fully read into
-/// memory at package-open time (typical combined size < 10 KB). The internal
-/// event queue remains bounded regardless of document size or hyperlink count.
+/// Memory use depends on which constructor you call. `from_path` streams
+/// `word/document.xml` in constant memory (O(1)). `from_reader` buffers
+/// `word/document.xml` into memory (O(N) in document size). In both cases,
+/// `_rels/.rels` and `word/_rels/document.xml.rels` are fully read into memory
+/// at package-open time (typical combined size < 10 KB). The internal event
+/// queue remains bounded regardless of document size or hyperlink count.
 ///
 /// # Errors
 ///
@@ -128,19 +135,41 @@ pub struct DocxReader {
 impl DocxReader {
     /// Creates a `DocxReader` from a file path.
     ///
+    /// Streams `word/document.xml` in constant memory (O(1) in document size).
+    /// Prefer this over [`from_reader`](Self::from_reader) when memory is a concern.
+    ///
     /// # Errors
     ///
     /// Returns [`Error::Io`] if the file cannot be opened. See [`from_reader`](Self::from_reader)
     /// for additional error conditions.
     #[inline]
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let file = std::fs::File::open(path.as_ref()).map_err(Error::from)?;
-        Self::from_reader(file)
+        let (style_list, numbering, hyperlink_map, image_map, content_types, archive, stream) =
+            package::open_package_from_path(path.as_ref())?;
+        let xml = quick_xml::Reader::from_reader(BufReader::new(stream));
+        let data = document::DocxData {
+            style_list,
+            hyperlink_map,
+            numbering,
+            image_map,
+        };
+        Ok(Self {
+            inner: document::DocumentReader::from_xml_reader_and_archive(
+                xml,
+                data,
+                archive,
+                content_types,
+            ),
+        })
     }
 
     /// Creates a `DocxReader` from any `Read + Seek` source.
     ///
     /// The reader must be positioned at the start of a valid DOCX (ZIP) archive.
+    ///
+    /// **Memory note**: this constructor buffers `word/document.xml` into memory
+    /// (O(N) in document size). Use [`from_path`](Self::from_path) for O(1)
+    /// constant-memory streaming.
     ///
     /// # Errors
     ///
