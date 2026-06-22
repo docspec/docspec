@@ -9,9 +9,11 @@ use crate::{Event, EventSource, Result};
 /// skippable `Start*` event (`StartHeading`, `StartBlockQuote`, or `StartParagraph`), it
 /// buffers that event and peeks the next event from the inner source. If the next event is
 /// the matching `End*` (i.e., the block is empty), both events are dropped and the adapter
-/// recurses to pull the next event. If the next event is something else, the buffered `Start*`
-/// is emitted immediately and the "something else" is stashed as `pending` for the next call.
-/// Memory is O(1) — at most two `Event` values are held at any time.
+/// keeps draining iteratively until it finds an event to emit. If the next event is something
+/// else, the buffered `Start*` is emitted immediately and the "something else" is stashed as
+/// `pending` for the next call. Memory is O(1) — at most two `Event` values are held at any
+/// time. Stack is O(1) — the implementation is a single `loop` with no recursion, so an
+/// arbitrarily long run of empty blocks consumes constant stack regardless of input size.
 ///
 /// # Skip Set
 ///
@@ -113,44 +115,46 @@ impl<S: EventSource> SkipEmptyBlocks<S> {
 impl<S: EventSource> EventSource for SkipEmptyBlocks<S> {
     #[inline]
     fn next_event(&mut self) -> Result<Option<Event>> {
-        // 1. Drain `pending` first (already decided to emit on a previous call).
-        if let Some(p) = self.pending.take() {
-            return Ok(Some(p));
-        }
-        // 2. If a buffered `Start*` exists, peek next from inner.
-        //    NOTE: `?` propagation here means an `Err` from inner while a
-        //    `Start*` is buffered surfaces IMMEDIATELY on this same call; the
-        //    buffered `Start*` is dropped. This is intentional and matches the
-        //    project's "Fail Fast" principle (MANIFESTO.md).
-        if let Some(buffered) = self.buffered.take() {
+        loop {
+            // 1. Drain `pending` first (already decided to emit on a previous call).
+            if let Some(pending) = self.pending.take() {
+                return Ok(Some(pending));
+            }
+            // 2. If a buffered `Start*` exists, peek next from inner.
+            //    NOTE: `?` propagation here means an `Err` from inner while a
+            //    `Start*` is buffered surfaces IMMEDIATELY on this same call; the
+            //    buffered `Start*` is dropped. This is intentional and matches the
+            //    project's "Fail Fast" principle (MANIFESTO.md).
+            if let Some(buffered) = self.buffered.take() {
+                match self.inner.next_event()? {
+                    Some(next) if is_matching_end(&buffered, &next) => {
+                        // Empty block detected: drop BOTH and keep draining iteratively.
+                        continue;
+                    }
+                    Some(next) if is_skippable_start(&next) => {
+                        // Emit `buffered` now; the new `Start*` becomes the new buffer.
+                        self.buffered = Some(next);
+                        return Ok(Some(buffered));
+                    }
+                    Some(next) => {
+                        // Emit `buffered` now; stash `next` as pending for the next call.
+                        self.pending = Some(next);
+                        return Ok(Some(buffered));
+                    }
+                    None => {
+                        // Truncated stream: emit buffered `Start*`; subsequent call returns None.
+                        return Ok(Some(buffered));
+                    }
+                }
+            }
+            // 3. No buffer, no pending. Pull from inner.
             match self.inner.next_event()? {
-                Some(next) if is_matching_end(&buffered, &next) => {
-                    // Empty block detected: drop BOTH. Recurse to pull the next event.
-                    return self.next_event();
+                Some(event) if is_skippable_start(&event) => {
+                    self.buffered = Some(event);
+                    // Loop iterates: re-enter the buffered branch above to peek the next event.
                 }
-                Some(next) if is_skippable_start(&next) => {
-                    // Emit `buffered` now; the new `Start*` becomes the new buffer.
-                    self.buffered = Some(next);
-                    return Ok(Some(buffered));
-                }
-                Some(next) => {
-                    // Emit `buffered` now; stash `next` as pending for the next call.
-                    self.pending = Some(next);
-                    return Ok(Some(buffered));
-                }
-                None => {
-                    // Truncated stream: emit buffered `Start*`; subsequent call returns None.
-                    return Ok(Some(buffered));
-                }
+                other => return Ok(other),
             }
-        }
-        // 3. No buffer, no pending. Pull from inner.
-        match self.inner.next_event()? {
-            Some(event) if is_skippable_start(&event) => {
-                self.buffered = Some(event);
-                self.next_event()
-            }
-            other => Ok(other),
         }
     }
 }
@@ -429,5 +433,22 @@ mod tests {
     fn send_sync_compile_assertion() {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<SkipEmptyBlocks<Replay>>();
+    }
+
+    #[test]
+    fn many_consecutive_empty_blocks_do_not_blow_stack() {
+        // Stack-safety regression: the previous recursive implementation grew the call
+        // stack by ~2 frames per empty block, so a long run could overflow Rust's default
+        // 8 MiB main-thread / 2 MiB test-thread stack. The iterative `loop` form must
+        // drain an arbitrarily long run in O(1) stack. 100_000 empties is well above the
+        // overflow threshold of the old code and still completes in milliseconds.
+        const N: usize = 100_000;
+        let mut events = alloc::vec::Vec::with_capacity(N * 2);
+        for _ in 0..N {
+            events.push(Event::StartHeading { id: None, level: 1 });
+            events.push(Event::EndHeading);
+        }
+        let replay = Replay::new(events);
+        assert_eq!(drain(SkipEmptyBlocks::new(replay)), alloc::vec![]);
     }
 }
