@@ -2606,7 +2606,7 @@ mod tests {
     #[test]
     fn rstyle_code_classification_emits_inline_code_wrapper() {
         let styles = r#"<w:style w:type="character" w:styleId="CodeChar">
-            <w:name w:val="Source Code"/>
+            <w:name w:val="Verbatim Char"/>
         </w:style>"#;
         let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
@@ -2719,7 +2719,7 @@ mod tests {
     #[test]
     fn rstyle_inside_ppr_rpr_is_ignored() {
         let styles = r#"<w:style w:type="character" w:styleId="CodeChar">
-            <w:name w:val="Source Code"/>
+            <w:name w:val="Verbatim Char"/>
         </w:style>"#;
         let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
@@ -2756,7 +2756,7 @@ mod tests {
     #[test]
     fn rstyle_duplicate_rstyle_emits_single_wrapper() {
         let styles = r#"<w:style w:type="character" w:styleId="CodeChar">
-            <w:name w:val="Source Code"/>
+            <w:name w:val="Verbatim Char"/>
         </w:style>"#;
         let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
