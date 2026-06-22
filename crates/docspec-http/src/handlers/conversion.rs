@@ -200,15 +200,14 @@ async fn do_conversion(
     let join_result = tokio::task::spawn_blocking(move || -> Result<(Vec<u8>, u64), HttpError> {
         let mut output_buffer = Vec::new();
         let body_vec: Vec<u8> = body.into();
-        let mut reader =
-            docspec::AnyReader::from_reader(input_format, std::io::Cursor::new(body_vec)).map_err(
-                |error| {
-                    tracing::debug!(error = %error, "reader construction failed");
-                    HttpError::Unprocessable {
-                        detail: error.to_string(),
-                    }
-                },
-            )?;
+        let reader = docspec::AnyReader::from_reader(input_format, std::io::Cursor::new(body_vec))
+            .map_err(|error| {
+                tracing::debug!(error = %error, "reader construction failed");
+                HttpError::Unprocessable {
+                    detail: error.to_string(),
+                }
+            })?;
+        let mut reader = docspec_core::SkipEmptyBlocks::new(reader);
         let mut sink = docspec::AnyWriter::new(output_format, &mut output_buffer);
 
         loop {

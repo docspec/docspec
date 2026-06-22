@@ -29,6 +29,7 @@ architecture, and the event protocol.
 - Emits: `StartDocument`, `StartParagraph`, `StartPreformatted`, `StartTextStyle`, `Text`, `EndTextStyle`, `LineBreak`, `EndParagraph`, `EndPreformatted`, `StartTable`, `StartTableRow`, `StartTableCell`, `StartTableHeader`, `EndTableHeader`, `EndTableCell`, `EndTableRow`, `EndTable`, `StartLink`, `EndLink`, `StartOrderedListItem`, `EndOrderedListItem`, `StartUnorderedListItem`, `EndUnorderedListItem`, `Image`, `EndDocument`
 - Symbol font character normalization for Wingdings, Wingdings 2, Wingdings 3, Webdings, and Symbol fonts — codepoints are mapped to their Unicode equivalents; unmapped codepoints are dropped
 - Compression: `Stored` and `Deflated` only
+- **Suppressing empty headings, block quotes, and paragraphs**: the reader emits these by design (see `empty_paragraph_still_emits_start_end` and sibling tests in `tests/reader.rs`). To hide empty `StartHeading`/`EndHeading`, `StartBlockQuote`/`EndBlockQuote`, and `StartParagraph`/`EndParagraph` pairs in your pipeline, wrap the reader in [`docspec_core::SkipEmptyBlocks`](https://docs.rs/docspec-core/latest/docspec_core/struct.SkipEmptyBlocks.html). The `docspec` CLI and HTTP server apply this filter by default; library consumers opt in by wrapping their `EventSource`.
 
 ### Color and Highlight Precedence
 
