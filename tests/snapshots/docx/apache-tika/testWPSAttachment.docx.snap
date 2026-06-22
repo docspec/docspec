@@ -1,0 +1,13 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: EndParagraph
+       3: EndDocument
+  ],
+  terminal: Ok,
+}

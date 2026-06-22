@@ -1,0 +1,383 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartOrderedListItem { id: Some("1"), level: 0, start: Some(1), style_type: Decimal }
+       2: StartParagraph { alignment: None, id: None }
+       3: Text { content: "This" }
+       4: EndParagraph
+       5: StartOrderedListItem { id: Some("1"), level: 1, start: None, style_type: LowerAlpha }
+       6: StartParagraph { alignment: None, id: None }
+       7: Text { content: "Is" }
+       8: EndParagraph
+       9: StartOrderedListItem { id: Some("1"), level: 2, start: None, style_type: LowerRoman }
+      10: StartParagraph { alignment: None, id: None }
+      11: Text { content: "A multi" }
+      12: EndParagraph
+      13: EndOrderedListItem
+      14: StartOrderedListItem { id: Some("1"), level: 2, start: None, style_type: LowerRoman }
+      15: StartParagraph { alignment: None, id: None }
+      16: Text { content: "Level" }
+      17: EndParagraph
+      18: EndOrderedListItem
+      19: EndOrderedListItem
+      20: EndOrderedListItem
+      21: StartTable { id: None }
+      22: StartTableRow { id: None }
+      23: StartTableCell { colspan: None, id: None, rowspan: None }
+      24: StartParagraph { alignment: None, id: None }
+      25: Text { content: "Intervening" }
+      26: Text { content: " table" }
+      27: EndParagraph
+      28: EndTableCell
+      29: StartTableCell { colspan: None, id: None, rowspan: None }
+      30: StartOrderedListItem { id: Some("3"), level: 0, start: Some(1), style_type: Decimal }
+      31: StartParagraph { alignment: None, id: None }
+      32: Text { content: "Within cell 1" }
+      33: EndParagraph
+      34: StartOrderedListItem { id: Some("3"), level: 1, start: None, style_type: LowerAlpha }
+      35: StartParagraph { alignment: None, id: None }
+      36: Text { content: "Cell a" }
+      37: EndParagraph
+      38: EndOrderedListItem
+      39: StartOrderedListItem { id: Some("3"), level: 1, start: None, style_type: LowerAlpha }
+      40: StartParagraph { alignment: None, id: None }
+      41: Text { content: "Cell b" }
+      42: EndParagraph
+      43: EndOrderedListItem
+      44: EndOrderedListItem
+      45: EndTableCell
+      46: StartTableCell { colspan: None, id: None, rowspan: None }
+      47: StartParagraph { alignment: None, id: None }
+      48: EndParagraph
+      49: EndTableCell
+      50: StartTableCell { colspan: None, id: None, rowspan: None }
+      51: StartParagraph { alignment: None, id: None }
+      52: EndParagraph
+      53: EndTableCell
+      54: EndTableRow
+      55: StartTableRow { id: None }
+      56: StartTableCell { colspan: None, id: None, rowspan: None }
+      57: StartParagraph { alignment: None, id: None }
+      58: EndParagraph
+      59: EndTableCell
+      60: StartTableCell { colspan: None, id: None, rowspan: None }
+      61: StartParagraph { alignment: None, id: None }
+      62: EndParagraph
+      63: EndTableCell
+      64: StartTableCell { colspan: None, id: None, rowspan: None }
+      65: StartParagraph { alignment: None, id: None }
+      66: EndParagraph
+      67: EndTableCell
+      68: StartTableCell { colspan: None, id: None, rowspan: None }
+      69: StartParagraph { alignment: None, id: None }
+      70: EndParagraph
+      71: EndTableCell
+      72: EndTableRow
+      73: StartTableRow { id: None }
+      74: StartTableCell { colspan: None, id: None, rowspan: None }
+      75: StartParagraph { alignment: None, id: None }
+      76: EndParagraph
+      77: EndTableCell
+      78: StartTableCell { colspan: None, id: None, rowspan: None }
+      79: StartParagraph { alignment: None, id: None }
+      80: EndParagraph
+      81: EndTableCell
+      82: StartTableCell { colspan: None, id: None, rowspan: None }
+      83: StartParagraph { alignment: None, id: None }
+      84: EndParagraph
+      85: EndTableCell
+      86: StartTableCell { colspan: None, id: None, rowspan: None }
+      87: StartParagraph { alignment: None, id: None }
+      88: EndParagraph
+      89: EndTableCell
+      90: EndTableRow
+      91: EndTable
+      92: StartParagraph { alignment: None, id: None }
+      93: EndParagraph
+      94: StartOrderedListItem { id: Some("1"), level: 0, start: None, style_type: Decimal }
+      95: StartOrderedListItem { id: Some("1"), level: 1, start: None, style_type: Decimal }
+      96: StartOrderedListItem { id: Some("1"), level: 2, start: None, style_type: LowerRoman }
+      97: StartParagraph { alignment: None, id: None }
+      98: Text { content: "List" }
+      99: EndParagraph
+     100: EndOrderedListItem
+     101: EndOrderedListItem
+     102: EndOrderedListItem
+     103: StartOrderedListItem { id: Some("1"), level: 0, start: None, style_type: Decimal }
+     104: StartParagraph { alignment: None, id: None }
+     105: Text { content: "foo" }
+     106: EndParagraph
+     107: StartOrderedListItem { id: Some("1"), level: 1, start: None, style_type: Decimal }
+     108: StartOrderedListItem { id: Some("1"), level: 2, start: None, style_type: LowerRoman }
+     109: StartParagraph { alignment: None, id: None }
+     110: Text { content: "bar" }
+     111: EndParagraph
+     112: EndOrderedListItem
+     113: StartOrderedListItem { id: Some("1"), level: 2, start: None, style_type: LowerRoman }
+     114: StartParagraph { alignment: None, id: None }
+     115: Text { content: "baz" }
+     116: EndParagraph
+     117: StartParagraph { alignment: None, id: None }
+     118: EndParagraph
+     119: StartParagraph { alignment: None, id: None }
+     120: Text { content: "This is another list" }
+     121: EndParagraph
+     122: EndOrderedListItem
+     123: EndOrderedListItem
+     124: EndOrderedListItem
+     125: StartOrderedListItem { id: Some("2"), level: 0, start: Some(1), style_type: UpperRoman }
+     126: StartParagraph { alignment: None, id: None }
+     127: Text { content: "yet" }
+     128: EndParagraph
+     129: StartOrderedListItem { id: Some("2"), level: 1, start: None, style_type: LowerAlpha }
+     130: StartParagraph { alignment: None, id: None }
+     131: Text { content: "another" }
+     132: EndParagraph
+     133: StartOrderedListItem { id: Some("2"), level: 2, start: None, style_type: LowerRoman }
+     134: StartParagraph { alignment: None, id: None }
+     135: Text { content: "list" }
+     136: EndParagraph
+     137: StartParagraph { alignment: None, id: None }
+     138: EndParagraph
+     139: StartParagraph { alignment: None, id: None }
+     140: EndParagraph
+     141: StartParagraph { alignment: None, id: None }
+     142: Text { content: "Intervening paragraph" }
+     143: EndParagraph
+     144: StartParagraph { alignment: None, id: None }
+     145: EndParagraph
+     146: EndOrderedListItem
+     147: StartOrderedListItem { id: Some("2"), level: 2, start: None, style_type: LowerRoman }
+     148: StartParagraph { alignment: None, id: None }
+     149: Text { content: "foo" }
+     150: EndParagraph
+     151: EndOrderedListItem
+     152: EndOrderedListItem
+     153: EndOrderedListItem
+     154: StartOrderedListItem { id: Some("2"), level: 0, start: None, style_type: UpperRoman }
+     155: StartParagraph { alignment: None, id: None }
+     156: Text { content: "bar" }
+     157: EndParagraph
+     158: StartOrderedListItem { id: Some("2"), level: 1, start: None, style_type: LowerAlpha }
+     159: StartParagraph { alignment: None, id: None }
+     160: Text { content: "baz" }
+     161: EndParagraph
+     162: StartOrderedListItem { id: Some("2"), level: 2, start: None, style_type: Decimal }
+     163: StartOrderedListItem { id: Some("2"), level: 3, start: None, style_type: Decimal }
+     164: StartParagraph { alignment: None, id: None }
+     165: Text { content: "baq" }
+     166: EndParagraph
+     167: StartParagraph { alignment: None, id: None }
+     168: EndParagraph
+     169: StartParagraph { alignment: None, id: None }
+     170: EndParagraph
+     171: StartParagraph { alignment: None, id: None }
+     172: EndParagraph
+     173: StartParagraph { alignment: None, id: None }
+     174: Text { content: "This is a new list that starts at 6" }
+     175: Text { content: ", with a custom change of b. -> e." }
+     176: EndParagraph
+     177: EndOrderedListItem
+     178: EndOrderedListItem
+     179: EndOrderedListItem
+     180: EndOrderedListItem
+     181: StartOrderedListItem { id: Some("5"), level: 0, start: Some(1), style_type: Decimal }
+     182: StartParagraph { alignment: None, id: None }
+     183: Text { content: "six" }
+     184: EndParagraph
+     185: EndOrderedListItem
+     186: StartOrderedListItem { id: Some("5"), level: 0, start: None, style_type: Decimal }
+     187: StartParagraph { alignment: None, id: None }
+     188: Text { content: "seven" }
+     189: EndParagraph
+     190: StartOrderedListItem { id: Some("5"), level: 1, start: None, style_type: LowerAlpha }
+     191: StartParagraph { alignment: None, id: None }
+     192: Text { content: "seven a" }
+     193: EndParagraph
+     194: EndOrderedListItem
+     195: EndOrderedListItem
+     196: StartOrderedListItem { id: Some("6"), level: 0, start: Some(1), style_type: LowerAlpha }
+     197: StartParagraph { alignment: None, id: None }
+     198: Text { content: "seven e" }
+     199: EndParagraph
+     200: EndOrderedListItem
+     201: StartOrderedListItem { id: Some("6"), level: 0, start: None, style_type: LowerAlpha }
+     202: StartParagraph { alignment: None, id: None }
+     203: Text { content: "seven f" }
+     204: EndParagraph
+     205: StartParagraph { alignment: None, id: None }
+     206: EndParagraph
+     207: StartParagraph { alignment: None, id: None }
+     208: EndParagraph
+     209: StartParagraph { alignment: None, id: None }
+     210: EndParagraph
+     211: StartParagraph { alignment: None, id: None }
+     212: EndParagraph
+     213: StartParagraph { alignment: None, id: None }
+     214: EndParagraph
+     215: StartParagraph { alignment: None, id: None }
+     216: EndParagraph
+     217: StartParagraph { alignment: None, id: None }
+     218: EndParagraph
+     219: StartParagraph { alignment: None, id: None }
+     220: EndParagraph
+     221: StartParagraph { alignment: None, id: None }
+     222: EndParagraph
+     223: StartParagraph { alignment: None, id: None }
+     224: EndParagraph
+     225: StartParagraph { alignment: None, id: None }
+     226: EndParagraph
+     227: StartParagraph { alignment: None, id: None }
+     228: EndParagraph
+     229: StartParagraph { alignment: None, id: None }
+     230: EndParagraph
+     231: StartParagraph { alignment: None, id: None }
+     232: Text { content: "How about a list over a section break" }
+     233: EndParagraph
+     234: EndOrderedListItem
+     235: StartOrderedListItem { id: Some("10"), level: 0, start: Some(1), style_type: Decimal }
+     236: StartParagraph { alignment: None, id: None }
+     237: Text { content: "list 1" }
+     238: EndParagraph
+     239: EndOrderedListItem
+     240: StartOrderedListItem { id: Some("10"), level: 0, start: None, style_type: Decimal }
+     241: StartParagraph { alignment: None, id: None }
+     242: Text { content: "list 2" }
+     243: EndParagraph
+     244: StartParagraph { alignment: None, id: None }
+     245: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     246: LineBreak
+     247: EndTextStyle
+     248: EndParagraph
+     249: StartParagraph { alignment: None, id: None }
+     250: EndParagraph
+     251: StartParagraph { alignment: None, id: None }
+     252: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     253: Text { content: "Finally" }
+     254: EndTextStyle
+     255: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     256: Text { content: " some missing items" }
+     257: EndTextStyle
+     258: EndParagraph
+     259: EndOrderedListItem
+     260: StartOrderedListItem { id: Some("11"), level: 0, start: Some(1), style_type: UpperAlpha }
+     261: StartParagraph { alignment: None, id: None }
+     262: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     263: Text { content: "A" }
+     264: EndTextStyle
+     265: EndParagraph
+     266: StartOrderedListItem { id: Some("11"), level: 1, start: None, style_type: Decimal }
+     267: StartOrderedListItem { id: Some("11"), level: 2, start: None, style_type: LowerRoman }
+     268: StartParagraph { alignment: None, id: None }
+     269: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     270: Text { content: "A i" }
+     271: EndTextStyle
+     272: EndParagraph
+     273: EndOrderedListItem
+     274: StartOrderedListItem { id: Some("11"), level: 2, start: None, style_type: LowerRoman }
+     275: StartParagraph { alignment: None, id: None }
+     276: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     277: Text { content: "A ii" }
+     278: EndTextStyle
+     279: EndParagraph
+     280: StartOrderedListItem { id: Some("11"), level: 3, start: None, style_type: Decimal }
+     281: StartOrderedListItem { id: Some("11"), level: 4, start: None, style_type: LowerAlpha }
+     282: StartParagraph { alignment: None, id: None }
+     283: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     284: Text { content: "A ii a" }
+     285: EndTextStyle
+     286: EndParagraph
+     287: EndOrderedListItem
+     288: StartOrderedListItem { id: Some("11"), level: 4, start: None, style_type: LowerAlpha }
+     289: StartParagraph { alignment: None, id: None }
+     290: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     291: Text { content: "A ii b" }
+     292: EndTextStyle
+     293: EndParagraph
+     294: EndOrderedListItem
+     295: EndOrderedListItem
+     296: StartOrderedListItem { id: Some("11"), level: 3, start: None, style_type: Decimal }
+     297: StartParagraph { alignment: None, id: None }
+     298: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     299: Text { content: "A ii 2" }
+     300: EndTextStyle
+     301: EndParagraph
+     302: StartParagraph { alignment: None, id: None }
+     303: EndParagraph
+     304: EndOrderedListItem
+     305: EndOrderedListItem
+     306: EndOrderedListItem
+     307: EndOrderedListItem
+     308: StartOrderedListItem { id: Some("10"), level: 0, start: None, style_type: Decimal }
+     309: StartParagraph { alignment: None, id: None }
+     310: Text { content: "page break " }
+     311: Text { content: "list 3" }
+     312: EndParagraph
+     313: StartParagraph { alignment: None, id: None }
+     314: EndParagraph
+     315: StartParagraph { alignment: None, id: None }
+     316: EndParagraph
+     317: EndOrderedListItem
+     318: StartOrderedListItem { id: Some("12"), level: 0, start: Some(1), style_type: Decimal }
+     319: StartParagraph { alignment: None, id: None }
+     320: Text { content: "Greek numbering with crazy format - alpha" }
+     321: EndParagraph
+     322: EndOrderedListItem
+     323: StartOrderedListItem { id: Some("12"), level: 0, start: None, style_type: Decimal }
+     324: StartParagraph { alignment: None, id: None }
+     325: Text { content: "Greek numbering with crazy format - beta" }
+     326: EndParagraph
+     327: StartParagraph { alignment: None, id: None }
+     328: EndParagraph
+     329: StartParagraph { alignment: None, id: None }
+     330: EndParagraph
+     331: StartParagraph { alignment: None, id: None }
+     332: EndParagraph
+     333: StartParagraph { alignment: None, id: None }
+     334: EndParagraph
+     335: EndOrderedListItem
+     336: StartOrderedListItem { id: Some("13"), level: 0, start: Some(1), style_type: Decimal }
+     337: StartParagraph { alignment: None, id: None }
+     338: Text { content: "1" }
+     339: EndParagraph
+     340: StartOrderedListItem { id: Some("13"), level: 1, start: None, style_type: Decimal }
+     341: StartOrderedListItem { id: Some("13"), level: 2, start: None, style_type: Decimal }
+     342: StartParagraph { alignment: None, id: None }
+     343: Text { content: "1.1.1" }
+     344: EndParagraph
+     345: EndOrderedListItem
+     346: EndOrderedListItem
+     347: StartOrderedListItem { id: Some("14"), level: 1, start: Some(1), style_type: Decimal }
+     348: StartParagraph { alignment: None, id: None }
+     349: Text { content: "1.2" }
+     350: Text { content: "->1.1" }
+     351: Text { content: "  //set the value to 1 and “start new list”" }
+     352: EndParagraph
+     353: EndOrderedListItem
+     354: StartOrderedListItem { id: Some("14"), level: 1, start: None, style_type: Decimal }
+     355: StartParagraph { alignment: None, id: None }
+     356: Text { content: "1.3" }
+     357: Text { content: " -> 1.2" }
+     358: EndParagraph
+     359: EndOrderedListItem
+     360: EndOrderedListItem
+     361: StartOrderedListItem { id: Some("14"), level: 0, start: None, style_type: Decimal }
+     362: StartParagraph { alignment: None, id: None }
+     363: Text { content: "2." }
+     364: EndParagraph
+     365: StartOrderedListItem { id: Some("14"), level: 1, start: None, style_type: Decimal }
+     366: StartParagraph { alignment: None, id: None }
+     367: Text { content: "2.1" }
+     368: EndParagraph
+     369: StartParagraph { alignment: None, id: None }
+     370: EndParagraph
+     371: EndOrderedListItem
+     372: EndOrderedListItem
+     373: EndDocument
+  ],
+  terminal: Ok,
+}

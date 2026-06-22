@@ -11,6 +11,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
     println!("cargo::rustc-check-cfg=cfg(coverage)");
     generate_corpus_tests("pandoc", "pandoc_corpus_tests.rs")?;
     generate_corpus_tests("docspec", "docspec_corpus_tests.rs")?;
+    generate_corpus_tests("apache-tika", "apache_tika_corpus_tests.rs")?;
     Ok(())
 }
 
@@ -74,26 +75,56 @@ fn test_name_for_fixture(file_name: &str) -> Result<String, Box<dyn core::error:
         .and_then(OsStr::to_str)
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "fixture stem is not UTF-8"))?;
 
-    let test_name = match stem {
-        "0_level_headers" => "_0_level_headers",
-        "compact-style-removal" => "compact_style_removal",
-        "custom-style-reference" => "custom_style_reference",
-        "german-reference" => "german_reference",
-        "instrText_hyperlink" => "instr_text_hyperlink",
-        "lists-compact" => "lists_compact",
-        "nested_instrText" => "nested_instr_text",
-        "preformatted-boundaries" => "preformatted_boundaries",
-        other => other,
-    };
+    let test_name = sanitize_test_name(stem);
 
-    if is_valid_rust_identifier(test_name) {
-        Ok(test_name.to_owned())
+    if is_valid_rust_identifier(&test_name) {
+        Ok(test_name)
     } else {
-        Err(format!(
-            "Pandoc fixture {file_name:?} does not map to a valid Rust test name; add an explicit case in build.rs"
-        )
-        .into())
+        Err(format!("Fixture {file_name:?} does not map to a valid Rust test name").into())
     }
+}
+
+fn sanitize_test_name(stem: &str) -> String {
+    let mut test_name = String::new();
+    let mut previous_was_separator = true;
+    let mut previous_was_lower_or_digit = false;
+
+    for character in stem.chars() {
+        if character.is_ascii_alphanumeric() {
+            if character.is_ascii_uppercase() && previous_was_lower_or_digit {
+                test_name.push('_');
+            }
+            test_name.push(character.to_ascii_lowercase());
+            previous_was_separator = false;
+            previous_was_lower_or_digit =
+                character.is_ascii_lowercase() || character.is_ascii_digit();
+            continue;
+        }
+
+        if !previous_was_separator {
+            test_name.push('_');
+            previous_was_separator = true;
+            previous_was_lower_or_digit = false;
+        }
+    }
+
+    while test_name.ends_with('_') {
+        test_name.pop();
+    }
+
+    if test_name.is_empty() {
+        test_name.push('_');
+    } else {
+        let starts_with_invalid_character = test_name
+            .chars()
+            .next()
+            .is_some_and(|first| !first.is_ascii_alphabetic() && first != '_');
+        if starts_with_invalid_character {
+            test_name.insert(0, '_');
+        }
+    }
+
+    test_name
 }
 
 fn is_valid_rust_identifier(identifier: &str) -> bool {

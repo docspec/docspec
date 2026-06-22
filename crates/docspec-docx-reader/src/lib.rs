@@ -17,9 +17,14 @@
 //! and emitted as `StartLink`/`EndLink` events around inline content),
 //! structured document tags (`<w:sdt>` — content emitted normally;
 //! `<w:sdtPr>`/`<w:sdtEndPr>` dropped), tracked insertions and moves
-//! (`<w:ins>`, `<w:moveTo>` — accept-changes semantics), and `DrawingML` images
+//! (`<w:ins>`, `<w:moveTo>` — accept-changes semantics), `DrawingML` images
 //! (`<w:drawing>` — emitted as `Image` events; see the crate README for
-//! `ImageSource` variants and `AssetHandle` usage).
+//! `ImageSource` variants and `AssetHandle` usage), and VML images
+//! (`<w:pict>` containing `<v:imagedata>`) — emitted as `Event::Image`.
+//! Alt text precedence: `o:title` attribute on `<v:imagedata>` (non-empty) falls back to
+//! `alt` attribute on the parent `<v:shape>`. Multiple `<v:imagedata>` elements in one
+//! `<w:pict>` emit multiple `Image` events in document order. `<v:group>` wrappers are
+//! transparent.
 //! Emits: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`,
 //! `EndTextStyle`, `LineBreak`, `EndParagraph`, `StartTable`, `StartTableRow`,
 //! `StartTableCell`, `StartTableHeader`, `EndTableHeader`, `EndTableCell`,
@@ -41,7 +46,14 @@
 //! - Table-level property exceptions (`<w:tblPrEx>`) — silently ignored
 //! - Table, row, and cell visual properties (`<w:tblPr>`, `<w:trPr>` visual
 //!   fields, `<w:tcPr>` visual fields, `<w:tblGrid>`)
-//! - VML images (`<w:pict>`) — deferred to follow-up; subtree silently dropped
+//! - `<mc:Fallback>` (in `<mc:AlternateContent>`) — subtree silently dropped to prevent
+//!   duplicate `Image` events when both a modern `<w:drawing>` (in `<mc:Choice>`) and a
+//!   legacy `<w:pict>` (in `<mc:Fallback>`) reference the same image.
+//! - VML positioning attributes (`style="position:..."`, `w10:wrap`, `w10:anchorlock`,
+//!   `<v:textbox>` text content) — silently dropped (consistent with `<w:drawing>`
+//!   positioning loss for `<wp:anchor>`).
+//! - VML image-bytes via `<w:binData>` (referenced from `<v:imagedata src="wordml://..."/>`)
+//!   — not parsed; the `<v:imagedata>` degrades to "no rId found" and emits no event.
 //! - Comments, footnotes, headers, footers
 //! - Document metadata
 //! - Tracked deletions (`<w:del>`, `<w:moveFrom>`) — accept-changes semantics

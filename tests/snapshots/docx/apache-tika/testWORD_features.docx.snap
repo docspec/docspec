@@ -1,0 +1,56 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: Some(Left), id: None }
+       2: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+       3: Text { content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer tincidunt pretium d" }
+       4: EndTextStyle
+       5: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+       6: Text { content: "apibus" }
+       7: EndTextStyle
+       8: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+       9: Text { content: ". Fusce quis dolor dui. Nullam eleifend nibh non dui sodales vulputate. Mauris id mollis velit. Fusce in sagittis nisl. Maecenas eget elit " }
+      10: EndTextStyle
+      11: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      12: Text { content: "insert this " }
+      13: EndTextStyle
+      14: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      15: Text { content: "fringilla, " }
+      16: EndTextStyle
+      17: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      18: Text { content: "est eu, volutpat urna." }
+      19: EndTextStyle
+      20: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      21: Text { content: "ad litora" }
+      22: EndTextStyle
+      23: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      24: Text { content: "Maecenas ornare tortor velit, non ullamcorper turpis dapibus quis. " }
+      25: EndTextStyle
+      26: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      27: Text { content: "While " }
+      28: EndTextStyle
+      29: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      30: Text { content: "euismod posuere rhoncus. Duis mollis faucibus tincidunt. Praesent non facilisis orci, sodales hendrerit ipsum. Class aptent taciti sociosqu" }
+      31: EndTextStyle
+      32: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      33: Text { content: "torquent " }
+      34: EndTextStyle
+      35: Text { content: "inceptos " }
+      36: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      37: Text { content: "himenaeos." }
+      38: EndTextStyle
+      39: EndParagraph
+      40: StartParagraph { alignment: Some(Left), id: None }
+      41: LineBreak
+      42: EndParagraph
+      43: StartParagraph { alignment: None, id: None }
+      44: Text { content: "This is hidden text." }
+      45: EndParagraph
+      46: EndDocument
+  ],
+  terminal: Ok,
+}

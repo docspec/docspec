@@ -1,0 +1,62 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "Objective" }
+       3: EndParagraph
+       4: StartParagraph { alignment: None, id: None }
+       5: Text { content: "Getting the perfect job might be challenging, " }
+       6: Text { content: "but a great-looking résumé doesn’t have to be! We’ve provided a few quick tips to help you get started. To replace any tip text with your own, just click it and start typing." }
+       7: EndParagraph
+       8: StartParagraph { alignment: None, id: None }
+       9: Text { content: "Need another experience or education entry? You got it. Just click in the sample " }
+      10: Text { content: "entries below and then click the plus sign that appears. Looking for a matching cover letter? All you had to do was ask! On the Insert tab, click Cover Page." }
+      11: EndParagraph
+      12: StartParagraph { alignment: None, id: None }
+      13: Text { content: "Experience" }
+      14: EndParagraph
+      15: StartParagraph { alignment: None, id: None }
+      16: Text { content: "[Dates From - To]" }
+      17: EndParagraph
+      18: StartParagraph { alignment: None, id: None }
+      19: Text { content: "Metallica" }
+      20: EndParagraph
+      21: StartParagraph { alignment: None, id: None }
+      22: Text { content: "Guitarist" }
+      23: EndParagraph
+      24: StartParagraph { alignment: None, id: None }
+      25: Text { content: "Slept with one eye open gripping my pillow tight" }
+      26: EndParagraph
+      27: StartParagraph { alignment: None, id: None }
+      28: Text { content: "E" }
+      29: Text { content: "ducation" }
+      30: EndParagraph
+      31: StartParagraph { alignment: None, id: None }
+      32: Text { content: "[Dates From - To]" }
+      33: EndParagraph
+      34: StartParagraph { alignment: None, id: None }
+      35: Text { content: "[School Name, Location]" }
+      36: EndParagraph
+      37: StartParagraph { alignment: None, id: None }
+      38: Text { content: "[Degree]" }
+      39: EndParagraph
+      40: StartParagraph { alignment: None, id: None }
+      41: Text { content: "Click here to enter text." }
+      42: EndParagraph
+      43: StartParagraph { alignment: None, id: None }
+      44: Text { content: "Click here to enter text" }
+      45: EndParagraph
+      46: StartParagraph { alignment: None, id: None }
+      47: Text { content: "References" }
+      48: EndParagraph
+      49: StartParagraph { alignment: None, id: None }
+      50: Text { content: "References are available upon request." }
+      51: EndParagraph
+      52: EndDocument
+  ],
+  terminal: Ok,
+}

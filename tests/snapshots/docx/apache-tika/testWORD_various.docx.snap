@@ -1,0 +1,243 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "Footnote appears here" }
+       3: EndParagraph
+       4: StartParagraph { alignment: None, id: None }
+       5: EndParagraph
+       6: StartParagraph { alignment: None, id: None }
+       7: StartTextStyle { kind: Bold, id: None }
+       8: Text { content: "Bold" }
+       9: EndTextStyle
+      10: Text { content: " " }
+      11: StartTextStyle { kind: Italic, id: None }
+      12: Text { content: "italic" }
+      13: EndTextStyle
+      14: Text { content: " " }
+      15: StartTextStyle { kind: Underline, id: None }
+      16: Text { content: "underline" }
+      17: EndTextStyle
+      18: Text { content: " " }
+      19: StartTextStyle { kind: Superscript, id: None }
+      20: Text { content: "superscript" }
+      21: EndTextStyle
+      22: Text { content: " " }
+      23: StartTextStyle { kind: Subscript, id: None }
+      24: Text { content: "subscript " }
+      25: EndTextStyle
+      26: StartTextStyle { kind: Strikethrough, id: None }
+      27: StartTextStyle { kind: Subscript, id: None }
+      28: Text { content: "strikethrough" }
+      29: EndTextStyle
+      30: EndTextStyle
+      31: EndParagraph
+      32: StartParagraph { alignment: None, id: None }
+      33: StartTextStyle { kind: Italic, id: None }
+      34: Text { content: "ita" }
+      35: EndTextStyle
+      36: StartTextStyle { kind: Italic, id: None }
+      37: StartTextStyle { kind: Strikethrough, id: None }
+      38: Text { content: "li" }
+      39: EndTextStyle
+      40: EndTextStyle
+      41: StartTextStyle { kind: Italic, id: None }
+      42: Text { content: "c" }
+      43: EndTextStyle
+      44: EndParagraph
+      45: StartParagraph { alignment: None, id: None }
+      46: StartTextStyle { kind: Italic, id: None }
+      47: Text { content: "ita" }
+      48: EndTextStyle
+      49: StartTextStyle { kind: Italic, id: None }
+      50: StartTextStyle { kind: Strikethrough, id: None }
+      51: Text { content: "l" }
+      52: EndTextStyle
+      53: EndTextStyle
+      54: StartTextStyle { kind: Italic, id: None }
+      55: StartTextStyle { kind: Strikethrough, id: None }
+      56: StartTextStyle { kind: Underline, id: None }
+      57: Text { content: "i" }
+      58: EndTextStyle
+      59: EndTextStyle
+      60: EndTextStyle
+      61: StartTextStyle { kind: Italic, id: None }
+      62: Text { content: "c" }
+      63: EndTextStyle
+      64: EndParagraph
+      65: StartParagraph { alignment: None, id: None }
+      66: StartTextStyle { kind: Italic, id: None }
+      67: StartTextStyle { kind: Underline, id: None }
+      68: Text { content: "unde" }
+      69: EndTextStyle
+      70: EndTextStyle
+      71: StartTextStyle { kind: Italic, id: None }
+      72: StartTextStyle { kind: Strikethrough, id: None }
+      73: StartTextStyle { kind: Underline, id: None }
+      74: Text { content: "r" }
+      75: EndTextStyle
+      76: EndTextStyle
+      77: EndTextStyle
+      78: StartTextStyle { kind: Italic, id: None }
+      79: StartTextStyle { kind: Underline, id: None }
+      80: Text { content: "line" }
+      81: EndTextStyle
+      82: EndTextStyle
+      83: EndParagraph
+      84: StartParagraph { alignment: None, id: None }
+      85: Text { content: "Here is a list:" }
+      86: EndParagraph
+      87: StartUnorderedListItem { id: Some("1"), level: 0, style_type: Disc }
+      88: StartParagraph { alignment: None, id: None }
+      89: Text { content: "Bullet 1" }
+      90: EndParagraph
+      91: EndUnorderedListItem
+      92: StartUnorderedListItem { id: Some("1"), level: 0, style_type: Disc }
+      93: StartParagraph { alignment: None, id: None }
+      94: Text { content: "Bullet 2" }
+      95: EndParagraph
+      96: EndUnorderedListItem
+      97: StartUnorderedListItem { id: Some("1"), level: 0, style_type: Disc }
+      98: StartParagraph { alignment: None, id: None }
+      99: Text { content: "Bullet 3" }
+     100: EndParagraph
+     101: StartParagraph { alignment: None, id: None }
+     102: Text { content: "Here is a numbered list:" }
+     103: EndParagraph
+     104: EndUnorderedListItem
+     105: StartOrderedListItem { id: Some("2"), level: 0, start: Some(1), style_type: Decimal }
+     106: StartParagraph { alignment: None, id: None }
+     107: Text { content: "Number bullet 1" }
+     108: EndParagraph
+     109: EndOrderedListItem
+     110: StartOrderedListItem { id: Some("2"), level: 0, start: None, style_type: Decimal }
+     111: StartParagraph { alignment: None, id: None }
+     112: Text { content: "Number bullet 2" }
+     113: EndParagraph
+     114: EndOrderedListItem
+     115: StartOrderedListItem { id: Some("2"), level: 0, start: None, style_type: Decimal }
+     116: StartParagraph { alignment: None, id: None }
+     117: Text { content: "Number bullet 3" }
+     118: EndParagraph
+     119: StartParagraph { alignment: None, id: None }
+     120: EndParagraph
+     121: StartParagraph { alignment: None, id: None }
+     122: Text { content: " " }
+     123: Text { content: "Keyword1 Keyword2" }
+     124: EndParagraph
+     125: StartParagraph { alignment: None, id: None }
+     126: EndParagraph
+     127: StartParagraph { alignment: None, id: None }
+     128: StartLink { href: "http://tika.apache.org/", id: None, title: None }
+     129: Text { content: "This is a hyperlink" }
+     130: EndLink
+     131: EndParagraph
+     132: StartParagraph { alignment: None, id: None }
+     133: EndParagraph
+     134: StartParagraph { alignment: None, id: None }
+     135: Text { content: " " }
+     136: Text { content: "Subject is here" }
+     137: EndParagraph
+     138: StartParagraph { alignment: None, id: None }
+     139: EndParagraph
+     140: EndOrderedListItem
+     141: StartTable { id: None }
+     142: StartTableRow { id: None }
+     143: StartTableCell { colspan: None, id: None, rowspan: None }
+     144: StartParagraph { alignment: None, id: None }
+     145: Text { content: "Row 1 Col 1" }
+     146: EndParagraph
+     147: EndTableCell
+     148: StartTableCell { colspan: None, id: None, rowspan: None }
+     149: StartParagraph { alignment: None, id: None }
+     150: Text { content: "Row 1 Col 2" }
+     151: EndParagraph
+     152: EndTableCell
+     153: StartTableCell { colspan: None, id: None, rowspan: None }
+     154: StartParagraph { alignment: None, id: None }
+     155: Text { content: "Row 1 Col 3" }
+     156: EndParagraph
+     157: EndTableCell
+     158: EndTableRow
+     159: StartTableRow { id: None }
+     160: StartTableCell { colspan: None, id: None, rowspan: None }
+     161: StartParagraph { alignment: None, id: None }
+     162: Text { content: "Row 2 Col 1" }
+     163: EndParagraph
+     164: EndTableCell
+     165: StartTableCell { colspan: None, id: None, rowspan: None }
+     166: StartParagraph { alignment: None, id: None }
+     167: Text { content: "Row 2 Col 2" }
+     168: EndParagraph
+     169: EndTableCell
+     170: StartTableCell { colspan: None, id: None, rowspan: None }
+     171: StartParagraph { alignment: None, id: None }
+     172: Text { content: "Row 2 Col 3" }
+     173: EndParagraph
+     174: EndTableCell
+     175: EndTableRow
+     176: EndTable
+     177: StartParagraph { alignment: None, id: None }
+     178: EndParagraph
+     179: StartParagraph { alignment: None, id: None }
+     180: Text { content: "Suddenly some Japanese text:" }
+     181: EndParagraph
+     182: StartParagraph { alignment: None, id: None }
+     183: Text { content: "ゾルゲと尾崎、淡々と最期" }
+     184: EndParagraph
+     185: StartParagraph { alignment: None, id: None }
+     186: Text { content: "（ＧＨＱ）" }
+     187: EndParagraph
+     188: StartParagraph { alignment: None, id: None }
+     189: Text { content: "And then some Gothic text:" }
+     190: EndParagraph
+     191: StartParagraph { alignment: None, id: None }
+     192: Text { content: "𐌲𐌿𐍄𐌹𐍃𐌺" }
+     193: EndParagraph
+     194: StartParagraph { alignment: None, id: None }
+     195: EndParagraph
+     196: StartParagraph { alignment: None, id: None }
+     197: Text { content: "Here is a citation:" }
+     198: EndParagraph
+     199: StartParagraph { alignment: None, id: None }
+     200: Text { content: "(Kramer)" }
+     201: EndParagraph
+     202: StartParagraph { alignment: None, id: None }
+     203: EndParagraph
+     204: StartParagraph { alignment: None, id: None }
+     205: Text { content: "Figure " }
+     206: Text { content: "1" }
+     207: Text { content: " This is a caption for Figure 1" }
+     208: EndParagraph
+     209: StartParagraph { alignment: None, id: None }
+     210: EndParagraph
+     211: StartParagraph { alignment: None, id: None }
+     212: EndParagraph
+     213: StartParagraph { alignment: None, id: None }
+     214: EndParagraph
+     215: StartParagraph { alignment: None, id: None }
+     216: Text { content: "Row 1 column 1" }
+     217: EndParagraph
+     218: StartParagraph { alignment: None, id: None }
+     219: Text { content: "Row 2 column 1" }
+     220: EndParagraph
+     221: StartParagraph { alignment: None, id: None }
+     222: Text { content: "Row 1 column 2" }
+     223: EndParagraph
+     224: StartParagraph { alignment: None, id: None }
+     225: Text { content: "Row 2 column 2" }
+     226: EndParagraph
+     227: StartParagraph { alignment: None, id: None }
+     228: EndParagraph
+     229: StartParagraph { alignment: Some(Left), id: None }
+     230: EndParagraph
+     231: StartParagraph { alignment: None, id: None }
+     232: EndParagraph
+     233: EndDocument
+  ],
+  terminal: Ok,
+}

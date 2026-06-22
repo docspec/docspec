@@ -1,0 +1,33 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "This is a bold " }
+       3: StartLink { href: "http://tika.apache.org/", id: None, title: None }
+       4: Text { content: "hy" }
+       5: Text { content: "per" }
+       6: Text { content: "  " }
+       7: StartTextStyle { kind: Bold, id: None }
+       8: Text { content: "link" }
+       9: EndTextStyle
+      10: EndLink
+      11: Text { content: ";" }
+      12: Text { content: " bold, I sa" }
+      13: Text { content: "y. " }
+      14: StartLink { href: "http://tika.apache.org/", id: None, title: None }
+      15: StartTextStyle { kind: Bold, id: None }
+      16: Text { content: "hyper" }
+      17: EndTextStyle
+      18: Text { content: "  link" }
+      19: EndLink
+      20: Text { content: "; bol" }
+      21: Text { content: "d, I say." }
+      22: EndParagraph
+      23: EndDocument
+  ],
+  terminal: Ok,
+}

@@ -25,6 +25,7 @@ architecture, and the event protocol.
 - Structured Document Tags (`<w:sdt>`) — the content of an SDT is emitted normally. The property containers `<w:sdtPr>` and `<w:sdtEndPr>` are dropped.
 - Tracked insertions and moves (`<w:ins>`, `<w:moveTo>`) — the inserted/moved-in content is emitted (accept-changes semantics).
 - DrawingML images (`<w:drawing>`) — emitted as `Event::Image`. See [Image Support](#image-support) below.
+- VML images (`<w:pict>` containing `<v:imagedata>`) — emitted as `Event::Image`. Alt text precedence: `o:title` attribute on `<v:imagedata>` (non-empty) falls back to `alt` attribute on parent `<v:shape>`. Multiple `<v:imagedata>` in one `<w:pict>` emit multiple `Image` events in document order. `<v:group>` wrappers are transparent.
 - Emits: `StartDocument`, `StartParagraph`, `StartPreformatted`, `StartTextStyle`, `Text`, `EndTextStyle`, `LineBreak`, `EndParagraph`, `EndPreformatted`, `StartTable`, `StartTableRow`, `StartTableCell`, `StartTableHeader`, `EndTableHeader`, `EndTableCell`, `EndTableRow`, `EndTable`, `StartLink`, `EndLink`, `StartOrderedListItem`, `EndOrderedListItem`, `StartUnorderedListItem`, `EndUnorderedListItem`, `Image`, `EndDocument`
 - Symbol font character normalization for Wingdings, Wingdings 2, Wingdings 3, Webdings, and Symbol fonts — codepoints are mapped to their Unicode equivalents; unmapped codepoints are dropped
 - Compression: `Stored` and `Deflated` only
@@ -55,7 +56,7 @@ The XML elements listed below are the reader's denylist — their entire subtree
 - Header rows in nested tables — only the outermost table honors `<w:tblHeader>`
 - Table-level property exceptions (`<w:tblPrEx>`) — silently ignored (consistent with `<w:tblPr>`)
 - Table, row, and cell visual properties (`<w:tblPr>`, `<w:trPr>` visual fields, `<w:tcPr>` visual fields, `<w:tblGrid>`) — silently dropped
-- VML images (`<w:pict>`) — deferred to follow-up; subtree silently dropped
+- `<mc:Fallback>` (inside `<mc:AlternateContent>`) — subtree dropped to deduplicate images that appear in both the modern `<w:drawing>` (in `<mc:Choice>`) and the legacy `<w:pict>` (in `<mc:Fallback>`).
 - Comments, footnotes, headers, footers
 - Document metadata
 - Tracked deletions and moves-from (`<w:del>`, `<w:moveFrom>`) — silently dropped (accept-changes semantics). Their text content uses `<w:delText>` which is not part of the reader's text-matching set.
@@ -89,7 +90,7 @@ If the relationship ID cannot be resolved (missing or malformed rels), the reade
 
 `wp:docPr/@descr` maps to `Event::Image.alt`. The `title` field is always `None` in this release.
 
-VML images (`<w:pict>`) are not supported in this release — their subtree is silently dropped.
+VML images (`<w:pict>` containing `<v:imagedata>`) are also supported, using the same asset resolution as DrawingML images. V1 limitations: VML positioning attributes (`style`, `w10:wrap`, `w10:anchorlock`), `<v:textbox>` text content, and inline image bytes via `<w:binData>` (referenced from `<v:imagedata src="wordml://..."/>`) are silently dropped.
 
 ### Asset Handles
 

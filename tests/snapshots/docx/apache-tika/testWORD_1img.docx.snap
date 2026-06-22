@@ -1,0 +1,17 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "The quick brown fox jumps over the lazy dog" }
+       3: EndParagraph
+       4: StartParagraph { alignment: None, id: None }
+       5: Image { alt: Some("A description..."), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image1.png", content_type: "image/png", bytes: 4444, sha256: "c7ed7eaee12184fbae328aec72e7448b65c46296dbb04eae90e0bac9e0de9f32" } }
+       6: EndParagraph
+       7: EndDocument
+  ],
+  terminal: Ok,
+}

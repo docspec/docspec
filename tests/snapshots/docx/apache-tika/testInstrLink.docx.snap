@@ -1,0 +1,197 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartTable { id: None }
+       2: StartTableRow { id: None }
+       3: StartTableCell { colspan: None, id: None, rowspan: None }
+       4: StartTable { id: None }
+       5: StartTableRow { id: None }
+       6: StartTableCell { colspan: None, id: None, rowspan: None }
+       7: StartParagraph { alignment: None, id: None }
+       8: StartTextStyle { kind: Bold, id: None }
+       9: StartTextStyle { kind: TextColor(Rgb { b: 30, g: 31, r: 32 }), id: None }
+      10: Text { content: "Invoice document" }
+      11: EndTextStyle
+      12: EndTextStyle
+      13: StartTextStyle { kind: Bold, id: None }
+      14: StartTextStyle { kind: TextColor(Rgb { b: 30, g: 31, r: 32 }), id: None }
+      15: Text { content: " shared " }
+      16: EndTextStyle
+      17: EndTextStyle
+      18: StartTextStyle { kind: Bold, id: None }
+      19: StartTextStyle { kind: TextColor(Rgb { b: 30, g: 31, r: 32 }), id: None }
+      20: Text { content: "with your Gmail Workspace." }
+      21: EndTextStyle
+      22: EndTextStyle
+      23: EndParagraph
+      24: StartTable { id: None }
+      25: StartTableRow { id: None }
+      26: StartTableCell { colspan: None, id: None, rowspan: None }
+      27: StartParagraph { alignment: None, id: None }
+      28: StartTextStyle { kind: Bold, id: None }
+      29: Text { content: "Gmail" }
+      30: EndTextStyle
+      31: EndParagraph
+      32: StartParagraph { alignment: None, id: None }
+      33: StartTextStyle { kind: TextColor(Rgb { b: 92, g: 94, r: 96 }), id: None }
+      34: Text { content: "Shared " }
+      35: EndTextStyle
+      36: StartTextStyle { kind: TextColor(Rgb { b: 92, g: 94, r: 96 }), id: None }
+      37: Text { content: " " }
+      38: EndTextStyle
+      39: StartTextStyle { kind: TextColor(Rgb { b: 92, g: 94, r: 96 }), id: None }
+      40: Text { content: "from" }
+      41: EndTextStyle
+      42: StartTextStyle { kind: TextColor(Rgb { b: 92, g: 94, r: 96 }), id: None }
+      43: Text { content: " " }
+      44: EndTextStyle
+      45: StartTextStyle { kind: TextColor(Rgb { b: 92, g: 94, r: 96 }), id: None }
+      46: Text { content: " OneDrive " }
+      47: EndTextStyle
+      48: EndParagraph
+      49: EndTableCell
+      50: EndTableRow
+      51: EndTable
+      52: StartParagraph { alignment: None, id: None }
+      53: EndParagraph
+      54: StartTable { id: None }
+      55: StartTableRow { id: None }
+      56: StartTableCell { colspan: None, id: None, rowspan: None }
+      57: StartParagraph { alignment: None, id: None }
+      58: StartTextStyle { kind: Bold, id: None }
+      59: Text { content: "2026_Amended_" }
+      60: EndTextStyle
+      61: StartTextStyle { kind: Bold, id: None }
+      62: Text { content: "invoice" }
+      63: EndTextStyle
+      64: StartTextStyle { kind: Bold, id: None }
+      65: Text { content: ".docx" }
+      66: EndTextStyle
+      67: EndParagraph
+      68: StartParagraph { alignment: None, id: None }
+      69: StartTextStyle { kind: TextColor(Rgb { b: 92, g: 94, r: 96 }), id: None }
+      70: Text { content: "Word Document • 2.4 MB " }
+      71: EndTextStyle
+      72: EndParagraph
+      73: EndTableCell
+      74: EndTableRow
+      75: StartTableRow { id: None }
+      76: StartTableCell { colspan: None, id: None, rowspan: None }
+      77: StartParagraph { alignment: None, id: None }
+      78: EndParagraph
+      79: EndTableCell
+      80: EndTableRow
+      81: StartTableRow { id: None }
+      82: StartTableCell { colspan: None, id: None, rowspan: None }
+      83: StartParagraph { alignment: None, id: None }
+      84: EndParagraph
+      85: EndTableCell
+      86: EndTableRow
+      87: StartTableRow { id: None }
+      88: StartTableCell { colspan: None, id: None, rowspan: None }
+      89: StartParagraph { alignment: None, id: None }
+      90: EndParagraph
+      91: EndTableCell
+      92: EndTableRow
+      93: StartTableRow { id: None }
+      94: StartTableCell { colspan: None, id: None, rowspan: None }
+      95: StartParagraph { alignment: None, id: None }
+      96: EndParagraph
+      97: EndTableCell
+      98: EndTableRow
+      99: StartTableRow { id: None }
+     100: StartTableCell { colspan: None, id: None, rowspan: None }
+     101: StartParagraph { alignment: None, id: None }
+     102: EndParagraph
+     103: EndTableCell
+     104: EndTableRow
+     105: StartTableRow { id: None }
+     106: StartTableCell { colspan: None, id: None, rowspan: None }
+     107: StartParagraph { alignment: None, id: None }
+     108: EndParagraph
+     109: EndTableCell
+     110: EndTableRow
+     111: EndTable
+     112: StartParagraph { alignment: None, id: None }
+     113: EndParagraph
+     114: StartTable { id: None }
+     115: StartTableRow { id: None }
+     116: StartTableCell { colspan: None, id: None, rowspan: None }
+     117: StartTable { id: None }
+     118: StartTableRow { id: None }
+     119: StartTableCell { colspan: None, id: None, rowspan: None }
+     120: StartParagraph { alignment: None, id: None }
+     121: StartTextStyle { kind: Bold, id: None }
+     122: StartTextStyle { kind: TextColor(Rgb { b: 255, g: 255, r: 255 }), id: None }
+     123: Text { content: "Access Document(s)" }
+     124: EndTextStyle
+     125: EndTextStyle
+     126: StartTextStyle { kind: Bold, id: None }
+     127: StartTextStyle { kind: TextColor(Rgb { b: 255, g: 255, r: 255 }), id: None }
+     128: Text { content: " " }
+     129: EndTextStyle
+     130: EndTextStyle
+     131: EndParagraph
+     132: EndTableCell
+     133: EndTableRow
+     134: EndTable
+     135: StartParagraph { alignment: None, id: None }
+     136: EndParagraph
+     137: EndTableCell
+     138: EndTableRow
+     139: EndTable
+     140: StartParagraph { alignment: None, id: None }
+     141: EndParagraph
+     142: StartTable { id: None }
+     143: StartTableRow { id: None }
+     144: StartTableCell { colspan: None, id: None, rowspan: None }
+     145: StartParagraph { alignment: None, id: None }
+     146: StartTextStyle { kind: Bold, id: None }
+     147: StartTextStyle { kind: TextColor(Rgb { b: 92, g: 94, r: 96 }), id: None }
+     148: Text { content: "Expires:" }
+     149: EndTextStyle
+     150: EndTextStyle
+     151: StartTextStyle { kind: TextColor(Rgb { b: 92, g: 94, r: 96 }), id: None }
+     152: Text { content: " " }
+     153: EndTextStyle
+     154: StartTextStyle { kind: TextColor(Rgb { b: 92, g: 94, r: 96 }), id: None }
+     155: Text { content: "48" }
+     156: EndTextStyle
+     157: StartTextStyle { kind: TextColor(Rgb { b: 92, g: 94, r: 96 }), id: None }
+     158: Text { content: " hours" }
+     159: EndTextStyle
+     160: EndParagraph
+     161: EndTableCell
+     162: EndTableRow
+     163: EndTable
+     164: StartParagraph { alignment: None, id: None }
+     165: EndParagraph
+     166: StartParagraph { alignment: None, id: None }
+     167: StartTextStyle { kind: TextColor(Rgb { b: 157, g: 159, r: 161 }), id: None }
+     168: Text { content: "© 2026 Cooperate " }
+     169: EndTextStyle
+     170: StartTextStyle { kind: TextColor(Rgb { b: 157, g: 159, r: 161 }), id: None }
+     171: Text { content: "Google " }
+     172: EndTextStyle
+     173: StartTextStyle { kind: TextColor(Rgb { b: 157, g: 159, r: 161 }), id: None }
+     174: Text { content: "Workspace " }
+     175: EndTextStyle
+     176: EndParagraph
+     177: EndTableCell
+     178: EndTableRow
+     179: EndTable
+     180: StartParagraph { alignment: None, id: None }
+     181: EndParagraph
+     182: EndTableCell
+     183: EndTableRow
+     184: EndTable
+     185: StartParagraph { alignment: None, id: None }
+     186: EndParagraph
+     187: EndDocument
+  ],
+  terminal: Ok,
+}
