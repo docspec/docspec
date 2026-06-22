@@ -1,12 +1,12 @@
 //! Child process for memory measurement.
 //!
 //! Reads the DOCX file at the path given as the first command-line argument,
-//! drives DocxReader::from_path to completion, then prints the peak RSS to stderr.
+//! drives `DocxReader::from_path` to completion, then prints the peak RSS to stderr.
 //!
-//! Usage: memtest_child <docx-path>
+//! Usage: `memtest_child` <docx-path>
 use std::path::Path;
 
-use docspec_docx_reader::{DocxReader, EventSource};
+use docspec_docx_reader::{DocxReader, EventSource as _};
 
 fn read_vm_hwm_kb() -> u64 {
     let status = std::fs::read_to_string("/proc/self/status").unwrap_or_default();
@@ -20,7 +20,7 @@ fn read_vm_hwm_kb() -> u64 {
     0
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn core::error::Error>> {
     let path_arg = std::env::args()
         .nth(1)
         .ok_or("Usage: memtest_child <docx-path>")?;

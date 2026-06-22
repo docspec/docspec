@@ -10,7 +10,7 @@ use std::path::Path;
 
 use docspec_core::{Error, Result};
 use flate2::read::DeflateDecoder;
-use zip::{CompressionMethod, ZipArchive};
+use zip::{result::ZipError, CompressionMethod, ZipArchive};
 
 enum EntryReader {
     Stored(std::io::Take<File>),
@@ -40,14 +40,20 @@ impl StreamingArchive {
     /// named `entry_name` (typically `"word/document.xml"`).
     pub(crate) fn open(path: &Path, entry_name: &str) -> Result<Self> {
         let file = File::open(path).map_err(Error::from)?;
-        let mut archive = ZipArchive::new(file).map_err(|err| Error::Parse {
-            message: format!("not a valid ZIP archive: {err}"),
-            position: None,
+        let mut archive = ZipArchive::new(file).map_err(|err| match err {
+            ZipError::Io(source) => Error::Io { source },
+            other => Error::Parse {
+                message: format!("not a valid ZIP archive: {other}"),
+                position: None,
+            },
         })?;
 
-        let entry = archive.by_name(entry_name).map_err(|err| Error::Parse {
-            message: format!("document target not found: {err}"),
-            position: None,
+        let entry = archive.by_name(entry_name).map_err(|err| match err {
+            ZipError::Io(source) => Error::Io { source },
+            other => Error::Parse {
+                message: format!("document target not found: {other}"),
+                position: None,
+            },
         })?;
         let data_start = entry.data_start().ok_or_else(|| Error::Parse {
             message: format!("document target has no data offset: {entry_name}"),
