@@ -52,13 +52,13 @@ To refresh fixtures from the sibling `documents` repo:
 rsync -a ../documents/documents/docx/pandoc/*.docx tests/fixtures/docx/pandoc/
 ```
 
-Then run `INSTA_UPDATE=unseen cargo test --test pandoc_corpus -p docspec-docx-reader`
+Then run `INSTA_UPDATE=unseen cargo test --test snapshots -p docspec-docx-reader`
 to generate any new snapshots, review them with `cargo insta review`, and commit.
 Update the **Imported** line above when refreshing en masse.
 
 ## Adding a DocSpec Fixture
 
 Drop a new `.docx` in `docx/docspec/`, add a row to the table above, then run
-`INSTA_UPDATE=unseen cargo test --test docspec_corpus -p docspec-docx-reader`
+`INSTA_UPDATE=unseen cargo test --test snapshots -p docspec-docx-reader`
 to materialise the snapshot, review it with `cargo insta review`, and commit
 the fixture, the snapshot, and this attribution update together.
