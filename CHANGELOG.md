@@ -12,6 +12,18 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.12.0](https://github.com/docspec/docspec/compare/v1.11.0...v1.12.0) - 2026-06-22
+
+### Added
+
+- *(docx-reader)* consolidate consecutive preformatted paragraphs into one block
+
+### Other
+
+- *(docx-reader)* unify DOCX corpus snapshot harness into snapshots.rs
+- *(docx-reader)* exercise both DocxReader constructors in pandoc corpus, drop redundant synthetic tests
+- *(docx-reader)* mirror pandoc DOCX corpus
+
 ## [1.11.0](https://github.com/docspec/docspec/compare/v1.10.1...v1.11.0) - 2026-06-22
 
 ### Added
