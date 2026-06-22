@@ -1,0 +1,162 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: StartTextStyle { kind: Italic, id: None }
+       3: Text { content: "  " }
+       4: EndTextStyle
+       5: Text { content: "T" }
+       6: Text { content: "h" }
+       7: Text { content: "e" }
+       8: Text { content: "s" }
+       9: Text { content: "e " }
+      10: Text { content: "a" }
+      11: Text { content: "r" }
+      12: Text { content: "e " }
+      13: Text { content: "d" }
+      14: Text { content: "i" }
+      15: Text { content: "f" }
+      16: Text { content: "f" }
+      17: Text { content: "e" }
+      18: Text { content: "r" }
+      19: Text { content: "e" }
+      20: Text { content: "n" }
+      21: Text { content: "t" }
+      22: Text { content: " " }
+      23: Text { content: "f" }
+      24: Text { content: "o" }
+      25: Text { content: "n" }
+      26: Text { content: "t" }
+      27: Text { content: "s" }
+      28: Text { content: "." }
+      29: EndParagraph
+      30: StartParagraph { alignment: None, id: None }
+      31: EndParagraph
+      32: StartParagraph { alignment: None, id: None }
+      33: StartTextStyle { kind: Bold, id: None }
+      34: Text { content: "T" }
+      35: EndTextStyle
+      36: StartTextStyle { kind: Bold, id: None }
+      37: Text { content: "h" }
+      38: EndTextStyle
+      39: StartTextStyle { kind: Bold, id: None }
+      40: Text { content: "e" }
+      41: EndTextStyle
+      42: StartTextStyle { kind: Bold, id: None }
+      43: Text { content: "s" }
+      44: EndTextStyle
+      45: StartTextStyle { kind: Bold, id: None }
+      46: Text { content: "e " }
+      47: EndTextStyle
+      48: StartTextStyle { kind: Bold, id: None }
+      49: StartTextStyle { kind: Italic, id: None }
+      50: Text { content: "a" }
+      51: EndTextStyle
+      52: EndTextStyle
+      53: StartTextStyle { kind: Bold, id: None }
+      54: StartTextStyle { kind: Italic, id: None }
+      55: Text { content: "r" }
+      56: EndTextStyle
+      57: EndTextStyle
+      58: StartTextStyle { kind: Bold, id: None }
+      59: StartTextStyle { kind: Italic, id: None }
+      60: Text { content: "e " }
+      61: EndTextStyle
+      62: EndTextStyle
+      63: StartTextStyle { kind: Bold, id: None }
+      64: StartTextStyle { kind: Italic, id: None }
+      65: StartTextStyle { kind: Strikethrough, id: None }
+      66: Text { content: "d" }
+      67: EndTextStyle
+      68: EndTextStyle
+      69: EndTextStyle
+      70: StartTextStyle { kind: Bold, id: None }
+      71: StartTextStyle { kind: Italic, id: None }
+      72: StartTextStyle { kind: Strikethrough, id: None }
+      73: Text { content: "i" }
+      74: EndTextStyle
+      75: EndTextStyle
+      76: EndTextStyle
+      77: StartTextStyle { kind: Bold, id: None }
+      78: StartTextStyle { kind: Italic, id: None }
+      79: StartTextStyle { kind: Strikethrough, id: None }
+      80: Text { content: "f" }
+      81: EndTextStyle
+      82: EndTextStyle
+      83: EndTextStyle
+      84: StartTextStyle { kind: Bold, id: None }
+      85: StartTextStyle { kind: Italic, id: None }
+      86: StartTextStyle { kind: Strikethrough, id: None }
+      87: Text { content: "f" }
+      88: EndTextStyle
+      89: EndTextStyle
+      90: EndTextStyle
+      91: StartTextStyle { kind: Bold, id: None }
+      92: StartTextStyle { kind: Italic, id: None }
+      93: StartTextStyle { kind: Strikethrough, id: None }
+      94: Text { content: "e" }
+      95: EndTextStyle
+      96: EndTextStyle
+      97: EndTextStyle
+      98: StartTextStyle { kind: Bold, id: None }
+      99: StartTextStyle { kind: Italic, id: None }
+     100: StartTextStyle { kind: Strikethrough, id: None }
+     101: Text { content: "r" }
+     102: EndTextStyle
+     103: EndTextStyle
+     104: EndTextStyle
+     105: StartTextStyle { kind: Bold, id: None }
+     106: StartTextStyle { kind: Italic, id: None }
+     107: StartTextStyle { kind: Strikethrough, id: None }
+     108: Text { content: "e" }
+     109: EndTextStyle
+     110: EndTextStyle
+     111: EndTextStyle
+     112: StartTextStyle { kind: Bold, id: None }
+     113: StartTextStyle { kind: Italic, id: None }
+     114: StartTextStyle { kind: Strikethrough, id: None }
+     115: Text { content: "n" }
+     116: EndTextStyle
+     117: EndTextStyle
+     118: EndTextStyle
+     119: StartTextStyle { kind: Bold, id: None }
+     120: StartTextStyle { kind: Italic, id: None }
+     121: StartTextStyle { kind: Strikethrough, id: None }
+     122: Text { content: "t" }
+     123: EndTextStyle
+     124: EndTextStyle
+     125: EndTextStyle
+     126: StartTextStyle { kind: Bold, id: None }
+     127: Text { content: " " }
+     128: EndTextStyle
+     129: StartTextStyle { kind: Bold, id: None }
+     130: Text { content: "f" }
+     131: EndTextStyle
+     132: StartTextStyle { kind: Bold, id: None }
+     133: Text { content: "o" }
+     134: EndTextStyle
+     135: StartTextStyle { kind: Bold, id: None }
+     136: Text { content: "n" }
+     137: EndTextStyle
+     138: StartTextStyle { kind: Bold, id: None }
+     139: Text { content: "t" }
+     140: EndTextStyle
+     141: StartTextStyle { kind: Bold, id: None }
+     142: Text { content: "s" }
+     143: EndTextStyle
+     144: StartTextStyle { kind: Bold, id: None }
+     145: Text { content: "." }
+     146: EndTextStyle
+     147: EndParagraph
+     148: StartParagraph { alignment: None, id: None }
+     149: EndParagraph
+     150: StartParagraph { alignment: None, id: None }
+     151: EndParagraph
+     152: EndDocument
+  ],
+  terminal: Ok,
+}

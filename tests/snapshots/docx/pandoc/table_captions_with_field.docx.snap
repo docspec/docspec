@@ -1,0 +1,128 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "S" }
+       3: Text { content: "ee" }
+       4: Text { content: " " }
+       5: Text { content: "Table " }
+       6: Text { content: "1" }
+       7: Text { content: ". " }
+       8: EndParagraph
+       9: StartParagraph { alignment: None, id: None }
+      10: Text { content: "Table " }
+      11: Text { content: "1" }
+      12: EndParagraph
+      13: StartTable { id: None }
+      14: StartTableRow { id: None }
+      15: StartTableCell { colspan: None, id: None, rowspan: None }
+      16: StartParagraph { alignment: None, id: None }
+      17: EndParagraph
+      18: EndTableCell
+      19: StartTableCell { colspan: None, id: None, rowspan: None }
+      20: StartParagraph { alignment: None, id: None }
+      21: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      22: Text { content: "Count" }
+      23: EndTextStyle
+      24: EndParagraph
+      25: EndTableCell
+      26: StartTableCell { colspan: None, id: None, rowspan: None }
+      27: StartParagraph { alignment: None, id: None }
+      28: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      29: Text { content: "%" }
+      30: EndTextStyle
+      31: EndParagraph
+      32: EndTableCell
+      33: EndTableRow
+      34: StartTableRow { id: None }
+      35: StartTableCell { colspan: None, id: None, rowspan: None }
+      36: StartParagraph { alignment: None, id: None }
+      37: Text { content: "First option" }
+      38: EndParagraph
+      39: EndTableCell
+      40: StartTableCell { colspan: None, id: None, rowspan: None }
+      41: StartParagraph { alignment: None, id: None }
+      42: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      43: Text { content: "242" }
+      44: EndTextStyle
+      45: EndParagraph
+      46: EndTableCell
+      47: StartTableCell { colspan: None, id: None, rowspan: None }
+      48: StartParagraph { alignment: None, id: None }
+      49: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      50: Text { content: "45" }
+      51: EndTextStyle
+      52: EndParagraph
+      53: EndTableCell
+      54: EndTableRow
+      55: StartTableRow { id: None }
+      56: StartTableCell { colspan: None, id: None, rowspan: None }
+      57: StartParagraph { alignment: None, id: None }
+      58: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      59: Text { content: "Second option" }
+      60: EndTextStyle
+      61: EndParagraph
+      62: EndTableCell
+      63: StartTableCell { colspan: None, id: None, rowspan: None }
+      64: StartParagraph { alignment: None, id: None }
+      65: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      66: Text { content: "99" }
+      67: EndTextStyle
+      68: EndParagraph
+      69: EndTableCell
+      70: StartTableCell { colspan: None, id: None, rowspan: None }
+      71: StartParagraph { alignment: None, id: None }
+      72: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
+      73: Text { content: "18" }
+      74: EndTextStyle
+      75: EndParagraph
+      76: EndTableCell
+      77: EndTableRow
+      78: EndTable
+      79: StartHeading { id: None, level: 2 }
+      80: EndHeading
+      81: StartTable { id: None }
+      82: StartTableRow { id: None }
+      83: StartTableCell { colspan: None, id: None, rowspan: None }
+      84: StartParagraph { alignment: None, id: None }
+      85: Text { content: "One" }
+      86: EndParagraph
+      87: EndTableCell
+      88: StartTableCell { colspan: None, id: None, rowspan: None }
+      89: StartParagraph { alignment: None, id: None }
+      90: Text { content: "Two" }
+      91: EndParagraph
+      92: EndTableCell
+      93: StartTableCell { colspan: None, id: None, rowspan: None }
+      94: StartParagraph { alignment: None, id: None }
+      95: Text { content: "Three" }
+      96: EndParagraph
+      97: EndTableCell
+      98: EndTableRow
+      99: EndTable
+     100: StartParagraph { alignment: None, id: None }
+     101: Text { content: "Table " }
+     102: Text { content: "2" }
+     103: EndParagraph
+     104: StartParagraph { alignment: None, id: None }
+     105: EndParagraph
+     106: StartParagraph { alignment: None, id: None }
+     107: EndParagraph
+     108: StartParagraph { alignment: None, id: None }
+     109: Text { content: "See " }
+     110: Text { content: "Table " }
+     111: Text { content: "2" }
+     112: Text { content: "." }
+     113: EndParagraph
+     114: StartParagraph { alignment: None, id: None }
+     115: EndParagraph
+     116: StartParagraph { alignment: None, id: None }
+     117: EndParagraph
+     118: EndDocument
+  ],
+  terminal: Ok,
+}

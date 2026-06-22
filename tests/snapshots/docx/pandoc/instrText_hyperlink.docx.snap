@@ -1,0 +1,47 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "希望深入了解的读者可以去看" }
+       3: Text { content: "David French Belding" }
+       4: Text { content: "和" }
+       5: Text { content: "Kevin J. Mitchell" }
+       6: Text { content: "的" }
+       7: Text { content: "Foundations of Analysis, 2nd Edition" }
+       8: Text { content: "," }
+       9: Text { content: "可从19页" }
+      10: Text { content: "看起" }
+      11: Text { content: "，" }
+      12: Text { content: "或" }
+      13: Text { content: "D.C. " }
+      14: Text { content: "Goldrei" }
+      15: Text { content: "的" }
+      16: Text { content: " " }
+      17: StartLink { href: "https://books.google.ae/books?id=dlc0DwAAQBAJ&lpg=PT29&hl=zh-CN&pg=PT26", id: None, title: None }
+      18: Text { content: "Classic Set Theory: For Guided Independent Study" }
+      19: EndLink
+      20: Text { content: "，从" }
+      21: Text { content: "第" }
+      22: Text { content: "二章" }
+      23: Text { content: "看起" }
+      24: Text { content: "，" }
+      25: Text { content: "阅读" }
+      26: Text { content: "时" }
+      27: Text { content: "要注意" }
+      28: Text { content: "本文与" }
+      29: Text { content: "这些" }
+      30: Text { content: "书所不同的是" }
+      31: Text { content: "并没有把" }
+      32: Text { content: "实数看作是有理数集的分割" }
+      33: Text { content: "。" }
+      34: EndParagraph
+      35: StartParagraph { alignment: None, id: None }
+      36: EndParagraph
+      37: EndDocument
+  ],
+  terminal: Ok,
+}

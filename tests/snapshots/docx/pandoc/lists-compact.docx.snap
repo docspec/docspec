@@ -1,0 +1,31 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartOrderedListItem { id: Some("1001"), level: 0, start: Some(1), style_type: Decimal }
+       2: StartParagraph { alignment: None, id: None }
+       3: Text { content: "One" }
+       4: EndParagraph
+       5: EndOrderedListItem
+       6: StartOrderedListItem { id: Some("1001"), level: 0, start: None, style_type: Decimal }
+       7: StartParagraph { alignment: None, id: None }
+       8: Text { content: "Two" }
+       9: EndParagraph
+      10: EndOrderedListItem
+      11: StartOrderedListItem { id: Some("1001"), level: 0, start: None, style_type: Decimal }
+      12: StartParagraph { alignment: None, id: None }
+      13: Text { content: "Three" }
+      14: EndParagraph
+      15: EndOrderedListItem
+      16: StartOrderedListItem { id: Some("1001"), level: 0, start: None, style_type: Decimal }
+      17: StartParagraph { alignment: None, id: None }
+      18: Text { content: "Four" }
+      19: EndParagraph
+      20: EndOrderedListItem
+      21: EndDocument
+  ],
+  terminal: Ok,
+}

@@ -13,17 +13,17 @@ use docspec_core::{Event, ImageSource};
 ///
 /// Serialized via [`fmt::Debug`] and compared by `insta::assert_debug_snapshot!`.
 #[derive(Clone, PartialEq, Eq)]
-pub struct CorpusSnapshot {
+pub struct ReaderFixtureSnapshot {
     /// All events emitted before the stream ended or errored.
     pub events: Vec<EventSnapshot>,
     /// How the stream terminated.
     pub terminal: Terminal,
 }
 
-impl fmt::Debug for CorpusSnapshot {
+impl fmt::Debug for ReaderFixtureSnapshot {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "CorpusSnapshot {{")?;
+        writeln!(f, "ReaderFixtureSnapshot {{")?;
         writeln!(f, "  events: [")?;
         for (i, ev) in self.events.iter().enumerate() {
             writeln!(f, "    {i:>4}: {ev:?}")?;
@@ -36,17 +36,46 @@ impl fmt::Debug for CorpusSnapshot {
 
 /// A single event captured from the reader stream.
 #[non_exhaustive]
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum EventSnapshot {
     /// Any non-image event; holds the `{ev:?}` Debug string of the event.
     Other(String),
     /// An image event with stable metadata and asset descriptor.
     Image {
-        /// Stable representation of the non-asset fields.
-        metadata: String,
+        /// Alternative text extracted from the image metadata.
+        alt: Option<String>,
+        /// Whether the image is decorative.
+        decorative: bool,
+        /// Reader-assigned image identifier, if present.
+        id: Option<String>,
+        /// Image title, if present.
+        title: Option<String>,
         /// Asset content descriptor.
         asset: AssetDescriptor,
     },
+}
+
+impl fmt::Debug for EventSnapshot {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Other(event) => f.write_str(event),
+            Self::Image {
+                alt,
+                decorative,
+                id,
+                title,
+                asset,
+            } => f
+                .debug_struct("Image")
+                .field("alt", alt)
+                .field("decorative", decorative)
+                .field("id", id)
+                .field("title", title)
+                .field("asset", asset)
+                .finish(),
+        }
+    }
 }
 
 /// Stable descriptor for an image asset, including its SHA-256 content hash.
@@ -94,7 +123,7 @@ pub fn is_lfs_pointer(bytes: &[u8]) -> bool {
 }
 
 /// Reads a fixture file, opens it with `open`, drains the event stream, and
-/// returns a [`CorpusSnapshot`].
+/// returns a [`ReaderFixtureSnapshot`].
 ///
 /// # Panics
 ///
@@ -102,7 +131,7 @@ pub fn is_lfs_pointer(bytes: &[u8]) -> bool {
 /// - Panics with a message containing `"Git LFS pointer"` and `"git lfs pull"` if
 ///   the file is an LFS pointer rather than smudged bytes.
 #[inline]
-pub fn capture<P, R, E, F>(path: P, open: F) -> CorpusSnapshot
+pub fn capture<P, R, E, F>(path: P, open: F) -> ReaderFixtureSnapshot
 where
     P: AsRef<Path>,
     R: docspec_core::EventSource,
@@ -120,7 +149,7 @@ where
     let mut reader = match open(bytes) {
         Ok(r) => r,
         Err(e) => {
-            return CorpusSnapshot {
+            return ReaderFixtureSnapshot {
                 events: vec![],
                 terminal: Terminal::Err(format!("open error: {e}")),
             };
@@ -131,13 +160,13 @@ where
         match reader.next_event() {
             Ok(Some(ev)) => events.push(event_to_snapshot(&ev)),
             Ok(None) => {
-                return CorpusSnapshot {
+                return ReaderFixtureSnapshot {
                     events,
                     terminal: Terminal::Ok,
                 };
             }
             Err(e) => {
-                return CorpusSnapshot {
+                return ReaderFixtureSnapshot {
                     events,
                     terminal: Terminal::Err(format!("{e}")),
                 };
@@ -155,9 +184,14 @@ fn event_to_snapshot(ev: &Event) -> EventSnapshot {
             id,
             title,
         } => {
-            let metadata = format!("alt={alt:?} decorative={decorative} id={id:?} title={title:?}");
             let asset = describe_asset(source);
-            EventSnapshot::Image { metadata, asset }
+            EventSnapshot::Image {
+                alt: alt.clone(),
+                decorative: *decorative,
+                id: id.clone(),
+                title: title.clone(),
+                asset,
+            }
         }
         other => EventSnapshot::Other(format!("{other:?}")),
     }
@@ -406,8 +440,8 @@ mod tests {
     }
 
     #[test]
-    fn corpus_snapshot_debug_shows_indexed_events() {
-        let snapshot = CorpusSnapshot {
+    fn reader_fixture_snapshot_debug_shows_indexed_events() {
+        let snapshot = ReaderFixtureSnapshot {
             events: vec![
                 EventSnapshot::Other("StartDocument".to_owned()),
                 EventSnapshot::Other("EndDocument".to_owned()),

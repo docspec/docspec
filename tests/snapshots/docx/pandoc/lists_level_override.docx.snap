@@ -1,0 +1,123 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "For each initiative below is outlined the goals, an approximate roadmap which will likely change as we iterate, signals/metrics to measure success, and initial workitems with a rough " }
+       3: StartTextStyle { kind: Bold, id: None }
+       4: Text { content: "schedule" }
+       5: EndTextStyle
+       6: Text { content: " and contacts where available:" }
+       7: EndParagraph
+       8: StartParagraph { alignment: None, id: None }
+       9: Text { content: "\u{a0}" }
+      10: EndParagraph
+      11: StartOrderedListItem { id: Some("1"), level: 0, start: Some(1), style_type: Decimal }
+      12: StartParagraph { alignment: None, id: None }
+      13: StartTextStyle { kind: TextColor(Rgb { b: 181, g: 117, r: 46 }), id: None }
+      14: Text { content: "State of Documentation " }
+      15: EndTextStyle
+      16: EndParagraph
+      17: StartParagraph { alignment: None, id: None }
+      18: StartTextStyle { kind: Bold, id: None }
+      19: StartTextStyle { kind: TextColor(Rgb { b: 213, g: 155, r: 91 }), id: None }
+      20: Text { content: "Goal:         Baseline and ongoing metrics tracking doc usefulness and completeness." }
+      21: EndTextStyle
+      22: EndTextStyle
+      23: EndParagraph
+      24: StartParagraph { alignment: None, id: None }
+      25: Text { content: "\u{a0}" }
+      26: EndParagraph
+      27: EndOrderedListItem
+      28: StartOrderedListItem { id: Some("2"), level: 0, start: Some(1), style_type: Decimal }
+      29: StartParagraph { alignment: None, id: None }
+      30: StartTextStyle { kind: TextColor(Rgb { b: 181, g: 117, r: 46 }), id: None }
+      31: Text { content: "Content Migration " }
+      32: EndTextStyle
+      33: EndParagraph
+      34: StartParagraph { alignment: None, id: None }
+      35: Text { content: "Goal: Content is accessible to new employees and is better organized/archived." }
+      36: EndParagraph
+      37: StartParagraph { alignment: None, id: None }
+      38: Text { content: "\u{a0}" }
+      39: EndParagraph
+      40: EndOrderedListItem
+      41: StartOrderedListItem { id: Some("3"), level: 0, start: Some(1), style_type: Decimal }
+      42: StartParagraph { alignment: None, id: None }
+      43: StartTextStyle { kind: TextColor(Rgb { b: 181, g: 117, r: 46 }), id: None }
+      44: Text { content: "Wiki (xl)" }
+      45: EndTextStyle
+      46: EndParagraph
+      47: StartParagraph { alignment: None, id: None }
+      48: StartTextStyle { kind: Bold, id: None }
+      49: StartTextStyle { kind: TextColor(Rgb { b: 213, g: 155, r: 91 }), id: None }
+      50: Text { content: "Goal:         Useful documentation that is archived, searchable and easy to create" }
+      51: EndTextStyle
+      52: EndTextStyle
+      53: EndParagraph
+      54: StartParagraph { alignment: None, id: None }
+      55: Text { content: "\u{a0}\u{a0}" }
+      56: EndParagraph
+      57: EndOrderedListItem
+      58: StartOrderedListItem { id: Some("4"), level: 0, start: Some(1), style_type: Decimal }
+      59: StartParagraph { alignment: None, id: None }
+      60: StartTextStyle { kind: TextColor(Rgb { b: 181, g: 117, r: 46 }), id: None }
+      61: Text { content: "XL Code Autoreview Bot (XLCRBot). " }
+      62: EndTextStyle
+      63: EndParagraph
+      64: StartParagraph { alignment: None, id: None }
+      65: StartTextStyle { kind: Bold, id: None }
+      66: StartTextStyle { kind: TextColor(Rgb { b: 213, g: 155, r: 91 }), id: None }
+      67: Text { content: "Goal:         Feedback on basic violations in seconds or minutes at most in either VS or Codeflow." }
+      68: EndTextStyle
+      69: EndTextStyle
+      70: EndParagraph
+      71: StartParagraph { alignment: None, id: None }
+      72: EndParagraph
+      73: EndOrderedListItem
+      74: StartOrderedListItem { id: Some("5"), level: 0, start: Some(1), style_type: Decimal }
+      75: StartParagraph { alignment: None, id: None }
+      76: StartTextStyle { kind: TextColor(Rgb { b: 181, g: 117, r: 46 }), id: None }
+      77: Text { content: "Code documentation" }
+      78: EndTextStyle
+      79: EndParagraph
+      80: StartParagraph { alignment: None, id: None }
+      81: StartTextStyle { kind: Bold, id: None }
+      82: StartTextStyle { kind: TextColor(Rgb { b: 213, g: 155, r: 91 }), id: None }
+      83: Text { content: "Goal:        Useful, consistent, tool supported comments " }
+      84: EndTextStyle
+      85: EndTextStyle
+      86: EndParagraph
+      87: StartParagraph { alignment: None, id: None }
+      88: StartTextStyle { kind: Bold, id: None }
+      89: Text { content: "\u{a0}" }
+      90: EndTextStyle
+      91: Text { content: "\u{a0}" }
+      92: EndParagraph
+      93: EndOrderedListItem
+      94: StartOrderedListItem { id: Some("6"), level: 0, start: Some(1), style_type: Decimal }
+      95: StartParagraph { alignment: None, id: None }
+      96: StartTextStyle { kind: TextColor(Rgb { b: 181, g: 117, r: 46 }), id: None }
+      97: Text { content: "Education efforts" }
+      98: EndTextStyle
+      99: EndParagraph
+     100: StartParagraph { alignment: None, id: None }
+     101: StartTextStyle { kind: Bold, id: None }
+     102: StartTextStyle { kind: TextColor(Rgb { b: 213, g: 155, r: 91 }), id: None }
+     103: Text { content: "Goal:        Broad, discoverable channels for updates and news" }
+     104: EndTextStyle
+     105: EndTextStyle
+     106: EndParagraph
+     107: StartParagraph { alignment: None, id: None }
+     108: StartTextStyle { kind: Bold, id: None }
+     109: Text { content: "\u{a0}" }
+     110: EndTextStyle
+     111: EndParagraph
+     112: EndOrderedListItem
+     113: EndDocument
+  ],
+  terminal: Ok,
+}

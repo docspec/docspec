@@ -1,0 +1,20 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "First bullet point created and then deleted" }
+       3: EndParagraph
+       4: StartParagraph { alignment: None, id: None }
+       5: Text { content: "A normal paragraph" }
+       6: EndParagraph
+       7: StartParagraph { alignment: None, id: None }
+       8: Text { content: "First bullet point created and then deleted after the normal paragraph" }
+       9: EndParagraph
+      10: EndDocument
+  ],
+  terminal: Ok,
+}

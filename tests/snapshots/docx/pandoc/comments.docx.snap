@@ -1,0 +1,32 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "I want " }
+       3: Text { content: "some text to have a comment " }
+       4: Text { content: "on it." }
+       5: EndParagraph
+       6: StartParagraph { alignment: None, id: None }
+       7: Text { content: "This is " }
+       8: Text { content: "a new paragraph." }
+       9: EndParagraph
+      10: StartParagraph { alignment: None, id: None }
+      11: Text { content: "And so" }
+      12: Text { content: " is this." }
+      13: EndParagraph
+      14: StartParagraph { alignment: None, id: None }
+      15: Text { content: "One " }
+      16: Text { content: "more" }
+      17: Text { content: "." }
+      18: Text { content: " And this is one with a " }
+      19: Text { content: "comment in a comment" }
+      20: Text { content: "." }
+      21: EndParagraph
+      22: EndDocument
+  ],
+  terminal: Ok,
+}

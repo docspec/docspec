@@ -1,0 +1,60 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "希望深入了解的读者可以去看" }
+       3: Text { content: "David French" }
+       4: Text { content: " Belding" }
+       5: Text { content: "和" }
+       6: Text { content: "Kevin J. Mitchell" }
+       7: Text { content: "的" }
+       8: Text { content: "Foundations of Analysis, 2nd Edition" }
+       9: Text { content: "," }
+      10: Text { content: "可从19页" }
+      11: Text { content: "看起" }
+      12: Text { content: "，" }
+      13: Text { content: "或" }
+      14: Text { content: "D.C. " }
+      15: Text { content: "Goldrei" }
+      16: Text { content: "的" }
+      17: Text { content: " " }
+      18: StartLink { href: "https://books.google.ae/books?id=dlc0DwAAQBAJ&lpg=PT29&hl=zh-CN&pg=PT26", id: None, title: None }
+      19: Text { content: "Classic Set Theory: For Guided Independent Study" }
+      20: EndLink
+      21: Text { content: "，从" }
+      22: Text { content: "第" }
+      23: Text { content: "二章" }
+      24: Text { content: "看起" }
+      25: Text { content: "，" }
+      26: Text { content: "阅读" }
+      27: Text { content: "时" }
+      28: Text { content: "要注意" }
+      29: Text { content: "本文与" }
+      30: Text { content: "这些" }
+      31: Text { content: "书所不同的是" }
+      32: Text { content: "并没有把" }
+      33: Text { content: "实数看作是有理数集的分割" }
+      34: Text { content: "。" }
+      35: EndParagraph
+      36: StartParagraph { alignment: Some(Left), id: None }
+      37: LineBreak
+      38: EndParagraph
+      39: StartParagraph { alignment: None, id: None }
+      40: Text { content: "\t" }
+      41: Text { content: "Index:" }
+      42: EndParagraph
+      43: StartParagraph { alignment: None, id: None }
+      44: Text { content: "\t" }
+      45: Text { content: "French" }
+      46: Text { content: ", 1" }
+      47: EndParagraph
+      48: StartParagraph { alignment: None, id: None }
+      49: EndParagraph
+      50: EndDocument
+  ],
+  terminal: Ok,
+}

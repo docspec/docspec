@@ -1,0 +1,80 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartHeading { id: None, level: 2 }
+       2: Text { content: "159. And It Came to Pass " }
+       3: Text { content: "in the Course of" }
+       4: Text { content: " Those Many Days" }
+       5: EndHeading
+       6: StartParagraph { alignment: None, id: None }
+       7: Text { content: "I heard" }
+       8: EndParagraph
+       9: StartParagraph { alignment: None, id: None }
+      10: Text { content: "“And it came to pass " }
+      11: Text { content: "in the course of" }
+      12: Text { content: " those many days that the king of " }
+      13: Text { content: "Egypt" }
+      14: Text { content: " died; and the children of " }
+      15: Text { content: "Israel" }
+      16: Text { content: " sighed by reason of the bondage, and they cried, and their cry came up unto God by reason of the bondage. And God heard their groaning” (Exodus 2:23-4). This means that they suffered so much that they could not bear it any longer. And they so pleaded with prayer, that “their cry came up unto God.”" }
+      17: EndParagraph
+      18: StartParagraph { alignment: None, id: None }
+      19: Text { content: "But we can see that they were saying, “Would that we had… when we sat by the flesh-pots, when we did eat bread to the full.” And they also said, “We remember the fish, which we" }
+      20: Text { content: " would" }
+      21: Text { content: " eat in " }
+      22: Text { content: "Egypt" }
+      23: Text { content: " for naught; the cucumbers, and the melons, and the leeks, and the onions, and the garlic.”" }
+      24: EndParagraph
+      25: StartParagraph { alignment: None, id: None }
+      26: Text { content: "The thing is that" }
+      27: Text { content: "," }
+      28: Text { content: " indeed, they were very fond of the work in " }
+      29: Text { content: "Egypt" }
+      30: Text { content: ". This is the meaning of “But mingled themselves with the nations, and learned their works.” It means that if " }
+      31: Text { content: "Israel" }
+      32: Text { content: " are under the dominion of a certain nation, that nation controls them and they cannot retire from their dominion. Thus, they tasted sufficient flavor in that work and could not be redeemed." }
+      33: EndParagraph
+      34: StartParagraph { alignment: None, id: None }
+      35: Text { content: "So" }
+      36: Text { content: " what did the Creator do? “The king of " }
+      37: Text { content: "Egypt" }
+      38: Text { content: " died,” meaning they had lost this servitude. " }
+      39: Text { content: "Thus" }
+      40: Text { content: " they could no longer work; they understood that if there is no perfection of the " }
+      41: StartTextStyle { kind: Italic, id: None }
+      42: Text { content: "Mochin" }
+      43: EndTextStyle
+      44: Text { content: ", the servitude is also incomplete. Hence, “and the children of " }
+      45: Text { content: "Israel" }
+      46: Text { content: " sighed " }
+      47: Text { content: "by reason of" }
+      48: Text { content: " the bondage.” The work means that they did not suffice for the work, that they had no liveliness in the servitude." }
+      49: EndParagraph
+      50: StartParagraph { alignment: None, id: None }
+      51: Text { content: "This is the meaning of “the king of " }
+      52: Text { content: "Egypt" }
+      53: Text { content: " died,” that all the dominations of the king of " }
+      54: Text { content: "Egypt" }
+      55: Text { content: ", which he was providing for and nourishing, had died. " }
+      56: Text { content: "This is why" }
+      57: Text { content: " they had room for prayer. And they were immediately salvaged. And afterwards, when they walked in the desert and came to a state of " }
+      58: StartTextStyle { kind: Italic, id: None }
+      59: Text { content: "Katnut" }
+      60: EndTextStyle
+      61: StartTextStyle { kind: Italic, id: None }
+      62: Text { content: " " }
+      63: EndTextStyle
+      64: Text { content: "(smallness)," }
+      65: Text { content: " " }
+      66: Text { content: "they craved the servitude that they had had prior to the death of the king of Egypt." }
+      67: EndParagraph
+      68: StartParagraph { alignment: None, id: None }
+      69: EndParagraph
+      70: EndDocument
+  ],
+  terminal: Ok,
+}

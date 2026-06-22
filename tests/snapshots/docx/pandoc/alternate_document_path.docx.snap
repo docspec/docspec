@@ -1,0 +1,53 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "Test" }
+       3: EndParagraph
+       4: StartParagraph { alignment: None, id: None }
+       5: EndParagraph
+       6: StartParagraph { alignment: None, id: None }
+       7: Text { content: "This is " }
+       8: StartTextStyle { kind: Italic, id: None }
+       9: Text { content: "italic" }
+      10: EndTextStyle
+      11: Text { content: ", " }
+      12: StartTextStyle { kind: Bold, id: None }
+      13: Text { content: "bold" }
+      14: EndTextStyle
+      15: Text { content: ", " }
+      16: StartTextStyle { kind: Underline, id: None }
+      17: Text { content: "underlined" }
+      18: EndTextStyle
+      19: Text { content: ", " }
+      20: StartTextStyle { kind: Italic, id: None }
+      21: StartTextStyle { kind: Underline, id: None }
+      22: Text { content: "italic underlined" }
+      23: EndTextStyle
+      24: EndTextStyle
+      25: Text { content: ", " }
+      26: StartTextStyle { kind: Bold, id: None }
+      27: StartTextStyle { kind: Underline, id: None }
+      28: Text { content: "bold underlined" }
+      29: EndTextStyle
+      30: EndTextStyle
+      31: Text { content: ", " }
+      32: StartTextStyle { kind: Bold, id: None }
+      33: StartTextStyle { kind: Italic, id: None }
+      34: StartTextStyle { kind: Underline, id: None }
+      35: Text { content: "bold italic underlined" }
+      36: EndTextStyle
+      37: EndTextStyle
+      38: EndTextStyle
+      39: Text { content: "." }
+      40: EndParagraph
+      41: StartParagraph { alignment: None, id: None }
+      42: EndParagraph
+      43: EndDocument
+  ],
+  terminal: Ok,
+}

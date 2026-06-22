@@ -1,0 +1,50 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "A Test of Headers" }
+       3: EndParagraph
+       4: StartParagraph { alignment: None, id: None }
+       5: Text { content: "Second Level" }
+       6: EndParagraph
+       7: StartParagraph { alignment: None, id: None }
+       8: Text { content: "Some plain text." }
+       9: EndParagraph
+      10: StartParagraph { alignment: None, id: None }
+      11: Text { content: "Third level" }
+      12: EndParagraph
+      13: StartParagraph { alignment: None, id: None }
+      14: Text { content: "Some more plain text." }
+      15: EndParagraph
+      16: StartParagraph { alignment: None, id: None }
+      17: Text { content: "Fourth level" }
+      18: EndParagraph
+      19: StartParagraph { alignment: None, id: None }
+      20: Text { content: "Some more plain text." }
+      21: EndParagraph
+      22: StartParagraph { alignment: None, id: None }
+      23: Text { content: "Fifth level" }
+      24: EndParagraph
+      25: StartParagraph { alignment: None, id: None }
+      26: Text { content: "Some more plain text." }
+      27: EndParagraph
+      28: StartParagraph { alignment: None, id: None }
+      29: Text { content: "Sixth level" }
+      30: EndParagraph
+      31: StartParagraph { alignment: None, id: None }
+      32: Text { content: "Some more plain text." }
+      33: EndParagraph
+      34: StartParagraph { alignment: None, id: None }
+      35: Text { content: "Seventh level" }
+      36: EndParagraph
+      37: StartParagraph { alignment: None, id: None }
+      38: Text { content: "Since no Heading 7 style exists in styles.xml, this gets converted to Span." }
+      39: EndParagraph
+      40: EndDocument
+  ],
+  terminal: Ok,
+}

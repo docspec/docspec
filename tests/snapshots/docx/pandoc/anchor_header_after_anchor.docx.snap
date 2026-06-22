@@ -1,0 +1,40 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "A" }
+       3: Text { content: " link to " }
+       4: Text { content: "the" }
+       5: Text { content: " bookmark" }
+       6: EndParagraph
+       7: StartParagraph { alignment: Some(Justify), id: None }
+       8: StartTextStyle { kind: Bold, id: None }
+       9: Text { content: "Accomplices" }
+      10: EndTextStyle
+      11: StartTextStyle { kind: Bold, id: None }
+      12: Text { content: ":" }
+      13: EndTextStyle
+      14: EndParagraph
+      15: StartParagraph { alignment: Some(Justify), id: None }
+      16: Text { content: "There are bookmarks around here" }
+      17: Text { content: "." }
+      18: EndParagraph
+      19: StartParagraph { alignment: Some(Justify), id: None }
+      20: EndParagraph
+      21: StartParagraph { alignment: Some(Justify), id: None }
+      22: EndParagraph
+      23: StartHeading { id: None, level: 1 }
+      24: Text { content: "Referenced " }
+      25: Text { content: "title" }
+      26: EndHeading
+      27: StartParagraph { alignment: None, id: None }
+      28: Text { content: "Content" }
+      29: EndParagraph
+      30: EndDocument
+  ],
+  terminal: Ok,
+}

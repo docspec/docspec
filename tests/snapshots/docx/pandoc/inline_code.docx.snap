@@ -1,0 +1,20 @@
+---
+source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
+expression: snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "This is an example of" }
+       3: Text { content: " " }
+       4: StartTextStyle { kind: Code, id: None }
+       5: Text { content: "inline   code" }
+       6: EndTextStyle
+       7: Text { content: " " }
+       8: Text { content: "with three spaces." }
+       9: EndParagraph
+      10: EndDocument
+  ],
+  terminal: Ok,
+}
