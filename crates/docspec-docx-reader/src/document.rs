@@ -154,6 +154,8 @@ pub struct DocumentReader {
     /// The block kind opened for the current paragraph.
     /// Set in `ensure_paragraph_started()`, consumed in `end_paragraph()`.
     current_paragraph_block: ParagraphBlockKind,
+    /// True when a preformatted paragraph ended but the block close is deferred until the next boundary.
+    pending_preformatted_close: bool,
     /// True once `StartParagraph` has been queued for the current paragraph.
     paragraph_started_emitted: bool,
     /// Whether currently inside a `<w:rPr>` element that is still legal (first child of run).
@@ -268,6 +270,10 @@ impl fmt::Debug for DocumentReader {
                 &self.pending_paragraph_classification,
             )
             .field("current_paragraph_block", &self.current_paragraph_block)
+            .field(
+                "pending_preformatted_close",
+                &self.pending_preformatted_close,
+            )
             .field("paragraph_started_emitted", &self.paragraph_started_emitted)
             .field("in_rpr", &self.in_rpr)
             .field("pending_run_kinds", &self.pending_run_kinds)
@@ -338,6 +344,7 @@ impl DocumentReader {
             pending_paragraph_alignment: None,
             pending_paragraph_classification: None,
             current_paragraph_block: ParagraphBlockKind::Paragraph,
+            pending_preformatted_close: false,
             paragraph_started_emitted: false,
             in_rpr: false,
             pending_run_kinds: Vec::new(),
@@ -459,9 +466,17 @@ impl DocumentReader {
             | ParagraphBlockKind::UnorderedListItem { .. } => Event::EndParagraph,
             ParagraphBlockKind::Heading { .. } => Event::EndHeading,
             ParagraphBlockKind::BlockQuote => Event::EndBlockQuote,
-            ParagraphBlockKind::Preformatted => Event::EndPreformatted,
+            ParagraphBlockKind::Preformatted => {
+                self.pending_preformatted_close = true;
+                self.reset_paragraph_state();
+                return;
+            }
         };
         self.queue.push_back(end_event);
+        self.reset_paragraph_state();
+    }
+
+    fn reset_paragraph_state(&mut self) {
         self.in_paragraph = false;
         self.in_text = false;
         self.pending_text.clear();
@@ -469,10 +484,18 @@ impl DocumentReader {
         self.in_numpr = false;
         self.pending_num_pr_id = None;
         self.pending_num_pr_ilvl = None;
+        self.pending_paragraph_list = None;
         self.pending_paragraph_alignment = None;
         self.pending_paragraph_classification = None;
         self.current_paragraph_block = ParagraphBlockKind::Paragraph;
         self.paragraph_started_emitted = false;
+    }
+
+    fn flush_pending_preformatted_close(&mut self) {
+        if self.pending_preformatted_close {
+            self.queue.push_back(Event::EndPreformatted);
+            self.pending_preformatted_close = false;
+        }
     }
 
     fn flush_list_stack(&mut self) {
@@ -913,11 +936,13 @@ impl DocumentReader {
             }
             b"tbl" => {
                 self.flush_list_stack();
+                self.flush_pending_preformatted_close();
                 self.table_depth = self.table_depth.saturating_sub(1);
                 self.queue.push_back(Event::EndTable);
             }
             b"tr" => {
                 self.ensure_row_started();
+                self.flush_pending_preformatted_close();
                 self.queue.push_back(Event::EndTableRow);
                 if self.table_depth > 1 {
                     if let Some((pending_row_is_header, row_started_emitted, in_trpr)) =
@@ -932,6 +957,7 @@ impl DocumentReader {
             b"tc" => {
                 self.ensure_cell_started();
                 self.flush_list_stack();
+                self.flush_pending_preformatted_close();
                 if self.current_cell_is_header && self.table_depth == 1 {
                     self.queue.push_back(Event::EndTableHeader);
                 } else {
@@ -961,6 +987,7 @@ impl DocumentReader {
             self.end_paragraph();
         }
         self.flush_list_stack();
+        self.flush_pending_preformatted_close();
         self.queue.push_back(Event::EndDocument);
         self.phase = Phase::Finished;
     }
@@ -1248,6 +1275,7 @@ impl DocumentReader {
             b"tbl" => {
                 self.ensure_cell_started();
                 self.flush_list_stack();
+                self.flush_pending_preformatted_close();
                 self.table_depth = self.table_depth.saturating_add(1);
                 if self.table_depth == 1 {
                     self.header_band_open = true;
@@ -1369,6 +1397,21 @@ impl DocumentReader {
     /// Queues the appropriate Start event once paragraph properties have been parsed.
     fn ensure_paragraph_started(&mut self) {
         if self.in_paragraph && !self.paragraph_started_emitted {
+            if self.pending_preformatted_close {
+                if matches!(
+                    self.pending_paragraph_classification.as_ref(),
+                    Some(crate::styles::StyleClassification::Code)
+                ) {
+                    self.queue.push_back(Event::LineBreak);
+                    self.pending_preformatted_close = false;
+                    self.current_paragraph_block = ParagraphBlockKind::Preformatted;
+                    self.paragraph_started_emitted = true;
+                    self.pending_paragraph_classification = None;
+                    return;
+                }
+                self.flush_pending_preformatted_close();
+            }
+
             let list_classification = match self.pending_paragraph_list.take() {
                 None => None,
                 Some((num_id, raw_ilvl)) => {

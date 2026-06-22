@@ -15,124 +15,97 @@ ReaderFixtureSnapshot {
        8: EndParagraph
        9: StartPreformatted { id: None, syntax: None }
       10: Text { content: "# ifconfig -a" }
-      11: EndPreformatted
-      12: StartPreformatted { id: None, syntax: None }
-      13: Text { content: "eth0      Link encap:Ethernet  HWaddr 00:0c:29:69:12:7c  " }
-      14: EndPreformatted
-      15: StartPreformatted { id: None, syntax: None }
-      16: Text { content: "          inet addr:172.16.0.108  Bcast:172.16.0.255  Mask:255.255.255.0" }
-      17: EndPreformatted
-      18: StartPreformatted { id: None, syntax: None }
-      19: Text { content: "          inet6 addr: fc00:660:0:1:20c:29ff:fe69:127c/64 Scope:Global" }
-      20: EndPreformatted
-      21: StartPreformatted { id: None, syntax: None }
-      22: Text { content: "          inet6 addr: fe80::20c:29ff:fe69:127c/64 Scope:Link" }
-      23: EndPreformatted
-      24: StartPreformatted { id: None, syntax: None }
-      25: Text { content: "          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1" }
-      26: EndPreformatted
-      27: StartPreformatted { id: None, syntax: None }
-      28: Text { content: "          RX packets:9859 errors:0 dropped:0 overruns:0 frame:0" }
-      29: EndPreformatted
-      30: StartPreformatted { id: None, syntax: None }
-      31: Text { content: "          TX packets:1399 errors:0 dropped:0 overruns:0 carrier:0" }
-      32: EndPreformatted
-      33: StartPreformatted { id: None, syntax: None }
-      34: Text { content: "          collisions:0 txqueuelen:1000 " }
-      35: EndPreformatted
-      36: StartPreformatted { id: None, syntax: None }
-      37: Text { content: "          RX bytes:1920894 (1.8 MiB)  TX bytes:233088 (227.6 KiB)" }
-      38: EndPreformatted
-      39: StartPreformatted { id: None, syntax: None }
-      40: Text { content: "          Interrupt:19 Base address:0x2000 " }
-      41: EndPreformatted
-      42: StartPreformatted { id: None, syntax: None }
-      43: EndPreformatted
-      44: StartPreformatted { id: None, syntax: None }
-      45: Text { content: "lo        Link encap:Local Loopback  " }
-      46: EndPreformatted
-      47: StartPreformatted { id: None, syntax: None }
-      48: Text { content: "          inet addr:127.0.0.1  Mask:255.0.0.0" }
-      49: EndPreformatted
-      50: StartPreformatted { id: None, syntax: None }
-      51: Text { content: "          inet6 addr: ::1/128 Scope:Host" }
-      52: EndPreformatted
-      53: StartPreformatted { id: None, syntax: None }
-      54: Text { content: "          UP LOOPBACK RUNNING  MTU:65536  Metric:1" }
-      55: EndPreformatted
-      56: StartPreformatted { id: None, syntax: None }
-      57: Text { content: "          RX packets:372 errors:0 dropped:0 overruns:0 frame:0" }
-      58: EndPreformatted
-      59: StartPreformatted { id: None, syntax: None }
-      60: Text { content: "          TX packets:372 errors:0 dropped:0 overruns:0 carrier:0" }
+      11: LineBreak
+      12: Text { content: "eth0      Link encap:Ethernet  HWaddr 00:0c:29:69:12:7c  " }
+      13: LineBreak
+      14: Text { content: "          inet addr:172.16.0.108  Bcast:172.16.0.255  Mask:255.255.255.0" }
+      15: LineBreak
+      16: Text { content: "          inet6 addr: fc00:660:0:1:20c:29ff:fe69:127c/64 Scope:Global" }
+      17: LineBreak
+      18: Text { content: "          inet6 addr: fe80::20c:29ff:fe69:127c/64 Scope:Link" }
+      19: LineBreak
+      20: Text { content: "          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1" }
+      21: LineBreak
+      22: Text { content: "          RX packets:9859 errors:0 dropped:0 overruns:0 frame:0" }
+      23: LineBreak
+      24: Text { content: "          TX packets:1399 errors:0 dropped:0 overruns:0 carrier:0" }
+      25: LineBreak
+      26: Text { content: "          collisions:0 txqueuelen:1000 " }
+      27: LineBreak
+      28: Text { content: "          RX bytes:1920894 (1.8 MiB)  TX bytes:233088 (227.6 KiB)" }
+      29: LineBreak
+      30: Text { content: "          Interrupt:19 Base address:0x2000 " }
+      31: LineBreak
+      32: LineBreak
+      33: Text { content: "lo        Link encap:Local Loopback  " }
+      34: LineBreak
+      35: Text { content: "          inet addr:127.0.0.1  Mask:255.0.0.0" }
+      36: LineBreak
+      37: Text { content: "          inet6 addr: ::1/128 Scope:Host" }
+      38: LineBreak
+      39: Text { content: "          UP LOOPBACK RUNNING  MTU:65536  Metric:1" }
+      40: LineBreak
+      41: Text { content: "          RX packets:372 errors:0 dropped:0 overruns:0 frame:0" }
+      42: LineBreak
+      43: Text { content: "          TX packets:372 errors:0 dropped:0 overruns:0 carrier:0" }
+      44: LineBreak
+      45: Text { content: "          collisions:0 txqueuelen:0 " }
+      46: LineBreak
+      47: Text { content: "          RX bytes:22320 (21.7 KiB)  TX bytes:22320 (21.7 KiB)" }
+      48: LineBreak
+      49: LineBreak
+      50: Text { content: "wlan0     Link encap:Ethernet  HWaddr 00:c0:ca:85:00:ba  " }
+      51: LineBreak
+      52: Text { content: "          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1" }
+      53: LineBreak
+      54: Text { content: "          RX packets:0 errors:0 dropped:0 overruns:0 frame:0" }
+      55: LineBreak
+      56: Text { content: "          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0" }
+      57: LineBreak
+      58: Text { content: "          collisions:0 txqueuelen:1000 " }
+      59: LineBreak
+      60: Text { content: "          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)" }
       61: EndPreformatted
-      62: StartPreformatted { id: None, syntax: None }
-      63: Text { content: "          collisions:0 txqueuelen:0 " }
-      64: EndPreformatted
-      65: StartPreformatted { id: None, syntax: None }
-      66: Text { content: "          RX bytes:22320 (21.7 KiB)  TX bytes:22320 (21.7 KiB)" }
-      67: EndPreformatted
-      68: StartPreformatted { id: None, syntax: None }
-      69: EndPreformatted
-      70: StartPreformatted { id: None, syntax: None }
-      71: Text { content: "wlan0     Link encap:Ethernet  HWaddr 00:c0:ca:85:00:ba  " }
-      72: EndPreformatted
-      73: StartPreformatted { id: None, syntax: None }
-      74: Text { content: "          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1" }
-      75: EndPreformatted
-      76: StartPreformatted { id: None, syntax: None }
-      77: Text { content: "          RX packets:0 errors:0 dropped:0 overruns:0 frame:0" }
-      78: EndPreformatted
-      79: StartPreformatted { id: None, syntax: None }
-      80: Text { content: "          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0" }
-      81: EndPreformatted
-      82: StartPreformatted { id: None, syntax: None }
-      83: Text { content: "          collisions:0 txqueuelen:1000 " }
-      84: EndPreformatted
+      62: StartParagraph { alignment: None, id: None }
+      63: EndParagraph
+      64: StartParagraph { alignment: None, id: None }
+      65: Text { content: "The ALFA wireless card is represented by the \"wlan0\" interface." }
+      66: EndParagraph
+      67: StartParagraph { alignment: None, id: None }
+      68: Text { content: "In addition to the interfaces shown in the " }
+      69: Text { content: "ifconfig" }
+      70: Text { content: " output, there is " }
+      71: Text { content: "another" }
+      72: Text { content: " interface known as the " }
+      73: StartTextStyle { kind: Italic, id: None }
+      74: Text { content: "wireless physical interface" }
+      75: EndTextStyle
+      76: Text { content: ". " }
+      77: Text { content: "We can identify this interface by listing the contents of the " }
+      78: Text { content: "/sys/class/ieee80211" }
+      79: Text { content: " directory, as shown" }
+      80: Text { content: "." }
+      81: EndParagraph
+      82: StartParagraph { alignment: None, id: None }
+      83: Text { content: "\t" }
+      84: EndParagraph
       85: StartPreformatted { id: None, syntax: None }
-      86: Text { content: "          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)" }
-      87: EndPreformatted
-      88: StartParagraph { alignment: None, id: None }
-      89: EndParagraph
+      86: Text { content: "# ls /sys/class/ieee80211/" }
+      87: LineBreak
+      88: Text { content: "phy0" }
+      89: EndPreformatted
       90: StartParagraph { alignment: None, id: None }
-      91: Text { content: "The ALFA wireless card is represented by the \"wlan0\" interface." }
-      92: EndParagraph
-      93: StartParagraph { alignment: None, id: None }
-      94: Text { content: "In addition to the interfaces shown in the " }
-      95: Text { content: "ifconfig" }
-      96: Text { content: " output, there is " }
-      97: Text { content: "another" }
-      98: Text { content: " interface known as the " }
-      99: StartTextStyle { kind: Italic, id: None }
-     100: Text { content: "wireless physical interface" }
-     101: EndTextStyle
-     102: Text { content: ". " }
-     103: Text { content: "We can identify this interface by listing the contents of the " }
-     104: Text { content: "/sys/class/ieee80211" }
-     105: Text { content: " directory, as shown" }
-     106: Text { content: "." }
-     107: EndParagraph
-     108: StartParagraph { alignment: None, id: None }
-     109: Text { content: "\t" }
-     110: EndParagraph
-     111: StartPreformatted { id: None, syntax: None }
-     112: Text { content: "# ls /sys/class/ieee80211/" }
-     113: EndPreformatted
-     114: StartPreformatted { id: None, syntax: None }
-     115: Text { content: "phy0" }
-     116: EndPreformatted
-     117: StartParagraph { alignment: None, id: None }
-     118: EndParagraph
-     119: StartParagraph { alignment: None, id: None }
-     120: Text { content: "The \"phy0\" interface is the parent interface used to create child interfaces. Note that if you unplug and " }
-     121: Text { content: "replug" }
-     122: Text { content: " the USB interface, the \"" }
-     123: Text { content: "phy" }
-     124: Text { content: "\" interface number will increment by one until you reboot your system." }
-     125: EndParagraph
-     126: StartParagraph { alignment: None, id: None }
-     127: EndParagraph
-     128: EndDocument
+      91: EndParagraph
+      92: StartParagraph { alignment: None, id: None }
+      93: Text { content: "The \"phy0\" interface is the parent interface used to create child interfaces. Note that if you unplug and " }
+      94: Text { content: "replug" }
+      95: Text { content: " the USB interface, the \"" }
+      96: Text { content: "phy" }
+      97: Text { content: "\" interface number will increment by one until you reboot your system." }
+      98: EndParagraph
+      99: StartParagraph { alignment: None, id: None }
+     100: EndParagraph
+     101: EndDocument
   ],
   terminal: Ok,
 }
