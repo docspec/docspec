@@ -44,7 +44,7 @@
 use std::io::Write;
 
 use docspec_core::{Event, EventSink, Result};
-use docspec_json::{JsonEmitter, StrusonBackend};
+use docspec_json::JsonWriter;
 
 /// Streaming writer that converts a `DocSpec` event stream into `oxa.dev` JSON.
 ///
@@ -57,30 +57,17 @@ use docspec_json::{JsonEmitter, StrusonBackend};
 /// All other events are silently ignored (no error, no panic).
 pub struct OxaWriter<W: Write> {
     document_open: bool,
-    in_paragraph: bool,
-    json: JsonEmitter<StrusonBackend<W>>,
+    json: JsonWriter<W>,
 }
 
 impl<W: Write> OxaWriter<W> {
-    /// Close the currently open paragraph, if any. No-op when no paragraph is open.
-    fn close_paragraph(&mut self) -> Result<()> {
-        if !self.in_paragraph {
-            return Ok(());
-        }
-        self.json.close_array()?;
-        self.json.close_object()?;
-        self.in_paragraph = false;
-        Ok(())
-    }
-
     /// Create a new `OxaWriter` that writes to `writer`.
     #[inline]
     #[must_use]
     pub fn new(writer: W) -> Self {
         Self {
             document_open: false,
-            in_paragraph: false,
-            json: JsonEmitter::new(StrusonBackend::new(writer)),
+            json: JsonWriter::new(writer),
         }
     }
 }
@@ -88,7 +75,7 @@ impl<W: Write> OxaWriter<W> {
 impl<W: Write> EventSink for OxaWriter<W> {
     #[inline]
     fn finish(self) -> Result<()> {
-        self.json.finish().map(|_| ())
+        self.json.finish()
     }
 
     #[inline]
@@ -108,25 +95,25 @@ impl<W: Write> EventSink for OxaWriter<W> {
                 if !self.document_open {
                     return Ok(());
                 }
-                self.close_paragraph()?;
+                self.json.close_paragraph()?;
                 self.json.close_array()?;
                 self.json.close_object()?;
                 self.document_open = false;
                 Ok(())
             }
             Event::StartParagraph { .. } => {
-                if !self.document_open || self.in_paragraph {
+                if !self.document_open || self.json.in_paragraph() {
                     return Ok(());
                 }
                 self.json.open_object()?;
                 self.json.key("type").value("Paragraph")?;
                 self.json.key("children").open_array()?;
-                self.in_paragraph = true;
+                self.json.set_paragraph_open();
                 Ok(())
             }
-            Event::EndParagraph => self.close_paragraph(),
+            Event::EndParagraph => self.json.close_paragraph(),
             Event::Text { content } => {
-                if !self.in_paragraph {
+                if !self.json.in_paragraph() {
                     return Ok(());
                 }
                 self.json.object(|j| {
