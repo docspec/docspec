@@ -690,7 +690,7 @@ mod tests {
             b: 0,
         };
         let event = Event::StartTextStyle {
-            kind: TextStyleKind::Mark(color.clone()),
+            kind: TextStyleKind::Mark(color),
             id: None,
         };
         assert_eq!(
@@ -709,7 +709,7 @@ mod tests {
             g: 34,
             b: 51,
         };
-        let kind = TextStyleKind::TextColor(color.clone());
+        let kind = TextStyleKind::TextColor(color);
         let cloned = kind.clone();
         assert_eq!(kind, cloned);
         let event = Event::StartTextStyle {

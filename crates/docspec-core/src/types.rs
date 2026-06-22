@@ -17,7 +17,7 @@ pub enum TextAlignment {
 /// The specific visual style for a list.
 ///
 /// Writers ignore mismatched styles (e.g., Disc on an ordered list).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ListStyleType {
     /// Hollow circle bullet.
@@ -51,7 +51,7 @@ pub enum TableHeaderScope {
 }
 
 /// An RGB color value.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Color {
     /// RGB color with red, green, and blue components (0-255).

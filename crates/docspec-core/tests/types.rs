@@ -79,7 +79,7 @@ mod tests {
             g: 128,
             b: 0,
         };
-        let cloned = color.clone();
+        let cloned = color;
         assert_eq!(color, cloned);
     }
 
@@ -219,7 +219,7 @@ mod tests {
     #[test]
     fn list_style_type_clone() {
         let style = ListStyleType::Decimal;
-        let cloned = style.clone();
+        let cloned = style;
         assert_eq!(style, cloned);
     }
 
