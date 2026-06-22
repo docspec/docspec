@@ -1,0 +1,150 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartTable { id: None }
+       2: StartTableRow { id: None }
+       3: StartTableCell { colspan: None, id: None, rowspan: None }
+       4: StartHeading { id: None, level: 1 }
+       5: EndHeading
+       6: EndTableCell
+       7: StartTableCell { colspan: None, id: None, rowspan: None }
+       8: StartParagraph { alignment: None, id: None }
+       9: EndParagraph
+      10: EndTableCell
+      11: StartTableCell { colspan: None, id: None, rowspan: None }
+      12: StartHeading { id: None, level: 1 }
+      13: EndHeading
+      14: EndTableCell
+      15: EndTableRow
+      16: StartTableRow { id: None }
+      17: StartTableCell { colspan: None, id: None, rowspan: None }
+      18: StartParagraph { alignment: None, id: None }
+      19: EndParagraph
+      20: EndTableCell
+      21: StartTableCell { colspan: None, id: None, rowspan: None }
+      22: StartParagraph { alignment: None, id: None }
+      23: EndParagraph
+      24: EndTableCell
+      25: StartTableCell { colspan: None, id: None, rowspan: None }
+      26: StartParagraph { alignment: None, id: None }
+      27: EndParagraph
+      28: EndTableCell
+      29: EndTableRow
+      30: StartTableRow { id: None }
+      31: StartTableCell { colspan: None, id: None, rowspan: None }
+      32: StartHeading { id: None, level: 1 }
+      33: Text { content: "Statement" }
+      34: EndHeading
+      35: EndTableCell
+      36: StartTableCell { colspan: None, id: None, rowspan: None }
+      37: StartParagraph { alignment: None, id: None }
+      38: EndParagraph
+      39: EndTableCell
+      40: StartTableCell { colspan: None, id: None, rowspan: None }
+      41: StartParagraph { alignment: None, id: None }
+      42: Text { content: "Seasoned professional" }
+      43: EndParagraph
+      44: EndTableCell
+      45: EndTableRow
+      46: StartTableRow { id: None }
+      47: StartTableCell { colspan: None, id: None, rowspan: None }
+      48: StartParagraph { alignment: None, id: None }
+      49: EndParagraph
+      50: EndTableCell
+      51: StartTableCell { colspan: None, id: None, rowspan: None }
+      52: StartParagraph { alignment: None, id: None }
+      53: EndParagraph
+      54: EndTableCell
+      55: StartTableCell { colspan: None, id: None, rowspan: None }
+      56: StartParagraph { alignment: None, id: None }
+      57: EndParagraph
+      58: EndTableCell
+      59: EndTableRow
+      60: StartTableRow { id: None }
+      61: StartTableCell { colspan: None, id: None, rowspan: None }
+      62: StartHeading { id: None, level: 1 }
+      63: Text { content: "Experience" }
+      64: EndHeading
+      65: EndTableCell
+      66: StartTableCell { colspan: None, id: None, rowspan: None }
+      67: StartParagraph { alignment: None, id: None }
+      68: EndParagraph
+      69: EndTableCell
+      70: StartTableCell { colspan: None, id: None, rowspan: None }
+      71: StartHeading { id: None, level: 2 }
+      72: Text { content: "Big" }
+      73: Text { content: "Company" }
+      74: Text { content: "\t" }
+      75: EndHeading
+      76: StartParagraph { alignment: None, id: None }
+      77: Text { content: "other" }
+      78: EndParagraph
+      79: EndTableCell
+      80: EndTableRow
+      81: StartTableRow { id: None }
+      82: StartTableCell { colspan: None, id: None, rowspan: None }
+      83: StartParagraph { alignment: None, id: None }
+      84: EndParagraph
+      85: EndTableCell
+      86: StartTableCell { colspan: None, id: None, rowspan: None }
+      87: StartParagraph { alignment: None, id: None }
+      88: EndParagraph
+      89: EndTableCell
+      90: StartTableCell { colspan: None, id: None, rowspan: None }
+      91: StartParagraph { alignment: None, id: None }
+      92: EndParagraph
+      93: EndTableCell
+      94: EndTableRow
+      95: StartTableRow { id: None }
+      96: StartTableCell { colspan: None, id: None, rowspan: None }
+      97: StartParagraph { alignment: None, id: None }
+      98: EndParagraph
+      99: EndTableCell
+     100: StartTableCell { colspan: None, id: None, rowspan: None }
+     101: StartParagraph { alignment: None, id: None }
+     102: EndParagraph
+     103: EndTableCell
+     104: StartTableCell { colspan: None, id: None, rowspan: None }
+     105: StartParagraph { alignment: None, id: None }
+     106: EndParagraph
+     107: EndTableCell
+     108: EndTableRow
+     109: EndTable
+     110: StartParagraph { alignment: None, id: None }
+     111: EndParagraph
+     112: StartParagraph { alignment: None, id: None }
+     113: EndParagraph
+     114: StartParagraph { alignment: None, id: None }
+     115: EndParagraph
+     116: StartTable { id: None }
+     117: StartTableRow { id: None }
+     118: StartTableCell { colspan: None, id: None, rowspan: None }
+     119: StartParagraph { alignment: None, id: None }
+     120: Text { content: "\t" }
+     121: Text { content: "Cell0" }
+     122: EndParagraph
+     123: EndTableCell
+     124: StartTableCell { colspan: None, id: None, rowspan: None }
+     125: StartParagraph { alignment: None, id: None }
+     126: Text { content: "\t" }
+     127: Text { content: "Rich_text_in_cell" }
+     128: EndParagraph
+     129: EndTableCell
+     130: StartTableCell { colspan: None, id: None, rowspan: None }
+     131: StartParagraph { alignment: None, id: None }
+     132: Text { content: "\t" }
+     133: Text { content: "Cell2" }
+     134: EndParagraph
+     135: EndTableCell
+     136: EndTableRow
+     137: EndTable
+     138: StartParagraph { alignment: None, id: None }
+     139: EndParagraph
+     140: EndDocument
+  ],
+  terminal: Ok,
+}

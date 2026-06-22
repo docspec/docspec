@@ -1,0 +1,25 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: EndParagraph
+       3: StartParagraph { alignment: None, id: None }
+       4: EndParagraph
+       5: StartParagraph { alignment: None, id: None }
+       6: Image { alt: Some("F:\\photo\\2009.03.08. Кошка\\P1040891.JPG"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image1.jpeg", content_type: "image/jpeg", bytes: 416734, sha256: "a5f159f94681c474227491bc7ab70521b68faeacc2eeb249b7318f2778d5d6b0" } }
+       7: EndParagraph
+       8: StartParagraph { alignment: None, id: None }
+       9: EndParagraph
+      10: StartParagraph { alignment: None, id: None }
+      11: EndParagraph
+      12: StartParagraph { alignment: None, id: None }
+      13: Image { alt: Some("F:\\photo\\2009.03.08. Кошка\\P1040893.JPG"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image2.jpeg", content_type: "image/jpeg", bytes: 455436, sha256: "b577821f462fd7728f973ef607afb45121f2efa85a5343909ae1e5c3b1305ac5" } }
+      14: EndParagraph
+      15: EndDocument
+  ],
+  terminal: Ok,
+}

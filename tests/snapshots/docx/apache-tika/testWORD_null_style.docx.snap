@@ -1,0 +1,33 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartHeading { id: None, level: 1 }
+       2: Text { content: "Test av styrt dokument" }
+       3: EndHeading
+       4: StartParagraph { alignment: None, id: None }
+       5: Text { content: "Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim. Fusce est." }
+       6: EndParagraph
+       7: StartParagraph { alignment: None, id: None }
+       8: Text { content: "Vivamus a tellus. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Proin pharetra nonummy pede. Mauris et orci. Aenean nec lorem." }
+       9: EndParagraph
+      10: StartParagraph { alignment: None, id: None }
+      11: Text { content: "In porttitor. Donec laoreet nonummy augue. Suspendisse dui purus, scelerisque at, vulputate vitae, pretium mattis, nunc. Mauris eget neque at sem venenatis eleifend. Ut nonummy." }
+      12: EndParagraph
+      13: StartParagraph { alignment: None, id: None }
+      14: Text { content: "Fusce aliquet pede non pede. Suspendisse dapibus lorem pellentesque magna. Integer nulla. Donec blandit feugiat ligula. Donec hendrerit, felis et imperdiet euismod, purus ipsum pretium metus, in lacinia nulla nisl eget sapien." }
+      15: EndParagraph
+      16: StartParagraph { alignment: None, id: None }
+      17: Text { content: "Donec ut est in lectus consequat consequat. Etiam eget dui. Aliquam erat volutpat. Sed at lorem in nunc porta tristique. Proin nec augue." }
+      18: EndParagraph
+      19: StartParagraph { alignment: None, id: None }
+      20: EndParagraph
+      21: StartParagraph { alignment: None, id: None }
+      22: EndParagraph
+      23: EndDocument
+  ],
+  terminal: Ok,
+}

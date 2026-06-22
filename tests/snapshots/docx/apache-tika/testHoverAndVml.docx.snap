@@ -1,0 +1,18 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "Testing hlinkHover: " }
+       3: Text { content: " (hover over image)" }
+       4: EndParagraph
+       5: StartParagraph { alignment: None, id: None }
+       6: Text { content: "Testing VML shape: " }
+       7: EndParagraph
+       8: EndDocument
+  ],
+  terminal: Ok,
+}

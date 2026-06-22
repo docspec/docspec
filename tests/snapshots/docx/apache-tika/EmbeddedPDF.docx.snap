@@ -1,0 +1,18 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "Test Document with embedded " }
+       3: Text { content: "pdf’s" }
+       4: Text { content: ":" }
+       5: EndParagraph
+       6: StartParagraph { alignment: None, id: None }
+       7: EndParagraph
+       8: EndDocument
+  ],
+  terminal: Ok,
+}

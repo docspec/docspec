@@ -1,0 +1,24 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "F" }
+       3: StartTextStyle { kind: Bold, id: None }
+       4: Text { content: "oo" }
+       5: EndTextStyle
+       6: StartTextStyle { kind: Bold, id: None }
+       7: Text { content: "b" }
+       8: EndTextStyle
+       9: Text { content: "a" }
+      10: StartTextStyle { kind: Bold, id: None }
+      11: Text { content: "r" }
+      12: EndTextStyle
+      13: EndParagraph
+      14: EndDocument
+  ],
+  terminal: Ok,
+}

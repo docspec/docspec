@@ -3,7 +3,7 @@
 //! Three corpora are exercised, each in its own module:
 //! - `pandoc`      — mirror of the Pandoc DOCX test suite (GPL-2.0-or-later)
 //! - `docspec`     — original DocSpec-curated fixtures (ODC-By-1.0)
-//! - `apache_tika` — selective import from the Apache Tika DOCX test suite (Apache-2.0)
+//! - `apache_tika` — mirror of the Apache Tika DOCX test documents (Apache-2.0)
 //!
 //! Every fixture is read through both `DocxReader::from_reader` and
 //! `DocxReader::from_path`; the two constructors must emit identical event

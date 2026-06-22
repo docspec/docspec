@@ -1,0 +1,17 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: Some(Left), id: None }
+       2: Text { content: "とうきょう" }
+       3: Text { content: "東京" }
+       4: EndParagraph
+       5: StartParagraph { alignment: Some(Left), id: None }
+       6: EndParagraph
+       7: EndDocument
+  ],
+  terminal: Ok,
+}

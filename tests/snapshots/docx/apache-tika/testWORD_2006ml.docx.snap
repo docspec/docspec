@@ -1,0 +1,562 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: EndParagraph
+       3: StartParagraph { alignment: None, id: None }
+       4: LineBreak
+       5: EndParagraph
+       6: StartHeading { id: None, level: 1 }
+       7: Text { content: "Contents" }
+       8: EndHeading
+       9: StartParagraph { alignment: None, id: None }
+      10: Text { content: "\t" }
+      11: StartLink { href: "#_Toc467647605", id: None, title: None }
+      12: Text { content: "Heading1" }
+      13: Text { content: "\t" }
+      14: Text { content: "3" }
+      15: EndLink
+      16: EndParagraph
+      17: StartParagraph { alignment: None, id: None }
+      18: Text { content: "\t" }
+      19: StartLink { href: "#_Toc467647606", id: None, title: None }
+      20: Text { content: "Heading2" }
+      21: Text { content: "\t" }
+      22: Text { content: "3" }
+      23: EndLink
+      24: EndParagraph
+      25: StartParagraph { alignment: None, id: None }
+      26: EndParagraph
+      27: StartParagraph { alignment: None, id: None }
+      28: Text { content: "\t" }
+      29: StartLink { href: "#_Toc467647797", id: None, title: None }
+      30: Text { content: "Table 1: Table1 Caption" }
+      31: Text { content: "\t" }
+      32: Text { content: "2" }
+      33: EndLink
+      34: EndParagraph
+      35: StartParagraph { alignment: None, id: None }
+      36: EndParagraph
+      37: StartParagraph { alignment: None, id: None }
+      38: EndParagraph
+      39: StartParagraph { alignment: None, id: None }
+      40: EndParagraph
+      41: StartParagraph { alignment: None, id: None }
+      42: LineBreak
+      43: EndParagraph
+      44: StartParagraph { alignment: None, id: None }
+      45: EndParagraph
+      46: StartParagraph { alignment: None, id: None }
+      47: EndParagraph
+      48: StartParagraph { alignment: None, id: None }
+      49: Text { content: "The " }
+      50: StartTextStyle { kind: Italic, id: None }
+      51: Text { content: "quick" }
+      52: EndTextStyle
+      53: Text { content: " brown " }
+      54: StartTextStyle { kind: Bold, id: None }
+      55: Text { content: "fox " }
+      56: EndTextStyle
+      57: Text { content: "j" }
+      58: StartTextStyle { kind: Italic, id: None }
+      59: Text { content: "um" }
+      60: EndTextStyle
+      61: StartTextStyle { kind: Bold, id: None }
+      62: StartTextStyle { kind: Italic, id: None }
+      63: Text { content: "ped" }
+      64: EndTextStyle
+      65: EndTextStyle
+      66: Text { content: " over the lazy brown " }
+      67: Text { content: "dog" }
+      68: Text { content: "." }
+      69: EndParagraph
+      70: StartOrderedListItem { id: Some("1"), level: 0, start: Some(1), style_type: Decimal }
+      71: StartParagraph { alignment: None, id: None }
+      72: Text { content: "this is a basic list 1." }
+      73: EndParagraph
+      74: EndOrderedListItem
+      75: StartOrderedListItem { id: Some("1"), level: 0, start: None, style_type: Decimal }
+      76: StartParagraph { alignment: None, id: None }
+      77: Text { content: "Really basic " }
+      78: Text { content: "2" }
+      79: Text { content: "." }
+      80: EndParagraph
+      81: StartParagraph { alignment: None, id: None }
+      82: EndParagraph
+      83: StartParagraph { alignment: None, id: None }
+      84: Text { content: "This should have a footnote" }
+      85: EndParagraph
+      86: StartParagraph { alignment: None, id: None }
+      87: EndParagraph
+      88: StartParagraph { alignment: None, id: None }
+      89: EndParagraph
+      90: StartParagraph { alignment: None, id: None }
+      91: Text { content: "This is a hyperlink: " }
+      92: StartLink { href: "http://tika.apache.org", id: None, title: None }
+      93: Text { content: "tika" }
+      94: EndLink
+      95: EndParagraph
+      96: StartParagraph { alignment: None, id: None }
+      97: Text { content: "This is a link to a local file: " }
+      98: StartLink { href: "file:///C:/data/test.png", id: None, title: None }
+      99: Text { content: "test.png" }
+     100: EndLink
+     101: EndParagraph
+     102: StartParagraph { alignment: None, id: None }
+     103: EndParagraph
+     104: StartParagraph { alignment: None, id: None }
+     105: Text { content: "This is          10 spaces" }
+     106: EndParagraph
+     107: StartParagraph { alignment: None, id: None }
+     108: EndParagraph
+     109: StartParagraph { alignment: None, id: None }
+     110: EndParagraph
+     111: StartParagraph { alignment: None, id: None }
+     112: EndParagraph
+     113: StartParagraph { alignment: None, id: None }
+     114: EndParagraph
+     115: StartParagraph { alignment: None, id: None }
+     116: Text { content: "Table " }
+     117: Text { content: "1" }
+     118: Text { content: ": Table1 Caption" }
+     119: EndParagraph
+     120: EndOrderedListItem
+     121: StartTable { id: None }
+     122: StartTableRow { id: None }
+     123: StartTableCell { colspan: None, id: None, rowspan: None }
+     124: StartParagraph { alignment: None, id: None }
+     125: Text { content: "R1c1" }
+     126: EndParagraph
+     127: EndTableCell
+     128: StartTableCell { colspan: None, id: None, rowspan: None }
+     129: StartParagraph { alignment: None, id: None }
+     130: Text { content: "R1c2" }
+     131: EndParagraph
+     132: EndTableCell
+     133: StartTableCell { colspan: None, id: None, rowspan: None }
+     134: StartParagraph { alignment: None, id: None }
+     135: Text { content: "R1c3" }
+     136: EndParagraph
+     137: EndTableCell
+     138: EndTableRow
+     139: StartTableRow { id: None }
+     140: StartTableCell { colspan: None, id: None, rowspan: None }
+     141: StartParagraph { alignment: None, id: None }
+     142: EndParagraph
+     143: EndTableCell
+     144: StartTableCell { colspan: None, id: None, rowspan: None }
+     145: StartParagraph { alignment: None, id: None }
+     146: EndParagraph
+     147: EndTableCell
+     148: StartTableCell { colspan: None, id: None, rowspan: None }
+     149: StartParagraph { alignment: None, id: None }
+     150: EndParagraph
+     151: EndTableCell
+     152: EndTableRow
+     153: StartTableRow { id: None }
+     154: StartTableCell { colspan: None, id: None, rowspan: None }
+     155: StartParagraph { alignment: None, id: None }
+     156: EndParagraph
+     157: EndTableCell
+     158: StartTableCell { colspan: None, id: None, rowspan: None }
+     159: StartParagraph { alignment: None, id: None }
+     160: EndParagraph
+     161: EndTableCell
+     162: StartTableCell { colspan: None, id: None, rowspan: None }
+     163: StartParagraph { alignment: None, id: None }
+     164: EndParagraph
+     165: EndTableCell
+     166: EndTableRow
+     167: StartTableRow { id: None }
+     168: StartTableCell { colspan: None, id: None, rowspan: None }
+     169: StartParagraph { alignment: None, id: None }
+     170: EndParagraph
+     171: EndTableCell
+     172: StartTableCell { colspan: None, id: None, rowspan: None }
+     173: StartTable { id: None }
+     174: StartTableRow { id: None }
+     175: StartTableCell { colspan: None, id: None, rowspan: None }
+     176: StartParagraph { alignment: None, id: None }
+     177: Text { content: "Embedded table r1c1" }
+     178: EndParagraph
+     179: EndTableCell
+     180: StartTableCell { colspan: None, id: None, rowspan: None }
+     181: StartParagraph { alignment: None, id: None }
+     182: EndParagraph
+     183: EndTableCell
+     184: StartTableCell { colspan: None, id: None, rowspan: None }
+     185: StartParagraph { alignment: None, id: None }
+     186: EndParagraph
+     187: EndTableCell
+     188: StartTableCell { colspan: None, id: None, rowspan: None }
+     189: StartParagraph { alignment: None, id: None }
+     190: EndParagraph
+     191: EndTableCell
+     192: EndTableRow
+     193: StartTableRow { id: None }
+     194: StartTableCell { colspan: None, id: None, rowspan: None }
+     195: StartParagraph { alignment: None, id: None }
+     196: EndParagraph
+     197: EndTableCell
+     198: StartTableCell { colspan: None, id: None, rowspan: None }
+     199: StartParagraph { alignment: None, id: None }
+     200: EndParagraph
+     201: EndTableCell
+     202: StartTableCell { colspan: None, id: None, rowspan: None }
+     203: StartParagraph { alignment: None, id: None }
+     204: EndParagraph
+     205: EndTableCell
+     206: StartTableCell { colspan: None, id: None, rowspan: None }
+     207: StartParagraph { alignment: None, id: None }
+     208: EndParagraph
+     209: EndTableCell
+     210: EndTableRow
+     211: StartTableRow { id: None }
+     212: StartTableCell { colspan: None, id: None, rowspan: None }
+     213: StartParagraph { alignment: None, id: None }
+     214: EndParagraph
+     215: EndTableCell
+     216: StartTableCell { colspan: None, id: None, rowspan: None }
+     217: StartParagraph { alignment: None, id: None }
+     218: EndParagraph
+     219: EndTableCell
+     220: StartTableCell { colspan: None, id: None, rowspan: None }
+     221: StartParagraph { alignment: None, id: None }
+     222: EndParagraph
+     223: EndTableCell
+     224: StartTableCell { colspan: None, id: None, rowspan: None }
+     225: StartParagraph { alignment: None, id: None }
+     226: EndParagraph
+     227: EndTableCell
+     228: EndTableRow
+     229: EndTable
+     230: StartParagraph { alignment: None, id: None }
+     231: EndParagraph
+     232: EndTableCell
+     233: StartTableCell { colspan: None, id: None, rowspan: None }
+     234: StartParagraph { alignment: None, id: None }
+     235: EndParagraph
+     236: EndTableCell
+     237: EndTableRow
+     238: EndTable
+     239: StartParagraph { alignment: None, id: None }
+     240: EndParagraph
+     241: StartParagraph { alignment: None, id: None }
+     242: EndParagraph
+     243: StartParagraph { alignment: None, id: None }
+     244: Image { alt: None, decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image2.jpg", content_type: "image/jpeg", bytes: 13325, sha256: "d66c76902f67a5f1253b6bed4fa5271b6f3c1355a90790318e3bef494f7cd81e" } }
+     245: EndParagraph
+     246: StartParagraph { alignment: None, id: None }
+     247: EndParagraph
+     248: StartParagraph { alignment: None, id: None }
+     249: Text { content: "3" }
+     250: Text { content: "4" }
+     251: EndParagraph
+     252: StartParagraph { alignment: None, id: None }
+     253: Text { content: "This is an embedded pdf" }
+     254: EndParagraph
+     255: StartParagraph { alignment: None, id: None }
+     256: EndParagraph
+     257: StartParagraph { alignment: None, id: None }
+     258: Text { content: "This is an embedded ppt" }
+     259: EndParagraph
+     260: StartParagraph { alignment: None, id: None }
+     261: EndParagraph
+     262: StartParagraph { alignment: None, id: None }
+     263: EndParagraph
+     264: StartParagraph { alignment: None, id: None }
+     265: Text { content: "Second paragraph here" }
+     266: EndParagraph
+     267: StartParagraph { alignment: None, id: None }
+     268: EndParagraph
+     269: StartParagraph { alignment: None, id: None }
+     270: Text { content: "First paragraph t" }
+     271: Text { content: "here" }
+     272: EndParagraph
+     273: StartParagraph { alignment: None, id: None }
+     274: EndParagraph
+     275: StartParagraph { alignment: None, id: None }
+     276: EndParagraph
+     277: StartParagraph { alignment: None, id: None }
+     278: Text { content: "Rich text content control" }
+     279: EndParagraph
+     280: StartParagraph { alignment: None, id: None }
+     281: EndParagraph
+     282: StartParagraph { alignment: None, id: None }
+     283: Text { content: "Simple text content control" }
+     284: EndParagraph
+     285: StartParagraph { alignment: None, id: None }
+     286: EndParagraph
+     287: StartParagraph { alignment: None, id: None }
+     288: Text { content: "Repeating content" }
+     289: EndParagraph
+     290: StartParagraph { alignment: None, id: None }
+     291: Text { content: "Repeating content" }
+     292: EndParagraph
+     293: StartParagraph { alignment: None, id: None }
+     294: Text { content: "Repeating content" }
+     295: EndParagraph
+     296: StartParagraph { alignment: None, id: None }
+     297: Text { content: "Repeating content" }
+     298: EndParagraph
+     299: StartParagraph { alignment: None, id: None }
+     300: EndParagraph
+     301: StartParagraph { alignment: None, id: None }
+     302: Text { content: "Drop down1" }
+     303: EndParagraph
+     304: StartParagraph { alignment: None, id: None }
+     305: EndParagraph
+     306: StartParagraph { alignment: None, id: None }
+     307: Text { content: "11/16/2016" }
+     308: EndParagraph
+     309: StartParagraph { alignment: None, id: None }
+     310: EndParagraph
+     311: StartParagraph { alignment: None, id: None }
+     312: EndParagraph
+     313: StartParagraph { alignment: None, id: None }
+     314: Text { content: "This " }
+     315: Text { content: "\t" }
+     316: Text { content: "is " }
+     317: Text { content: "\t" }
+     318: Text { content: "tabbed " }
+     319: Text { content: "\t" }
+     320: Text { content: "tab" }
+     321: Text { content: "\t" }
+     322: Text { content: "tab" }
+     323: EndParagraph
+     324: StartParagraph { alignment: None, id: None }
+     325: EndParagraph
+     326: StartParagraph { alignment: None, id: None }
+     327: EndParagraph
+     328: StartParagraph { alignment: None, id: None }
+     329: EndParagraph
+     330: StartHeading { id: None, level: 1 }
+     331: Text { content: "Heading1" }
+     332: EndHeading
+     333: StartParagraph { alignment: None, id: None }
+     334: EndParagraph
+     335: StartTable { id: None }
+     336: StartTableRow { id: None }
+     337: StartTableCell { colspan: None, id: None, rowspan: None }
+     338: StartParagraph { alignment: None, id: None }
+     339: EndParagraph
+     340: EndTableCell
+     341: StartTableCell { colspan: None, id: None, rowspan: None }
+     342: StartParagraph { alignment: None, id: None }
+     343: EndParagraph
+     344: EndTableCell
+     345: EndTableRow
+     346: StartTableRow { id: None }
+     347: StartTableCell { colspan: None, id: None, rowspan: None }
+     348: StartParagraph { alignment: None, id: None }
+     349: EndParagraph
+     350: EndTableCell
+     351: StartTableCell { colspan: None, id: None, rowspan: None }
+     352: StartParagraph { alignment: None, id: None }
+     353: EndParagraph
+     354: EndTableCell
+     355: EndTableRow
+     356: EndTable
+     357: StartParagraph { alignment: None, id: None }
+     358: EndParagraph
+     359: StartParagraph { alignment: None, id: None }
+     360: EndParagraph
+     361: StartParagraph { alignment: None, id: None }
+     362: EndParagraph
+     363: StartParagraph { alignment: None, id: None }
+     364: EndParagraph
+     365: StartTable { id: None }
+     366: StartTableRow { id: None }
+     367: StartTableCell { colspan: None, id: None, rowspan: None }
+     368: StartParagraph { alignment: None, id: None }
+     369: Text { content: "R1c1" }
+     370: EndParagraph
+     371: EndTableCell
+     372: StartTableCell { colspan: None, id: None, rowspan: None }
+     373: StartParagraph { alignment: None, id: None }
+     374: Text { content: "R1c2" }
+     375: EndParagraph
+     376: EndTableCell
+     377: EndTableRow
+     378: StartTableRow { id: None }
+     379: StartTableCell { colspan: None, id: None, rowspan: None }
+     380: StartParagraph { alignment: None, id: None }
+     381: EndParagraph
+     382: EndTableCell
+     383: StartTableCell { colspan: None, id: None, rowspan: None }
+     384: StartParagraph { alignment: None, id: None }
+     385: EndParagraph
+     386: EndTableCell
+     387: EndTableRow
+     388: StartTableRow { id: None }
+     389: StartTableCell { colspan: None, id: None, rowspan: None }
+     390: StartParagraph { alignment: None, id: None }
+     391: Text { content: "R4c1" }
+     392: EndParagraph
+     393: EndTableCell
+     394: StartTableCell { colspan: None, id: None, rowspan: None }
+     395: StartParagraph { alignment: None, id: None }
+     396: Text { content: "R3c2" }
+     397: EndParagraph
+     398: EndTableCell
+     399: EndTableRow
+     400: StartTableRow { id: None }
+     401: StartTableCell { colspan: None, id: None, rowspan: None }
+     402: StartParagraph { alignment: None, id: None }
+     403: EndParagraph
+     404: EndTableCell
+     405: StartTableCell { colspan: None, id: None, rowspan: None }
+     406: StartParagraph { alignment: None, id: None }
+     407: Text { content: "R4c2" }
+     408: EndParagraph
+     409: EndTableCell
+     410: EndTableRow
+     411: StartTableRow { id: None }
+     412: StartTableCell { colspan: None, id: None, rowspan: None }
+     413: StartParagraph { alignment: None, id: None }
+     414: EndParagraph
+     415: EndTableCell
+     416: StartTableCell { colspan: None, id: None, rowspan: None }
+     417: StartParagraph { alignment: None, id: None }
+     418: EndParagraph
+     419: EndTableCell
+     420: EndTableRow
+     421: EndTable
+     422: StartParagraph { alignment: None, id: None }
+     423: EndParagraph
+     424: StartHeading { id: None, level: 1 }
+     425: Text { content: "Heading2" }
+     426: EndHeading
+     427: StartParagraph { alignment: None, id: None }
+     428: EndParagraph
+     429: StartParagraph { alignment: None, id: None }
+     430: EndParagraph
+     431: StartParagraph { alignment: None, id: None }
+     432: StartTextStyle { kind: Bold, id: None }
+     433: Text { content: "Some text" }
+     434: EndTextStyle
+     435: EndParagraph
+     436: StartParagraph { alignment: None, id: None }
+     437: EndParagraph
+     438: StartParagraph { alignment: None, id: None }
+     439: EndParagraph
+     440: StartParagraph { alignment: None, id: None }
+     441: EndParagraph
+     442: StartParagraph { alignment: None, id: None }
+     443: EndParagraph
+     444: StartParagraph { alignment: None, id: None }
+     445: EndParagraph
+     446: StartParagraph { alignment: None, id: None }
+     447: EndParagraph
+     448: StartParagraph { alignment: None, id: None }
+     449: EndParagraph
+     450: StartParagraph { alignment: None, id: None }
+     451: EndParagraph
+     452: StartParagraph { alignment: None, id: None }
+     453: EndParagraph
+     454: StartParagraph { alignment: None, id: None }
+     455: EndParagraph
+     456: StartParagraph { alignment: None, id: None }
+     457: EndParagraph
+     458: StartParagraph { alignment: None, id: None }
+     459: EndParagraph
+     460: StartParagraph { alignment: None, id: None }
+     461: EndParagraph
+     462: StartParagraph { alignment: None, id: None }
+     463: EndParagraph
+     464: StartParagraph { alignment: None, id: None }
+     465: Text { content: "Here’s a citation" }
+     466: EndParagraph
+     467: StartParagraph { alignment: None, id: None }
+     468: Text { content: "(Mattmann & Zitting, 2011)" }
+     469: EndParagraph
+     470: StartParagraph { alignment: None, id: None }
+     471: EndParagraph
+     472: StartParagraph { alignment: None, id: None }
+     473: Text { content: "Here’s something for the index" }
+     474: EndParagraph
+     475: StartParagraph { alignment: None, id: None }
+     476: EndParagraph
+     477: StartParagraph { alignment: None, id: None }
+     478: Text { content: "Here’s a citation" }
+     479: EndParagraph
+     480: StartParagraph { alignment: None, id: None }
+     481: EndParagraph
+     482: StartParagraph { alignment: None, id: None }
+     483: EndParagraph
+     484: StartParagraph { alignment: None, id: None }
+     485: Text { content: "\t" }
+     486: Text { content: "index, 4" }
+     487: EndParagraph
+     488: StartParagraph { alignment: None, id: None }
+     489: EndParagraph
+     490: StartParagraph { alignment: None, id: None }
+     491: EndParagraph
+     492: StartHeading { id: None, level: 1 }
+     493: Text { content: "Bibliography" }
+     494: EndHeading
+     495: StartParagraph { alignment: None, id: None }
+     496: Text { content: "Mattmann, C., & Zitting, J. (2011). " }
+     497: StartTextStyle { kind: Italic, id: None }
+     498: Text { content: "Tika in Action." }
+     499: EndTextStyle
+     500: Text { content: " The Internet: Manning." }
+     501: EndParagraph
+     502: StartParagraph { alignment: None, id: None }
+     503: EndParagraph
+     504: StartParagraph { alignment: None, id: None }
+     505: Text { content: "\t" }
+     506: Text { content: "Cases" }
+     507: EndParagraph
+     508: StartParagraph { alignment: None, id: None }
+     509: Text { content: "\t" }
+     510: Text { content: "citation" }
+     511: Text { content: "\t" }
+     512: Text { content: "4" }
+     513: EndParagraph
+     514: StartParagraph { alignment: None, id: None }
+     515: EndParagraph
+     516: StartParagraph { alignment: None, id: None }
+     517: EndParagraph
+     518: StartParagraph { alignment: None, id: None }
+     519: EndParagraph
+     520: StartParagraph { alignment: None, id: None }
+     521: EndParagraph
+     522: StartParagraph { alignment: None, id: None }
+     523: EndParagraph
+     524: StartParagraph { alignment: None, id: None }
+     525: EndParagraph
+     526: StartParagraph { alignment: None, id: None }
+     527: EndParagraph
+     528: StartParagraph { alignment: None, id: None }
+     529: EndParagraph
+     530: StartParagraph { alignment: None, id: None }
+     531: EndParagraph
+     532: StartParagraph { alignment: None, id: None }
+     533: EndParagraph
+     534: StartParagraph { alignment: None, id: None }
+     535: EndParagraph
+     536: StartParagraph { alignment: None, id: None }
+     537: EndParagraph
+     538: StartParagraph { alignment: None, id: None }
+     539: EndParagraph
+     540: StartParagraph { alignment: None, id: None }
+     541: EndParagraph
+     542: StartParagraph { alignment: None, id: None }
+     543: EndParagraph
+     544: StartParagraph { alignment: None, id: None }
+     545: EndParagraph
+     546: StartParagraph { alignment: None, id: None }
+     547: EndParagraph
+     548: StartParagraph { alignment: None, id: None }
+     549: Text { content: "This should point to an endnote" }
+     550: Text { content: " " }
+     551: EndParagraph
+     552: EndDocument
+  ],
+  terminal: Ok,
+}

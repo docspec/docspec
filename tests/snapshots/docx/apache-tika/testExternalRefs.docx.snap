@@ -1,0 +1,27 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "Testing INCLUDEPICTURE: " }
+       3: Text { content: "[Image placeholder]" }
+       4: EndParagraph
+       5: StartParagraph { alignment: None, id: None }
+       6: Text { content: "Testing INCLUDETEXT: " }
+       7: Text { content: "[Text placeholder]" }
+       8: EndParagraph
+       9: StartParagraph { alignment: None, id: None }
+      10: Text { content: "Testing IMPORT: " }
+      11: Text { content: "[Import placeholder]" }
+      12: EndParagraph
+      13: StartParagraph { alignment: None, id: None }
+      14: Text { content: "Testing LINK: " }
+      15: Text { content: "[Link placeholder]" }
+      16: EndParagraph
+      17: EndDocument
+  ],
+  terminal: Ok,
+}

@@ -1,6 +1,6 @@
 # Attribution — DOCX Test Fixtures
 
-The `tests/fixtures/docx/` tree contains test inputs from two corpora with
+The `tests/fixtures/docx/` tree contains test inputs from three corpora with
 different provenance and licensing. Each corpus lives in its own subdirectory.
 
 ## DocSpec-Curated Corpus (`docx/docspec/`)
@@ -38,8 +38,11 @@ indicated.
 - **License**: Apache-2.0 — SPDX identifier `Apache-2.0`; canonical text at <https://www.apache.org/licenses/LICENSE-2.0.txt>
 - **Imported**: 2026-06-22
 
-Selective import — see `docx/apache-tika/README.md` for the fixture list and
-the criterion for adding new ones.
+The `docx/apache-tika/` directory mirrors the DOCX fixtures currently available
+from the sibling `documents` repository's `documents/docx/apache-tika/` mirror.
+It intentionally preserves upstream fixture names so the `apache_tika` module in
+`crates/docspec-docx-reader/tests/snapshots.rs` can emit one snapshot test per
+`.docx` via `build.rs`.
 
 ## License Compatibility
 
@@ -50,23 +53,30 @@ DocSpec is licensed MIT. All three fixture corpora are test data only:
 - They are used solely as test inputs, consistent with GPL Section 0 scope for the Pandoc corpus, the Apache-2.0 permission grant for the Apache Tika corpus, and unconditionally permitted for the DocSpec corpus under ODC-By-1.0.
 - The verbatim GPL-2.0, Apache-2.0, and ODC-By-1.0 texts are intentionally not vendored; see the canonical URLs above.
 
-## Mirrored Corpus
+## Mirrored Corpora
 
 The `docx/pandoc/` directory mirrors the Pandoc DOCX fixture corpus from the
 sibling `documents` repository. See `docx/pandoc/README.md` for scope notes and
 expected silent drops.
 
-## Refreshing the Pandoc Corpus
+The `docx/apache-tika/` directory mirrors the Apache Tika DOCX fixtures from the
+same sibling repository. Some snapshots may be near-empty because the current
+`DocxReader` intentionally drops unsupported document parts such as comments,
+headers, footers, embedded packages, and metadata. Snapshot diffs will surface
+new output when support for those features is added.
+
+## Refreshing Mirrored Corpora
 
 To refresh fixtures from the sibling `documents` repo:
 
 ```bash
 rsync -a ../documents/documents/docx/pandoc/*.docx tests/fixtures/docx/pandoc/
+rsync -a ../documents/documents/docx/apache-tika/*.docx tests/fixtures/docx/apache-tika/
 ```
 
 Then run `INSTA_UPDATE=unseen cargo test --test snapshots -p docspec-docx-reader`
 to generate any new snapshots, review them with `cargo insta review`, and commit.
-Update the **Imported** line above when refreshing en masse.
+Update the relevant **Imported** line above when refreshing en masse.
 
 ## Adding a DocSpec Fixture
 
