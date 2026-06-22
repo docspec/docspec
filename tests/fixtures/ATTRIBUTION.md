@@ -71,7 +71,9 @@ To refresh fixtures from the sibling `documents` repo:
 
 ```bash
 rsync -a ../documents/documents/docx/pandoc/*.docx tests/fixtures/docx/pandoc/
-rsync -a ../documents/documents/docx/apache-tika/*.docx tests/fixtures/docx/apache-tika/
+# `--exclude` drops fixtures whose snapshots run into the thousands of lines.
+rsync -a --exclude='{014760,017091,017097,018367,testWORD_2006ml}.docx' \
+  ../documents/documents/docx/apache-tika/*.docx tests/fixtures/docx/apache-tika/
 ```
 
 Then run `INSTA_UPDATE=unseen cargo test --test snapshots -p docspec-docx-reader`
