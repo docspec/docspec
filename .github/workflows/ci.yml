@@ -17,6 +17,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           lfs: true
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       - run: cargo test --workspace
@@ -29,6 +30,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           lfs: true
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -43,6 +45,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           lfs: true
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
