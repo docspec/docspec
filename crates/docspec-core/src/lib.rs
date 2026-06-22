@@ -23,6 +23,7 @@ mod error;
 pub mod event;
 mod pipeline;
 mod stack;
+mod style;
 mod traits;
 mod types;
 
@@ -31,6 +32,7 @@ pub use error::{Error, Position, Result};
 pub use event::{Event, TextStyleKind};
 pub use pipeline::pipe;
 pub use stack::{block_kind_for_end, block_kind_for_start, BlockKind, StackTrackingSink};
+pub use style::{StyleStack, MAX_STYLE_DEPTH};
 pub use traits::{AssetHandle, EventSink, EventSource};
 pub use types::{
     Author, Color, DocumentMeta, ImageSource, ListStyleType, TableHeaderScope, TextAlignment,
