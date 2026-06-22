@@ -108,6 +108,8 @@ wildcard_enum_match_arm = "allow"
 arbitrary_source_item_ordering = "allow"
 # Reason: let x = x.trim() is idiomatic Rust transformation via shadowing
 shadow_same = "allow"
+# Reason: let reader = reader.new_wrapper() is idiomatic adapter wrapping via shadowing
+shadow_reuse = "allow"
 # Reason: Too noisy; numeric types clear from context
 default_numeric_fallback = "allow"
 # Reason: Targeting embedded — prefer core/alloc over std where possible

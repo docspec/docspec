@@ -15,7 +15,7 @@ fn run_pipeline<W: Write>(
     output: W,
 ) -> Result<()> {
     let sink = AnyWriter::new(output_format, output);
-    docspec_core::pipe(reader, sink).map_err(Into::into)
+    docspec_core::pipe(docspec_core::SkipEmptyBlocks::new(reader), sink).map_err(Into::into)
 }
 
 fn write_cli_terminating_newline<W: Write>(output: &mut W) -> Result<()> {
