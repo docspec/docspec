@@ -53,6 +53,8 @@ The palette snap uses squared Euclidean distance in 8-bit sRGB space. No percept
 
 The two palettes use different RGB values, so the same input color can snap to different names depending on whether it's a text color or a background color. For instance, the saturated red `(224, 62, 62)` snaps to background palette `"orange"` (not `"red"`) because the background palette uses pastel colors and the Euclidean distance to pastel orange is shorter than to pastel red. This is intentional and matches the reference implementation.
 
+See [COLOR_SNAPPING.md](./COLOR_SNAPPING.md) for an example of how this snap can rename a source color end-to-end (OOXML `<w:highlight w:val="yellow"/>` → BlockNote `"backgroundColor":"orange"`) and the mechanism behind it.
+
 ## Not Yet Supported
 
 - Footnotes — `StartFootnote`/`EndFootnote`/`FootnoteRef` are silently ignored; BlockNote's default schema has no equivalent
