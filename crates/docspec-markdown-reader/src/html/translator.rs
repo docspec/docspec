@@ -1,8 +1,8 @@
 //! HTML token stream → `DocSpec` event translator.
 
 use super::tags::{tag_intent, TagIntent};
-use crate::html::stack::StyleStack;
-use docspec_core::Event;
+use crate::html::tag_intent_to_style_kind;
+use docspec_core::{Event, StyleStack};
 use html5gum::{Token, Tokenizer};
 
 /// Tokenize an HTML fragment (from pulldown-cmark's `Event::Html` or `Event::InlineHtml` payload).
@@ -168,7 +168,9 @@ pub(crate) fn translate_inline(
                     | TagIntent::Mark => {
                         // LOAD-BEARING: Rule 11 (event.rs:24-54) — StartTextStyle MUST NOT nest inside Preformatted.
                         if !in_preformatted {
-                            out.extend(stack.open(intent));
+                            if let Some(kind) = tag_intent_to_style_kind(&intent) {
+                                out.extend(stack.open(kind));
+                            }
                         }
                     }
                     TagIntent::LineBreak | TagIntent::ThematicBreak => {
@@ -192,7 +194,9 @@ pub(crate) fn translate_inline(
                     | TagIntent::Mark => {
                         // LOAD-BEARING: Rule 11 (event.rs:24-54) — EndTextStyle MUST NOT emit inside Preformatted.
                         if !in_preformatted {
-                            out.extend(stack.close(intent));
+                            if let Some(kind) = tag_intent_to_style_kind(&intent) {
+                                out.extend(stack.close(&kind));
+                            }
                         }
                     }
                     TagIntent::LineBreak
@@ -255,7 +259,9 @@ pub(crate) fn translate_block(
                             && !heading_acc.is_inside_nested_ignored_heading()
                             && !in_preformatted
                         {
-                            out.extend(inline_stack.open(intent));
+                            if let Some(kind) = tag_intent_to_style_kind(&intent) {
+                                out.extend(inline_stack.open(kind));
+                            }
                         }
                     }
                     TagIntent::LineBreak | TagIntent::ThematicBreak => {
@@ -292,7 +298,9 @@ pub(crate) fn translate_block(
                             && !heading_acc.is_inside_nested_ignored_heading()
                             && !in_preformatted
                         {
-                            out.extend(inline_stack.close(intent));
+                            if let Some(kind) = tag_intent_to_style_kind(&intent) {
+                                out.extend(inline_stack.close(&kind));
+                            }
                         }
                     }
                     TagIntent::LineBreak | TagIntent::ThematicBreak | TagIntent::Ignored => {}

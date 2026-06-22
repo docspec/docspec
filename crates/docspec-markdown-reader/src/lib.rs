@@ -255,7 +255,7 @@ pub struct MarkdownReader {
     /// Heading accumulator for block HTML fragments.
     html_block_heading_acc: crate::html::translator::BlockHeadingAccumulator,
     /// Inline style stack scoped to block HTML headings.
-    html_block_inline_stack: crate::html::stack::StyleStack,
+    html_block_inline_stack: docspec_core::StyleStack,
     /// Whether the parser is currently inside a pulldown HTML block wrapper.
     in_html_block: bool,
     /// Whether the parser is currently inside a preformatted code block.
@@ -268,7 +268,7 @@ pub struct MarkdownReader {
     /// `level = list_stack.len().saturating_sub(1)` at item-emit time.
     list_stack: alloc::vec::Vec<ListContext>,
     /// Unified inline style stack shared by markdown emphasis and inline HTML.
-    inline_style_stack: crate::html::stack::StyleStack,
+    inline_style_stack: docspec_core::StyleStack,
     /// Document processing phase.
     phase: Phase,
     /// Queue of `DocSpec` events to emit.
@@ -302,20 +302,14 @@ impl MarkdownReader {
             return;
         }
 
-        for event in self
-            .inline_style_stack
-            .close(intent_from_text_style_kind(kind))
-        {
+        for event in self.inline_style_stack.close(kind) {
             self.queue.push_back(event);
         }
     }
 
     fn open_style(&mut self, kind: &TextStyleKind) {
         if !self.in_preformatted {
-            for event in self
-                .inline_style_stack
-                .open(intent_from_text_style_kind(kind))
-            {
+            for event in self.inline_style_stack.open(kind.clone()) {
                 self.queue.push_back(event);
             }
         }
@@ -372,13 +366,13 @@ impl MarkdownReader {
             code_block_buffer: None,
             image: None,
             html_block_heading_acc: crate::html::translator::BlockHeadingAccumulator::default(),
-            html_block_inline_stack: crate::html::stack::StyleStack::default(),
+            html_block_inline_stack: docspec_core::StyleStack::default(),
             in_html_block: false,
             in_preformatted: false,
             in_table_head: false,
             link: None,
             list_stack: Vec::new(),
-            inline_style_stack: crate::html::stack::StyleStack::default(),
+            inline_style_stack: docspec_core::StyleStack::default(),
             phase: Phase::NotStarted,
             queue: VecDeque::new(),
         }
@@ -878,21 +872,6 @@ impl EventSource for MarkdownReader {
         }
 
         Ok(self.queue.pop_front())
-    }
-}
-
-fn intent_from_text_style_kind(k: &TextStyleKind) -> crate::html::tags::TagIntent {
-    use crate::html::tags::TagIntent;
-    match k {
-        TextStyleKind::Bold => TagIntent::Bold,
-        TextStyleKind::Italic => TagIntent::Italic,
-        TextStyleKind::Underline => TagIntent::Underline,
-        TextStyleKind::Strikethrough => TagIntent::Strikethrough,
-        TextStyleKind::Code => TagIntent::Code,
-        TextStyleKind::Subscript => TagIntent::Subscript,
-        TextStyleKind::Superscript => TagIntent::Superscript,
-        TextStyleKind::Mark(_) => TagIntent::Mark,
-        _ => TagIntent::Ignored,
     }
 }
 
