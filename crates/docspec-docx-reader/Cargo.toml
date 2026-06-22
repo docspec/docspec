@@ -8,6 +8,7 @@ readme = "README.md"
 description = "DOCX to DocSpec event stream reader"
 keywords = ["document", "conversion", "streaming", "docx"]
 categories = ["parsing"]
+exclude = ["tests/fixtures/**", "tests/snapshots/**"]
 
 [dependencies]
 docspec-core = { workspace = true }
@@ -24,6 +25,7 @@ zip = { version = "8", default-features = false, features = [
 ] }
 tempfile = "3"
 docspec-test-utils = { workspace = true }
+insta = { version = "1", features = ["glob"] }
 
 [lints]
 workspace = true

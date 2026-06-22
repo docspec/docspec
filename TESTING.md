@@ -64,6 +64,12 @@ We use snapshots for output formats that are stable and well-defined: HTML outpu
 
 Snapshots also serve as regression tests. When a bug is fixed, we add a snapshot of the correct output. If the bug ever returns, the snapshot test will fail.
 
+### Snapshot Review
+
+Snapshot files live in `tests/snapshots/docx/pandoc/` and are committed alongside the fixtures they cover. Run `cargo insta review` to interactively inspect pending snapshots: press `a` to accept a change as correct, `r` to reject it and keep the existing snapshot. Accept snapshots only when you have verified the new output is correct — not merely different.
+
+To generate snapshots for the first time (or for fixtures added since the last run), use `INSTA_UPDATE=unseen cargo test --test pandoc_corpus -p docspec-docx-reader`. This writes only the missing snapshots and leaves existing ones untouched. In CI (`CI=true`, `INSTA_UPDATE` unset), any missing or mismatched snapshot causes the test to fail immediately — do not set `INSTA_UPDATE=always` in any committed script or workflow.
+
 ### Fuzz Tests
 
 Fuzz tests send random, malformed, and adversarial inputs at the parsers. The goal is simple: do not crash. A parser must handle any byte sequence without panicking.

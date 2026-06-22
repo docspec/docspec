@@ -6,6 +6,10 @@
 // Reason: Helpers panic on internal ZIP write failure to keep test call sites
 // terse. Equivalent to the per-file allows used in workspace test modules.
 #![allow(clippy::expect_used)]
+// Reason: This test-utility crate intentionally panics on programmer errors
+// (bad fixture paths, LFS pointers, unhandled enum variants) so call sites
+// stay terse and failures are obvious.
+#![allow(clippy::panic)]
 // Reason: Literal suffix rules have conflicting requirements in this crate
 #![allow(clippy::separated_literal_suffix)]
 
@@ -23,6 +27,11 @@ pub use drive::{drive, try_drive};
 
 mod failing_writer;
 pub use failing_writer::FailingWriter;
+
+pub mod snapshot;
+pub use snapshot::{
+    capture, is_lfs_pointer, AssetDescriptor, CorpusSnapshot, EventSnapshot, Terminal,
+};
 
 /// Builds a minimal 2-entry DOCX archive (Deflated) from raw XML strings.
 ///
