@@ -12,6 +12,12 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.17.0](https://github.com/docspec/docspec/compare/v1.16.1...v1.17.0) - 2026-06-23
+
+### Added
+
+- *(blocknote-writer)* lift in-cell images to siblings after enclosing table
+
 ## [1.16.1](https://github.com/docspec/docspec/compare/v1.16.0...v1.16.1) - 2026-06-23
 
 ### Fixed
