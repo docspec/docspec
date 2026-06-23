@@ -12,6 +12,18 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.17.0](https://github.com/docspec/docspec/compare/v1.16.0...v1.17.0) - 2026-06-23
+
+### Added
+
+- *(cli,http)* suppress empty headings, block quotes, and paragraphs by default
+- *(core)* add SkipEmptyBlocks source adapter for empty Heading/BlockQuote/Paragraph suppression
+
+### Other
+
+- *(core)* make SkipEmptyBlocks::next_event iterative to guarantee O(1) stack
+- *(docx-reader)* document StartHeading/StartBlockQuote emission and fix Out-of-Scope list
+
 ## [1.16.0](https://github.com/docspec/docspec/compare/v1.15.0...v1.16.0) - 2026-06-23
 
 ### Added
