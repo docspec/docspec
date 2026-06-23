@@ -129,8 +129,9 @@ let json = String::from_utf8(buf)?;
 
 - `StartParagraph` / `EndParagraph` boundaries are absorbed silently (adjacent paragraphs concatenate without separator)
 - `Text` and `LineBreak` are preserved
-- Images, headings, code blocks, blockquotes, and list items are dropped silently
-- Nested tables are lifted: their events are buffered between the inner `StartTable` and matching `EndTable`, then replayed as top-level sibling blocks immediately after the enclosing outermost table closes. Deep nesting (`A` containing `B` containing `C`) flattens to a top-level sequence (`A, B, C`) in document order. Inline text adjacent to a nested table in the same outer cell stays in that outer cell.
+- Headings, code blocks, blockquotes, and list items are dropped silently
+- Images are lifted: each `Image` event encountered inside a cell is buffered and replayed as a top-level sibling block immediately after the enclosing outermost table closes, preserving document order with any other lifted content from the same table. Inline text adjacent to a lifted image in the same cell stays in that cell — only the image moves out.
+- Nested tables are lifted: their events are buffered between the inner `StartTable` and matching `EndTable`, then replayed as top-level sibling blocks immediately after the enclosing outermost table closes. Deep nesting (`A` containing `B` containing `C`) flattens to a top-level sequence (`A, B, C`) in document order. Inline text adjacent to a nested table in the same outer cell stays in that outer cell. Images inside a nested cell lift through the recursive drain — they emit as siblings of the already-lifted nested table.
 
 **Non-paragraph children inside list items**: headings, images, code blocks, and blockquotes that appear as children of a list item are dropped. The first paragraph's inline content populates the item's `content[]` array; each subsequent paragraph becomes a child `paragraph` block in `children[]`.
 

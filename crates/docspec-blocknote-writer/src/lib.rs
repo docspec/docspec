@@ -39,8 +39,8 @@
 //!
 //! - **Preserved**: [`StartTextStyle`](docspec_core::Event::StartTextStyle) / [`EndTextStyle`](docspec_core::Event::EndTextStyle), [`Text`](docspec_core::Event::Text) (with currently open inline styles), [`LineBreak`](docspec_core::Event::LineBreak), [`SoftBreak`](docspec_core::Event::SoftBreak)
 //! - **Absorbed silently**: [`StartParagraph`](docspec_core::Event::StartParagraph) / [`EndParagraph`](docspec_core::Event::EndParagraph) (paragraph boundaries are dropped — adjacent paragraphs concatenate without separator)
-//! - **Dropped**: [`Image`](docspec_core::Event::Image), [`StartBlockQuote`](docspec_core::Event::StartBlockQuote), [`StartPreformatted`](docspec_core::Event::StartPreformatted), [`StartHeading`](docspec_core::Event::StartHeading), [`ThematicBreak`](docspec_core::Event::ThematicBreak) — silently discarded
-//! - **Lifted**: nested [`StartTable`](docspec_core::Event::StartTable) and its children — buffered and replayed as top-level sibling blocks after the enclosing outermost table closes
+//! - **Dropped**: [`StartBlockQuote`](docspec_core::Event::StartBlockQuote), [`StartPreformatted`](docspec_core::Event::StartPreformatted), [`StartHeading`](docspec_core::Event::StartHeading), [`ThematicBreak`](docspec_core::Event::ThematicBreak) — silently discarded
+//! - **Lifted**: nested [`StartTable`](docspec_core::Event::StartTable) and its children, and [`Image`](docspec_core::Event::Image) events that appear inside a cell — buffered and replayed as top-level sibling blocks after the enclosing outermost table closes
 //!
 //! Nested tables (a `StartTable` inside a cell) are buffered between the first nested
 //! `StartTable` and its matching `EndTable`, then replayed through the writer after the
@@ -49,6 +49,13 @@
 //! number of levels deep collapses to a flat top-level sequence: `A` containing `B`
 //! containing `C` emits as `A, B, C`. Inline text adjacent to a nested table in the same
 //! outer cell stays in that outer cell.
+//!
+//! Images encountered inside a cell are likewise buffered and replayed as top-level sibling
+//! blocks after the enclosing outermost table closes. Their order in the output mirrors the
+//! order they appeared inside the table (interleaved with any lifted nested tables in
+//! document order). Inline text adjacent to a lifted image in the same cell stays in that
+//! cell — only the image moves out. Images inside a nested cell lift through the recursive
+//! drain: they emit as siblings of the (already-lifted) nested table.
 //!
 //! # List Support
 //!
@@ -258,7 +265,9 @@ pub struct BlockNoteWriter<W: Write> {
     json: JsonEmitter<StrusonBackend<W>>,
     /// Whether at least one `StyledText` has been emitted into the current link's content array.
     link_emitted_styled_text: bool,
-    /// Events from nested tables, replayed at the outermost `EndTable` to lift them to top level.
+    /// Events deferred for replay at the outermost `EndTable` as top-level siblings:
+    /// nested-table substreams and in-cell `Image` events. Both are illegal inside
+    /// `BlockNote`'s `tableCell.content`; co-buffering preserves their document order.
     lifted_nested_events: Vec<Event>,
     list_stack: Vec<ListStackEntry>,
     open_styles: Vec<TextStyleKind>,
@@ -1058,6 +1067,7 @@ impl<W: Write> BlockNoteWriter<W> {
     fn should_buffer_for_lift(&self, event: &Event) -> bool {
         match event {
             Event::StartTable { .. } => self.table_depth.is_positive(),
+            Event::Image { .. } if self.context.in_table_cell => true,
             _ => self.table_depth.get() >= 2,
         }
     }
