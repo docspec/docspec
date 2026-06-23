@@ -1,40 +1,40 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "A" }
-       3: Text { content: " link to " }
-       4: Text { content: "the" }
-       5: Text { content: " bookmark" }
-       6: EndParagraph
-       7: StartParagraph { alignment: Some(Justify), id: None }
-       8: StartTextStyle { kind: Bold, id: None }
-       9: Text { content: "Accomplices" }
-      10: EndTextStyle
-      11: StartTextStyle { kind: Bold, id: None }
-      12: Text { content: ":" }
-      13: EndTextStyle
-      14: EndParagraph
-      15: StartParagraph { alignment: Some(Justify), id: None }
-      16: Text { content: "There are bookmarks around here" }
-      17: Text { content: "." }
-      18: EndParagraph
-      19: StartParagraph { alignment: Some(Justify), id: None }
-      20: EndParagraph
-      21: StartParagraph { alignment: Some(Justify), id: None }
-      22: EndParagraph
-      23: StartHeading { id: None, level: 1 }
-      24: Text { content: "Referenced " }
-      25: Text { content: "title" }
-      26: EndHeading
-      27: StartParagraph { alignment: None, id: None }
-      28: Text { content: "Content" }
-      29: EndParagraph
-      30: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "A" },
+    Text { content: " link to " },
+    Text { content: "the" },
+    Text { content: " bookmark" },
+    EndParagraph,
+    StartParagraph { alignment: Some(Justify), id: None },
+    StartTextStyle { kind: Bold, id: None },
+    Text { content: "Accomplices" },
+    EndTextStyle,
+    StartTextStyle { kind: Bold, id: None },
+    Text { content: ":" },
+    EndTextStyle,
+    EndParagraph,
+    StartParagraph { alignment: Some(Justify), id: None },
+    Text { content: "There are bookmarks around here" },
+    Text { content: "." },
+    EndParagraph,
+    StartParagraph { alignment: Some(Justify), id: None },
+    EndParagraph,
+    StartParagraph { alignment: Some(Justify), id: None },
+    EndParagraph,
+    StartHeading { id: None, level: 1 },
+    Text { content: "Referenced " },
+    Text { content: "title" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Content" },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

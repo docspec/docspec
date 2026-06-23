@@ -1,49 +1,49 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartHeading { id: None, level: 2 }
-       2: Text { content: "Some block quotes, in different ways" }
-       3: EndHeading
-       4: StartParagraph { alignment: None, id: None }
-       5: EndParagraph
-       6: StartParagraph { alignment: None, id: None }
-       7: Text { content: "This is the proper way, with a style" }
-       8: EndParagraph
-       9: StartParagraph { alignment: None, id: None }
-      10: EndParagraph
-      11: StartBlockQuote { id: None }
-      12: Text { content: "I don’t know why this would be in italics, but so it appears to be on my screen." }
-      13: EndBlockQuote
-      14: StartParagraph { alignment: None, id: None }
-      15: EndParagraph
-      16: StartParagraph { alignment: None, id: None }
-      17: Text { content: "And this is also a proper way, with a different style" }
-      18: EndParagraph
-      19: StartParagraph { alignment: None, id: None }
-      20: EndParagraph
-      21: StartBlockQuote { id: None }
-      22: Text { content: "This is called the Intense Quote style." }
-      23: EndBlockQuote
-      24: StartParagraph { alignment: None, id: None }
-      25: EndParagraph
-      26: StartParagraph { alignment: None, id: None }
-      27: Text { content: "And this is the way that most people do it:" }
-      28: EndParagraph
-      29: StartParagraph { alignment: None, id: None }
-      30: EndParagraph
-      31: StartParagraph { alignment: None, id: None }
-      32: Text { content: "I just indented this, so it looks like a block quote. I think this is how most people do block quotes in their documents." }
-      33: EndParagraph
-      34: StartParagraph { alignment: None, id: None }
-      35: EndParagraph
-      36: StartParagraph { alignment: None, id: None }
-      37: Text { content: "And back to the normal  style." }
-      38: EndParagraph
-      39: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartHeading { id: None, level: 2 },
+    Text { content: "Some block quotes, in different ways" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is the proper way, with a style" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartBlockQuote { id: None },
+    Text { content: "I don’t know why this would be in italics, but so it appears to be on my screen." },
+    EndBlockQuote,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "And this is also a proper way, with a different style" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartBlockQuote { id: None },
+    Text { content: "This is called the Intense Quote style." },
+    EndBlockQuote,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "And this is the way that most people do it:" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "I just indented this, so it looks like a block quote. I think this is how most people do block quotes in their documents." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "And back to the normal  style." },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

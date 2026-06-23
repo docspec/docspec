@@ -1,65 +1,65 @@
 ---
-source: crates/docspec-docx-reader/tests/docspec_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartPreformatted { id: None, syntax: None }
-       2: Text { content: "alpha" }
-       3: LineBreak
-       4: Text { content: "beta" }
-       5: LineBreak
-       6: LineBreak
-       7: Text { content: "gamma" }
-       8: EndPreformatted
-       9: StartParagraph { alignment: None, id: None }
-      10: Text { content: "regular" }
-      11: EndParagraph
-      12: StartPreformatted { id: None, syntax: None }
-      13: Text { content: "before heading" }
-      14: EndPreformatted
-      15: StartHeading { id: None, level: 1 }
-      16: Text { content: "heading" }
-      17: EndHeading
-      18: StartPreformatted { id: None, syntax: None }
-      19: Text { content: "before quote" }
-      20: EndPreformatted
-      21: StartBlockQuote { id: None }
-      22: Text { content: "quote" }
-      23: EndBlockQuote
-      24: StartPreformatted { id: None, syntax: None }
-      25: Text { content: "before list" }
-      26: EndPreformatted
-      27: StartOrderedListItem { id: Some("1"), level: 0, start: Some(1), style_type: Decimal }
-      28: StartParagraph { alignment: None, id: None }
-      29: Text { content: "item" }
-      30: EndParagraph
-      31: EndOrderedListItem
-      32: StartPreformatted { id: None, syntax: None }
-      33: Text { content: "before table" }
-      34: EndPreformatted
-      35: StartTable { id: None }
-      36: StartTableRow { id: None }
-      37: StartTableCell { colspan: None, id: None, rowspan: None }
-      38: StartParagraph { alignment: None, id: None }
-      39: Text { content: "cell" }
-      40: EndParagraph
-      41: EndTableCell
-      42: EndTableRow
-      43: EndTable
-      44: StartTable { id: None }
-      45: StartTableRow { id: None }
-      46: StartTableCell { colspan: None, id: None, rowspan: None }
-      47: StartPreformatted { id: None, syntax: None }
-      48: Text { content: "cell first" }
-      49: LineBreak
-      50: Text { content: "cell second" }
-      51: EndPreformatted
-      52: EndTableCell
-      53: EndTableRow
-      54: EndTable
-      55: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartPreformatted { id: None, syntax: None },
+    Text { content: "alpha" },
+    LineBreak,
+    Text { content: "beta" },
+    LineBreak,
+    LineBreak,
+    Text { content: "gamma" },
+    EndPreformatted,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "regular" },
+    EndParagraph,
+    StartPreformatted { id: None, syntax: None },
+    Text { content: "before heading" },
+    EndPreformatted,
+    StartHeading { id: None, level: 1 },
+    Text { content: "heading" },
+    EndHeading,
+    StartPreformatted { id: None, syntax: None },
+    Text { content: "before quote" },
+    EndPreformatted,
+    StartBlockQuote { id: None },
+    Text { content: "quote" },
+    EndBlockQuote,
+    StartPreformatted { id: None, syntax: None },
+    Text { content: "before list" },
+    EndPreformatted,
+    StartOrderedListItem { id: Some("1"), level: 0, start: Some(1), style_type: Decimal },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "item" },
+    EndParagraph,
+    EndOrderedListItem,
+    StartPreformatted { id: None, syntax: None },
+    Text { content: "before table" },
+    EndPreformatted,
+    StartTable { id: None },
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "cell" },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    EndTable,
+    StartTable { id: None },
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartPreformatted { id: None, syntax: None },
+    Text { content: "cell first" },
+    LineBreak,
+    Text { content: "cell second" },
+    EndPreformatted,
+    EndTableCell,
+    EndTableRow,
+    EndTable,
+    EndDocument,
   ],
   terminal: Ok,
 }

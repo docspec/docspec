@@ -1,75 +1,75 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "m" }
-       3: StartTextStyle { kind: Superscript, id: None }
-       4: Text { content: "2" }
-       5: EndTextStyle
-       6: EndParagraph
-       7: StartParagraph { alignment: None, id: None }
-       8: Text { content: "m" }
-       9: StartTextStyle { kind: Code, id: None }
-      10: StartTextStyle { kind: Superscript, id: None }
-      11: Text { content: "2" }
-      12: EndTextStyle
-      13: EndTextStyle
-      14: EndParagraph
-      15: StartParagraph { alignment: None, id: None }
-      16: StartTextStyle { kind: Code, id: None }
-      17: Text { content: "m" }
-      18: EndTextStyle
-      19: StartTextStyle { kind: Superscript, id: None }
-      20: Text { content: "2" }
-      21: EndTextStyle
-      22: EndParagraph
-      23: StartParagraph { alignment: None, id: None }
-      24: StartTextStyle { kind: Code, id: None }
-      25: Text { content: "m" }
-      26: EndTextStyle
-      27: StartTextStyle { kind: Code, id: None }
-      28: StartTextStyle { kind: Superscript, id: None }
-      29: Text { content: "2" }
-      30: EndTextStyle
-      31: EndTextStyle
-      32: EndParagraph
-      33: StartParagraph { alignment: None, id: None }
-      34: Text { content: "m" }
-      35: StartTextStyle { kind: Subscript, id: None }
-      36: Text { content: "2" }
-      37: EndTextStyle
-      38: EndParagraph
-      39: StartParagraph { alignment: None, id: None }
-      40: Text { content: "m" }
-      41: StartTextStyle { kind: Code, id: None }
-      42: StartTextStyle { kind: Subscript, id: None }
-      43: Text { content: "2" }
-      44: EndTextStyle
-      45: EndTextStyle
-      46: EndParagraph
-      47: StartParagraph { alignment: None, id: None }
-      48: StartTextStyle { kind: Code, id: None }
-      49: Text { content: "m" }
-      50: EndTextStyle
-      51: StartTextStyle { kind: Subscript, id: None }
-      52: Text { content: "2" }
-      53: EndTextStyle
-      54: EndParagraph
-      55: StartParagraph { alignment: None, id: None }
-      56: StartTextStyle { kind: Code, id: None }
-      57: Text { content: "m" }
-      58: EndTextStyle
-      59: StartTextStyle { kind: Code, id: None }
-      60: StartTextStyle { kind: Subscript, id: None }
-      61: Text { content: "2" }
-      62: EndTextStyle
-      63: EndTextStyle
-      64: EndParagraph
-      65: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "m" },
+    StartTextStyle { kind: Superscript, id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "m" },
+    StartTextStyle { kind: Code, id: None },
+    StartTextStyle { kind: Superscript, id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndTextStyle,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: Code, id: None },
+    Text { content: "m" },
+    EndTextStyle,
+    StartTextStyle { kind: Superscript, id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: Code, id: None },
+    Text { content: "m" },
+    EndTextStyle,
+    StartTextStyle { kind: Code, id: None },
+    StartTextStyle { kind: Superscript, id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndTextStyle,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "m" },
+    StartTextStyle { kind: Subscript, id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "m" },
+    StartTextStyle { kind: Code, id: None },
+    StartTextStyle { kind: Subscript, id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndTextStyle,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: Code, id: None },
+    Text { content: "m" },
+    EndTextStyle,
+    StartTextStyle { kind: Subscript, id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: Code, id: None },
+    Text { content: "m" },
+    EndTextStyle,
+    StartTextStyle { kind: Code, id: None },
+    StartTextStyle { kind: Subscript, id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndTextStyle,
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

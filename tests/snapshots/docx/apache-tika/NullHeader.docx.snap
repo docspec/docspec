@@ -4,104 +4,104 @@ expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "Hundreds injured in Yemen protest" }
-       3: EndParagraph
-       4: StartParagraph { alignment: None, id: None }
-       5: Text { content: "BBC Middle East" }
-       6: EndParagraph
-       7: StartParagraph { alignment: None, id: None }
-       8: Text { content: "Mon, 04 Apr 2011 10:01:50 GMT" }
-       9: EndParagraph
-      10: StartParagraph { alignment: None, id: None }
-      11: Text { content: "At least 12 people have reportedly been killed in anti-government protests in the Yemeni city of Taiz when troops opened fire on demonstrators." }
-      12: EndParagraph
-      13: StartParagraph { alignment: None, id: None }
-      14: Text { content: "At least 30 people are said to be in a critical condition. " }
-      15: EndParagraph
-      16: StartParagraph { alignment: None, id: None }
-      17: Text { content: "There were reports that snipers had also shot at protesters during a march in the fourth largest city, Hudaida, on the Red Sea. " }
-      18: EndParagraph
-      19: StartParagraph { alignment: None, id: None }
-      20: Text { content: "The violence follows weeks of protests in cities across the country calling for the president to stand down." }
-      21: EndParagraph
-      22: StartParagraph { alignment: None, id: None }
-      23: Text { content: "President Ali Abdullah Saleh, who has ruled the country for 32 years, has signalled that he has no plans to leave. " }
-      24: EndParagraph
-      25: StartParagraph { alignment: None, id: None }
-      26: Text { content: "Many streets in the city of Taiz are reported to be blocked and there is a very heavy security presence." }
-      27: EndParagraph
-      28: StartParagraph { alignment: None, id: None }
-      29: Text { content: "The march in Hudaida was organised in protest at the crackdown in Taiz over the weekend, which left at least two people reported dead and hundreds wounded." }
-      30: EndParagraph
-      31: StartParagraph { alignment: None, id: None }
-      32: Text { content: "In Hudaida, police fired live rounds and tear gas at demonstrators who left in the early hours of Monday morning to attempt to march on a presidential palace." }
-      33: EndParagraph
-      34: StartParagraph { alignment: None, id: None }
-      35: Text { content: "Doctors at Hudaida hospital said nine people had been shot, 350 had inhaled tear gas and a further 50 had been hit by rocks, Reuters reports." }
-      36: EndParagraph
-      37: StartParagraph { alignment: None, id: None }
-      38: Text { content: "\"They suddenly gathered around the province's administrative building and headed to the presidential palace, but police stopped them by firing gunshots in the air and using teargas. I saw a lot of plainclothes police attack them too,\" an unnamed witness told the news agency." }
-      39: EndParagraph
-      40: StartParagraph { alignment: None, id: None }
-      41: Text { content: "Collapsing economy" }
-      42: EndParagraph
-      43: StartParagraph { alignment: None, id: None }
-      44: Text { content: "A BBC correspondent in the country, who cannot be named for security reasons, says President Saleh is under immense pressure - he has lost allies, Yemen's army is split, the government has lost controls of entire areas of the country and the economy is collapsing.  " }
-      45: EndParagraph
-      46: StartParagraph { alignment: None, id: None }
-      47: Text { content: "Yemen's leader has been one of Washington's key allies in the war on terror. Yemen is home to one of al-Qaeda's most dangerous franchises. The inability of the government in Sana to control much of its territory gives al-Qaeda in the Arabian Peninsula space to train and grow. " }
-      48: EndParagraph
-      49: StartParagraph { alignment: None, id: None }
-      50: Text { content: "But, more than this, Yemen occupies a piece of strategic real-estate near to the mouth of the Red Sea. Yemen as a totally failed state, dominating a key shipping route to and from the Suez Canal is a nightmare for Washington; a kind of Afghanistan-on-sea, before the ouster of the Taliban. " }
-      51: EndParagraph
-      52: StartParagraph { alignment: None, id: None }
-      53: Text { content: "Washington has been very cautious in its approach to the Arab Spring in Yemen; initially eager to do nothing to weaken his tenuous grip on power while hoping perhaps that the unrest would die down and some kind of transitional arrangements might be put in place. " }
-      54: EndParagraph
-      55: StartParagraph { alignment: None, id: None }
-      56: Text { content: "But the growing violence and the president's refusal to give up power has prompted something of a shift in the US view over the past couple of weeks. " }
-      57: EndParagraph
-      58: StartParagraph { alignment: None, id: None }
-      59: Text { content: "President Saleh is now seen by the Obama Administration as less of an asset and more of a liability.  " }
-      60: EndParagraph
-      61: StartParagraph { alignment: None, id: None }
-      62: Text { content: "On Saturday, the opposition coalition Common Forum called on the president to hand over power to his deputy, Vice-President Abdu Rabu Hadi." }
-      63: EndParagraph
-      64: StartParagraph { alignment: None, id: None }
-      65: Text { content: "Common Forum, which includes the five biggest opposition groups in Yemen, offered a five-point plan for the handover:" }
-      66: EndParagraph
-      67: StartParagraph { alignment: None, id: None }
-      68: Text { content: "Officials have said they have not yet received a copy of the plan - but, speaking at a meeting in Sanaa with representatives from Taiz Province on Sunday, President Saleh called on Common Forum to \"end the crisis through calling off protests and removing roadblocks\"." }
-      69: EndParagraph
-      70: StartParagraph { alignment: None, id: None }
-      71: Text { content: "Any transition, he said, would have to be made \"through constitutional ways\"." }
-      72: EndParagraph
-      73: StartParagraph { alignment: None, id: None }
-      74: Text { content: "A Turkish humanitarian ship carrying more than 250 injured people from the Libyan city of Misrata arrives in the rebel stronghold of Benghazi." }
-      75: EndParagraph
-      76: StartParagraph { alignment: None, id: None }
-      77: Text { content: "Mapping oil giant's social and economic divisions \t" }
-      78: EndParagraph
-      79: StartParagraph { alignment: None, id: None }
-      80: Text { content: "Humble beginnings of the first man in space \t" }
-      81: EndParagraph
-      82: StartParagraph { alignment: None, id: None }
-      83: Text { content: "Libya rebels race to train recruits to take on Gaddafi forces \t" }
-      84: EndParagraph
-      85: StartParagraph { alignment: None, id: None }
-      86: Text { content: "Bob Dylan set to play first gig in China \t" }
-      87: EndParagraph
-      88: StartParagraph { alignment: None, id: None }
-      89: Text { content: "Washington DC holds vigil with its annual Cherry Blossom Festival, as the trees bloom in Tokyo" }
-      90: EndParagraph
-      91: StartParagraph { alignment: None, id: None }
-      92: Text { content: "Review of the racing game Shift 2: Unleashed and forthcoming detective title LA Noire" }
-      93: EndParagraph
-      94: StartParagraph { alignment: None, id: None }
-      95: Text { content: "          Search term:   " }
-      96: EndParagraph
-      97: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Hundreds injured in Yemen protest" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "BBC Middle East" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Mon, 04 Apr 2011 10:01:50 GMT" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "At least 12 people have reportedly been killed in anti-government protests in the Yemeni city of Taiz when troops opened fire on demonstrators." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "At least 30 people are said to be in a critical condition. " },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "There were reports that snipers had also shot at protesters during a march in the fourth largest city, Hudaida, on the Red Sea. " },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "The violence follows weeks of protests in cities across the country calling for the president to stand down." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "President Ali Abdullah Saleh, who has ruled the country for 32 years, has signalled that he has no plans to leave. " },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Many streets in the city of Taiz are reported to be blocked and there is a very heavy security presence." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "The march in Hudaida was organised in protest at the crackdown in Taiz over the weekend, which left at least two people reported dead and hundreds wounded." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "In Hudaida, police fired live rounds and tear gas at demonstrators who left in the early hours of Monday morning to attempt to march on a presidential palace." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Doctors at Hudaida hospital said nine people had been shot, 350 had inhaled tear gas and a further 50 had been hit by rocks, Reuters reports." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "\"They suddenly gathered around the province's administrative building and headed to the presidential palace, but police stopped them by firing gunshots in the air and using teargas. I saw a lot of plainclothes police attack them too,\" an unnamed witness told the news agency." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Collapsing economy" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "A BBC correspondent in the country, who cannot be named for security reasons, says President Saleh is under immense pressure - he has lost allies, Yemen's army is split, the government has lost controls of entire areas of the country and the economy is collapsing.  " },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Yemen's leader has been one of Washington's key allies in the war on terror. Yemen is home to one of al-Qaeda's most dangerous franchises. The inability of the government in Sana to control much of its territory gives al-Qaeda in the Arabian Peninsula space to train and grow. " },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "But, more than this, Yemen occupies a piece of strategic real-estate near to the mouth of the Red Sea. Yemen as a totally failed state, dominating a key shipping route to and from the Suez Canal is a nightmare for Washington; a kind of Afghanistan-on-sea, before the ouster of the Taliban. " },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Washington has been very cautious in its approach to the Arab Spring in Yemen; initially eager to do nothing to weaken his tenuous grip on power while hoping perhaps that the unrest would die down and some kind of transitional arrangements might be put in place. " },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "But the growing violence and the president's refusal to give up power has prompted something of a shift in the US view over the past couple of weeks. " },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "President Saleh is now seen by the Obama Administration as less of an asset and more of a liability.  " },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "On Saturday, the opposition coalition Common Forum called on the president to hand over power to his deputy, Vice-President Abdu Rabu Hadi." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Common Forum, which includes the five biggest opposition groups in Yemen, offered a five-point plan for the handover:" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Officials have said they have not yet received a copy of the plan - but, speaking at a meeting in Sanaa with representatives from Taiz Province on Sunday, President Saleh called on Common Forum to \"end the crisis through calling off protests and removing roadblocks\"." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Any transition, he said, would have to be made \"through constitutional ways\"." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "A Turkish humanitarian ship carrying more than 250 injured people from the Libyan city of Misrata arrives in the rebel stronghold of Benghazi." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Mapping oil giant's social and economic divisions \t" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Humble beginnings of the first man in space \t" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Libya rebels race to train recruits to take on Gaddafi forces \t" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Bob Dylan set to play first gig in China \t" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Washington DC holds vigil with its annual Cherry Blossom Festival, as the trees bloom in Tokyo" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Review of the racing game Shift 2: Unleashed and forthcoming detective title LA Noire" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "          Search term:   " },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

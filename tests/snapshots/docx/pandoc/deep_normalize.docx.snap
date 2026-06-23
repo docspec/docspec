@@ -1,78 +1,78 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartOrderedListItem { id: Some("1"), level: 0, start: Some(1), style_type: Decimal }
-       2: StartParagraph { alignment: None, id: None }
-       3: Text { content: "This is at the first level" }
-       4: EndParagraph
-       5: StartOrderedListItem { id: Some("1"), level: 1, start: None, style_type: LowerAlpha }
-       6: StartParagraph { alignment: None, id: None }
-       7: Text { content: "This " }
-       8: Text { content: "is at the second " }
-       9: Text { content: "level" }
-      10: EndParagraph
-      11: StartOrderedListItem { id: Some("1"), level: 2, start: None, style_type: LowerRoman }
-      12: StartParagraph { alignment: None, id: None }
-      13: Text { content: "This is " }
-      14: StartTextStyle { kind: Italic, id: None }
-      15: Text { content: "at " }
-      16: EndTextStyle
-      17: StartTextStyle { kind: Bold, id: None }
-      18: StartTextStyle { kind: Italic, id: None }
-      19: Text { content: "the " }
-      20: EndTextStyle
-      21: EndTextStyle
-      22: StartTextStyle { kind: Bold, id: None }
-      23: StartTextStyle { kind: Italic, id: None }
-      24: StartTextStyle { kind: Mark(Rgb { b: 0, g: 255, r: 0 }), id: None }
-      25: Text { content: "t" }
-      26: EndTextStyle
-      27: EndTextStyle
-      28: EndTextStyle
-      29: StartTextStyle { kind: Bold, id: None }
-      30: StartTextStyle { kind: Italic, id: None }
-      31: StartTextStyle { kind: Mark(Rgb { b: 255, g: 255, r: 0 }), id: None }
-      32: Text { content: "h" }
-      33: EndTextStyle
-      34: EndTextStyle
-      35: EndTextStyle
-      36: StartTextStyle { kind: Bold, id: None }
-      37: StartTextStyle { kind: Italic, id: None }
-      38: Text { content: "i" }
-      39: EndTextStyle
-      40: EndTextStyle
-      41: StartTextStyle { kind: Bold, id: None }
-      42: StartTextStyle { kind: Italic, id: None }
-      43: StartTextStyle { kind: Mark(Rgb { b: 255, g: 0, r: 0 }), id: None }
-      44: Text { content: "r" }
-      45: EndTextStyle
-      46: EndTextStyle
-      47: EndTextStyle
-      48: StartTextStyle { kind: Bold, id: None }
-      49: StartTextStyle { kind: Italic, id: None }
-      50: StartTextStyle { kind: Mark(Rgb { b: 0, g: 0, r: 255 }), id: None }
-      51: Text { content: "d" }
-      52: EndTextStyle
-      53: EndTextStyle
-      54: EndTextStyle
-      55: StartTextStyle { kind: Bold, id: None }
-      56: StartTextStyle { kind: Italic, id: None }
-      57: Text { content: " level" }
-      58: EndTextStyle
-      59: EndTextStyle
-      60: StartTextStyle { kind: Italic, id: None }
-      61: Text { content: ", and I want to" }
-      62: EndTextStyle
-      63: Text { content: " test normalization here." }
-      64: EndParagraph
-      65: EndOrderedListItem
-      66: EndOrderedListItem
-      67: EndOrderedListItem
-      68: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartOrderedListItem { id: Some("1"), level: 0, start: Some(1), style_type: Decimal },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is at the first level" },
+    EndParagraph,
+    StartOrderedListItem { id: Some("1"), level: 1, start: None, style_type: LowerAlpha },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This " },
+    Text { content: "is at the second " },
+    Text { content: "level" },
+    EndParagraph,
+    StartOrderedListItem { id: Some("1"), level: 2, start: None, style_type: LowerRoman },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is " },
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: "at " },
+    EndTextStyle,
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: "the " },
+    EndTextStyle,
+    EndTextStyle,
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: Italic, id: None },
+    StartTextStyle { kind: Mark(Rgb { b: 0, g: 255, r: 0 }), id: None },
+    Text { content: "t" },
+    EndTextStyle,
+    EndTextStyle,
+    EndTextStyle,
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: Italic, id: None },
+    StartTextStyle { kind: Mark(Rgb { b: 255, g: 255, r: 0 }), id: None },
+    Text { content: "h" },
+    EndTextStyle,
+    EndTextStyle,
+    EndTextStyle,
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: "i" },
+    EndTextStyle,
+    EndTextStyle,
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: Italic, id: None },
+    StartTextStyle { kind: Mark(Rgb { b: 255, g: 0, r: 0 }), id: None },
+    Text { content: "r" },
+    EndTextStyle,
+    EndTextStyle,
+    EndTextStyle,
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: Italic, id: None },
+    StartTextStyle { kind: Mark(Rgb { b: 0, g: 0, r: 255 }), id: None },
+    Text { content: "d" },
+    EndTextStyle,
+    EndTextStyle,
+    EndTextStyle,
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: " level" },
+    EndTextStyle,
+    EndTextStyle,
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: ", and I want to" },
+    EndTextStyle,
+    Text { content: " test normalization here." },
+    EndParagraph,
+    EndOrderedListItem,
+    EndOrderedListItem,
+    EndOrderedListItem,
+    EndDocument,
   ],
   terminal: Ok,
 }

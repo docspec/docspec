@@ -4,15 +4,15 @@ expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "Let me see what happens if I insert a worksheet." }
-       3: EndParagraph
-       4: StartParagraph { alignment: None, id: None }
-       5: EndParagraph
-       6: StartParagraph { alignment: None, id: None }
-       7: EndParagraph
-       8: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Let me see what happens if I insert a worksheet." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

@@ -1,185 +1,185 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartHeading { id: None, level: 2 }
-       2: Text { content: "A table, with and without a header row" }
-       3: EndHeading
-       4: StartParagraph { alignment: None, id: None }
-       5: EndParagraph
-       6: StartTable { id: None }
-       7: StartTableRow { id: None }
-       8: StartTableCell { colspan: None, id: None, rowspan: None }
-       9: StartParagraph { alignment: None, id: None }
-      10: Text { content: "Name" }
-      11: EndParagraph
-      12: EndTableCell
-      13: StartTableCell { colspan: None, id: None, rowspan: None }
-      14: StartParagraph { alignment: None, id: None }
-      15: Text { content: "Game" }
-      16: EndParagraph
-      17: EndTableCell
-      18: StartTableCell { colspan: None, id: None, rowspan: None }
-      19: StartParagraph { alignment: None, id: None }
-      20: Text { content: "Fame" }
-      21: EndParagraph
-      22: EndTableCell
-      23: StartTableCell { colspan: None, id: None, rowspan: None }
-      24: StartParagraph { alignment: None, id: None }
-      25: Text { content: "Blame" }
-      26: EndParagraph
-      27: EndTableCell
-      28: EndTableRow
-      29: StartTableRow { id: None }
-      30: StartTableCell { colspan: None, id: None, rowspan: None }
-      31: StartParagraph { alignment: None, id: None }
-      32: Text { content: "Lebron James" }
-      33: EndParagraph
-      34: EndTableCell
-      35: StartTableCell { colspan: None, id: None, rowspan: None }
-      36: StartParagraph { alignment: None, id: None }
-      37: Text { content: "Basketball" }
-      38: EndParagraph
-      39: EndTableCell
-      40: StartTableCell { colspan: None, id: None, rowspan: None }
-      41: StartParagraph { alignment: None, id: None }
-      42: Text { content: "Very High" }
-      43: EndParagraph
-      44: EndTableCell
-      45: StartTableCell { colspan: None, id: None, rowspan: None }
-      46: StartParagraph { alignment: None, id: None }
-      47: Text { content: "Leaving Cleveland" }
-      48: EndParagraph
-      49: EndTableCell
-      50: EndTableRow
-      51: StartTableRow { id: None }
-      52: StartTableCell { colspan: None, id: None, rowspan: None }
-      53: StartParagraph { alignment: None, id: None }
-      54: Text { content: "Ryan Braun" }
-      55: EndParagraph
-      56: EndTableCell
-      57: StartTableCell { colspan: None, id: None, rowspan: None }
-      58: StartParagraph { alignment: None, id: None }
-      59: Text { content: "Baseball" }
-      60: EndParagraph
-      61: EndTableCell
-      62: StartTableCell { colspan: None, id: None, rowspan: None }
-      63: StartParagraph { alignment: None, id: None }
-      64: Text { content: "Moderate" }
-      65: EndParagraph
-      66: EndTableCell
-      67: StartTableCell { colspan: None, id: None, rowspan: None }
-      68: StartParagraph { alignment: None, id: None }
-      69: Text { content: "Steroids" }
-      70: EndParagraph
-      71: EndTableCell
-      72: EndTableRow
-      73: StartTableRow { id: None }
-      74: StartTableCell { colspan: None, id: None, rowspan: None }
-      75: StartParagraph { alignment: None, id: None }
-      76: Text { content: "Russell Wilson" }
-      77: EndParagraph
-      78: EndTableCell
-      79: StartTableCell { colspan: None, id: None, rowspan: None }
-      80: StartParagraph { alignment: None, id: None }
-      81: Text { content: "Football" }
-      82: EndParagraph
-      83: EndTableCell
-      84: StartTableCell { colspan: None, id: None, rowspan: None }
-      85: StartParagraph { alignment: None, id: None }
-      86: Text { content: "High" }
-      87: EndParagraph
-      88: EndTableCell
-      89: StartTableCell { colspan: None, id: None, rowspan: None }
-      90: StartParagraph { alignment: None, id: None }
-      91: Text { content: "Tacky uniform" }
-      92: EndParagraph
-      93: EndTableCell
-      94: EndTableRow
-      95: EndTable
-      96: StartParagraph { alignment: None, id: None }
-      97: EndParagraph
-      98: StartTable { id: None }
-      99: StartTableRow { id: None }
-     100: StartTableCell { colspan: None, id: None, rowspan: None }
-     101: StartParagraph { alignment: None, id: None }
-     102: Text { content: "Sinple" }
-     103: EndParagraph
-     104: EndTableCell
-     105: StartTableCell { colspan: None, id: None, rowspan: None }
-     106: StartParagraph { alignment: None, id: None }
-     107: Text { content: "Table" }
-     108: EndParagraph
-     109: EndTableCell
-     110: EndTableRow
-     111: StartTableRow { id: None }
-     112: StartTableCell { colspan: None, id: None, rowspan: None }
-     113: StartParagraph { alignment: None, id: None }
-     114: Text { content: "Without" }
-     115: EndParagraph
-     116: EndTableCell
-     117: StartTableCell { colspan: None, id: None, rowspan: None }
-     118: StartParagraph { alignment: None, id: None }
-     119: Text { content: "Header" }
-     120: EndParagraph
-     121: EndTableCell
-     122: EndTableRow
-     123: EndTable
-     124: StartParagraph { alignment: None, id: None }
-     125: EndParagraph
-     126: StartTable { id: None }
-     127: StartTableRow { id: None }
-     128: StartTableCell { colspan: None, id: None, rowspan: None }
-     129: StartParagraph { alignment: None, id: None }
-     130: Text { content: "Sim" }
-     131: Text { content: "ple" }
-     132: EndParagraph
-     133: StartParagraph { alignment: None, id: None }
-     134: EndParagraph
-     135: StartParagraph { alignment: None, id: None }
-     136: Text { content: "Multiparagraph" }
-     137: EndParagraph
-     138: EndTableCell
-     139: StartTableCell { colspan: None, id: None, rowspan: None }
-     140: StartParagraph { alignment: None, id: None }
-     141: Text { content: "Table" }
-     142: EndParagraph
-     143: StartParagraph { alignment: None, id: None }
-     144: EndParagraph
-     145: StartParagraph { alignment: None, id: None }
-     146: Text { content: "Full" }
-     147: EndParagraph
-     148: EndTableCell
-     149: EndTableRow
-     150: StartTableRow { id: None }
-     151: StartTableCell { colspan: None, id: None, rowspan: None }
-     152: StartParagraph { alignment: None, id: None }
-     153: Text { content: "Of" }
-     154: EndParagraph
-     155: StartParagraph { alignment: None, id: None }
-     156: EndParagraph
-     157: StartParagraph { alignment: None, id: None }
-     158: Text { content: "Paragraphs" }
-     159: EndParagraph
-     160: EndTableCell
-     161: StartTableCell { colspan: None, id: None, rowspan: None }
-     162: StartParagraph { alignment: None, id: None }
-     163: Text { content: "In each" }
-     164: EndParagraph
-     165: StartParagraph { alignment: None, id: None }
-     166: EndParagraph
-     167: StartParagraph { alignment: None, id: None }
-     168: Text { content: "Cell." }
-     169: EndParagraph
-     170: EndTableCell
-     171: EndTableRow
-     172: EndTable
-     173: StartParagraph { alignment: None, id: None }
-     174: EndParagraph
-     175: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartHeading { id: None, level: 2 },
+    Text { content: "A table, with and without a header row" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartTable { id: None },
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Name" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Game" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Fame" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Blame" },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Lebron James" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Basketball" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Very High" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Leaving Cleveland" },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Ryan Braun" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Baseball" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Moderate" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Steroids" },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Russell Wilson" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Football" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "High" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Tacky uniform" },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    EndTable,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartTable { id: None },
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Sinple" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Table" },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Without" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Header" },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    EndTable,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartTable { id: None },
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Sim" },
+    Text { content: "ple" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Multiparagraph" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Table" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Full" },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Of" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Paragraphs" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "In each" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Cell." },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    EndTable,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

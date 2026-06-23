@@ -1,53 +1,53 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "This is all in an " }
-       3: StartTextStyle { kind: Bold, id: None }
-       4: Text { content: "italic style" }
-       5: EndTextStyle
-       6: Text { content: "." }
-       7: EndParagraph
-       8: StartParagraph { alignment: None, id: None }
-       9: EndParagraph
-      10: StartParagraph { alignment: None, id: None }
-      11: Text { content: "This is an italic " }
-      12: Text { content: "style" }
-      13: Text { content: " with some " }
-      14: Text { content: "words" }
-      15: Text { content: " " }
-      16: Text { content: "unitalicized" }
-      17: Text { content: "." }
-      18: EndParagraph
-      19: StartParagraph { alignment: None, id: None }
-      20: EndParagraph
-      21: StartParagraph { alignment: None, id: None }
-      22: Text { content: "This is all in a " }
-      23: StartTextStyle { kind: Italic, id: None }
-      24: Text { content: "strong style" }
-      25: EndTextStyle
-      26: Text { content: "." }
-      27: EndParagraph
-      28: StartParagraph { alignment: None, id: None }
-      29: EndParagraph
-      30: StartParagraph { alignment: None, id: None }
-      31: Text { content: "This is a" }
-      32: Text { content: " strong " }
-      33: Text { content: "style" }
-      34: Text { content: " with some " }
-      35: Text { content: "words" }
-      36: Text { content: " " }
-      37: Text { content: "u" }
-      38: Text { content: "bolded" }
-      39: Text { content: "." }
-      40: EndParagraph
-      41: StartParagraph { alignment: None, id: None }
-      42: EndParagraph
-      43: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is all in an " },
+    StartTextStyle { kind: Bold, id: None },
+    Text { content: "italic style" },
+    EndTextStyle,
+    Text { content: "." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is an italic " },
+    Text { content: "style" },
+    Text { content: " with some " },
+    Text { content: "words" },
+    Text { content: " " },
+    Text { content: "unitalicized" },
+    Text { content: "." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is all in a " },
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: "strong style" },
+    EndTextStyle,
+    Text { content: "." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is a" },
+    Text { content: " strong " },
+    Text { content: "style" },
+    Text { content: " with some " },
+    Text { content: "words" },
+    Text { content: " " },
+    Text { content: "u" },
+    Text { content: "bolded" },
+    Text { content: "." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

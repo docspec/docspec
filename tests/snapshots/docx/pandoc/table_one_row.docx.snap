@@ -1,32 +1,32 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartTable { id: None }
-       2: StartTableRow { id: None }
-       3: StartTableCell { colspan: None, id: None, rowspan: None }
-       4: StartParagraph { alignment: None, id: None }
-       5: Text { content: "One" }
-       6: EndParagraph
-       7: EndTableCell
-       8: StartTableCell { colspan: None, id: None, rowspan: None }
-       9: StartParagraph { alignment: None, id: None }
-      10: Text { content: "Row" }
-      11: EndParagraph
-      12: EndTableCell
-      13: StartTableCell { colspan: None, id: None, rowspan: None }
-      14: StartParagraph { alignment: None, id: None }
-      15: Text { content: "Table" }
-      16: EndParagraph
-      17: EndTableCell
-      18: EndTableRow
-      19: EndTable
-      20: StartParagraph { alignment: None, id: None }
-      21: EndParagraph
-      22: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartTable { id: None },
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "One" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Row" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Table" },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    EndTable,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

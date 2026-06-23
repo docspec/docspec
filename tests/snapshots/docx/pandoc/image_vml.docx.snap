@@ -1,22 +1,22 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: StartTextStyle { kind: Bold, id: None }
-       3: Text { content: "VML Image" }
-       4: EndTextStyle
-       5: EndParagraph
-       6: StartParagraph { alignment: None, id: None }
-       7: Text { content: "It should follow below:" }
-       8: EndParagraph
-       9: StartParagraph { alignment: None, id: None }
-      10: Image { alt: None, decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image4.jpeg", content_type: "image/jpeg", bytes: 14795, sha256: "85e4a6c893d623c78c3390d8bafb0ce1186c8c8496e2f9d32c9e18d8fe405345" } }
-      11: EndParagraph
-      12: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: Bold, id: None },
+    Text { content: "VML Image" },
+    EndTextStyle,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "It should follow below:" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Image { alt: None, decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image4.jpeg", content_type: "image/jpeg", bytes: 14795, sha256: "85e4a6c893d623c78c3390d8bafb0ce1186c8c8496e2f9d32c9e18d8fe405345" } },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

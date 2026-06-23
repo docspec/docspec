@@ -4,426 +4,426 @@ expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: EndParagraph
-       3: StartParagraph { alignment: None, id: None }
-       4: EndParagraph
-       5: StartParagraph { alignment: None, id: None }
-       6: Text { content: "This is a " }
-       7: Image { alt: Some("C:\\Users\\tallison\\AppData\\Local\\Microsoft\\Windows\\INetCache\\Content.Word\\body_pic.jpg"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image1.jpeg", content_type: "image/jpeg", bytes: 7686, sha256: "643dbb91a62b47947d320a588aa9d837640cc9baf3fe00010c9fe52b3fef8a1a" } }
-       8: Text { content: "paragraph with an image" }
-       9: EndParagraph
-      10: StartParagraph { alignment: None, id: None }
-      11: EndParagraph
-      12: StartParagraph { alignment: None, id: None }
-      13: Text { content: "This is " }
-      14: Text { content: "a comment" }
-      15: EndParagraph
-      16: StartParagraph { alignment: None, id: None }
-      17: Text { content: "This is a footnote" }
-      18: EndParagraph
-      19: StartParagraph { alignment: None, id: None }
-      20: Text { content: "This is an endnote" }
-      21: EndParagraph
-      22: StartParagraph { alignment: None, id: None }
-      23: EndParagraph
-      24: StartParagraph { alignment: None, id: None }
-      25: Text { content: "This is a " }
-      26: Image { alt: Some("C:\\Users\\tallison\\AppData\\Local\\Microsoft\\Windows\\INetCache\\Content.Word\\sdt_pic.jpg"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image1.jpeg", content_type: "image/jpeg", bytes: 7686, sha256: "643dbb91a62b47947d320a588aa9d837640cc9baf3fe00010c9fe52b3fef8a1a" } }
-      27: Text { content: "rich text " }
-      28: Text { content: "sdt" }
-      29: EndParagraph
-      30: StartParagraph { alignment: None, id: None }
-      31: EndParagraph
-      32: StartParagraph { alignment: None, id: None }
-      33: Image { alt: None, decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image1.jpeg", content_type: "image/jpeg", bytes: 7686, sha256: "643dbb91a62b47947d320a588aa9d837640cc9baf3fe00010c9fe52b3fef8a1a" } }
-      34: EndParagraph
-      35: StartParagraph { alignment: None, id: None }
-      36: EndParagraph
-      37: StartParagraph { alignment: None, id: None }
-      38: EndParagraph
-      39: StartParagraph { alignment: None, id: None }
-      40: EndParagraph
-      41: StartParagraph { alignment: None, id: None }
-      42: EndParagraph
-      43: StartParagraph { alignment: None, id: None }
-      44: EndParagraph
-      45: StartParagraph { alignment: None, id: None }
-      46: EndParagraph
-      47: StartParagraph { alignment: None, id: None }
-      48: EndParagraph
-      49: StartTable { id: None }
-      50: StartTableRow { id: None }
-      51: StartTableCell { colspan: None, id: None, rowspan: None }
-      52: StartParagraph { alignment: None, id: None }
-      53: EndParagraph
-      54: EndTableCell
-      55: StartTableCell { colspan: None, id: None, rowspan: None }
-      56: StartParagraph { alignment: None, id: None }
-      57: EndParagraph
-      58: EndTableCell
-      59: StartTableCell { colspan: None, id: None, rowspan: None }
-      60: StartParagraph { alignment: None, id: None }
-      61: EndParagraph
-      62: EndTableCell
-      63: StartTableCell { colspan: None, id: None, rowspan: None }
-      64: StartParagraph { alignment: None, id: None }
-      65: EndParagraph
-      66: EndTableCell
-      67: EndTableRow
-      68: StartTableRow { id: None }
-      69: StartTableCell { colspan: None, id: None, rowspan: None }
-      70: StartParagraph { alignment: None, id: None }
-      71: EndParagraph
-      72: EndTableCell
-      73: StartTableCell { colspan: None, id: None, rowspan: None }
-      74: StartTable { id: None }
-      75: StartTableRow { id: None }
-      76: StartTableCell { colspan: None, id: None, rowspan: None }
-      77: StartParagraph { alignment: None, id: None }
-      78: EndParagraph
-      79: EndTableCell
-      80: StartTableCell { colspan: None, id: None, rowspan: None }
-      81: StartParagraph { alignment: None, id: None }
-      82: EndParagraph
-      83: EndTableCell
-      84: StartTableCell { colspan: None, id: None, rowspan: None }
-      85: StartParagraph { alignment: None, id: None }
-      86: EndParagraph
-      87: EndTableCell
-      88: StartTableCell { colspan: None, id: None, rowspan: None }
-      89: StartParagraph { alignment: None, id: None }
-      90: EndParagraph
-      91: EndTableCell
-      92: StartTableCell { colspan: None, id: None, rowspan: None }
-      93: StartParagraph { alignment: None, id: None }
-      94: EndParagraph
-      95: EndTableCell
-      96: EndTableRow
-      97: StartTableRow { id: None }
-      98: StartTableCell { colspan: None, id: None, rowspan: None }
-      99: StartParagraph { alignment: None, id: None }
-     100: EndParagraph
-     101: EndTableCell
-     102: StartTableCell { colspan: None, id: None, rowspan: None }
-     103: StartParagraph { alignment: None, id: None }
-     104: EndParagraph
-     105: EndTableCell
-     106: StartTableCell { colspan: None, id: None, rowspan: None }
-     107: StartParagraph { alignment: None, id: None }
-     108: EndParagraph
-     109: EndTableCell
-     110: StartTableCell { colspan: None, id: None, rowspan: None }
-     111: StartParagraph { alignment: None, id: None }
-     112: EndParagraph
-     113: EndTableCell
-     114: StartTableCell { colspan: None, id: None, rowspan: None }
-     115: StartParagraph { alignment: None, id: None }
-     116: EndParagraph
-     117: EndTableCell
-     118: EndTableRow
-     119: StartTableRow { id: None }
-     120: StartTableCell { colspan: None, id: None, rowspan: None }
-     121: StartParagraph { alignment: None, id: None }
-     122: EndParagraph
-     123: EndTableCell
-     124: StartTableCell { colspan: None, id: None, rowspan: None }
-     125: StartTable { id: None }
-     126: StartTableRow { id: None }
-     127: StartTableCell { colspan: None, id: None, rowspan: None }
-     128: StartParagraph { alignment: None, id: None }
-     129: EndParagraph
-     130: EndTableCell
-     131: StartTableCell { colspan: None, id: None, rowspan: None }
-     132: StartParagraph { alignment: None, id: None }
-     133: EndParagraph
-     134: EndTableCell
-     135: StartTableCell { colspan: None, id: None, rowspan: None }
-     136: StartParagraph { alignment: None, id: None }
-     137: EndParagraph
-     138: EndTableCell
-     139: StartTableCell { colspan: None, id: None, rowspan: None }
-     140: StartParagraph { alignment: None, id: None }
-     141: EndParagraph
-     142: EndTableCell
-     143: StartTableCell { colspan: None, id: None, rowspan: None }
-     144: StartParagraph { alignment: None, id: None }
-     145: EndParagraph
-     146: EndTableCell
-     147: EndTableRow
-     148: StartTableRow { id: None }
-     149: StartTableCell { colspan: None, id: None, rowspan: None }
-     150: StartParagraph { alignment: None, id: None }
-     151: EndParagraph
-     152: EndTableCell
-     153: StartTableCell { colspan: None, id: None, rowspan: None }
-     154: StartParagraph { alignment: None, id: None }
-     155: Text { content: "Deeply embedded" }
-     156: Image { alt: Some("deeply_embedded_pic"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image2.jpeg", content_type: "image/jpeg", bytes: 7686, sha256: "643dbb91a62b47947d320a588aa9d837640cc9baf3fe00010c9fe52b3fef8a1a" } }
-     157: EndParagraph
-     158: EndTableCell
-     159: StartTableCell { colspan: None, id: None, rowspan: None }
-     160: StartParagraph { alignment: None, id: None }
-     161: EndParagraph
-     162: EndTableCell
-     163: StartTableCell { colspan: None, id: None, rowspan: None }
-     164: StartParagraph { alignment: None, id: None }
-     165: EndParagraph
-     166: EndTableCell
-     167: StartTableCell { colspan: None, id: None, rowspan: None }
-     168: StartParagraph { alignment: None, id: None }
-     169: EndParagraph
-     170: EndTableCell
-     171: EndTableRow
-     172: StartTableRow { id: None }
-     173: StartTableCell { colspan: None, id: None, rowspan: None }
-     174: StartParagraph { alignment: None, id: None }
-     175: EndParagraph
-     176: EndTableCell
-     177: StartTableCell { colspan: None, id: None, rowspan: None }
-     178: StartParagraph { alignment: None, id: None }
-     179: EndParagraph
-     180: EndTableCell
-     181: StartTableCell { colspan: None, id: None, rowspan: None }
-     182: StartParagraph { alignment: None, id: None }
-     183: EndParagraph
-     184: EndTableCell
-     185: StartTableCell { colspan: None, id: None, rowspan: None }
-     186: StartParagraph { alignment: None, id: None }
-     187: EndParagraph
-     188: EndTableCell
-     189: StartTableCell { colspan: None, id: None, rowspan: None }
-     190: StartParagraph { alignment: None, id: None }
-     191: EndParagraph
-     192: EndTableCell
-     193: EndTableRow
-     194: StartTableRow { id: None }
-     195: StartTableCell { colspan: None, id: None, rowspan: None }
-     196: StartParagraph { alignment: None, id: None }
-     197: EndParagraph
-     198: EndTableCell
-     199: StartTableCell { colspan: None, id: None, rowspan: None }
-     200: StartParagraph { alignment: None, id: None }
-     201: EndParagraph
-     202: EndTableCell
-     203: StartTableCell { colspan: None, id: None, rowspan: None }
-     204: StartParagraph { alignment: None, id: None }
-     205: EndParagraph
-     206: EndTableCell
-     207: StartTableCell { colspan: None, id: None, rowspan: None }
-     208: StartParagraph { alignment: None, id: None }
-     209: EndParagraph
-     210: EndTableCell
-     211: StartTableCell { colspan: None, id: None, rowspan: None }
-     212: StartParagraph { alignment: None, id: None }
-     213: EndParagraph
-     214: EndTableCell
-     215: EndTableRow
-     216: StartTableRow { id: None }
-     217: StartTableCell { colspan: None, id: None, rowspan: None }
-     218: StartParagraph { alignment: None, id: None }
-     219: EndParagraph
-     220: EndTableCell
-     221: StartTableCell { colspan: None, id: None, rowspan: None }
-     222: StartParagraph { alignment: None, id: None }
-     223: EndParagraph
-     224: EndTableCell
-     225: StartTableCell { colspan: None, id: None, rowspan: None }
-     226: StartParagraph { alignment: None, id: None }
-     227: EndParagraph
-     228: EndTableCell
-     229: StartTableCell { colspan: None, id: None, rowspan: None }
-     230: StartParagraph { alignment: None, id: None }
-     231: EndParagraph
-     232: EndTableCell
-     233: StartTableCell { colspan: None, id: None, rowspan: None }
-     234: StartParagraph { alignment: None, id: None }
-     235: EndParagraph
-     236: EndTableCell
-     237: EndTableRow
-     238: EndTable
-     239: StartParagraph { alignment: None, id: None }
-     240: EndParagraph
-     241: EndTableCell
-     242: StartTableCell { colspan: None, id: None, rowspan: None }
-     243: StartParagraph { alignment: None, id: None }
-     244: EndParagraph
-     245: EndTableCell
-     246: StartTableCell { colspan: None, id: None, rowspan: None }
-     247: StartParagraph { alignment: None, id: None }
-     248: EndParagraph
-     249: EndTableCell
-     250: StartTableCell { colspan: None, id: None, rowspan: None }
-     251: StartParagraph { alignment: None, id: None }
-     252: EndParagraph
-     253: EndTableCell
-     254: EndTableRow
-     255: StartTableRow { id: None }
-     256: StartTableCell { colspan: None, id: None, rowspan: None }
-     257: StartParagraph { alignment: None, id: None }
-     258: EndParagraph
-     259: EndTableCell
-     260: StartTableCell { colspan: None, id: None, rowspan: None }
-     261: StartParagraph { alignment: None, id: None }
-     262: EndParagraph
-     263: EndTableCell
-     264: StartTableCell { colspan: None, id: None, rowspan: None }
-     265: StartParagraph { alignment: None, id: None }
-     266: EndParagraph
-     267: EndTableCell
-     268: StartTableCell { colspan: None, id: None, rowspan: None }
-     269: StartParagraph { alignment: None, id: None }
-     270: EndParagraph
-     271: EndTableCell
-     272: StartTableCell { colspan: None, id: None, rowspan: None }
-     273: StartParagraph { alignment: None, id: None }
-     274: EndParagraph
-     275: EndTableCell
-     276: EndTableRow
-     277: StartTableRow { id: None }
-     278: StartTableCell { colspan: None, id: None, rowspan: None }
-     279: StartParagraph { alignment: None, id: None }
-     280: EndParagraph
-     281: EndTableCell
-     282: StartTableCell { colspan: None, id: None, rowspan: None }
-     283: StartParagraph { alignment: None, id: None }
-     284: EndParagraph
-     285: EndTableCell
-     286: StartTableCell { colspan: None, id: None, rowspan: None }
-     287: StartParagraph { alignment: None, id: None }
-     288: EndParagraph
-     289: EndTableCell
-     290: StartTableCell { colspan: None, id: None, rowspan: None }
-     291: StartParagraph { alignment: None, id: None }
-     292: EndParagraph
-     293: EndTableCell
-     294: StartTableCell { colspan: None, id: None, rowspan: None }
-     295: StartParagraph { alignment: None, id: None }
-     296: EndParagraph
-     297: EndTableCell
-     298: EndTableRow
-     299: EndTable
-     300: StartParagraph { alignment: None, id: None }
-     301: EndParagraph
-     302: EndTableCell
-     303: StartTableCell { colspan: None, id: None, rowspan: None }
-     304: StartParagraph { alignment: None, id: None }
-     305: EndParagraph
-     306: EndTableCell
-     307: StartTableCell { colspan: None, id: None, rowspan: None }
-     308: StartParagraph { alignment: None, id: None }
-     309: EndParagraph
-     310: EndTableCell
-     311: EndTableRow
-     312: StartTableRow { id: None }
-     313: StartTableCell { colspan: None, id: None, rowspan: None }
-     314: StartParagraph { alignment: None, id: None }
-     315: EndParagraph
-     316: EndTableCell
-     317: StartTableCell { colspan: None, id: None, rowspan: None }
-     318: StartParagraph { alignment: None, id: None }
-     319: EndParagraph
-     320: EndTableCell
-     321: StartTableCell { colspan: None, id: None, rowspan: None }
-     322: StartParagraph { alignment: None, id: None }
-     323: EndParagraph
-     324: EndTableCell
-     325: StartTableCell { colspan: None, id: None, rowspan: None }
-     326: StartParagraph { alignment: None, id: None }
-     327: EndParagraph
-     328: EndTableCell
-     329: EndTableRow
-     330: EndTable
-     331: StartParagraph { alignment: None, id: None }
-     332: EndParagraph
-     333: StartParagraph { alignment: None, id: None }
-     334: EndParagraph
-     335: StartParagraph { alignment: None, id: None }
-     336: EndParagraph
-     337: StartParagraph { alignment: None, id: None }
-     338: EndParagraph
-     339: StartParagraph { alignment: None, id: None }
-     340: EndParagraph
-     341: StartParagraph { alignment: None, id: None }
-     342: EndParagraph
-     343: StartParagraph { alignment: None, id: None }
-     344: EndParagraph
-     345: StartParagraph { alignment: None, id: None }
-     346: EndParagraph
-     347: StartParagraph { alignment: None, id: None }
-     348: EndParagraph
-     349: StartParagraph { alignment: None, id: None }
-     350: EndParagraph
-     351: StartParagraph { alignment: None, id: None }
-     352: EndParagraph
-     353: StartParagraph { alignment: None, id: None }
-     354: EndParagraph
-     355: StartParagraph { alignment: None, id: None }
-     356: EndParagraph
-     357: StartParagraph { alignment: None, id: None }
-     358: EndParagraph
-     359: StartParagraph { alignment: None, id: None }
-     360: EndParagraph
-     361: StartParagraph { alignment: None, id: None }
-     362: EndParagraph
-     363: StartParagraph { alignment: None, id: None }
-     364: EndParagraph
-     365: StartParagraph { alignment: None, id: None }
-     366: EndParagraph
-     367: StartParagraph { alignment: None, id: None }
-     368: EndParagraph
-     369: StartParagraph { alignment: None, id: None }
-     370: EndParagraph
-     371: StartParagraph { alignment: None, id: None }
-     372: EndParagraph
-     373: StartParagraph { alignment: None, id: None }
-     374: EndParagraph
-     375: StartParagraph { alignment: None, id: None }
-     376: EndParagraph
-     377: StartParagraph { alignment: None, id: None }
-     378: EndParagraph
-     379: StartParagraph { alignment: None, id: None }
-     380: EndParagraph
-     381: StartParagraph { alignment: None, id: None }
-     382: EndParagraph
-     383: StartParagraph { alignment: None, id: None }
-     384: EndParagraph
-     385: StartParagraph { alignment: None, id: None }
-     386: EndParagraph
-     387: StartParagraph { alignment: None, id: None }
-     388: EndParagraph
-     389: StartParagraph { alignment: None, id: None }
-     390: EndParagraph
-     391: StartParagraph { alignment: None, id: None }
-     392: EndParagraph
-     393: StartParagraph { alignment: None, id: None }
-     394: EndParagraph
-     395: StartParagraph { alignment: None, id: None }
-     396: EndParagraph
-     397: StartParagraph { alignment: None, id: None }
-     398: EndParagraph
-     399: StartParagraph { alignment: None, id: None }
-     400: EndParagraph
-     401: StartParagraph { alignment: None, id: None }
-     402: EndParagraph
-     403: StartParagraph { alignment: None, id: None }
-     404: EndParagraph
-     405: StartParagraph { alignment: None, id: None }
-     406: EndParagraph
-     407: StartParagraph { alignment: None, id: None }
-     408: EndParagraph
-     409: StartParagraph { alignment: None, id: None }
-     410: EndParagraph
-     411: StartParagraph { alignment: None, id: None }
-     412: EndParagraph
-     413: StartParagraph { alignment: None, id: None }
-     414: EndParagraph
-     415: StartParagraph { alignment: None, id: None }
-     416: EndParagraph
-     417: StartParagraph { alignment: None, id: None }
-     418: EndParagraph
-     419: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is a " },
+    Image { alt: Some("C:\\Users\\tallison\\AppData\\Local\\Microsoft\\Windows\\INetCache\\Content.Word\\body_pic.jpg"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image1.jpeg", content_type: "image/jpeg", bytes: 7686, sha256: "643dbb91a62b47947d320a588aa9d837640cc9baf3fe00010c9fe52b3fef8a1a" } },
+    Text { content: "paragraph with an image" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is " },
+    Text { content: "a comment" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is a footnote" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is an endnote" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is a " },
+    Image { alt: Some("C:\\Users\\tallison\\AppData\\Local\\Microsoft\\Windows\\INetCache\\Content.Word\\sdt_pic.jpg"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image1.jpeg", content_type: "image/jpeg", bytes: 7686, sha256: "643dbb91a62b47947d320a588aa9d837640cc9baf3fe00010c9fe52b3fef8a1a" } },
+    Text { content: "rich text " },
+    Text { content: "sdt" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Image { alt: None, decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image1.jpeg", content_type: "image/jpeg", bytes: 7686, sha256: "643dbb91a62b47947d320a588aa9d837640cc9baf3fe00010c9fe52b3fef8a1a" } },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartTable { id: None },
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartTable { id: None },
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartTable { id: None },
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Deeply embedded" },
+    Image { alt: Some("deeply_embedded_pic"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image2.jpeg", content_type: "image/jpeg", bytes: 7686, sha256: "643dbb91a62b47947d320a588aa9d837640cc9baf3fe00010c9fe52b3fef8a1a" } },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    EndTable,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    EndTable,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    EndTable,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

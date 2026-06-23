@@ -1,31 +1,31 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "This is some text." }
-       3: EndParagraph
-       4: StartParagraph { alignment: None, id: None }
-       5: EndParagraph
-       6: StartParagraph { alignment: None, id: None }
-       7: Text { content: "This is text with an " }
-       8: Text { content: "emphasized" }
-       9: Text { content: " text style. And this is text with a " }
-      10: Text { content: "strengthened" }
-      11: Text { content: " text style." }
-      12: EndParagraph
-      13: StartParagraph { alignment: None, id: None }
-      14: EndParagraph
-      15: StartBlockQuote { id: None }
-      16: Text { content: "Here is a styled " }
-      17: Text { content: "paragr" }
-      18: Text { content: "aph" }
-      19: Text { content: " that inherits from Block Text." }
-      20: EndBlockQuote
-      21: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is some text." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is text with an " },
+    Text { content: "emphasized" },
+    Text { content: " text style. And this is text with a " },
+    Text { content: "strengthened" },
+    Text { content: " text style." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartBlockQuote { id: None },
+    Text { content: "Here is a styled " },
+    Text { content: "paragr" },
+    Text { content: "aph" },
+    Text { content: " that inherits from Block Text." },
+    EndBlockQuote,
+    EndDocument,
   ],
   terminal: Ok,
 }

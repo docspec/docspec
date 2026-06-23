@@ -25,8 +25,8 @@ impl fmt::Debug for ReaderFixtureSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "ReaderFixtureSnapshot {{")?;
         writeln!(f, "  events: [")?;
-        for (i, ev) in self.events.iter().enumerate() {
-            writeln!(f, "    {i:>4}: {ev:?}")?;
+        for ev in &self.events {
+            writeln!(f, "    {ev:?},")?;
         }
         writeln!(f, "  ],")?;
         writeln!(f, "  terminal: {:?},", self.terminal)?;
@@ -437,26 +437,6 @@ mod tests {
         };
         let expected = r#"AssetDescriptor { asset_id: "zip://word/media/image1.png", content_type: "image/png", bytes: 8, sha256: "4c4b6a3be1314ab86138bef4314dde022e600960d8689a2c8f8631802d20dab6" }"#;
         assert_eq!(format!("{desc:?}"), expected);
-    }
-
-    #[test]
-    fn reader_fixture_snapshot_debug_shows_indexed_events() {
-        let snapshot = ReaderFixtureSnapshot {
-            events: vec![
-                EventSnapshot::Other("StartDocument".to_owned()),
-                EventSnapshot::Other("EndDocument".to_owned()),
-            ],
-            terminal: Terminal::Ok,
-        };
-        let debug_output = format!("{snapshot:?}");
-        assert!(
-            debug_output.contains("   0: "),
-            "expected '   0: ' index prefix: {debug_output}"
-        );
-        assert!(
-            debug_output.contains("   1: "),
-            "expected '   1: ' index prefix: {debug_output}"
-        );
     }
 
     #[test]

@@ -4,30 +4,30 @@ expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "Here is the " }
-       3: Text { content: "pdf" }
-       4: Text { content: " file:" }
-       5: EndParagraph
-       6: StartParagraph { alignment: None, id: None }
-       7: EndParagraph
-       8: StartParagraph { alignment: None, id: None }
-       9: EndParagraph
-      10: StartParagraph { alignment: None, id: None }
-      11: Text { content: "Bye " }
-      12: Text { content: "Bye" }
-      13: EndParagraph
-      14: StartParagraph { alignment: None, id: None }
-      15: EndParagraph
-      16: StartParagraph { alignment: None, id: None }
-      17: EndParagraph
-      18: StartParagraph { alignment: None, id: None }
-      19: EndParagraph
-      20: StartParagraph { alignment: None, id: None }
-      21: Text { content: "Bye for real." }
-      22: EndParagraph
-      23: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Here is the " },
+    Text { content: "pdf" },
+    Text { content: " file:" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Bye " },
+    Text { content: "Bye" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Bye for real." },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

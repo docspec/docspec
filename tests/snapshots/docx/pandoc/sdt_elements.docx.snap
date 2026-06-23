@@ -1,61 +1,61 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartTable { id: None }
-       2: StartTableRow { id: None }
-       3: StartTableHeader { abbr: None, colspan: None, id: None, rowspan: None, scope: Some(Column) }
-       4: StartParagraph { alignment: Some(Center), id: None }
-       5: StartTextStyle { kind: Bold, id: None }
-       6: StartTextStyle { kind: TextColor(Rgb { b: 255, g: 255, r: 255 }), id: None }
-       7: Text { content: "col1Header" }
-       8: EndTextStyle
-       9: EndTextStyle
-      10: EndParagraph
-      11: EndTableHeader
-      12: StartTableHeader { abbr: None, colspan: None, id: None, rowspan: None, scope: Some(Column) }
-      13: StartParagraph { alignment: Some(Center), id: None }
-      14: StartTextStyle { kind: Bold, id: None }
-      15: StartTextStyle { kind: TextColor(Rgb { b: 255, g: 255, r: 255 }), id: None }
-      16: Text { content: "col2Header" }
-      17: EndTextStyle
-      18: EndTextStyle
-      19: EndParagraph
-      20: EndTableHeader
-      21: StartTableHeader { abbr: None, colspan: None, id: None, rowspan: None, scope: Some(Column) }
-      22: StartParagraph { alignment: Some(Center), id: None }
-      23: StartTextStyle { kind: Bold, id: None }
-      24: StartTextStyle { kind: TextColor(Rgb { b: 255, g: 255, r: 255 }), id: None }
-      25: Text { content: "col3Header" }
-      26: EndTextStyle
-      27: EndTextStyle
-      28: EndParagraph
-      29: EndTableHeader
-      30: EndTableRow
-      31: StartTableRow { id: None }
-      32: StartTableCell { colspan: None, id: None, rowspan: None }
-      33: StartParagraph { alignment: None, id: None }
-      34: Text { content: "col1 content" }
-      35: EndParagraph
-      36: EndTableCell
-      37: StartTableCell { colspan: None, id: None, rowspan: None }
-      38: StartParagraph { alignment: None, id: None }
-      39: Text { content: "Body copy" }
-      40: EndParagraph
-      41: EndTableCell
-      42: StartTableCell { colspan: None, id: None, rowspan: None }
-      43: StartParagraph { alignment: None, id: None }
-      44: Text { content: "col3 content" }
-      45: EndParagraph
-      46: EndTableCell
-      47: EndTableRow
-      48: EndTable
-      49: StartParagraph { alignment: None, id: None }
-      50: EndParagraph
-      51: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartTable { id: None },
+    StartTableRow { id: None },
+    StartTableHeader { abbr: None, colspan: None, id: None, rowspan: None, scope: Some(Column) },
+    StartParagraph { alignment: Some(Center), id: None },
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 255, g: 255, r: 255 }), id: None },
+    Text { content: "col1Header" },
+    EndTextStyle,
+    EndTextStyle,
+    EndParagraph,
+    EndTableHeader,
+    StartTableHeader { abbr: None, colspan: None, id: None, rowspan: None, scope: Some(Column) },
+    StartParagraph { alignment: Some(Center), id: None },
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 255, g: 255, r: 255 }), id: None },
+    Text { content: "col2Header" },
+    EndTextStyle,
+    EndTextStyle,
+    EndParagraph,
+    EndTableHeader,
+    StartTableHeader { abbr: None, colspan: None, id: None, rowspan: None, scope: Some(Column) },
+    StartParagraph { alignment: Some(Center), id: None },
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 255, g: 255, r: 255 }), id: None },
+    Text { content: "col3Header" },
+    EndTextStyle,
+    EndTextStyle,
+    EndParagraph,
+    EndTableHeader,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "col1 content" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Body copy" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "col3 content" },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    EndTable,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

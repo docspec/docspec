@@ -1,89 +1,89 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "S" }
-       3: Text { content: "ee Table " }
-       4: Text { content: "5.1" }
-       5: Text { content: ". " }
-       6: EndParagraph
-       7: StartParagraph { alignment: None, id: None }
-       8: Text { content: "Table " }
-       9: Text { content: "5.1" }
-      10: EndParagraph
-      11: StartTable { id: None }
-      12: StartTableRow { id: None }
-      13: StartTableCell { colspan: None, id: None, rowspan: None }
-      14: StartParagraph { alignment: None, id: None }
-      15: EndParagraph
-      16: EndTableCell
-      17: StartTableCell { colspan: None, id: None, rowspan: None }
-      18: StartParagraph { alignment: None, id: None }
-      19: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      20: Text { content: "Count" }
-      21: EndTextStyle
-      22: EndParagraph
-      23: EndTableCell
-      24: StartTableCell { colspan: None, id: None, rowspan: None }
-      25: StartParagraph { alignment: None, id: None }
-      26: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      27: Text { content: "%" }
-      28: EndTextStyle
-      29: EndParagraph
-      30: EndTableCell
-      31: EndTableRow
-      32: StartTableRow { id: None }
-      33: StartTableCell { colspan: None, id: None, rowspan: None }
-      34: StartParagraph { alignment: None, id: None }
-      35: Text { content: "First option" }
-      36: EndParagraph
-      37: EndTableCell
-      38: StartTableCell { colspan: None, id: None, rowspan: None }
-      39: StartParagraph { alignment: None, id: None }
-      40: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      41: Text { content: "242" }
-      42: EndTextStyle
-      43: EndParagraph
-      44: EndTableCell
-      45: StartTableCell { colspan: None, id: None, rowspan: None }
-      46: StartParagraph { alignment: None, id: None }
-      47: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      48: Text { content: "45" }
-      49: EndTextStyle
-      50: EndParagraph
-      51: EndTableCell
-      52: EndTableRow
-      53: StartTableRow { id: None }
-      54: StartTableCell { colspan: None, id: None, rowspan: None }
-      55: StartParagraph { alignment: None, id: None }
-      56: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      57: Text { content: "Second option" }
-      58: EndTextStyle
-      59: EndParagraph
-      60: EndTableCell
-      61: StartTableCell { colspan: None, id: None, rowspan: None }
-      62: StartParagraph { alignment: None, id: None }
-      63: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      64: Text { content: "99" }
-      65: EndTextStyle
-      66: EndParagraph
-      67: EndTableCell
-      68: StartTableCell { colspan: None, id: None, rowspan: None }
-      69: StartParagraph { alignment: None, id: None }
-      70: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      71: Text { content: "18" }
-      72: EndTextStyle
-      73: EndParagraph
-      74: EndTableCell
-      75: EndTableRow
-      76: EndTable
-      77: StartHeading { id: None, level: 2 }
-      78: EndHeading
-      79: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "S" },
+    Text { content: "ee Table " },
+    Text { content: "5.1" },
+    Text { content: ". " },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Table " },
+    Text { content: "5.1" },
+    EndParagraph,
+    StartTable { id: None },
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "Count" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "%" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "First option" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "242" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "45" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "Second option" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "99" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "18" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    EndTable,
+    StartHeading { id: None, level: 2 },
+    EndHeading,
+    EndDocument,
   ],
   terminal: Ok,
 }

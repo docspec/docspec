@@ -1,64 +1,64 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartHeading { id: None, level: 2 }
-       2: Text { content: "An internal link and a" }
-       3: Text { content: "n external link" }
-       4: EndHeading
-       5: StartParagraph { alignment: None, id: None }
-       6: EndParagraph
-       7: StartParagraph { alignment: None, id: None }
-       8: Text { content: "An " }
-       9: StartLink { href: "http://google.com", id: None, title: None }
-      10: Text { content: "external link" }
-      11: EndLink
-      12: Text { content: " to a popular website." }
-      13: EndParagraph
-      14: StartParagraph { alignment: None, id: None }
-      15: EndParagraph
-      16: StartParagraph { alignment: None, id: None }
-      17: Text { content: "An " }
-      18: StartLink { href: "http://pandoc.org/README.html", id: None, title: None }
-      19: Text { content: "external link" }
-      20: EndLink
-      21: Text { content: " to a website with an anchor." }
-      22: EndParagraph
-      23: StartParagraph { alignment: None, id: None }
-      24: EndParagraph
-      25: StartParagraph { alignment: None, id: None }
-      26: Text { content: "An " }
-      27: StartLink { href: "#_A_section_for", id: None, title: None }
-      28: Text { content: "internal link" }
-      29: EndLink
-      30: Text { content: " to a section header." }
-      31: EndParagraph
-      32: StartParagraph { alignment: None, id: None }
-      33: EndParagraph
-      34: StartParagraph { alignment: None, id: None }
-      35: Text { content: "An " }
-      36: StartLink { href: "#my_bookmark", id: None, title: None }
-      37: Text { content: "internal link" }
-      38: EndLink
-      39: Text { content: " to a bookmark." }
-      40: EndParagraph
-      41: StartParagraph { alignment: None, id: None }
-      42: EndParagraph
-      43: StartHeading { id: None, level: 2 }
-      44: Text { content: "A section for testing link targets" }
-      45: EndHeading
-      46: StartParagraph { alignment: None, id: None }
-      47: EndParagraph
-      48: StartParagraph { alignment: None, id: None }
-      49: Text { content: "A bookmark right " }
-      50: Text { content: "here" }
-      51: EndParagraph
-      52: StartParagraph { alignment: None, id: None }
-      53: EndParagraph
-      54: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartHeading { id: None, level: 2 },
+    Text { content: "An internal link and a" },
+    Text { content: "n external link" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "An " },
+    StartLink { href: "http://google.com", id: None, title: None },
+    Text { content: "external link" },
+    EndLink,
+    Text { content: " to a popular website." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "An " },
+    StartLink { href: "http://pandoc.org/README.html", id: None, title: None },
+    Text { content: "external link" },
+    EndLink,
+    Text { content: " to a website with an anchor." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "An " },
+    StartLink { href: "#_A_section_for", id: None, title: None },
+    Text { content: "internal link" },
+    EndLink,
+    Text { content: " to a section header." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "An " },
+    StartLink { href: "#my_bookmark", id: None, title: None },
+    Text { content: "internal link" },
+    EndLink,
+    Text { content: " to a bookmark." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartHeading { id: None, level: 2 },
+    Text { content: "A section for testing link targets" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "A bookmark right " },
+    Text { content: "here" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }
