@@ -96,6 +96,12 @@ struct ParagraphParseState {
     block_start_emitted: bool,
 }
 
+enum HyperlinkParseEnd {
+    HyperlinkClosed,
+    ParagraphClosed,
+    Eof,
+}
+
 impl Default for ParagraphParseState {
     fn default() -> Self {
         Self {
@@ -146,25 +152,6 @@ pub struct DocxData {
     pub numbering: crate::numbering::MinimalNumbering,
     /// Map of relationship Id → [`crate::rels::ImageRel`] for every image relationship in the document part. Resolved from word/_rels/document.xml.rels at package-open time; empty if absent.
     pub image_map: ImageMap,
-}
-
-/// Deferred-emission state for an open <w:hyperlink>.
-///
-/// Populated when `handle_start` or `handle_empty` sees a hyperlink whose
-/// `r:id` resolves OR whose `w:anchor` is non-empty. Flushed to the event
-/// queue as `Event::StartLink` immediately before the first inline
-/// content event (`Text`, `LineBreak`, `StartTextStyle`) inside the link.
-/// Discarded without emission if the hyperlink closes empty.
-#[derive(Debug, Clone)]
-pub(crate) struct PendingLink {
-    /// Resolved URL or "#anchor". Never empty.
-    href: String,
-    /// Optional XML-decoded tooltip text.
-    title: Option<String>,
-    /// True after `StartLink` has been emitted to the queue.
-    /// Used to decide whether `EndLink` should be emitted when the
-    /// hyperlink closes (or paragraph/EOF auto-closes).
-    link_started: bool,
 }
 
 #[non_exhaustive]
@@ -236,14 +223,6 @@ pub struct DocumentReader {
     table_depth: u32,
     /// True while the contiguous header band at the top of the outermost table is still open.
     header_band_open: bool,
-    /// Nesting depth for `<w:hyperlink>`. Incremented on hyperlink open
-    /// (only when `denied_stack` is empty). Decremented on hyperlink close.
-    /// `StartLink` is emitted only at the 0→1 transition; `EndLink` only at 1→0.
-    hyperlink_depth: u32,
-    /// State of the currently-open (depth >= 1) hyperlink, if any.
-    /// Some when a hyperlink has been opened but possibly before its
-    /// `StartLink` has been flushed. None when no hyperlink is open.
-    pending_link: Option<PendingLink>,
     /// Open list nesting stack. Each entry represents one open list level.
     list_stack: Vec<ListStackEntry>,
     /// Set of numIds whose first item has been emitted document-wide.
@@ -260,10 +239,6 @@ pub struct DocumentReader {
 impl fmt::Debug for DocumentReader {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let pending_link = self
-            .pending_link
-            .as_ref()
-            .map(|pending| (&pending.href, &pending.title, pending.link_started));
         let mut debug = f.debug_struct("DocumentReader");
         debug
             .field("buf", &self.buf)
@@ -277,8 +252,6 @@ impl fmt::Debug for DocumentReader {
             .field("queue", &self.queue)
             .field("data", &"<DocxData>")
             .field("hyperlink_map", &self.hyperlink_map)
-            .field("hyperlink_depth", &self.hyperlink_depth)
-            .field("pending_link", &pending_link)
             .field("list_stack", &self.list_stack)
             .field("seen_lists", &self.seen_lists);
         if std::env::var_os("DOCSPEC_DEBUG_DEFERRED_TABLE_SCAFFOLD").is_some() {
@@ -343,8 +316,6 @@ impl DocumentReader {
             nested_row_state_stack: Vec::new(),
             table_depth: 0,
             header_band_open: false,
-            hyperlink_depth: 0,
-            pending_link: None,
             list_stack: Vec::new(),
             seen_lists: std::collections::HashSet::new(),
             xml,
@@ -473,29 +444,6 @@ impl DocumentReader {
         } else {
             Event::EndUnorderedListItem
         });
-    }
-
-    fn flush_pending_link_start(&mut self) {
-        let should_start = self
-            .pending_link
-            .as_ref()
-            .is_some_and(|link| !link.link_started);
-        if !should_start {
-            return;
-        }
-
-        if let Some(link) = self.pending_link.as_mut() {
-            if !link.link_started {
-                let href = link.href.clone();
-                let title = link.title.clone();
-                link.link_started = true;
-                self.queue.push_back(Event::StartLink {
-                    href,
-                    id: None,
-                    title,
-                });
-            }
-        }
     }
 
     fn emit_style_if_not_open(&mut self, kind: TextStyleKind) {
@@ -671,7 +619,6 @@ impl DocumentReader {
         props: Option<&ResolvedRunProperties>,
         content_emitted: &mut bool,
     ) {
-        self.flush_pending_link_start();
         if *content_emitted {
             return;
         }
@@ -1166,12 +1113,6 @@ impl DocumentReader {
         while self.open_styles.pop().is_some() {
             self.queue.push_back(Event::EndTextStyle);
         }
-        if let Some(link) = self.pending_link.take() {
-            if link.link_started {
-                self.queue.push_back(Event::EndLink);
-            }
-        }
-        self.hyperlink_depth = 0;
 
         let end_event = match block_kind {
             ParagraphBlockKind::Paragraph
@@ -1217,7 +1158,6 @@ impl DocumentReader {
 
     fn emit_local_tab(&mut self, state: &mut ParagraphParseState) {
         self.ensure_local_paragraph_started(state);
-        self.flush_pending_link_start();
         self.queue.push_back(Event::Text {
             content: "\t".to_string(),
         });
@@ -1225,22 +1165,130 @@ impl DocumentReader {
 
     fn emit_local_line_break(&mut self, state: &mut ParagraphParseState) {
         self.ensure_local_paragraph_started(state);
-        self.flush_pending_link_start();
         self.queue.push_back(Event::LineBreak);
     }
 
-    fn close_hyperlink(&mut self) {
-        if self.hyperlink_depth == 0 {
+    fn drain_new_events_into(&mut self, existing_len: usize, buffered: &mut Vec<Event>) {
+        let appended = self.queue.split_off(existing_len);
+        buffered.extend(appended);
+    }
+
+    fn resolved_hyperlink(
+        &self,
+        tag: &BytesStart<'_>,
+        is_preformatted: bool,
+    ) -> Option<(String, Option<String>)> {
+        if is_preformatted {
+            return None;
+        }
+
+        let rid = read_attribute(tag, b"r:id");
+        let anchor = read_attribute(tag, b"w:anchor");
+        let tooltip = read_attribute(tag, b"w:tooltip");
+
+        let href = if let Some(rid_val) = rid {
+            self.hyperlink_map.get(&rid_val).cloned()?
+        } else if let Some(anchor_val) = anchor.filter(|a| !a.is_empty()) {
+            format!("#{anchor_val}")
+        } else {
+            return None;
+        };
+
+        let title = tooltip.and_then(|t| {
+            quick_xml::escape::unescape(&t)
+                .ok()
+                .map(std::borrow::Cow::into_owned)
+        });
+
+        Some((href, title))
+    }
+
+    fn emit_buffered_hyperlink(
+        &mut self,
+        resolved: Option<(String, Option<String>)>,
+        buffered: Vec<Event>,
+    ) {
+        if buffered.is_empty() {
             return;
         }
-        if self.hyperlink_depth == 1 {
-            if let Some(link) = self.pending_link.take() {
-                if link.link_started {
-                    self.queue.push_back(Event::EndLink);
+
+        if let Some((href, title)) = resolved {
+            self.queue.push_back(Event::StartLink {
+                href,
+                id: None,
+                title,
+            });
+            self.queue.extend(buffered);
+            self.queue.push_back(Event::EndLink);
+        } else {
+            self.queue.extend(buffered);
+        }
+    }
+
+    fn parse_hyperlink(
+        &mut self,
+        start: &BytesStart<'_>,
+        is_preformatted: bool,
+        is_empty: bool,
+    ) -> Result<HyperlinkParseEnd> {
+        let resolved = self.resolved_hyperlink(start, is_preformatted);
+        let mut buffered: Vec<Event> = Vec::new();
+
+        if is_empty {
+            self.emit_buffered_hyperlink(resolved, buffered);
+            return Ok(HyperlinkParseEnd::HyperlinkClosed);
+        }
+
+        let mut nested_depth: u32 = 1;
+        while nested_depth > 0 {
+            self.buf.clear();
+            let event = self
+                .xml
+                .read_event_into(&mut self.buf)
+                .map_err(map_quick_xml_error)?
+                .into_owned();
+            match event {
+                quick_xml::events::Event::Start(tag) => match tag.local_name().as_ref() {
+                    b"r" => {
+                        let existing_len = self.queue.len();
+                        self.parse_r(&tag)?;
+                        self.drain_new_events_into(existing_len, &mut buffered);
+                    }
+                    b"hyperlink" => {
+                        nested_depth = nested_depth.saturating_add(1);
+                    }
+                    _ => {
+                        let end = tag.to_end().into_owned();
+                        self.xml
+                            .read_to_end_into(end.name(), &mut self.buf)
+                            .map_err(map_quick_xml_error)?;
+                    }
+                },
+                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"hyperlink" => {
+                    nested_depth = nested_depth.saturating_sub(1);
+                }
+                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"p" => {
+                    self.emit_buffered_hyperlink(resolved, buffered);
+                    return Ok(HyperlinkParseEnd::ParagraphClosed);
+                }
+                quick_xml::events::Event::Empty(_)
+                | quick_xml::events::Event::End(_)
+                | quick_xml::events::Event::Text(_)
+                | quick_xml::events::Event::GeneralRef(_)
+                | quick_xml::events::Event::CData(_)
+                | quick_xml::events::Event::Comment(_)
+                | quick_xml::events::Event::Decl(_)
+                | quick_xml::events::Event::PI(_)
+                | quick_xml::events::Event::DocType(_) => {}
+                quick_xml::events::Event::Eof => {
+                    self.emit_buffered_hyperlink(resolved, buffered);
+                    return Ok(HyperlinkParseEnd::Eof);
                 }
             }
         }
-        self.hyperlink_depth = self.hyperlink_depth.saturating_sub(1);
+
+        self.emit_buffered_hyperlink(resolved, buffered);
+        Ok(HyperlinkParseEnd::HyperlinkClosed)
     }
 
     fn consume_current_start(&mut self, start: &BytesStart<'_>) -> Result<()> {
@@ -1255,7 +1303,7 @@ impl DocumentReader {
         &mut self,
         start: &BytesStart<'_>,
         state: &mut ParagraphParseState,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         match start.local_name().as_ref() {
             b"pPr" if !state.paragraph_emitted => {
                 state.props = self.parse_ppr(start)?;
@@ -1275,32 +1323,42 @@ impl DocumentReader {
             }
             b"hyperlink" => {
                 self.ensure_local_paragraph_started(state);
-                self.handle_hyperlink_start(
+                match self.parse_hyperlink(
                     start,
                     matches!(state.block_kind, ParagraphBlockKind::Preformatted),
-                );
+                    false,
+                )? {
+                    HyperlinkParseEnd::HyperlinkClosed => {}
+                    HyperlinkParseEnd::ParagraphClosed => {
+                        self.finish_paragraph_parse(state);
+                        return Ok(true);
+                    }
+                    HyperlinkParseEnd::Eof => {
+                        self.finish_paragraph_parse(state);
+                        self.handle_eof();
+                        return Ok(true);
+                    }
+                }
             }
             b"drawing" => {
                 self.ensure_local_paragraph_started(state);
-                self.flush_pending_link_start();
                 self.parse_drawing_subtree()?;
             }
             b"pict" => {
                 self.ensure_local_paragraph_started(state);
-                self.flush_pending_link_start();
                 self.parse_pict_subtree()?;
             }
             local if is_denied_container(local).is_some() => self.consume_current_start(start)?,
             _ => {}
         }
-        Ok(())
+        Ok(false)
     }
 
     fn handle_paragraph_empty_child(
         &mut self,
         empty: &BytesStart<'_>,
         state: &mut ParagraphParseState,
-    ) {
+    ) -> Result<()> {
         match empty.local_name().as_ref() {
             b"pPr" if !state.paragraph_emitted => {
                 state.props = ResolvedParagraphProperties::default();
@@ -1311,15 +1369,15 @@ impl DocumentReader {
             b"r" | b"drawing" | b"pict" => self.ensure_local_paragraph_started(state),
             b"hyperlink" => {
                 self.ensure_local_paragraph_started(state);
-                self.handle_hyperlink_start(
+                self.parse_hyperlink(
                     empty,
                     matches!(state.block_kind, ParagraphBlockKind::Preformatted),
-                );
-                let _ = self.pending_link.take();
-                self.hyperlink_depth = self.hyperlink_depth.saturating_sub(1);
+                    true,
+                )?;
             }
             _ => {}
         }
+        Ok(())
     }
 
     fn finish_paragraph_parse(&mut self, state: &mut ParagraphParseState) {
@@ -1339,13 +1397,12 @@ impl DocumentReader {
 
             match event {
                 quick_xml::events::Event::Start(start) => {
-                    self.handle_paragraph_start_child(&start, &mut state)?;
+                    if self.handle_paragraph_start_child(&start, &mut state)? {
+                        return Ok(());
+                    }
                 }
                 quick_xml::events::Event::Empty(empty) => {
-                    self.handle_paragraph_empty_child(&empty, &mut state);
-                }
-                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"hyperlink" => {
-                    self.close_hyperlink();
+                    self.handle_paragraph_empty_child(&empty, &mut state)?;
                 }
                 quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"p" => {
                     self.finish_paragraph_parse(&mut state);
@@ -1447,16 +1504,6 @@ impl DocumentReader {
                 }
                 self.in_table_cell = false;
             }
-            b"hyperlink" if self.hyperlink_depth > 0 => {
-                if self.hyperlink_depth == 1 {
-                    if let Some(link) = self.pending_link.take() {
-                        if link.link_started {
-                            self.queue.push_back(Event::EndLink);
-                        }
-                    }
-                }
-                self.hyperlink_depth = self.hyperlink_depth.saturating_sub(1);
-            }
             _ => {}
         }
     }
@@ -1496,7 +1543,6 @@ impl DocumentReader {
                 self.parse_p(tag)?;
                 return Ok(());
             }
-            (b"hyperlink", _) => self.handle_hyperlink_start(tag, false),
             _ => {}
         }
         Ok(())
@@ -1759,44 +1805,6 @@ impl DocumentReader {
             Arc::clone(&self.content_types),
             asset_id,
         )))
-    }
-
-    fn handle_hyperlink_start(&mut self, tag: &BytesStart<'_>, is_preformatted: bool) {
-        self.hyperlink_depth = self.hyperlink_depth.saturating_add(1);
-        if self.hyperlink_depth != 1 || self.pending_link.is_some() {
-            return;
-        }
-        if is_preformatted {
-            return;
-        }
-
-        let rid = read_attribute(tag, b"r:id");
-        let anchor = read_attribute(tag, b"w:anchor");
-        let tooltip = read_attribute(tag, b"w:tooltip");
-
-        let href = if let Some(rid_val) = rid {
-            if let Some(target) = self.hyperlink_map.get(&rid_val) {
-                target.clone()
-            } else {
-                return;
-            }
-        } else if let Some(anchor_val) = anchor.filter(|a| !a.is_empty()) {
-            format!("#{anchor_val}")
-        } else {
-            return;
-        };
-
-        let title = tooltip.and_then(|t| {
-            quick_xml::escape::unescape(&t)
-                .ok()
-                .map(std::borrow::Cow::into_owned)
-        });
-
-        self.pending_link = Some(PendingLink {
-            href,
-            title,
-            link_started: false,
-        });
     }
 
     fn handle_table_start(&mut self, local: &[u8], tag: &BytesStart<'_>) -> bool {
@@ -2241,6 +2249,31 @@ mod tests {
         DocumentReader::from_xml_reader(xml, data)
     }
 
+    fn make_reader_with_hyperlinks(
+        document_xml: &str,
+        hyperlink_map: HyperlinkMap,
+    ) -> DocumentReader {
+        let stream: Box<dyn Read + Send> = Box::new(Cursor::new(document_xml.as_bytes().to_vec()));
+        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
+        let data = DocxData {
+            style_list: crate::styles::StyleList::default(),
+            hyperlink_map,
+            numbering: crate::numbering::MinimalNumbering::new(),
+            image_map: crate::rels::ImageMap::default(),
+        };
+        DocumentReader::from_xml_reader(xml, data)
+    }
+
+    fn document_with_hyperlink_body(body: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>{body}</w:body>
+</w:document>"#
+        )
+    }
+
     fn read_first_start(reader: &mut DocumentReader) -> BytesStart<'static> {
         loop {
             reader.buf.clear();
@@ -2392,6 +2425,86 @@ mod tests {
                     content: "title".to_string(),
                 },
                 Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_hyperlink_with_text() {
+        let mut hyperlink_map = HyperlinkMap::default();
+        hyperlink_map.insert("rId1".to_string(), "https://example.com".to_string());
+        let doc = document_with_hyperlink_body(
+            r#"<w:p><w:hyperlink r:id="rId1" w:tooltip="tip &amp; title"><w:r><w:t>link</w:t></w:r></w:hyperlink></w:p>"#,
+        );
+        let mut reader = make_reader_with_hyperlinks(&doc, hyperlink_map);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartLink {
+                    href: "https://example.com".to_string(),
+                    id: None,
+                    title: Some("tip & title".to_string()),
+                },
+                Event::Text {
+                    content: "link".to_string(),
+                },
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_hyperlink_empty_emits_nothing() {
+        let mut hyperlink_map = HyperlinkMap::default();
+        hyperlink_map.insert("rId1".to_string(), "https://example.com".to_string());
+        let doc = document_with_hyperlink_body(r#"<w:p><w:hyperlink r:id="rId1"/></w:p>"#);
+        let mut reader = make_reader_with_hyperlinks(&doc, hyperlink_map);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_hyperlink_nested_flattens() {
+        let mut hyperlink_map = HyperlinkMap::default();
+        hyperlink_map.insert("rId1".to_string(), "https://outer.example".to_string());
+        hyperlink_map.insert("rId2".to_string(), "https://inner.example".to_string());
+        let doc = document_with_hyperlink_body(
+            r#"<w:p><w:hyperlink r:id="rId1"><w:r><w:t>outer</w:t></w:r><w:hyperlink r:id="rId2"><w:r><w:t>inner</w:t></w:r></w:hyperlink></w:hyperlink></w:p>"#,
+        );
+        let mut reader = make_reader_with_hyperlinks(&doc, hyperlink_map);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartLink {
+                    href: "https://outer.example".to_string(),
+                    id: None,
+                    title: None,
+                },
+                Event::Text {
+                    content: "outer".to_string(),
+                },
+                Event::Text {
+                    content: "inner".to_string(),
+                },
+                Event::EndLink,
+                Event::EndParagraph,
                 Event::EndDocument,
             ]
         );
@@ -2800,25 +2913,6 @@ mod tests {
                 Event::EndDocument,
             ]
         );
-    }
-
-    #[test]
-    fn document_reader_initializes_hyperlink_state_to_default() {
-        let doc = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#;
-        let reader = make_reader(doc);
-
-        assert_eq!(reader.hyperlink_depth, 0);
-        assert!(reader.pending_link.is_none());
-    }
-
-    #[test]
-    fn document_reader_debug_includes_hyperlink_fields() {
-        let doc = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#;
-        let reader = make_reader(doc);
-        let debug = format!("{reader:?}");
-
-        assert!(debug.contains("hyperlink_depth"));
-        assert!(debug.contains("pending_link"));
     }
 
     #[test]
