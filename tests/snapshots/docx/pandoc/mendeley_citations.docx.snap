@@ -1,81 +1,81 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "This is a Mendeley test " }
-       3: Text { content: "(prefix Hadwen-Bennett et al., 2018, p. 123 suffix)" }
-       4: Text { content: "." }
-       5: EndParagraph
-       6: StartParagraph { alignment: None, id: None }
-       7: EndParagraph
-       8: StartParagraph { alignment: None, id: None }
-       9: Text { content: "Another test " }
-      10: Text { content: "(prefix Seo, 2019, pp. 10–20 suffix)" }
-      11: Text { content: "." }
-      12: EndParagraph
-      13: StartParagraph { alignment: None, id: None }
-      14: EndParagraph
-      15: StartParagraph { alignment: None, id: None }
-      16: Text { content: "The last test " }
-      17: Text { content: "(Koh & Abbas, 2015; Lee et al., 2011)" }
-      18: Text { content: "." }
-      19: EndParagraph
-      20: StartParagraph { alignment: None, id: None }
-      21: EndParagraph
-      22: StartHeading { id: None, level: 1 }
-      23: Text { content: "References" }
-      24: EndHeading
-      25: StartParagraph { alignment: None, id: None }
-      26: Text { content: "Hadwen-Bennett, A., Sentance, S., & Morrison, C. (2018). Making Programming Accessible to Learners with Visual Impairments: A Literature Review. " }
-      27: StartTextStyle { kind: Italic, id: None }
-      28: Text { content: "International Journal of Computer Science Education in Schools" }
-      29: EndTextStyle
-      30: Text { content: ", " }
-      31: StartTextStyle { kind: Italic, id: None }
-      32: Text { content: "2" }
-      33: EndTextStyle
-      34: Text { content: "(2), 3–13. https://www.microsoft.com/en-us/research/publication/making-programming-accessible-to-learners-with-visual-impairments-a-literature-review/" }
-      35: EndParagraph
-      36: StartParagraph { alignment: None, id: None }
-      37: Text { content: "Koh, K., & Abbas, J. (2015). Future of library and museum services supporting teen learning: Perceptions of professionals in learning labs and makerspaces. " }
-      38: StartTextStyle { kind: Italic, id: None }
-      39: Text { content: "Journal of Research on Libraries \\& Young Adults" }
-      40: EndTextStyle
-      41: Text { content: ", " }
-      42: StartTextStyle { kind: Italic, id: None }
-      43: Text { content: "6" }
-      44: EndTextStyle
-      45: Text { content: "(4)." }
-      46: EndParagraph
-      47: StartParagraph { alignment: None, id: None }
-      48: Text { content: "Lee, I., Martin, F., Denner, J., Coulter, B., Allan, W., Erickson, J., Malyn-Smith, J., & Werner, L. (2011). Computational Thinking for Youth in Practice. " }
-      49: StartTextStyle { kind: Italic, id: None }
-      50: Text { content: "ACM Inroads" }
-      51: EndTextStyle
-      52: Text { content: ", " }
-      53: StartTextStyle { kind: Italic, id: None }
-      54: Text { content: "2" }
-      55: EndTextStyle
-      56: Text { content: "(1), 32–37. https://doi.org/10.1145/1929887.1929902" }
-      57: EndParagraph
-      58: StartParagraph { alignment: None, id: None }
-      59: Text { content: "Seo, J. (2019). Is the Maker Movement Inclusive of {ANYONE}?: Three Accessibility Considerations to Invite Blind Makers to the Making World. " }
-      60: StartTextStyle { kind: Italic, id: None }
-      61: Text { content: "TechTrends" }
-      62: EndTextStyle
-      63: Text { content: ", " }
-      64: StartTextStyle { kind: Italic, id: None }
-      65: Text { content: "63" }
-      66: EndTextStyle
-      67: Text { content: "(5), 514–520. https://doi.org/10.1007/s11528-019-00377-3" }
-      68: EndParagraph
-      69: StartParagraph { alignment: None, id: None }
-      70: EndParagraph
-      71: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is a Mendeley test " },
+    Text { content: "(prefix Hadwen-Bennett et al., 2018, p. 123 suffix)" },
+    Text { content: "." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Another test " },
+    Text { content: "(prefix Seo, 2019, pp. 10–20 suffix)" },
+    Text { content: "." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "The last test " },
+    Text { content: "(Koh & Abbas, 2015; Lee et al., 2011)" },
+    Text { content: "." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartHeading { id: None, level: 1 },
+    Text { content: "References" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Hadwen-Bennett, A., Sentance, S., & Morrison, C. (2018). Making Programming Accessible to Learners with Visual Impairments: A Literature Review. " },
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: "International Journal of Computer Science Education in Schools" },
+    EndTextStyle,
+    Text { content: ", " },
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    Text { content: "(2), 3–13. https://www.microsoft.com/en-us/research/publication/making-programming-accessible-to-learners-with-visual-impairments-a-literature-review/" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Koh, K., & Abbas, J. (2015). Future of library and museum services supporting teen learning: Perceptions of professionals in learning labs and makerspaces. " },
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: "Journal of Research on Libraries \\& Young Adults" },
+    EndTextStyle,
+    Text { content: ", " },
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: "6" },
+    EndTextStyle,
+    Text { content: "(4)." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Lee, I., Martin, F., Denner, J., Coulter, B., Allan, W., Erickson, J., Malyn-Smith, J., & Werner, L. (2011). Computational Thinking for Youth in Practice. " },
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: "ACM Inroads" },
+    EndTextStyle,
+    Text { content: ", " },
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    Text { content: "(1), 32–37. https://doi.org/10.1145/1929887.1929902" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Seo, J. (2019). Is the Maker Movement Inclusive of {ANYONE}?: Three Accessibility Considerations to Invite Blind Makers to the Making World. " },
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: "TechTrends" },
+    EndTextStyle,
+    Text { content: ", " },
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: "63" },
+    EndTextStyle,
+    Text { content: "(5), 514–520. https://doi.org/10.1007/s11528-019-00377-3" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

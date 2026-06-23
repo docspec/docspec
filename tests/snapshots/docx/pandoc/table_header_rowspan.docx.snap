@@ -1,634 +1,634 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: EndParagraph
-       3: StartTable { id: None }
-       4: StartTableRow { id: None }
-       5: StartTableCell { colspan: None, id: None, rowspan: None }
-       6: StartParagraph { alignment: None, id: None }
-       7: Text { content: "A" }
-       8: EndParagraph
-       9: EndTableCell
-      10: StartTableCell { colspan: None, id: None, rowspan: None }
-      11: StartParagraph { alignment: None, id: None }
-      12: StartTextStyle { kind: Bold, id: None }
-      13: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      14: Text { content: "B" }
-      15: EndTextStyle
-      16: EndTextStyle
-      17: EndParagraph
-      18: EndTableCell
-      19: StartTableCell { colspan: None, id: None, rowspan: None }
-      20: StartParagraph { alignment: None, id: None }
-      21: StartTextStyle { kind: Bold, id: None }
-      22: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      23: Text { content: "C" }
-      24: EndTextStyle
-      25: EndTextStyle
-      26: EndParagraph
-      27: EndTableCell
-      28: StartTableCell { colspan: None, id: None, rowspan: None }
-      29: StartParagraph { alignment: None, id: None }
-      30: StartTextStyle { kind: Bold, id: None }
-      31: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      32: Text { content: "D" }
-      33: EndTextStyle
-      34: EndTextStyle
-      35: EndParagraph
-      36: EndTableCell
-      37: StartTableCell { colspan: Some(3), id: None, rowspan: None }
-      38: StartParagraph { alignment: None, id: None }
-      39: Text { content: "E" }
-      40: EndParagraph
-      41: EndTableCell
-      42: StartTableCell { colspan: None, id: None, rowspan: None }
-      43: StartParagraph { alignment: None, id: None }
-      44: Text { content: "F" }
-      45: EndParagraph
-      46: EndTableCell
-      47: EndTableRow
-      48: StartTableRow { id: None }
-      49: StartTableCell { colspan: None, id: None, rowspan: None }
-      50: StartParagraph { alignment: None, id: None }
-      51: EndParagraph
-      52: EndTableCell
-      53: StartTableCell { colspan: None, id: None, rowspan: None }
-      54: StartParagraph { alignment: None, id: None }
-      55: EndParagraph
-      56: EndTableCell
-      57: StartTableCell { colspan: None, id: None, rowspan: None }
-      58: StartParagraph { alignment: None, id: None }
-      59: EndParagraph
-      60: EndTableCell
-      61: StartTableCell { colspan: None, id: None, rowspan: None }
-      62: StartParagraph { alignment: None, id: None }
-      63: EndParagraph
-      64: EndTableCell
-      65: StartTableCell { colspan: None, id: None, rowspan: None }
-      66: StartParagraph { alignment: None, id: None }
-      67: StartTextStyle { kind: Bold, id: None }
-      68: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      69: Text { content: "G" }
-      70: EndTextStyle
-      71: EndTextStyle
-      72: EndParagraph
-      73: EndTableCell
-      74: StartTableCell { colspan: None, id: None, rowspan: None }
-      75: StartParagraph { alignment: None, id: None }
-      76: StartTextStyle { kind: Bold, id: None }
-      77: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      78: Text { content: "H" }
-      79: EndTextStyle
-      80: EndTextStyle
-      81: EndParagraph
-      82: EndTableCell
-      83: StartTableCell { colspan: None, id: None, rowspan: None }
-      84: StartParagraph { alignment: None, id: None }
-      85: StartTextStyle { kind: Bold, id: None }
-      86: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      87: Text { content: "I" }
-      88: EndTextStyle
-      89: EndTextStyle
-      90: EndParagraph
-      91: EndTableCell
-      92: StartTableCell { colspan: None, id: None, rowspan: None }
-      93: StartParagraph { alignment: None, id: None }
-      94: EndParagraph
-      95: EndTableCell
-      96: EndTableRow
-      97: StartTableRow { id: None }
-      98: StartTableCell { colspan: None, id: None, rowspan: None }
-      99: StartParagraph { alignment: Some(Left), id: None }
-     100: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     101: Text { content: "1" }
-     102: EndTextStyle
-     103: EndParagraph
-     104: EndTableCell
-     105: StartTableCell { colspan: None, id: None, rowspan: None }
-     106: StartParagraph { alignment: None, id: None }
-     107: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     108: Text { content: "2" }
-     109: EndTextStyle
-     110: EndParagraph
-     111: EndTableCell
-     112: StartTableCell { colspan: None, id: None, rowspan: None }
-     113: StartParagraph { alignment: None, id: None }
-     114: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     115: Text { content: "3" }
-     116: EndTextStyle
-     117: EndParagraph
-     118: EndTableCell
-     119: StartTableCell { colspan: None, id: None, rowspan: None }
-     120: StartParagraph { alignment: None, id: None }
-     121: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     122: Text { content: "4" }
-     123: EndTextStyle
-     124: EndParagraph
-     125: EndTableCell
-     126: StartTableCell { colspan: None, id: None, rowspan: None }
-     127: StartParagraph { alignment: None, id: None }
-     128: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     129: Text { content: "5" }
-     130: EndTextStyle
-     131: EndParagraph
-     132: EndTableCell
-     133: StartTableCell { colspan: None, id: None, rowspan: None }
-     134: StartParagraph { alignment: None, id: None }
-     135: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     136: Text { content: "6" }
-     137: EndTextStyle
-     138: EndParagraph
-     139: EndTableCell
-     140: StartTableCell { colspan: None, id: None, rowspan: None }
-     141: StartParagraph { alignment: None, id: None }
-     142: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     143: Text { content: "7" }
-     144: EndTextStyle
-     145: EndParagraph
-     146: EndTableCell
-     147: StartTableCell { colspan: None, id: None, rowspan: None }
-     148: StartParagraph { alignment: None, id: None }
-     149: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     150: Text { content: "8" }
-     151: EndTextStyle
-     152: EndParagraph
-     153: EndTableCell
-     154: EndTableRow
-     155: StartTableRow { id: None }
-     156: StartTableCell { colspan: None, id: None, rowspan: None }
-     157: StartParagraph { alignment: Some(Left), id: None }
-     158: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     159: Text { content: "1" }
-     160: EndTextStyle
-     161: EndParagraph
-     162: EndTableCell
-     163: StartTableCell { colspan: None, id: None, rowspan: None }
-     164: StartParagraph { alignment: None, id: None }
-     165: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     166: Text { content: "2" }
-     167: EndTextStyle
-     168: EndParagraph
-     169: EndTableCell
-     170: StartTableCell { colspan: None, id: None, rowspan: None }
-     171: StartParagraph { alignment: None, id: None }
-     172: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     173: Text { content: "3" }
-     174: EndTextStyle
-     175: EndParagraph
-     176: EndTableCell
-     177: StartTableCell { colspan: None, id: None, rowspan: None }
-     178: StartParagraph { alignment: None, id: None }
-     179: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     180: Text { content: "4" }
-     181: EndTextStyle
-     182: EndParagraph
-     183: EndTableCell
-     184: StartTableCell { colspan: None, id: None, rowspan: None }
-     185: StartParagraph { alignment: None, id: None }
-     186: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     187: Text { content: "5" }
-     188: EndTextStyle
-     189: EndParagraph
-     190: EndTableCell
-     191: StartTableCell { colspan: None, id: None, rowspan: None }
-     192: StartParagraph { alignment: None, id: None }
-     193: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     194: Text { content: "6" }
-     195: EndTextStyle
-     196: EndParagraph
-     197: EndTableCell
-     198: StartTableCell { colspan: None, id: None, rowspan: None }
-     199: StartParagraph { alignment: None, id: None }
-     200: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     201: Text { content: "7" }
-     202: EndTextStyle
-     203: EndParagraph
-     204: EndTableCell
-     205: StartTableCell { colspan: None, id: None, rowspan: None }
-     206: StartParagraph { alignment: None, id: None }
-     207: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     208: Text { content: "8" }
-     209: EndTextStyle
-     210: EndParagraph
-     211: EndTableCell
-     212: EndTableRow
-     213: StartTableRow { id: None }
-     214: StartTableCell { colspan: None, id: None, rowspan: None }
-     215: StartParagraph { alignment: Some(Left), id: None }
-     216: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     217: Text { content: "1" }
-     218: EndTextStyle
-     219: EndParagraph
-     220: EndTableCell
-     221: StartTableCell { colspan: None, id: None, rowspan: None }
-     222: StartParagraph { alignment: None, id: None }
-     223: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     224: Text { content: "2" }
-     225: EndTextStyle
-     226: EndParagraph
-     227: EndTableCell
-     228: StartTableCell { colspan: None, id: None, rowspan: None }
-     229: StartParagraph { alignment: None, id: None }
-     230: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     231: Text { content: "3" }
-     232: EndTextStyle
-     233: EndParagraph
-     234: EndTableCell
-     235: StartTableCell { colspan: None, id: None, rowspan: None }
-     236: StartParagraph { alignment: None, id: None }
-     237: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     238: Text { content: "4" }
-     239: EndTextStyle
-     240: EndParagraph
-     241: EndTableCell
-     242: StartTableCell { colspan: None, id: None, rowspan: None }
-     243: StartParagraph { alignment: None, id: None }
-     244: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     245: Text { content: "5" }
-     246: EndTextStyle
-     247: EndParagraph
-     248: EndTableCell
-     249: StartTableCell { colspan: None, id: None, rowspan: None }
-     250: StartParagraph { alignment: None, id: None }
-     251: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     252: Text { content: "6" }
-     253: EndTextStyle
-     254: EndParagraph
-     255: EndTableCell
-     256: StartTableCell { colspan: None, id: None, rowspan: None }
-     257: StartParagraph { alignment: None, id: None }
-     258: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     259: Text { content: "7" }
-     260: EndTextStyle
-     261: EndParagraph
-     262: EndTableCell
-     263: StartTableCell { colspan: None, id: None, rowspan: None }
-     264: StartParagraph { alignment: None, id: None }
-     265: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     266: Text { content: "8" }
-     267: EndTextStyle
-     268: EndParagraph
-     269: EndTableCell
-     270: EndTableRow
-     271: StartTableRow { id: None }
-     272: StartTableCell { colspan: None, id: None, rowspan: None }
-     273: StartParagraph { alignment: Some(Left), id: None }
-     274: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     275: Text { content: "1" }
-     276: EndTextStyle
-     277: EndParagraph
-     278: EndTableCell
-     279: StartTableCell { colspan: None, id: None, rowspan: None }
-     280: StartParagraph { alignment: None, id: None }
-     281: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     282: Text { content: "2" }
-     283: EndTextStyle
-     284: EndParagraph
-     285: EndTableCell
-     286: StartTableCell { colspan: None, id: None, rowspan: None }
-     287: StartParagraph { alignment: None, id: None }
-     288: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     289: Text { content: "3" }
-     290: EndTextStyle
-     291: EndParagraph
-     292: EndTableCell
-     293: StartTableCell { colspan: None, id: None, rowspan: None }
-     294: StartParagraph { alignment: None, id: None }
-     295: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     296: Text { content: "4" }
-     297: EndTextStyle
-     298: EndParagraph
-     299: EndTableCell
-     300: StartTableCell { colspan: None, id: None, rowspan: None }
-     301: StartParagraph { alignment: None, id: None }
-     302: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     303: Text { content: "5" }
-     304: EndTextStyle
-     305: EndParagraph
-     306: EndTableCell
-     307: StartTableCell { colspan: None, id: None, rowspan: None }
-     308: StartParagraph { alignment: None, id: None }
-     309: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     310: Text { content: "6" }
-     311: EndTextStyle
-     312: EndParagraph
-     313: EndTableCell
-     314: StartTableCell { colspan: None, id: None, rowspan: None }
-     315: StartParagraph { alignment: None, id: None }
-     316: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     317: Text { content: "7" }
-     318: EndTextStyle
-     319: EndParagraph
-     320: EndTableCell
-     321: StartTableCell { colspan: None, id: None, rowspan: None }
-     322: StartParagraph { alignment: None, id: None }
-     323: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     324: Text { content: "8" }
-     325: EndTextStyle
-     326: EndParagraph
-     327: EndTableCell
-     328: EndTableRow
-     329: StartTableRow { id: None }
-     330: StartTableCell { colspan: None, id: None, rowspan: None }
-     331: StartParagraph { alignment: Some(Left), id: None }
-     332: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     333: Text { content: "1" }
-     334: EndTextStyle
-     335: EndParagraph
-     336: EndTableCell
-     337: StartTableCell { colspan: None, id: None, rowspan: None }
-     338: StartParagraph { alignment: None, id: None }
-     339: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     340: Text { content: "2" }
-     341: EndTextStyle
-     342: EndParagraph
-     343: EndTableCell
-     344: StartTableCell { colspan: None, id: None, rowspan: None }
-     345: StartParagraph { alignment: None, id: None }
-     346: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     347: Text { content: "3" }
-     348: EndTextStyle
-     349: EndParagraph
-     350: EndTableCell
-     351: StartTableCell { colspan: None, id: None, rowspan: None }
-     352: StartParagraph { alignment: None, id: None }
-     353: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     354: Text { content: "4" }
-     355: EndTextStyle
-     356: EndParagraph
-     357: EndTableCell
-     358: StartTableCell { colspan: None, id: None, rowspan: None }
-     359: StartParagraph { alignment: None, id: None }
-     360: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     361: Text { content: "5" }
-     362: EndTextStyle
-     363: EndParagraph
-     364: EndTableCell
-     365: StartTableCell { colspan: None, id: None, rowspan: None }
-     366: StartParagraph { alignment: None, id: None }
-     367: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     368: Text { content: "6" }
-     369: EndTextStyle
-     370: EndParagraph
-     371: EndTableCell
-     372: StartTableCell { colspan: None, id: None, rowspan: None }
-     373: StartParagraph { alignment: None, id: None }
-     374: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     375: Text { content: "7" }
-     376: EndTextStyle
-     377: EndParagraph
-     378: EndTableCell
-     379: StartTableCell { colspan: None, id: None, rowspan: None }
-     380: StartParagraph { alignment: None, id: None }
-     381: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     382: Text { content: "8" }
-     383: EndTextStyle
-     384: EndParagraph
-     385: EndTableCell
-     386: EndTableRow
-     387: StartTableRow { id: None }
-     388: StartTableCell { colspan: None, id: None, rowspan: None }
-     389: StartParagraph { alignment: Some(Left), id: None }
-     390: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     391: Text { content: "1" }
-     392: EndTextStyle
-     393: EndParagraph
-     394: EndTableCell
-     395: StartTableCell { colspan: None, id: None, rowspan: None }
-     396: StartParagraph { alignment: None, id: None }
-     397: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     398: Text { content: "2" }
-     399: EndTextStyle
-     400: EndParagraph
-     401: EndTableCell
-     402: StartTableCell { colspan: None, id: None, rowspan: None }
-     403: StartParagraph { alignment: None, id: None }
-     404: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     405: Text { content: "3" }
-     406: EndTextStyle
-     407: EndParagraph
-     408: EndTableCell
-     409: StartTableCell { colspan: None, id: None, rowspan: None }
-     410: StartParagraph { alignment: None, id: None }
-     411: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     412: Text { content: "4" }
-     413: EndTextStyle
-     414: EndParagraph
-     415: EndTableCell
-     416: StartTableCell { colspan: None, id: None, rowspan: None }
-     417: StartParagraph { alignment: None, id: None }
-     418: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     419: Text { content: "5" }
-     420: EndTextStyle
-     421: EndParagraph
-     422: EndTableCell
-     423: StartTableCell { colspan: None, id: None, rowspan: None }
-     424: StartParagraph { alignment: None, id: None }
-     425: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     426: Text { content: "6" }
-     427: EndTextStyle
-     428: EndParagraph
-     429: EndTableCell
-     430: StartTableCell { colspan: None, id: None, rowspan: None }
-     431: StartParagraph { alignment: None, id: None }
-     432: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     433: Text { content: "7" }
-     434: EndTextStyle
-     435: EndParagraph
-     436: EndTableCell
-     437: StartTableCell { colspan: None, id: None, rowspan: None }
-     438: StartParagraph { alignment: None, id: None }
-     439: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     440: Text { content: "8" }
-     441: EndTextStyle
-     442: EndParagraph
-     443: EndTableCell
-     444: EndTableRow
-     445: StartTableRow { id: None }
-     446: StartTableCell { colspan: None, id: None, rowspan: None }
-     447: StartParagraph { alignment: Some(Left), id: None }
-     448: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     449: Text { content: "1" }
-     450: EndTextStyle
-     451: EndParagraph
-     452: EndTableCell
-     453: StartTableCell { colspan: None, id: None, rowspan: None }
-     454: StartParagraph { alignment: None, id: None }
-     455: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     456: Text { content: "2" }
-     457: EndTextStyle
-     458: EndParagraph
-     459: EndTableCell
-     460: StartTableCell { colspan: None, id: None, rowspan: None }
-     461: StartParagraph { alignment: None, id: None }
-     462: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     463: Text { content: "3" }
-     464: EndTextStyle
-     465: EndParagraph
-     466: EndTableCell
-     467: StartTableCell { colspan: None, id: None, rowspan: None }
-     468: StartParagraph { alignment: None, id: None }
-     469: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     470: Text { content: "4" }
-     471: EndTextStyle
-     472: EndParagraph
-     473: EndTableCell
-     474: StartTableCell { colspan: None, id: None, rowspan: None }
-     475: StartParagraph { alignment: None, id: None }
-     476: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     477: Text { content: "5" }
-     478: EndTextStyle
-     479: EndParagraph
-     480: EndTableCell
-     481: StartTableCell { colspan: None, id: None, rowspan: None }
-     482: StartParagraph { alignment: None, id: None }
-     483: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     484: Text { content: "6" }
-     485: EndTextStyle
-     486: EndParagraph
-     487: EndTableCell
-     488: StartTableCell { colspan: None, id: None, rowspan: None }
-     489: StartParagraph { alignment: None, id: None }
-     490: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     491: Text { content: "7" }
-     492: EndTextStyle
-     493: EndParagraph
-     494: EndTableCell
-     495: StartTableCell { colspan: None, id: None, rowspan: None }
-     496: StartParagraph { alignment: None, id: None }
-     497: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     498: Text { content: "8" }
-     499: EndTextStyle
-     500: EndParagraph
-     501: EndTableCell
-     502: EndTableRow
-     503: StartTableRow { id: None }
-     504: StartTableCell { colspan: None, id: None, rowspan: None }
-     505: StartParagraph { alignment: Some(Left), id: None }
-     506: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     507: Text { content: "1" }
-     508: EndTextStyle
-     509: EndParagraph
-     510: EndTableCell
-     511: StartTableCell { colspan: None, id: None, rowspan: None }
-     512: StartParagraph { alignment: None, id: None }
-     513: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     514: Text { content: "2" }
-     515: EndTextStyle
-     516: EndParagraph
-     517: EndTableCell
-     518: StartTableCell { colspan: None, id: None, rowspan: None }
-     519: StartParagraph { alignment: None, id: None }
-     520: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     521: Text { content: "3" }
-     522: EndTextStyle
-     523: EndParagraph
-     524: EndTableCell
-     525: StartTableCell { colspan: None, id: None, rowspan: None }
-     526: StartParagraph { alignment: None, id: None }
-     527: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     528: Text { content: "4" }
-     529: EndTextStyle
-     530: EndParagraph
-     531: EndTableCell
-     532: StartTableCell { colspan: None, id: None, rowspan: None }
-     533: StartParagraph { alignment: None, id: None }
-     534: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     535: Text { content: "5" }
-     536: EndTextStyle
-     537: EndParagraph
-     538: EndTableCell
-     539: StartTableCell { colspan: None, id: None, rowspan: None }
-     540: StartParagraph { alignment: None, id: None }
-     541: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     542: Text { content: "6" }
-     543: EndTextStyle
-     544: EndParagraph
-     545: EndTableCell
-     546: StartTableCell { colspan: None, id: None, rowspan: None }
-     547: StartParagraph { alignment: None, id: None }
-     548: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     549: Text { content: "7" }
-     550: EndTextStyle
-     551: EndParagraph
-     552: EndTableCell
-     553: StartTableCell { colspan: None, id: None, rowspan: None }
-     554: StartParagraph { alignment: None, id: None }
-     555: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     556: Text { content: "8" }
-     557: EndTextStyle
-     558: EndParagraph
-     559: EndTableCell
-     560: EndTableRow
-     561: StartTableRow { id: None }
-     562: StartTableCell { colspan: None, id: None, rowspan: None }
-     563: StartParagraph { alignment: Some(Left), id: None }
-     564: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     565: Text { content: "1" }
-     566: EndTextStyle
-     567: EndParagraph
-     568: EndTableCell
-     569: StartTableCell { colspan: None, id: None, rowspan: None }
-     570: StartParagraph { alignment: None, id: None }
-     571: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     572: Text { content: "2" }
-     573: EndTextStyle
-     574: EndParagraph
-     575: EndTableCell
-     576: StartTableCell { colspan: None, id: None, rowspan: None }
-     577: StartParagraph { alignment: None, id: None }
-     578: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     579: Text { content: "3" }
-     580: EndTextStyle
-     581: EndParagraph
-     582: EndTableCell
-     583: StartTableCell { colspan: None, id: None, rowspan: None }
-     584: StartParagraph { alignment: None, id: None }
-     585: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     586: Text { content: "4" }
-     587: EndTextStyle
-     588: EndParagraph
-     589: EndTableCell
-     590: StartTableCell { colspan: None, id: None, rowspan: None }
-     591: StartParagraph { alignment: None, id: None }
-     592: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     593: Text { content: "5" }
-     594: EndTextStyle
-     595: EndParagraph
-     596: EndTableCell
-     597: StartTableCell { colspan: None, id: None, rowspan: None }
-     598: StartParagraph { alignment: None, id: None }
-     599: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     600: Text { content: "6" }
-     601: EndTextStyle
-     602: EndParagraph
-     603: EndTableCell
-     604: StartTableCell { colspan: None, id: None, rowspan: None }
-     605: StartParagraph { alignment: None, id: None }
-     606: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     607: Text { content: "7" }
-     608: EndTextStyle
-     609: EndParagraph
-     610: EndTableCell
-     611: StartTableCell { colspan: None, id: None, rowspan: None }
-     612: StartParagraph { alignment: None, id: None }
-     613: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-     614: Text { content: "8" }
-     615: EndTextStyle
-     616: EndParagraph
-     617: EndTableCell
-     618: EndTableRow
-     619: EndTable
-     620: StartParagraph { alignment: None, id: None }
-     621: EndParagraph
-     622: StartParagraph { alignment: None, id: None }
-     623: EndParagraph
-     624: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartTable { id: None },
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "A" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "B" },
+    EndTextStyle,
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "C" },
+    EndTextStyle,
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "D" },
+    EndTextStyle,
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: Some(3), id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "E" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "F" },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "G" },
+    EndTextStyle,
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "H" },
+    EndTextStyle,
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: Bold, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "I" },
+    EndTextStyle,
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: Some(Left), id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "1" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "3" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "4" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "5" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "6" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "7" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "8" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: Some(Left), id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "1" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "3" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "4" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "5" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "6" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "7" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "8" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: Some(Left), id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "1" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "3" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "4" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "5" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "6" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "7" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "8" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: Some(Left), id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "1" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "3" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "4" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "5" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "6" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "7" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "8" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: Some(Left), id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "1" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "3" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "4" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "5" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "6" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "7" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "8" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: Some(Left), id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "1" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "3" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "4" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "5" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "6" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "7" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "8" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: Some(Left), id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "1" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "3" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "4" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "5" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "6" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "7" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "8" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: Some(Left), id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "1" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "3" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "4" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "5" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "6" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "7" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "8" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: Some(Left), id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "1" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "2" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "3" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "4" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "5" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "6" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "7" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "8" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    EndTable,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

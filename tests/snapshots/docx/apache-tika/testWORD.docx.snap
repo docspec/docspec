@@ -4,155 +4,155 @@ expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartHeading { id: None, level: 1 }
-       2: Text { content: "Sample Word Document Title" }
-       3: EndHeading
-       4: StartParagraph { alignment: None, id: None }
-       5: Text { content: "And now for a subtitle" }
-       6: EndParagraph
-       7: StartParagraph { alignment: None, id: None }
-       8: Text { content: "Main Heading" }
-       9: EndParagraph
-      10: StartHeading { id: None, level: 1 }
-      11: Text { content: "Heading Level 1" }
-      12: EndHeading
-      13: StartHeading { id: None, level: 2 }
-      14: Text { content: "Heading Level 2" }
-      15: EndHeading
-      16: StartHeading { id: None, level: 3 }
-      17: Text { content: "Heading Level 3" }
-      18: EndHeading
-      19: StartParagraph { alignment: None, id: None }
-      20: EndParagraph
-      21: StartParagraph { alignment: None, id: None }
-      22: Text { content: "This is a sample Microsoft Word Document." }
-      23: EndParagraph
-      24: StartParagraph { alignment: None, id: None }
-      25: EndParagraph
-      26: StartParagraph { alignment: None, id: None }
-      27: Text { content: "This document includes text that is " }
-      28: StartTextStyle { kind: Bold, id: None }
-      29: Text { content: "BOLD" }
-      30: EndTextStyle
-      31: Text { content: " and " }
-      32: StartTextStyle { kind: Italic, id: None }
-      33: Text { content: "ITALIC" }
-      34: EndTextStyle
-      35: Text { content: "." }
-      36: EndParagraph
-      37: StartParagraph { alignment: None, id: None }
-      38: EndParagraph
-      39: StartTable { id: None }
-      40: StartTableRow { id: None }
-      41: StartTableCell { colspan: None, id: None, rowspan: None }
-      42: StartParagraph { alignment: None, id: None }
-      43: Text { content: "This is a table" }
-      44: EndParagraph
-      45: EndTableCell
-      46: StartTableCell { colspan: None, id: None, rowspan: None }
-      47: StartParagraph { alignment: None, id: None }
-      48: EndParagraph
-      49: EndTableCell
-      50: EndTableRow
-      51: StartTableRow { id: None }
-      52: StartTableCell { colspan: None, id: None, rowspan: None }
-      53: StartParagraph { alignment: None, id: None }
-      54: EndParagraph
-      55: EndTableCell
-      56: StartTableCell { colspan: None, id: None, rowspan: None }
-      57: StartTable { id: None }
-      58: StartTableRow { id: None }
-      59: StartTableCell { colspan: None, id: None, rowspan: None }
-      60: StartParagraph { alignment: None, id: None }
-      61: Text { content: "Nested table" }
-      62: EndParagraph
-      63: EndTableCell
-      64: StartTableCell { colspan: None, id: None, rowspan: None }
-      65: StartParagraph { alignment: None, id: None }
-      66: EndParagraph
-      67: EndTableCell
-      68: EndTableRow
-      69: StartTableRow { id: None }
-      70: StartTableCell { colspan: None, id: None, rowspan: None }
-      71: StartParagraph { alignment: None, id: None }
-      72: EndParagraph
-      73: EndTableCell
-      74: StartTableCell { colspan: None, id: None, rowspan: None }
-      75: StartParagraph { alignment: None, id: None }
-      76: Text { content: "More of our" }
-      77: Text { content: " nested table" }
-      78: EndParagraph
-      79: EndTableCell
-      80: EndTableRow
-      81: EndTable
-      82: StartParagraph { alignment: None, id: None }
-      83: EndParagraph
-      84: EndTableCell
-      85: EndTableRow
-      86: StartTableRow { id: None }
-      87: StartTableCell { colspan: None, id: None, rowspan: None }
-      88: StartParagraph { alignment: None, id: None }
-      89: Text { content: "The table has things in it" }
-      90: EndParagraph
-      91: EndTableCell
-      92: StartTableCell { colspan: None, id: None, rowspan: None }
-      93: StartParagraph { alignment: None, id: None }
-      94: EndParagraph
-      95: EndTableCell
-      96: EndTableRow
-      97: EndTable
-      98: StartParagraph { alignment: None, id: None }
-      99: EndParagraph
-     100: StartParagraph { alignment: None, id: None }
-     101: EndParagraph
-     102: StartParagraph { alignment: None, id: None }
-     103: Text { content: "Apache Tika: " }
-     104: StartLink { href: "http://tika.apache.org/", id: None, title: None }
-     105: Text { content: "http://tika.apache.org/" }
-     106: EndLink
-     107: Text { content: " " }
-     108: StartLink { href: "http://tika.apache.org/", id: None, title: None }
-     109: Text { content: "Tika" }
-     110: EndLink
-     111: EndParagraph
-     112: StartParagraph { alignment: None, id: None }
-     113: Text { content: "Apache POI: " }
-     114: StartLink { href: "http://poi.apache.org/", id: None, title: None }
-     115: Text { content: "http://poi.apache.org/" }
-     116: EndLink
-     117: Text { content: " " }
-     118: StartLink { href: "http://poi.apache.org/", id: None, title: None }
-     119: Text { content: "POI" }
-     120: EndLink
-     121: EndParagraph
-     122: StartParagraph { alignment: None, id: None }
-     123: EndParagraph
-     124: StartParagraph { alignment: None, id: None }
-     125: Text { content: "This paragraph is in the default text style" }
-     126: EndParagraph
-     127: StartParagraph { alignment: None, id: None }
-     128: EndParagraph
-     129: StartParagraph { alignment: None, id: None }
-     130: Text { content: "This one is in a different one, the Signature style" }
-     131: EndParagraph
-     132: StartParagraph { alignment: None, id: None }
-     133: EndParagraph
-     134: StartParagraph { alignment: None, id: None }
-     135: Text { content: "This is back to the default again" }
-     136: EndParagraph
-     137: StartParagraph { alignment: None, id: None }
-     138: Text { content: "This links to " }
-     139: StartLink { href: "#OnMainHeading", id: None, title: None }
-     140: Text { content: "The Main Heading Bookmark" }
-     141: EndLink
-     142: Text { content: " and " }
-     143: StartLink { href: "#OnLevel3", id: None, title: None }
-     144: Text { content: "The Level 3 Bookmark" }
-     145: EndLink
-     146: Text { content: ". That’s it!" }
-     147: EndParagraph
-     148: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartHeading { id: None, level: 1 },
+    Text { content: "Sample Word Document Title" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "And now for a subtitle" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Main Heading" },
+    EndParagraph,
+    StartHeading { id: None, level: 1 },
+    Text { content: "Heading Level 1" },
+    EndHeading,
+    StartHeading { id: None, level: 2 },
+    Text { content: "Heading Level 2" },
+    EndHeading,
+    StartHeading { id: None, level: 3 },
+    Text { content: "Heading Level 3" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is a sample Microsoft Word Document." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This document includes text that is " },
+    StartTextStyle { kind: Bold, id: None },
+    Text { content: "BOLD" },
+    EndTextStyle,
+    Text { content: " and " },
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: "ITALIC" },
+    EndTextStyle,
+    Text { content: "." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartTable { id: None },
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is a table" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartTable { id: None },
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Nested table" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "More of our" },
+    Text { content: " nested table" },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    EndTable,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "The table has things in it" },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    EndTable,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Apache Tika: " },
+    StartLink { href: "http://tika.apache.org/", id: None, title: None },
+    Text { content: "http://tika.apache.org/" },
+    EndLink,
+    Text { content: " " },
+    StartLink { href: "http://tika.apache.org/", id: None, title: None },
+    Text { content: "Tika" },
+    EndLink,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Apache POI: " },
+    StartLink { href: "http://poi.apache.org/", id: None, title: None },
+    Text { content: "http://poi.apache.org/" },
+    EndLink,
+    Text { content: " " },
+    StartLink { href: "http://poi.apache.org/", id: None, title: None },
+    Text { content: "POI" },
+    EndLink,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This paragraph is in the default text style" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This one is in a different one, the Signature style" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is back to the default again" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This links to " },
+    StartLink { href: "#OnMainHeading", id: None, title: None },
+    Text { content: "The Main Heading Bookmark" },
+    EndLink,
+    Text { content: " and " },
+    StartLink { href: "#OnLevel3", id: None, title: None },
+    Text { content: "The Level 3 Bookmark" },
+    EndLink,
+    Text { content: ". That’s it!" },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

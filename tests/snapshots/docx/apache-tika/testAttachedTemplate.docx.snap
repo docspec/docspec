@@ -4,11 +4,11 @@ expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "Document with external attached template" }
-       3: EndParagraph
-       4: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Document with external attached template" },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

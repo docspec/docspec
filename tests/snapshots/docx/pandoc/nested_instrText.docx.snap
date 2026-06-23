@@ -1,52 +1,52 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "希望深入了解的读者可以去看" }
-       3: Text { content: "David French Belding" }
-       4: Text { content: "和" }
-       5: Text { content: "Kevin J. Mitchell" }
-       6: Text { content: "的" }
-       7: Text { content: "Foundations of Analysis" }
-       8: Text { content: ", " }
-       9: Text { content: "1/16/" }
-      10: Text { content: "1" }
-      11: Text { content: "8 8:40:00 AM" }
-      12: Text { content: ", 2nd Edition" }
-      13: Text { content: "," }
-      14: Text { content: "可从19页" }
-      15: Text { content: "看起" }
-      16: Text { content: "，" }
-      17: Text { content: "或" }
-      18: Text { content: "D.C. " }
-      19: Text { content: "Goldrei" }
-      20: Text { content: "的" }
-      21: Text { content: " " }
-      22: StartLink { href: "https://books.google.ae/books?id=dlc0DwAAQBAJ&lpg=PT29&hl=zh-CN&pg=PT26", id: None, title: None }
-      23: Text { content: "Classic Set Theory: For Guided Independent Study" }
-      24: EndLink
-      25: Text { content: "，从" }
-      26: Text { content: "第" }
-      27: Text { content: "二章" }
-      28: Text { content: "看起" }
-      29: Text { content: "，" }
-      30: Text { content: "阅读" }
-      31: Text { content: "时" }
-      32: Text { content: "要注意" }
-      33: Text { content: "本文与" }
-      34: Text { content: "这些" }
-      35: Text { content: "书所不同的是" }
-      36: Text { content: "并没有把" }
-      37: Text { content: "实数看作是有理数集的分割" }
-      38: Text { content: "。" }
-      39: EndParagraph
-      40: StartParagraph { alignment: None, id: None }
-      41: EndParagraph
-      42: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "希望深入了解的读者可以去看" },
+    Text { content: "David French Belding" },
+    Text { content: "和" },
+    Text { content: "Kevin J. Mitchell" },
+    Text { content: "的" },
+    Text { content: "Foundations of Analysis" },
+    Text { content: ", " },
+    Text { content: "1/16/" },
+    Text { content: "1" },
+    Text { content: "8 8:40:00 AM" },
+    Text { content: ", 2nd Edition" },
+    Text { content: "," },
+    Text { content: "可从19页" },
+    Text { content: "看起" },
+    Text { content: "，" },
+    Text { content: "或" },
+    Text { content: "D.C. " },
+    Text { content: "Goldrei" },
+    Text { content: "的" },
+    Text { content: " " },
+    StartLink { href: "https://books.google.ae/books?id=dlc0DwAAQBAJ&lpg=PT29&hl=zh-CN&pg=PT26", id: None, title: None },
+    Text { content: "Classic Set Theory: For Guided Independent Study" },
+    EndLink,
+    Text { content: "，从" },
+    Text { content: "第" },
+    Text { content: "二章" },
+    Text { content: "看起" },
+    Text { content: "，" },
+    Text { content: "阅读" },
+    Text { content: "时" },
+    Text { content: "要注意" },
+    Text { content: "本文与" },
+    Text { content: "这些" },
+    Text { content: "书所不同的是" },
+    Text { content: "并没有把" },
+    Text { content: "实数看作是有理数集的分割" },
+    Text { content: "。" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

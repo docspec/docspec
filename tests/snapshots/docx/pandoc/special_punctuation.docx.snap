@@ -1,19 +1,19 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "Soft hyphen: [" }
-       3: Text { content: "]" }
-       4: EndParagraph
-       5: StartParagraph { alignment: None, id: None }
-       6: Text { content: "Non-breaking hyphen: [" }
-       7: Text { content: "]" }
-       8: EndParagraph
-       9: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Soft hyphen: [" },
+    Text { content: "]" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Non-breaking hyphen: [" },
+    Text { content: "]" },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

@@ -1,24 +1,24 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartHeading { id: None, level: 1 }
-       2: Text { content: "My Section" }
-       3: EndHeading
-       4: StartParagraph { alignment: None, id: None }
-       5: StartLink { href: "#Bar", id: None, title: None }
-       6: Text { content: "Here is a link." }
-       7: EndLink
-       8: EndParagraph
-       9: StartParagraph { alignment: None, id: None }
-      10: EndParagraph
-      11: StartParagraph { alignment: None, id: None }
-      12: Text { content: "Here is the target." }
-      13: EndParagraph
-      14: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartHeading { id: None, level: 1 },
+    Text { content: "My Section" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    StartLink { href: "#Bar", id: None, title: None },
+    Text { content: "Here is a link." },
+    EndLink,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Here is the target." },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

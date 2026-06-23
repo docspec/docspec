@@ -1,98 +1,98 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartHeading { id: None, level: 1 }
-       2: Text { content: "Оглавление" }
-       3: EndHeading
-       4: StartParagraph { alignment: None, id: None }
-       5: Text { content: "\t" }
-       6: StartLink { href: "#_Toc459979384", id: None, title: None }
-       7: Text { content: "Short instructions" }
-       8: Text { content: "\t" }
-       9: Text { content: "1" }
-      10: EndLink
-      11: EndParagraph
-      12: StartParagraph { alignment: None, id: None }
-      13: Text { content: "\t" }
-      14: StartLink { href: "#_Toc459979385", id: None, title: None }
-      15: Text { content: "Some instructions" }
-      16: Text { content: "\t" }
-      17: Text { content: "1" }
-      18: EndLink
-      19: EndParagraph
-      20: StartParagraph { alignment: None, id: None }
-      21: Text { content: "\t" }
-      22: StartLink { href: "#_Toc459979386", id: None, title: None }
-      23: Text { content: "Remote folder or longlonglonglonglong file with manymanymanymany letters inside opening" }
-      24: Text { content: "\t" }
-      25: Text { content: "2" }
-      26: EndLink
-      27: EndParagraph
-      28: StartParagraph { alignment: None, id: None }
-      29: Text { content: "\t" }
-      30: StartLink { href: "#_Toc459979387", id: None, title: None }
-      31: Text { content: "Remote folder or longlonglonglonglong file with manymanymanymany letters inside closing" }
-      32: Text { content: "\t" }
-      33: Text { content: "2" }
-      34: EndLink
-      35: EndParagraph
-      36: StartParagraph { alignment: None, id: None }
-      37: EndParagraph
-      38: StartHeading { id: None, level: 1 }
-      39: Text { content: "Short instructions" }
-      40: EndHeading
-      41: StartParagraph { alignment: None, id: None }
-      42: StartLink { href: "#_Remote_folder_opening", id: None, title: None }
-      43: Text { content: "Open remote folder" }
-      44: EndLink
-      45: Text { content: " " }
-      46: EndParagraph
-      47: StartParagraph { alignment: None, id: None }
-      48: Text { content: "Do staff" }
-      49: EndParagraph
-      50: StartParagraph { alignment: None, id: None }
-      51: StartLink { href: "#_Remote_folder_closing", id: None, title: None }
-      52: Text { content: "Close remote folder" }
-      53: EndLink
-      54: Text { content: " " }
-      55: EndParagraph
-      56: StartHeading { id: None, level: 1 }
-      57: Text { content: "Some instructions" }
-      58: EndHeading
-      59: StartParagraph { alignment: None, id: None }
-      60: Text { content: "Lines" }
-      61: EndParagraph
-      62: StartHeading { id: None, level: 2 }
-      63: Text { content: "Remote folder " }
-      64: Text { content: "or " }
-      65: Text { content: "longlonglonglonglong" }
-      66: Text { content: " file with " }
-      67: Text { content: "manymanymanymany" }
-      68: Text { content: " letters inside " }
-      69: Text { content: "opening" }
-      70: EndHeading
-      71: StartParagraph { alignment: None, id: None }
-      72: Text { content: "Open folder" }
-      73: EndParagraph
-      74: StartHeading { id: None, level: 2 }
-      75: Text { content: "Remote folder " }
-      76: Text { content: "or " }
-      77: Text { content: "longlonglonglonglong" }
-      78: Text { content: " file with " }
-      79: Text { content: "manymanymanymany" }
-      80: Text { content: " letters inside " }
-      81: Text { content: "closing" }
-      82: EndHeading
-      83: StartParagraph { alignment: None, id: None }
-      84: Text { content: "Close folder" }
-      85: EndParagraph
-      86: StartParagraph { alignment: None, id: None }
-      87: EndParagraph
-      88: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartHeading { id: None, level: 1 },
+    Text { content: "Оглавление" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "\t" },
+    StartLink { href: "#_Toc459979384", id: None, title: None },
+    Text { content: "Short instructions" },
+    Text { content: "\t" },
+    Text { content: "1" },
+    EndLink,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "\t" },
+    StartLink { href: "#_Toc459979385", id: None, title: None },
+    Text { content: "Some instructions" },
+    Text { content: "\t" },
+    Text { content: "1" },
+    EndLink,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "\t" },
+    StartLink { href: "#_Toc459979386", id: None, title: None },
+    Text { content: "Remote folder or longlonglonglonglong file with manymanymanymany letters inside opening" },
+    Text { content: "\t" },
+    Text { content: "2" },
+    EndLink,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "\t" },
+    StartLink { href: "#_Toc459979387", id: None, title: None },
+    Text { content: "Remote folder or longlonglonglonglong file with manymanymanymany letters inside closing" },
+    Text { content: "\t" },
+    Text { content: "2" },
+    EndLink,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartHeading { id: None, level: 1 },
+    Text { content: "Short instructions" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    StartLink { href: "#_Remote_folder_opening", id: None, title: None },
+    Text { content: "Open remote folder" },
+    EndLink,
+    Text { content: " " },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Do staff" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    StartLink { href: "#_Remote_folder_closing", id: None, title: None },
+    Text { content: "Close remote folder" },
+    EndLink,
+    Text { content: " " },
+    EndParagraph,
+    StartHeading { id: None, level: 1 },
+    Text { content: "Some instructions" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Lines" },
+    EndParagraph,
+    StartHeading { id: None, level: 2 },
+    Text { content: "Remote folder " },
+    Text { content: "or " },
+    Text { content: "longlonglonglonglong" },
+    Text { content: " file with " },
+    Text { content: "manymanymanymany" },
+    Text { content: " letters inside " },
+    Text { content: "opening" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Open folder" },
+    EndParagraph,
+    StartHeading { id: None, level: 2 },
+    Text { content: "Remote folder " },
+    Text { content: "or " },
+    Text { content: "longlonglonglonglong" },
+    Text { content: " file with " },
+    Text { content: "manymanymanymany" },
+    Text { content: " letters inside " },
+    Text { content: "closing" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Close folder" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

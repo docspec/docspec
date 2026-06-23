@@ -1,89 +1,89 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartTable { id: None }
-       2: StartTableRow { id: None }
-       3: StartTableCell { colspan: None, id: None, rowspan: None }
-       4: StartParagraph { alignment: None, id: None }
-       5: EndParagraph
-       6: EndTableCell
-       7: StartTableCell { colspan: None, id: None, rowspan: None }
-       8: StartParagraph { alignment: None, id: None }
-       9: EndParagraph
-      10: EndTableCell
-      11: StartTableCell { colspan: None, id: None, rowspan: None }
-      12: StartParagraph { alignment: None, id: None }
-      13: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      14: Text { content: "h3" }
-      15: EndTextStyle
-      16: EndParagraph
-      17: EndTableCell
-      18: StartTableCell { colspan: Some(2), id: None, rowspan: None }
-      19: StartParagraph { alignment: None, id: None }
-      20: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      21: Text { content: "h4" }
-      22: EndTextStyle
-      23: EndParagraph
-      24: EndTableCell
-      25: StartTableCell { colspan: None, id: None, rowspan: None }
-      26: StartParagraph { alignment: None, id: None }
-      27: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      28: Text { content: "h5" }
-      29: EndTextStyle
-      30: EndParagraph
-      31: EndTableCell
-      32: EndTableRow
-      33: StartTableRow { id: None }
-      34: StartTableCell { colspan: Some(3), id: None, rowspan: None }
-      35: StartParagraph { alignment: None, id: None }
-      36: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      37: Text { content: "c11" }
-      38: EndTextStyle
-      39: EndParagraph
-      40: EndTableCell
-      41: StartTableCell { colspan: None, id: None, rowspan: None }
-      42: StartParagraph { alignment: None, id: None }
-      43: EndParagraph
-      44: EndTableCell
-      45: StartTableCell { colspan: Some(2), id: None, rowspan: None }
-      46: StartParagraph { alignment: None, id: None }
-      47: EndParagraph
-      48: EndTableCell
-      49: EndTableRow
-      50: StartTableRow { id: None }
-      51: StartTableCell { colspan: None, id: None, rowspan: None }
-      52: StartParagraph { alignment: None, id: None }
-      53: EndParagraph
-      54: EndTableCell
-      55: StartTableCell { colspan: Some(2), id: None, rowspan: None }
-      56: StartParagraph { alignment: None, id: None }
-      57: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      58: Text { content: "c22" }
-      59: EndTextStyle
-      60: EndParagraph
-      61: EndTableCell
-      62: StartTableCell { colspan: None, id: None, rowspan: None }
-      63: StartParagraph { alignment: None, id: None }
-      64: StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None }
-      65: Text { content: "c23" }
-      66: EndTextStyle
-      67: EndParagraph
-      68: EndTableCell
-      69: StartTableCell { colspan: Some(2), id: None, rowspan: None }
-      70: StartParagraph { alignment: None, id: None }
-      71: EndParagraph
-      72: EndTableCell
-      73: EndTableRow
-      74: EndTable
-      75: StartParagraph { alignment: None, id: None }
-      76: EndParagraph
-      77: StartParagraph { alignment: None, id: None }
-      78: EndParagraph
-      79: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartTable { id: None },
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "h3" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: Some(2), id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "h4" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "h5" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: Some(3), id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "c11" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: Some(2), id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    StartTableRow { id: None },
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: Some(2), id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "c22" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: None, id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: TextColor(Rgb { b: 0, g: 0, r: 0 }), id: None },
+    Text { content: "c23" },
+    EndTextStyle,
+    EndParagraph,
+    EndTableCell,
+    StartTableCell { colspan: Some(2), id: None, rowspan: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndTableCell,
+    EndTableRow,
+    EndTable,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

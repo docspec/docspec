@@ -4,18 +4,18 @@ expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "F" }
-       3: StartTextStyle { kind: Bold, id: None }
-       4: Text { content: "oob" }
-       5: EndTextStyle
-       6: Text { content: "a" }
-       7: StartTextStyle { kind: Bold, id: None }
-       8: Text { content: "r" }
-       9: EndTextStyle
-      10: EndParagraph
-      11: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "F" },
+    StartTextStyle { kind: Bold, id: None },
+    Text { content: "oob" },
+    EndTextStyle,
+    Text { content: "a" },
+    StartTextStyle { kind: Bold, id: None },
+    Text { content: "r" },
+    EndTextStyle,
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

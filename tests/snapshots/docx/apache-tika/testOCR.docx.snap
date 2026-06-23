@@ -4,21 +4,21 @@ expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "This is some text." }
-       3: EndParagraph
-       4: StartParagraph { alignment: None, id: None }
-       5: EndParagraph
-       6: StartParagraph { alignment: None, id: None }
-       7: Text { content: "Here is an embedded image:" }
-       8: EndParagraph
-       9: StartParagraph { alignment: None, id: None }
-      10: EndParagraph
-      11: StartParagraph { alignment: None, id: None }
-      12: Image { alt: Some("asciiSentence.png"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image1.png", content_type: "image/png", bytes: 32393, sha256: "ff0c50ca65cc834175fb62cadfac50c1baa0b5b7a62be2f50485b3d308a1024e" } }
-      13: EndParagraph
-      14: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is some text." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Here is an embedded image:" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Image { alt: Some("asciiSentence.png"), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image1.png", content_type: "image/png", bytes: 32393, sha256: "ff0c50ca65cc834175fb62cadfac50c1baa0b5b7a62be2f50485b3d308a1024e" } },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

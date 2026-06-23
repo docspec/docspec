@@ -4,8 +4,8 @@ expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    EndDocument,
   ],
   terminal: Ok,
 }

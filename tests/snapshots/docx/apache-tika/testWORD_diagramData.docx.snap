@@ -4,17 +4,17 @@ expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: EndParagraph
-       3: StartParagraph { alignment: None, id: None }
-       4: EndParagraph
-       5: StartParagraph { alignment: None, id: None }
-       6: EndParagraph
-       7: StartParagraph { alignment: None, id: None }
-       8: Text { content: "This is a regular text in document body." }
-       9: EndParagraph
-      10: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is a regular text in document body." },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

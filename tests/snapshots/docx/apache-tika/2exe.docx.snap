@@ -4,24 +4,24 @@ expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: EndParagraph
-       3: StartParagraph { alignment: None, id: None }
-       4: EndParagraph
-       5: StartParagraph { alignment: None, id: None }
-       6: EndParagraph
-       7: StartParagraph { alignment: None, id: None }
-       8: EndParagraph
-       9: StartParagraph { alignment: None, id: None }
-      10: EndParagraph
-      11: StartParagraph { alignment: None, id: None }
-      12: EndParagraph
-      13: StartParagraph { alignment: None, id: None }
-      14: EndParagraph
-      15: StartParagraph { alignment: None, id: None }
-      16: EndParagraph
-      17: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

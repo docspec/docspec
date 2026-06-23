@@ -1,35 +1,35 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "Term 1" }
-       3: EndParagraph
-       4: StartParagraph { alignment: None, id: None }
-       5: Text { content: "Definition 1" }
-       6: EndParagraph
-       7: StartParagraph { alignment: None, id: None }
-       8: Text { content: "Term 2 with" }
-       9: Text { content: " " }
-      10: StartTextStyle { kind: Italic, id: None }
-      11: Text { content: "inline markup" }
-      12: EndTextStyle
-      13: EndParagraph
-      14: StartParagraph { alignment: None, id: None }
-      15: Text { content: "Definition 2" }
-      16: EndParagraph
-      17: StartParagraph { alignment: None, id: None }
-      18: StartTextStyle { kind: Code, id: None }
-      19: Text { content: "{ some code, part of Definition 2 }" }
-      20: EndTextStyle
-      21: EndParagraph
-      22: StartParagraph { alignment: None, id: None }
-      23: Text { content: "Third paragraph of definition 2." }
-      24: EndParagraph
-      25: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Term 1" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Definition 1" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Term 2 with" },
+    Text { content: " " },
+    StartTextStyle { kind: Italic, id: None },
+    Text { content: "inline markup" },
+    EndTextStyle,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Definition 2" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    StartTextStyle { kind: Code, id: None },
+    Text { content: "{ some code, part of Definition 2 }" },
+    EndTextStyle,
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Third paragraph of definition 2." },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

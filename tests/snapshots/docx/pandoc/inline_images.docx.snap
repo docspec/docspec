@@ -1,29 +1,29 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "This picture " }
-       3: Image { alt: Some("This one is green and looks like Sideshow Bob."), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image1.jpg", content_type: "image/jpeg", bytes: 1733, sha256: "6091a4b33254db1788cb4169b727f14f3c321d4311aad26b3798c0fe896f543b" } }
-       4: Text { content: " is an " }
-       5: Text { content: "identicon" }
-       6: Text { content: "." }
-       7: EndParagraph
-       8: StartParagraph { alignment: None, id: None }
-       9: EndParagraph
-      10: StartParagraph { alignment: None, id: None }
-      11: Text { content: "Here is " }
-      12: StartLink { href: "http://www.google.com", id: None, title: None }
-      13: Text { content: "one  " }
-      14: Image { alt: Some("This one is reddish, and looks like a heart that has leaked out."), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image2.jpg", content_type: "image/jpeg", bytes: 1378, sha256: "be14c2e7ed2f60f21692ff6421aa371157a88de129f61ae228e624ca68a0e14e" } }
-      15: Text { content: " that" }
-      16: EndLink
-      17: Text { content: " links." }
-      18: EndParagraph
-      19: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This picture " },
+    Image { alt: Some("This one is green and looks like Sideshow Bob."), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image1.jpg", content_type: "image/jpeg", bytes: 1733, sha256: "6091a4b33254db1788cb4169b727f14f3c321d4311aad26b3798c0fe896f543b" } },
+    Text { content: " is an " },
+    Text { content: "identicon" },
+    Text { content: "." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Here is " },
+    StartLink { href: "http://www.google.com", id: None, title: None },
+    Text { content: "one  " },
+    Image { alt: Some("This one is reddish, and looks like a heart that has leaked out."), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image2.jpg", content_type: "image/jpeg", bytes: 1378, sha256: "be14c2e7ed2f60f21692ff6421aa371157a88de129f61ae228e624ca68a0e14e" } },
+    Text { content: " that" },
+    EndLink,
+    Text { content: " links." },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

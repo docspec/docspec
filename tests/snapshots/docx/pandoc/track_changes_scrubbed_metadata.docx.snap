@@ -1,18 +1,18 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "Here is a " }
-       3: Text { content: "test" }
-       4: Text { content: " " }
-       5: Text { content: "document" }
-       6: Text { content: "." }
-       7: EndParagraph
-       8: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Here is a " },
+    Text { content: "test" },
+    Text { content: " " },
+    Text { content: "document" },
+    Text { content: "." },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

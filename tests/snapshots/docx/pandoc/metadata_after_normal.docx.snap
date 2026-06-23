@@ -1,66 +1,66 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartHeading { id: None, level: 1 }
-       2: Text { content: "This Is the Title" }
-       3: EndHeading
-       4: StartParagraph { alignment: None, id: None }
-       5: Text { content: "Mary Ann Evans" }
-       6: EndParagraph
-       7: StartParagraph { alignment: None, id: None }
-       8: Text { content: "Aurore" }
-       9: Text { content: " " }
-      10: Text { content: "Dupin" }
-      11: EndParagraph
-      12: StartParagraph { alignment: None, id: None }
-      13: EndParagraph
-      14: StartParagraph { alignment: None, id: None }
-      15: Text { content: "July 28, 2014" }
-      16: EndParagraph
-      17: StartParagraph { alignment: None, id: None }
-      18: EndParagraph
-      19: StartParagraph { alignment: None, id: None }
-      20: Text { content: "This is a test of how this all works. I’ve skipped lines here, which " }
-      21: Text { content: "pandoc" }
-      22: Text { content: " doesn’t do, but which shouldn’t make a difference." }
-      23: EndParagraph
-      24: StartParagraph { alignment: None, id: None }
-      25: EndParagraph
-      26: StartParagraph { alignment: None, id: None }
-      27: Text { content: "And now this is normal text." }
-      28: EndParagraph
-      29: StartParagraph { alignment: None, id: None }
-      30: EndParagraph
-      31: StartHeading { id: None, level: 1 }
-      32: Text { content: "This Is the Title" }
-      33: EndHeading
-      34: StartParagraph { alignment: None, id: None }
-      35: Text { content: "Mary Ann Evans" }
-      36: EndParagraph
-      37: StartParagraph { alignment: None, id: None }
-      38: Text { content: "Aurore" }
-      39: Text { content: " " }
-      40: Text { content: "Dupin" }
-      41: EndParagraph
-      42: StartParagraph { alignment: None, id: None }
-      43: EndParagraph
-      44: StartParagraph { alignment: None, id: None }
-      45: Text { content: "July 28, 2014" }
-      46: EndParagraph
-      47: StartParagraph { alignment: None, id: None }
-      48: EndParagraph
-      49: StartParagraph { alignment: None, id: None }
-      50: Text { content: "This is a test of how this all works. I’ve skipped lines here, which " }
-      51: Text { content: "pandoc" }
-      52: Text { content: " doesn’t do, but which shouldn’t make a difference." }
-      53: EndParagraph
-      54: StartParagraph { alignment: None, id: None }
-      55: EndParagraph
-      56: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartHeading { id: None, level: 1 },
+    Text { content: "This Is the Title" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Mary Ann Evans" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Aurore" },
+    Text { content: " " },
+    Text { content: "Dupin" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "July 28, 2014" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is a test of how this all works. I’ve skipped lines here, which " },
+    Text { content: "pandoc" },
+    Text { content: " doesn’t do, but which shouldn’t make a difference." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "And now this is normal text." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartHeading { id: None, level: 1 },
+    Text { content: "This Is the Title" },
+    EndHeading,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Mary Ann Evans" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "Aurore" },
+    Text { content: " " },
+    Text { content: "Dupin" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "July 28, 2014" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: "This is a test of how this all works. I’ve skipped lines here, which " },
+    Text { content: "pandoc" },
+    Text { content: " doesn’t do, but which shouldn’t make a difference." },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }

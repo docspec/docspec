@@ -1,18 +1,18 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
-       0: StartDocument { id: None, language: None, metadata: None }
-       1: StartParagraph { alignment: None, id: None }
-       2: Text { content: "An image:" }
-       3: EndParagraph
-       4: StartParagraph { alignment: None, id: None }
-       5: Text { content: " " }
-       6: Image { alt: Some("He realizes he's making the file-size too big."), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image1.jpg", content_type: "image/jpeg", bytes: 22975, sha256: "12b4b04ed9f4a443c6a60b2d8ce79e19b0c4752eb82d461081a21930b7165a56" } }
-       7: EndParagraph
-       8: EndDocument
+    StartDocument { id: None, language: None, metadata: None },
+    StartParagraph { alignment: None, id: None },
+    Text { content: "An image:" },
+    EndParagraph,
+    StartParagraph { alignment: None, id: None },
+    Text { content: " " },
+    Image { alt: Some("He realizes he's making the file-size too big."), decorative: false, id: None, title: None, asset: AssetDescriptor { asset_id: "zip://word/media/image1.jpg", content_type: "image/jpeg", bytes: 22975, sha256: "12b4b04ed9f4a443c6a60b2d8ce79e19b0c4752eb82d461081a21930b7165a56" } },
+    EndParagraph,
+    EndDocument,
   ],
   terminal: Ok,
 }
