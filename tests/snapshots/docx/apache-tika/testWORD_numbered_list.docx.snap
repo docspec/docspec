@@ -1,5 +1,6 @@
 ---
 source: crates/docspec-docx-reader/tests/snapshots.rs
+assertion_line: 56
 expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
@@ -121,14 +122,14 @@ ReaderFixtureSnapshot {
      114: StartParagraph { alignment: None, id: None }
      115: Text { content: "baz" }
      116: EndParagraph
-     117: StartParagraph { alignment: None, id: None }
-     118: EndParagraph
-     119: StartParagraph { alignment: None, id: None }
-     120: Text { content: "This is another list" }
+     117: EndOrderedListItem
+     118: EndOrderedListItem
+     119: EndOrderedListItem
+     120: StartParagraph { alignment: None, id: None }
      121: EndParagraph
-     122: EndOrderedListItem
-     123: EndOrderedListItem
-     124: EndOrderedListItem
+     122: StartParagraph { alignment: None, id: None }
+     123: Text { content: "This is another list" }
+     124: EndParagraph
      125: StartOrderedListItem { id: Some("2"), level: 0, start: Some(1), style_type: UpperRoman }
      126: StartParagraph { alignment: None, id: None }
      127: Text { content: "yet" }
@@ -141,243 +142,247 @@ ReaderFixtureSnapshot {
      134: StartParagraph { alignment: None, id: None }
      135: Text { content: "list" }
      136: EndParagraph
-     137: StartParagraph { alignment: None, id: None }
-     138: EndParagraph
-     139: StartParagraph { alignment: None, id: None }
-     140: EndParagraph
-     141: StartParagraph { alignment: None, id: None }
-     142: Text { content: "Intervening paragraph" }
+     137: EndOrderedListItem
+     138: EndOrderedListItem
+     139: EndOrderedListItem
+     140: StartParagraph { alignment: None, id: None }
+     141: EndParagraph
+     142: StartParagraph { alignment: None, id: None }
      143: EndParagraph
      144: StartParagraph { alignment: None, id: None }
-     145: EndParagraph
-     146: EndOrderedListItem
-     147: StartOrderedListItem { id: Some("2"), level: 2, start: None, style_type: LowerRoman }
-     148: StartParagraph { alignment: None, id: None }
-     149: Text { content: "foo" }
-     150: EndParagraph
-     151: EndOrderedListItem
-     152: EndOrderedListItem
-     153: EndOrderedListItem
-     154: StartOrderedListItem { id: Some("2"), level: 0, start: None, style_type: UpperRoman }
-     155: StartParagraph { alignment: None, id: None }
-     156: Text { content: "bar" }
-     157: EndParagraph
-     158: StartOrderedListItem { id: Some("2"), level: 1, start: None, style_type: LowerAlpha }
+     145: Text { content: "Intervening paragraph" }
+     146: EndParagraph
+     147: StartParagraph { alignment: None, id: None }
+     148: EndParagraph
+     149: StartOrderedListItem { id: Some("2"), level: 0, start: None, style_type: Decimal }
+     150: StartOrderedListItem { id: Some("2"), level: 1, start: None, style_type: Decimal }
+     151: StartOrderedListItem { id: Some("2"), level: 2, start: None, style_type: LowerRoman }
+     152: StartParagraph { alignment: None, id: None }
+     153: Text { content: "foo" }
+     154: EndParagraph
+     155: EndOrderedListItem
+     156: EndOrderedListItem
+     157: EndOrderedListItem
+     158: StartOrderedListItem { id: Some("2"), level: 0, start: None, style_type: UpperRoman }
      159: StartParagraph { alignment: None, id: None }
-     160: Text { content: "baz" }
+     160: Text { content: "bar" }
      161: EndParagraph
-     162: StartOrderedListItem { id: Some("2"), level: 2, start: None, style_type: Decimal }
-     163: StartOrderedListItem { id: Some("2"), level: 3, start: None, style_type: Decimal }
-     164: StartParagraph { alignment: None, id: None }
-     165: Text { content: "baq" }
-     166: EndParagraph
-     167: StartParagraph { alignment: None, id: None }
-     168: EndParagraph
-     169: StartParagraph { alignment: None, id: None }
+     162: StartOrderedListItem { id: Some("2"), level: 1, start: None, style_type: LowerAlpha }
+     163: StartParagraph { alignment: None, id: None }
+     164: Text { content: "baz" }
+     165: EndParagraph
+     166: StartOrderedListItem { id: Some("2"), level: 2, start: None, style_type: Decimal }
+     167: StartOrderedListItem { id: Some("2"), level: 3, start: None, style_type: Decimal }
+     168: StartParagraph { alignment: None, id: None }
+     169: Text { content: "baq" }
      170: EndParagraph
-     171: StartParagraph { alignment: None, id: None }
-     172: EndParagraph
-     173: StartParagraph { alignment: None, id: None }
-     174: Text { content: "This is a new list that starts at 6" }
-     175: Text { content: ", with a custom change of b. -> e." }
+     171: EndOrderedListItem
+     172: EndOrderedListItem
+     173: EndOrderedListItem
+     174: EndOrderedListItem
+     175: StartParagraph { alignment: None, id: None }
      176: EndParagraph
-     177: EndOrderedListItem
-     178: EndOrderedListItem
-     179: EndOrderedListItem
-     180: EndOrderedListItem
-     181: StartOrderedListItem { id: Some("5"), level: 0, start: Some(1), style_type: Decimal }
-     182: StartParagraph { alignment: None, id: None }
-     183: Text { content: "six" }
+     177: StartParagraph { alignment: None, id: None }
+     178: EndParagraph
+     179: StartParagraph { alignment: None, id: None }
+     180: EndParagraph
+     181: StartParagraph { alignment: None, id: None }
+     182: Text { content: "This is a new list that starts at 6" }
+     183: Text { content: ", with a custom change of b. -> e." }
      184: EndParagraph
-     185: EndOrderedListItem
-     186: StartOrderedListItem { id: Some("5"), level: 0, start: None, style_type: Decimal }
-     187: StartParagraph { alignment: None, id: None }
-     188: Text { content: "seven" }
-     189: EndParagraph
-     190: StartOrderedListItem { id: Some("5"), level: 1, start: None, style_type: LowerAlpha }
+     185: StartOrderedListItem { id: Some("5"), level: 0, start: Some(1), style_type: Decimal }
+     186: StartParagraph { alignment: None, id: None }
+     187: Text { content: "six" }
+     188: EndParagraph
+     189: EndOrderedListItem
+     190: StartOrderedListItem { id: Some("5"), level: 0, start: None, style_type: Decimal }
      191: StartParagraph { alignment: None, id: None }
-     192: Text { content: "seven a" }
+     192: Text { content: "seven" }
      193: EndParagraph
-     194: EndOrderedListItem
-     195: EndOrderedListItem
-     196: StartOrderedListItem { id: Some("6"), level: 0, start: Some(1), style_type: LowerAlpha }
-     197: StartParagraph { alignment: None, id: None }
-     198: Text { content: "seven e" }
-     199: EndParagraph
-     200: EndOrderedListItem
-     201: StartOrderedListItem { id: Some("6"), level: 0, start: None, style_type: LowerAlpha }
-     202: StartParagraph { alignment: None, id: None }
-     203: Text { content: "seven f" }
-     204: EndParagraph
-     205: StartParagraph { alignment: None, id: None }
-     206: EndParagraph
-     207: StartParagraph { alignment: None, id: None }
+     194: StartOrderedListItem { id: Some("5"), level: 1, start: None, style_type: LowerAlpha }
+     195: StartParagraph { alignment: None, id: None }
+     196: Text { content: "seven a" }
+     197: EndParagraph
+     198: EndOrderedListItem
+     199: EndOrderedListItem
+     200: StartOrderedListItem { id: Some("6"), level: 0, start: Some(1), style_type: LowerAlpha }
+     201: StartParagraph { alignment: None, id: None }
+     202: Text { content: "seven e" }
+     203: EndParagraph
+     204: EndOrderedListItem
+     205: StartOrderedListItem { id: Some("6"), level: 0, start: None, style_type: LowerAlpha }
+     206: StartParagraph { alignment: None, id: None }
+     207: Text { content: "seven f" }
      208: EndParagraph
-     209: StartParagraph { alignment: None, id: None }
-     210: EndParagraph
-     211: StartParagraph { alignment: None, id: None }
-     212: EndParagraph
-     213: StartParagraph { alignment: None, id: None }
-     214: EndParagraph
-     215: StartParagraph { alignment: None, id: None }
-     216: EndParagraph
-     217: StartParagraph { alignment: None, id: None }
-     218: EndParagraph
-     219: StartParagraph { alignment: None, id: None }
-     220: EndParagraph
-     221: StartParagraph { alignment: None, id: None }
-     222: EndParagraph
-     223: StartParagraph { alignment: None, id: None }
-     224: EndParagraph
-     225: StartParagraph { alignment: None, id: None }
-     226: EndParagraph
-     227: StartParagraph { alignment: None, id: None }
-     228: EndParagraph
-     229: StartParagraph { alignment: None, id: None }
-     230: EndParagraph
-     231: StartParagraph { alignment: None, id: None }
-     232: Text { content: "How about a list over a section break" }
+     209: EndOrderedListItem
+     210: StartParagraph { alignment: None, id: None }
+     211: EndParagraph
+     212: StartParagraph { alignment: None, id: None }
+     213: EndParagraph
+     214: StartParagraph { alignment: None, id: None }
+     215: EndParagraph
+     216: StartParagraph { alignment: None, id: None }
+     217: EndParagraph
+     218: StartParagraph { alignment: None, id: None }
+     219: EndParagraph
+     220: StartParagraph { alignment: None, id: None }
+     221: EndParagraph
+     222: StartParagraph { alignment: None, id: None }
+     223: EndParagraph
+     224: StartParagraph { alignment: None, id: None }
+     225: EndParagraph
+     226: StartParagraph { alignment: None, id: None }
+     227: EndParagraph
+     228: StartParagraph { alignment: None, id: None }
+     229: EndParagraph
+     230: StartParagraph { alignment: None, id: None }
+     231: EndParagraph
+     232: StartParagraph { alignment: None, id: None }
      233: EndParagraph
-     234: EndOrderedListItem
-     235: StartOrderedListItem { id: Some("10"), level: 0, start: Some(1), style_type: Decimal }
+     234: StartParagraph { alignment: None, id: None }
+     235: EndParagraph
      236: StartParagraph { alignment: None, id: None }
-     237: Text { content: "list 1" }
+     237: Text { content: "How about a list over a section break" }
      238: EndParagraph
-     239: EndOrderedListItem
-     240: StartOrderedListItem { id: Some("10"), level: 0, start: None, style_type: Decimal }
-     241: StartParagraph { alignment: None, id: None }
-     242: Text { content: "list 2" }
-     243: EndParagraph
-     244: StartParagraph { alignment: None, id: None }
-     245: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
-     246: LineBreak
-     247: EndTextStyle
-     248: EndParagraph
+     239: StartOrderedListItem { id: Some("10"), level: 0, start: Some(1), style_type: Decimal }
+     240: StartParagraph { alignment: None, id: None }
+     241: Text { content: "list 1" }
+     242: EndParagraph
+     243: EndOrderedListItem
+     244: StartOrderedListItem { id: Some("10"), level: 0, start: None, style_type: Decimal }
+     245: StartParagraph { alignment: None, id: None }
+     246: Text { content: "list 2" }
+     247: EndParagraph
+     248: EndOrderedListItem
      249: StartParagraph { alignment: None, id: None }
-     250: EndParagraph
-     251: StartParagraph { alignment: None, id: None }
-     252: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
-     253: Text { content: "Finally" }
-     254: EndTextStyle
-     255: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
-     256: Text { content: " some missing items" }
-     257: EndTextStyle
-     258: EndParagraph
-     259: EndOrderedListItem
-     260: StartOrderedListItem { id: Some("11"), level: 0, start: Some(1), style_type: UpperAlpha }
-     261: StartParagraph { alignment: None, id: None }
-     262: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
-     263: Text { content: "A" }
-     264: EndTextStyle
-     265: EndParagraph
-     266: StartOrderedListItem { id: Some("11"), level: 1, start: None, style_type: Decimal }
-     267: StartOrderedListItem { id: Some("11"), level: 2, start: None, style_type: LowerRoman }
-     268: StartParagraph { alignment: None, id: None }
-     269: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
-     270: Text { content: "A i" }
-     271: EndTextStyle
-     272: EndParagraph
-     273: EndOrderedListItem
-     274: StartOrderedListItem { id: Some("11"), level: 2, start: None, style_type: LowerRoman }
-     275: StartParagraph { alignment: None, id: None }
-     276: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
-     277: Text { content: "A ii" }
-     278: EndTextStyle
-     279: EndParagraph
-     280: StartOrderedListItem { id: Some("11"), level: 3, start: None, style_type: Decimal }
-     281: StartOrderedListItem { id: Some("11"), level: 4, start: None, style_type: LowerAlpha }
-     282: StartParagraph { alignment: None, id: None }
-     283: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
-     284: Text { content: "A ii a" }
-     285: EndTextStyle
-     286: EndParagraph
-     287: EndOrderedListItem
-     288: StartOrderedListItem { id: Some("11"), level: 4, start: None, style_type: LowerAlpha }
-     289: StartParagraph { alignment: None, id: None }
-     290: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
-     291: Text { content: "A ii b" }
-     292: EndTextStyle
-     293: EndParagraph
-     294: EndOrderedListItem
-     295: EndOrderedListItem
-     296: StartOrderedListItem { id: Some("11"), level: 3, start: None, style_type: Decimal }
-     297: StartParagraph { alignment: None, id: None }
-     298: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
-     299: Text { content: "A ii 2" }
-     300: EndTextStyle
-     301: EndParagraph
-     302: StartParagraph { alignment: None, id: None }
-     303: EndParagraph
-     304: EndOrderedListItem
-     305: EndOrderedListItem
+     250: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     251: LineBreak
+     252: EndTextStyle
+     253: EndParagraph
+     254: StartParagraph { alignment: None, id: None }
+     255: EndParagraph
+     256: StartParagraph { alignment: None, id: None }
+     257: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     258: Text { content: "Finally" }
+     259: EndTextStyle
+     260: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     261: Text { content: " some missing items" }
+     262: EndTextStyle
+     263: EndParagraph
+     264: StartOrderedListItem { id: Some("11"), level: 0, start: Some(1), style_type: UpperAlpha }
+     265: StartParagraph { alignment: None, id: None }
+     266: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     267: Text { content: "A" }
+     268: EndTextStyle
+     269: EndParagraph
+     270: StartOrderedListItem { id: Some("11"), level: 1, start: None, style_type: Decimal }
+     271: StartOrderedListItem { id: Some("11"), level: 2, start: None, style_type: LowerRoman }
+     272: StartParagraph { alignment: None, id: None }
+     273: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     274: Text { content: "A i" }
+     275: EndTextStyle
+     276: EndParagraph
+     277: EndOrderedListItem
+     278: StartOrderedListItem { id: Some("11"), level: 2, start: None, style_type: LowerRoman }
+     279: StartParagraph { alignment: None, id: None }
+     280: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     281: Text { content: "A ii" }
+     282: EndTextStyle
+     283: EndParagraph
+     284: StartOrderedListItem { id: Some("11"), level: 3, start: None, style_type: Decimal }
+     285: StartOrderedListItem { id: Some("11"), level: 4, start: None, style_type: LowerAlpha }
+     286: StartParagraph { alignment: None, id: None }
+     287: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     288: Text { content: "A ii a" }
+     289: EndTextStyle
+     290: EndParagraph
+     291: EndOrderedListItem
+     292: StartOrderedListItem { id: Some("11"), level: 4, start: None, style_type: LowerAlpha }
+     293: StartParagraph { alignment: None, id: None }
+     294: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     295: Text { content: "A ii b" }
+     296: EndTextStyle
+     297: EndParagraph
+     298: EndOrderedListItem
+     299: EndOrderedListItem
+     300: StartOrderedListItem { id: Some("11"), level: 3, start: None, style_type: Decimal }
+     301: StartParagraph { alignment: None, id: None }
+     302: StartTextStyle { kind: Mark(Rgb { b: 192, g: 192, r: 192 }), id: None }
+     303: Text { content: "A ii 2" }
+     304: EndTextStyle
+     305: EndParagraph
      306: EndOrderedListItem
      307: EndOrderedListItem
-     308: StartOrderedListItem { id: Some("10"), level: 0, start: None, style_type: Decimal }
-     309: StartParagraph { alignment: None, id: None }
-     310: Text { content: "page break " }
-     311: Text { content: "list 3" }
-     312: EndParagraph
+     308: EndOrderedListItem
+     309: EndOrderedListItem
+     310: StartParagraph { alignment: None, id: None }
+     311: EndParagraph
+     312: StartOrderedListItem { id: Some("10"), level: 0, start: None, style_type: Decimal }
      313: StartParagraph { alignment: None, id: None }
-     314: EndParagraph
-     315: StartParagraph { alignment: None, id: None }
+     314: Text { content: "page break " }
+     315: Text { content: "list 3" }
      316: EndParagraph
      317: EndOrderedListItem
-     318: StartOrderedListItem { id: Some("12"), level: 0, start: Some(1), style_type: Decimal }
-     319: StartParagraph { alignment: None, id: None }
-     320: Text { content: "Greek numbering with crazy format - alpha" }
+     318: StartParagraph { alignment: None, id: None }
+     319: EndParagraph
+     320: StartParagraph { alignment: None, id: None }
      321: EndParagraph
-     322: EndOrderedListItem
-     323: StartOrderedListItem { id: Some("12"), level: 0, start: None, style_type: Decimal }
-     324: StartParagraph { alignment: None, id: None }
-     325: Text { content: "Greek numbering with crazy format - beta" }
-     326: EndParagraph
-     327: StartParagraph { alignment: None, id: None }
-     328: EndParagraph
-     329: StartParagraph { alignment: None, id: None }
+     322: StartOrderedListItem { id: Some("12"), level: 0, start: Some(1), style_type: Decimal }
+     323: StartParagraph { alignment: None, id: None }
+     324: Text { content: "Greek numbering with crazy format - alpha" }
+     325: EndParagraph
+     326: EndOrderedListItem
+     327: StartOrderedListItem { id: Some("12"), level: 0, start: None, style_type: Decimal }
+     328: StartParagraph { alignment: None, id: None }
+     329: Text { content: "Greek numbering with crazy format - beta" }
      330: EndParagraph
-     331: StartParagraph { alignment: None, id: None }
-     332: EndParagraph
-     333: StartParagraph { alignment: None, id: None }
-     334: EndParagraph
-     335: EndOrderedListItem
-     336: StartOrderedListItem { id: Some("13"), level: 0, start: Some(1), style_type: Decimal }
-     337: StartParagraph { alignment: None, id: None }
-     338: Text { content: "1" }
+     331: EndOrderedListItem
+     332: StartParagraph { alignment: None, id: None }
+     333: EndParagraph
+     334: StartParagraph { alignment: None, id: None }
+     335: EndParagraph
+     336: StartParagraph { alignment: None, id: None }
+     337: EndParagraph
+     338: StartParagraph { alignment: None, id: None }
      339: EndParagraph
-     340: StartOrderedListItem { id: Some("13"), level: 1, start: None, style_type: Decimal }
-     341: StartOrderedListItem { id: Some("13"), level: 2, start: None, style_type: Decimal }
-     342: StartParagraph { alignment: None, id: None }
-     343: Text { content: "1.1.1" }
-     344: EndParagraph
-     345: EndOrderedListItem
-     346: EndOrderedListItem
-     347: StartOrderedListItem { id: Some("14"), level: 1, start: Some(1), style_type: Decimal }
-     348: StartParagraph { alignment: None, id: None }
-     349: Text { content: "1.2" }
-     350: Text { content: "->1.1" }
-     351: Text { content: "  //set the value to 1 and “start new list”" }
-     352: EndParagraph
-     353: EndOrderedListItem
-     354: StartOrderedListItem { id: Some("14"), level: 1, start: None, style_type: Decimal }
-     355: StartParagraph { alignment: None, id: None }
-     356: Text { content: "1.3" }
-     357: Text { content: " -> 1.2" }
-     358: EndParagraph
-     359: EndOrderedListItem
-     360: EndOrderedListItem
-     361: StartOrderedListItem { id: Some("14"), level: 0, start: None, style_type: Decimal }
-     362: StartParagraph { alignment: None, id: None }
-     363: Text { content: "2." }
-     364: EndParagraph
-     365: StartOrderedListItem { id: Some("14"), level: 1, start: None, style_type: Decimal }
+     340: StartOrderedListItem { id: Some("13"), level: 0, start: Some(1), style_type: Decimal }
+     341: StartParagraph { alignment: None, id: None }
+     342: Text { content: "1" }
+     343: EndParagraph
+     344: StartOrderedListItem { id: Some("13"), level: 1, start: None, style_type: Decimal }
+     345: StartOrderedListItem { id: Some("13"), level: 2, start: None, style_type: Decimal }
+     346: StartParagraph { alignment: None, id: None }
+     347: Text { content: "1.1.1" }
+     348: EndParagraph
+     349: EndOrderedListItem
+     350: EndOrderedListItem
+     351: StartOrderedListItem { id: Some("14"), level: 1, start: Some(1), style_type: Decimal }
+     352: StartParagraph { alignment: None, id: None }
+     353: Text { content: "1.2" }
+     354: Text { content: "->1.1" }
+     355: Text { content: "  //set the value to 1 and “start new list”" }
+     356: EndParagraph
+     357: EndOrderedListItem
+     358: StartOrderedListItem { id: Some("14"), level: 1, start: None, style_type: Decimal }
+     359: StartParagraph { alignment: None, id: None }
+     360: Text { content: "1.3" }
+     361: Text { content: " -> 1.2" }
+     362: EndParagraph
+     363: EndOrderedListItem
+     364: EndOrderedListItem
+     365: StartOrderedListItem { id: Some("14"), level: 0, start: None, style_type: Decimal }
      366: StartParagraph { alignment: None, id: None }
-     367: Text { content: "2.1" }
+     367: Text { content: "2." }
      368: EndParagraph
-     369: StartParagraph { alignment: None, id: None }
-     370: EndParagraph
-     371: EndOrderedListItem
-     372: EndOrderedListItem
-     373: EndDocument
+     369: StartOrderedListItem { id: Some("14"), level: 1, start: None, style_type: Decimal }
+     370: StartParagraph { alignment: None, id: None }
+     371: Text { content: "2.1" }
+     372: EndParagraph
+     373: EndOrderedListItem
+     374: EndOrderedListItem
+     375: StartParagraph { alignment: None, id: None }
+     376: EndParagraph
+     377: EndDocument
   ],
   terminal: Ok,
 }

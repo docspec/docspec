@@ -1,5 +1,6 @@
 ---
 source: crates/docspec-docx-reader/tests/snapshots.rs
+assertion_line: 56
 expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
@@ -105,10 +106,10 @@ ReaderFixtureSnapshot {
       98: StartParagraph { alignment: None, id: None }
       99: Text { content: "Bullet 3" }
      100: EndParagraph
-     101: StartParagraph { alignment: None, id: None }
-     102: Text { content: "Here is a numbered list:" }
-     103: EndParagraph
-     104: EndUnorderedListItem
+     101: EndUnorderedListItem
+     102: StartParagraph { alignment: None, id: None }
+     103: Text { content: "Here is a numbered list:" }
+     104: EndParagraph
      105: StartOrderedListItem { id: Some("2"), level: 0, start: Some(1), style_type: Decimal }
      106: StartParagraph { alignment: None, id: None }
      107: Text { content: "Number bullet 1" }
@@ -123,28 +124,28 @@ ReaderFixtureSnapshot {
      116: StartParagraph { alignment: None, id: None }
      117: Text { content: "Number bullet 3" }
      118: EndParagraph
-     119: StartParagraph { alignment: None, id: None }
-     120: EndParagraph
-     121: StartParagraph { alignment: None, id: None }
-     122: Text { content: " " }
-     123: Text { content: "Keyword1 Keyword2" }
-     124: EndParagraph
-     125: StartParagraph { alignment: None, id: None }
-     126: EndParagraph
-     127: StartParagraph { alignment: None, id: None }
-     128: StartLink { href: "http://tika.apache.org/", id: None, title: None }
-     129: Text { content: "This is a hyperlink" }
-     130: EndLink
-     131: EndParagraph
-     132: StartParagraph { alignment: None, id: None }
-     133: EndParagraph
-     134: StartParagraph { alignment: None, id: None }
-     135: Text { content: " " }
-     136: Text { content: "Subject is here" }
-     137: EndParagraph
-     138: StartParagraph { alignment: None, id: None }
-     139: EndParagraph
-     140: EndOrderedListItem
+     119: EndOrderedListItem
+     120: StartParagraph { alignment: None, id: None }
+     121: EndParagraph
+     122: StartParagraph { alignment: None, id: None }
+     123: Text { content: " " }
+     124: Text { content: "Keyword1 Keyword2" }
+     125: EndParagraph
+     126: StartParagraph { alignment: None, id: None }
+     127: EndParagraph
+     128: StartParagraph { alignment: None, id: None }
+     129: StartLink { href: "http://tika.apache.org/", id: None, title: None }
+     130: Text { content: "This is a hyperlink" }
+     131: EndLink
+     132: EndParagraph
+     133: StartParagraph { alignment: None, id: None }
+     134: EndParagraph
+     135: StartParagraph { alignment: None, id: None }
+     136: Text { content: " " }
+     137: Text { content: "Subject is here" }
+     138: EndParagraph
+     139: StartParagraph { alignment: None, id: None }
+     140: EndParagraph
      141: StartTable { id: None }
      142: StartTableRow { id: None }
      143: StartTableCell { colspan: None, id: None, rowspan: None }

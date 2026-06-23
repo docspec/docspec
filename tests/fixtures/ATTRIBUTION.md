@@ -19,6 +19,13 @@ indicated.
 | Fixture | Primary event coverage |
 |---------|------------------------|
 | `preformatted-boundaries.docx` | Consecutive code-styled paragraphs consolidated into one `StartPreformatted` / `EndPreformatted` block separated by `LineBreak` events; clean closure before regular paragraphs, headings, block quotes, list items, tables, and table cells; consecutive code paragraphs inside a table cell. |
+| `list_then_paragraph_same_style.docx` | Minimized synthetic reduction inspired by real-world DOCX upload 696c51d02b… — content scrubbed; structure preserved for regression testing of numPr resolution. |
+| `list_then_paragraph_style_change.docx` | Minimized synthetic reduction inspired by real-world DOCX upload e2b582ff09… — content scrubbed; structure preserved for regression testing of numPr resolution. |
+| `style_inherited_numpr.docx` | Synthetic fixture for testing style-inherited numPr resolution. |
+| `basedon_chain_numpr.docx` | Synthetic fixture for testing basedOn chain numPr resolution. |
+| `numid_zero_direct_clear.docx` | Synthetic fixture for testing numId=0 direct clear over style-inherited numPr. |
+| `numid_zero_style_chain.docx` | Synthetic fixture for testing numId=0 in style chain termination. |
+| `basedon_cycle.docx` | Synthetic fixture for testing basedOn cycle graceful degradation. |
 
 ## Pandoc DOCX Test Suite (`docx/pandoc/`)
 

@@ -1763,7 +1763,7 @@ mod events {
 
         assert_eq!(
             format!("{reader:?}"),
-            "DocxReader { inner: DocumentReader { buf: [], denied_stack: [], in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, pending_paragraph_classification: None, current_paragraph_block: Paragraph, pending_preformatted_close: false, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, pending_run_font: None, frozen_run_font: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, data: \"<DocxData>\", hyperlink_map: {}, hyperlink_depth: 0, pending_link: None, list_stack: [], seen_lists: {}, pending_paragraph_list: None, in_numpr: false, pending_num_pr_id: None, pending_num_pr_ilvl: None, xml: \"<quick_xml::Reader>\", archive: \"<Arc<Mutex<ZipArchive>>>\", content_types: \"<Arc<ContentTypes>>\" } }"
+            "DocxReader { inner: DocumentReader { buf: [], denied_stack: [], in_paragraph: false, in_text: false, in_ppr: false, pending_paragraph_alignment: None, pending_paragraph_classification: None, pending_paragraph_style_id: None, current_paragraph_block: Paragraph, pending_preformatted_close: false, paragraph_started_emitted: false, in_rpr: false, pending_run_kinds: [], pending_run_text_color: None, pending_run_mark: None, pending_run_shade: None, pending_text: \"\", frozen_run_kinds: [], frozen_run_text_color: None, frozen_run_mark: None, pending_run_font: None, frozen_run_font: None, open_styles: [], phase: \"<phase>\", queue: [], run_content_emitted: false, data: \"<DocxData>\", hyperlink_map: {}, hyperlink_depth: 0, pending_link: None, list_stack: [], seen_lists: {}, pending_paragraph_list: None, in_numpr: false, pending_num_pr_id: None, pending_num_pr_ilvl: None, xml: \"<quick_xml::Reader>\", archive: \"<Arc<Mutex<ZipArchive>>>\", content_types: \"<Arc<ContentTypes>>\" } }"
         );
     }
 
@@ -7123,7 +7123,7 @@ mod cross_feature_lists {
     }
 
     #[test]
-    fn same_num_id_continuation_paragraph_attaches_and_second_item_keeps_start_none() {
+    fn same_num_id_continuation_paragraph_splits_list_and_second_item_keeps_start_none() {
         let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
@@ -7143,10 +7143,10 @@ mod cross_feature_lists {
                 start_paragraph(),
                 text("one"),
                 Event::EndParagraph,
+                Event::EndOrderedListItem,
                 start_paragraph(),
                 text("break"),
                 Event::EndParagraph,
-                Event::EndOrderedListItem,
                 start_ordered("1", None),
                 start_paragraph(),
                 text("two"),

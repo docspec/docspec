@@ -31,6 +31,13 @@ pub struct Style {
     kind: StyleType,
     name: Option<String>,
     based_on: Option<String>,
+    /// Paragraph numbering properties from `<w:pPr><w:numPr>`.
+    ///
+    /// Stored as `(num_id, ilvl)`. `Some((0, 0))` represents Word's explicit
+    /// numbering clear signal for `w:numId="0"`; the level is normalized to
+    /// zero because MS-OE376 §2.3.1.19 documents Word's deviation allowing
+    /// `<w:ilvl>` in style definitions.
+    pub num_pr: Option<(u32, u32)>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -125,7 +132,32 @@ impl StyleList {
             current = self.get_by_id(current.based_on.as_deref()?)?;
         }
     }
+
+    /// Walk the `pStyle` → `basedOn` chain to find the effective `numPr`.
+    ///
+    /// Returns the first style in the chain whose `num_pr` is `Some`. If that
+    /// style has `num_id == 0`, returns `Some((0, 0))` and stops because Word
+    /// uses `w:numId="0"` as an explicit numbering clear signal.
+    pub fn resolve_num_pr(&self, style_id: &str) -> Option<(u32, u32)> {
+        let mut visited: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let mut current = self.get_by_id(style_id)?;
+        loop {
+            if !visited.insert(current.id.as_str()) {
+                return None;
+            }
+            if let Some((num_id, ilvl)) = current.num_pr {
+                return if num_id == 0 {
+                    Some((0, 0))
+                } else {
+                    Some((num_id, ilvl))
+                };
+            }
+            current = self.get_by_id(current.based_on.as_deref()?)?;
+        }
+    }
 }
+
+const _: fn(&StyleList, &str) -> Option<(u32, u32)> = StyleList::resolve_num_pr;
 
 fn parse_style_body<R: std::io::BufRead>(
     xml_reader: &mut quick_xml::Reader<R>,
@@ -135,6 +167,7 @@ fn parse_style_body<R: std::io::BufRead>(
 ) -> Result<Style> {
     let mut name: Option<String> = None;
     let mut based_on: Option<String> = None;
+    let mut num_pr: Option<(u32, u32)> = None;
 
     loop {
         match xml_reader.read_event_into(buf) {
@@ -146,6 +179,11 @@ fn parse_style_body<R: std::io::BufRead>(
             Ok(Event::Empty(elem)) if elem.local_name().as_ref() == b"basedOn" => {
                 if let Some(value) = get_attr(&elem, b"val")?.filter(|s| !s.is_empty()) {
                     based_on = Some(value);
+                }
+            }
+            Ok(Event::Start(elem)) if elem.local_name().as_ref() == b"pPr" => {
+                if let Some(value) = parse_ppr_body(xml_reader, buf)? {
+                    num_pr = Some(value);
                 }
             }
             Ok(Event::End(elem)) if elem.local_name().as_ref() == b"style" => break,
@@ -164,7 +202,107 @@ fn parse_style_body<R: std::io::BufRead>(
         kind,
         name,
         based_on,
+        num_pr,
     })
+}
+
+fn parse_ppr_body<R: std::io::BufRead>(
+    xml_reader: &mut quick_xml::Reader<R>,
+    buf: &mut Vec<u8>,
+) -> Result<Option<(u32, u32)>> {
+    let mut num_pr: Option<(u32, u32)> = None;
+
+    loop {
+        match xml_reader.read_event_into(buf) {
+            Ok(Event::Start(elem)) if elem.local_name().as_ref() == b"numPr" => {
+                if let Some(value) = parse_numpr_body(xml_reader, buf)? {
+                    num_pr = Some(value);
+                }
+            }
+            Ok(Event::Empty(elem)) if elem.local_name().as_ref() == b"numPr" => {}
+            Ok(Event::End(elem)) if elem.local_name().as_ref() == b"pPr" => break,
+            Ok(Event::Start(_)) => drain_element(xml_reader, buf)?,
+            Ok(Event::Eof) => {
+                return Err(parse_error("unexpected EOF inside <w:pPr>".to_string()));
+            }
+            Err(err) => {
+                return Err(parse_error(format!("malformed styles.xml: {err}")));
+            }
+            Ok(_) => {}
+        }
+        buf.clear();
+    }
+
+    Ok(num_pr)
+}
+
+fn parse_numpr_body<R: std::io::BufRead>(
+    xml_reader: &mut quick_xml::Reader<R>,
+    buf: &mut Vec<u8>,
+) -> Result<Option<(u32, u32)>> {
+    let mut num_id: Option<u32> = None;
+    let mut ilvl: Option<u32> = None;
+
+    loop {
+        match xml_reader.read_event_into(buf) {
+            Ok(Event::Empty(elem)) if elem.local_name().as_ref() == b"numId" => {
+                if let Some(value) = get_attr(&elem, b"val")? {
+                    if let Ok(parsed) = value.parse::<u32>() {
+                        num_id = Some(parsed);
+                    }
+                }
+            }
+            Ok(Event::Empty(elem)) if elem.local_name().as_ref() == b"ilvl" => {
+                if let Some(value) = get_attr(&elem, b"val")? {
+                    if let Ok(parsed) = value.parse::<u32>() {
+                        ilvl = Some(parsed);
+                    }
+                }
+            }
+            Ok(Event::End(elem)) if elem.local_name().as_ref() == b"numPr" => break,
+            Ok(Event::Start(_)) => drain_element(xml_reader, buf)?,
+            Ok(Event::Eof) => {
+                return Err(parse_error("unexpected EOF inside <w:numPr>".to_string()));
+            }
+            Err(err) => {
+                return Err(parse_error(format!("malformed styles.xml: {err}")));
+            }
+            Ok(_) => {}
+        }
+        buf.clear();
+    }
+
+    Ok(num_id.map(|id| {
+        if id == 0 {
+            (0, 0)
+        } else {
+            (id, ilvl.unwrap_or(0))
+        }
+    }))
+}
+
+fn drain_element<R: std::io::BufRead>(
+    xml_reader: &mut quick_xml::Reader<R>,
+    buf: &mut Vec<u8>,
+) -> Result<()> {
+    let mut depth: u32 = 1;
+
+    while depth > 0 {
+        buf.clear();
+        match xml_reader.read_event_into(buf) {
+            Ok(Event::Start(_)) => depth = depth.saturating_add(1),
+            Ok(Event::End(_)) => depth = depth.saturating_sub(1),
+            Ok(Event::Eof) => {
+                return Err(parse_error("unexpected EOF inside XML element".to_string()));
+            }
+            Err(err) => {
+                return Err(parse_error(format!("malformed styles.xml: {err}")));
+            }
+            Ok(_) => {}
+        }
+    }
+
+    Ok(())
 }
 
 fn get_attr(elem: &quick_xml::events::BytesStart<'_>, name: &[u8]) -> Result<Option<String>> {
@@ -235,6 +373,7 @@ mod tests {
                         kind: StyleType::Paragraph,
                         name: Some("Normal".to_string()),
                         based_on: None,
+                        num_pr: None,
                     }],
                 }
             ),
@@ -262,6 +401,7 @@ mod tests {
                         kind: StyleType::Paragraph,
                         name: Some("heading 1".to_string()),
                         based_on: Some("Normal".to_string()),
+                        num_pr: None,
                     }],
                 }
             ),
@@ -292,12 +432,14 @@ mod tests {
                             kind: StyleType::Character,
                             name: Some("Default Paragraph Font".to_string()),
                             based_on: None,
+                            num_pr: None,
                         },
                         Style {
                             id: "Normal".to_string(),
                             kind: StyleType::Paragraph,
                             name: Some("Normal".to_string()),
                             based_on: None,
+                            num_pr: None,
                         },
                     ],
                 }
@@ -312,6 +454,22 @@ mod tests {
             kind: StyleType::Paragraph,
             name: name.map(str::to_string),
             based_on: based_on.map(str::to_string),
+            num_pr: None,
+        }
+    }
+
+    fn paragraph_with_num_pr(
+        id: &str,
+        name: Option<&str>,
+        based_on: Option<&str>,
+        num_pr: Option<(u32, u32)>,
+    ) -> Style {
+        Style {
+            id: id.to_string(),
+            kind: StyleType::Paragraph,
+            name: name.map(str::to_string),
+            based_on: based_on.map(str::to_string),
+            num_pr,
         }
     }
 
@@ -321,6 +479,194 @@ mod tests {
             kind: StyleType::Character,
             name: name.map(str::to_string),
             based_on: based_on.map(str::to_string),
+            num_pr: None,
+        }
+    }
+
+    #[test]
+    fn test_style_with_numpr_stores_pair() {
+        let xml = styles_xml(
+            r#"<w:style w:type="paragraph" w:styleId="ListParagraph">
+                 <w:pPr>
+                   <w:numPr>
+                     <w:numId w:val="3"/>
+                     <w:ilvl w:val="0"/>
+                   </w:numPr>
+                 </w:pPr>
+               </w:style>"#,
+        );
+
+        let result = StyleList::parse(Cursor::new(xml.into_bytes()));
+
+        match result {
+            Ok(list) => assert_eq!(
+                list.get_by_id("ListParagraph"),
+                Some(&paragraph_with_num_pr(
+                    "ListParagraph",
+                    None,
+                    None,
+                    Some((3, 0))
+                ))
+            ),
+            Err(err) => assert_eq!(format!("{err:?}"), "expected style numPr pair"),
+        }
+    }
+
+    #[test]
+    fn test_style_with_numid_zero_and_ilvl_stores_zero_pair() {
+        let xml = styles_xml(
+            r#"<w:style w:type="paragraph" w:styleId="ClearList">
+                 <w:pPr>
+                   <w:numPr>
+                     <w:numId w:val="0"/>
+                     <w:ilvl w:val="2"/>
+                   </w:numPr>
+                 </w:pPr>
+               </w:style>"#,
+        );
+
+        let result = StyleList::parse(Cursor::new(xml.into_bytes()));
+
+        match result {
+            Ok(list) => assert_eq!(
+                list.get_by_id("ClearList"),
+                Some(&paragraph_with_num_pr(
+                    "ClearList",
+                    None,
+                    None,
+                    Some((0, 0))
+                ))
+            ),
+            Err(err) => assert_eq!(format!("{err:?}"), "expected numId zero clear"),
+        }
+    }
+
+    #[test]
+    fn test_style_with_numid_zero_no_ilvl_stores_zero_pair() {
+        let xml = styles_xml(
+            r#"<w:style w:type="paragraph" w:styleId="ClearList">
+                 <w:pPr>
+                   <w:numPr>
+                     <w:numId w:val="0"/>
+                   </w:numPr>
+                 </w:pPr>
+               </w:style>"#,
+        );
+
+        let result = StyleList::parse(Cursor::new(xml.into_bytes()));
+
+        match result {
+            Ok(list) => assert_eq!(
+                list.get_by_id("ClearList"),
+                Some(&paragraph_with_num_pr(
+                    "ClearList",
+                    None,
+                    None,
+                    Some((0, 0))
+                ))
+            ),
+            Err(err) => assert_eq!(format!("{err:?}"), "expected numId zero without ilvl"),
+        }
+    }
+
+    #[test]
+    fn test_style_with_numid_only_defaults_ilvl_to_zero() {
+        let xml = styles_xml(
+            r#"<w:style w:type="paragraph" w:styleId="ListParagraph">
+                 <w:pPr>
+                   <w:numPr>
+                     <w:numId w:val="3"/>
+                   </w:numPr>
+                 </w:pPr>
+               </w:style>"#,
+        );
+
+        let result = StyleList::parse(Cursor::new(xml.into_bytes()));
+
+        match result {
+            Ok(list) => assert_eq!(
+                list.get_by_id("ListParagraph"),
+                Some(&paragraph_with_num_pr(
+                    "ListParagraph",
+                    None,
+                    None,
+                    Some((3, 0))
+                ))
+            ),
+            Err(err) => assert_eq!(format!("{err:?}"), "expected default ilvl zero"),
+        }
+    }
+
+    #[test]
+    fn test_style_with_empty_numpr_stores_none() {
+        let xml = styles_xml(
+            r#"<w:style w:type="paragraph" w:styleId="NoList">
+                 <w:pPr><w:numPr/></w:pPr>
+               </w:style>"#,
+        );
+
+        let result = StyleList::parse(Cursor::new(xml.into_bytes()));
+
+        match result {
+            Ok(list) => assert_eq!(
+                list.get_by_id("NoList"),
+                Some(&paragraph_with_num_pr("NoList", None, None, None))
+            ),
+            Err(err) => assert_eq!(format!("{err:?}"), "expected empty numPr as none"),
+        }
+    }
+
+    #[test]
+    fn test_style_with_only_ilvl_stores_none() {
+        let xml = styles_xml(
+            r#"<w:style w:type="paragraph" w:styleId="MalformedList">
+                 <w:pPr>
+                   <w:numPr><w:ilvl w:val="2"/></w:numPr>
+                 </w:pPr>
+               </w:style>"#,
+        );
+
+        let result = StyleList::parse(Cursor::new(xml.into_bytes()));
+
+        match result {
+            Ok(list) => assert_eq!(
+                list.get_by_id("MalformedList"),
+                Some(&paragraph_with_num_pr("MalformedList", None, None, None))
+            ),
+            Err(err) => assert_eq!(format!("{err:?}"), "expected ilvl only as none"),
+        }
+    }
+
+    #[test]
+    fn test_parse_continues_after_unknown_nested_element() {
+        let xml = styles_xml(
+            r#"<w:style w:type="paragraph" w:styleId="ListParagraph">
+                 <w:pPr>
+                   <w:numPr>
+                     <w:numId w:val="3"/>
+                     <w:unknown><w:child/></w:unknown>
+                     <w:ilvl w:val="1"/>
+                   </w:numPr>
+                 </w:pPr>
+               </w:style>
+               <w:style w:type="paragraph" w:styleId="NextStyle">
+                 <w:name w:val="Next Style"/>
+               </w:style>"#,
+        );
+
+        let result = StyleList::parse(Cursor::new(xml.into_bytes()));
+
+        match result {
+            Ok(list) => assert_eq!(
+                list,
+                StyleList {
+                    styles: vec![
+                        paragraph_with_num_pr("ListParagraph", None, None, Some((3, 1))),
+                        paragraph("NextStyle", Some("Next Style"), None),
+                    ],
+                }
+            ),
+            Err(err) => assert_eq!(format!("{err:?}"), "expected stream alignment"),
         }
     }
 
@@ -534,6 +880,110 @@ mod tests {
     }
 
     #[test]
+    fn test_resolve_no_pstyle_returns_none() {
+        assert_eq!(StyleList::default().resolve_num_pr("Missing"), None);
+    }
+
+    #[test]
+    fn test_resolve_style_with_direct_numpr_returns_pair() {
+        let list = StyleList {
+            styles: vec![paragraph_with_num_pr("List", None, None, Some((3, 1)))],
+        };
+
+        assert_eq!(list.resolve_num_pr("List"), Some((3, 1)));
+    }
+
+    #[test]
+    fn test_resolve_style_with_numid_zero_terminates_walk_returns_zero_pair() {
+        let list = StyleList {
+            styles: vec![
+                paragraph_with_num_pr("Base", None, None, Some((3, 1))),
+                paragraph_with_num_pr("Clear", None, Some("Base"), Some((0, 0))),
+            ],
+        };
+
+        assert_eq!(list.resolve_num_pr("Clear"), Some((0, 0)));
+    }
+
+    #[test]
+    fn test_resolve_basedon_has_numpr_returns_parent_numpr() {
+        let list = StyleList {
+            styles: vec![
+                paragraph_with_num_pr("Base", None, None, Some((4, 2))),
+                paragraph("Child", None, Some("Base")),
+            ],
+        };
+
+        assert_eq!(list.resolve_num_pr("Child"), Some((4, 2)));
+    }
+
+    #[test]
+    fn test_resolve_basedon_chain_depth_three_returns_deepest() {
+        let list = StyleList {
+            styles: vec![
+                paragraph_with_num_pr("Grandparent", None, None, Some((7, 3))),
+                paragraph("Parent", None, Some("Grandparent")),
+                paragraph("Child", None, Some("Parent")),
+            ],
+        };
+
+        assert_eq!(list.resolve_num_pr("Child"), Some((7, 3)));
+    }
+
+    #[test]
+    fn test_resolve_basedon_cycle_returns_none_no_panic() {
+        let list = StyleList {
+            styles: vec![
+                paragraph("A", None, Some("B")),
+                paragraph("B", None, Some("A")),
+            ],
+        };
+
+        assert_eq!(list.resolve_num_pr("A"), None);
+    }
+
+    #[test]
+    fn test_resolve_missing_style_id_returns_none() {
+        let list = StyleList {
+            styles: vec![paragraph_with_num_pr("Known", None, None, Some((3, 0)))],
+        };
+
+        assert_eq!(list.resolve_num_pr("Missing"), None);
+    }
+
+    #[test]
+    fn test_resolve_style_with_ilvl_only_returns_none() {
+        let xml = styles_xml(
+            r#"<w:style w:type="paragraph" w:styleId="MalformedList">
+                 <w:pPr><w:numPr><w:ilvl w:val="2"/></w:numPr></w:pPr>
+               </w:style>"#,
+        );
+
+        let result = StyleList::parse(Cursor::new(xml.into_bytes()));
+
+        match result {
+            Ok(list) => assert_eq!(list.resolve_num_pr("MalformedList"), None),
+            Err(err) => assert_eq!(format!("{err:?}"), "expected ilvl only style"),
+        }
+    }
+
+    #[test]
+    fn test_resolve_style_with_empty_numpr_returns_none() {
+        let xml = styles_xml(
+            r#"<w:style w:type="paragraph" w:styleId="NoList">
+                 <w:pPr><w:numPr/></w:pPr>
+               </w:style>"#,
+        );
+
+        let result = StyleList::parse(Cursor::new(xml.into_bytes()));
+
+        match result {
+            Ok(list) => assert_eq!(list.resolve_num_pr("NoList"), None),
+            Err(err) => assert_eq!(format!("{err:?}"), "expected empty numPr style"),
+        }
+    }
+
+    #[test]
     fn classify_returns_none_for_paragraph_style_named_html_preformatted() {
         let list = StyleList {
             styles: vec![paragraph(
@@ -579,12 +1029,14 @@ mod tests {
                             kind: StyleType::Paragraph,
                             name: Some("Normal".to_string()),
                             based_on: None,
+                            num_pr: None,
                         },
                         Style {
                             id: "Heading1".to_string(),
                             kind: StyleType::Paragraph,
                             name: Some("heading 1".to_string()),
                             based_on: Some("Normal".to_string()),
+                            num_pr: None,
                         },
                     ],
                 }

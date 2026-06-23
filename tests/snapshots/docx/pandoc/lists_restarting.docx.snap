@@ -1,6 +1,7 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+assertion_line: 56
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
@@ -22,17 +23,17 @@ ReaderFixtureSnapshot {
       15: Text { content: "\t" }
       16: Text { content: "Baz" }
       17: EndParagraph
-      18: StartParagraph { alignment: None, id: None }
-      19: Text { content: "\t" }
-      20: EndParagraph
-      21: StartParagraph { alignment: None, id: None }
-      22: Text { content: "\t" }
-      23: Text { content: "Interruption" }
-      24: EndParagraph
-      25: StartParagraph { alignment: None, id: None }
-      26: Text { content: "\t" }
-      27: EndParagraph
-      28: EndOrderedListItem
+      18: EndOrderedListItem
+      19: StartParagraph { alignment: None, id: None }
+      20: Text { content: "\t" }
+      21: EndParagraph
+      22: StartParagraph { alignment: None, id: None }
+      23: Text { content: "\t" }
+      24: Text { content: "Interruption" }
+      25: EndParagraph
+      26: StartParagraph { alignment: None, id: None }
+      27: Text { content: "\t" }
+      28: EndParagraph
       29: StartOrderedListItem { id: Some("5"), level: 0, start: Some(1), style_type: Decimal }
       30: StartParagraph { alignment: None, id: None }
       31: Text { content: "\t" }

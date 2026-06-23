@@ -155,6 +155,10 @@ pub struct DocumentReader {
     in_ppr: bool,
     /// Paragraph alignment captured from `<w:jc>` while inside `<w:pPr>`.
     pending_paragraph_alignment: Option<TextAlignment>,
+    /// Raw `<w:pStyle>` identifier for the current paragraph, retained for
+    /// effective numPr resolution via `StyleList::resolve_num_pr`.
+    /// Set by the `pStyle` attribute handler; cleared in `start_paragraph()`.
+    pending_paragraph_style_id: Option<String>,
     /// Style classification pending for the current paragraph, set by `<w:pStyle>` parsing.
     /// Consumed and cleared by `ensure_paragraph_started()`.
     pending_paragraph_classification: Option<crate::styles::StyleClassification>,
@@ -276,6 +280,10 @@ impl fmt::Debug for DocumentReader {
                 "pending_paragraph_classification",
                 &self.pending_paragraph_classification,
             )
+            .field(
+                "pending_paragraph_style_id",
+                &self.pending_paragraph_style_id,
+            )
             .field("current_paragraph_block", &self.current_paragraph_block)
             .field(
                 "pending_preformatted_close",
@@ -349,6 +357,7 @@ impl DocumentReader {
             in_text: false,
             in_ppr: false,
             pending_paragraph_alignment: None,
+            pending_paragraph_style_id: None,
             pending_paragraph_classification: None,
             current_paragraph_block: ParagraphBlockKind::Paragraph,
             pending_preformatted_close: false,
@@ -400,8 +409,7 @@ impl DocumentReader {
         }
     }
 
-    #[cfg(test)]
-    #[cfg(test)]
+    #[cfg(all(test, not(coverage)))]
     #[allow(clippy::expect_used, clippy::as_conversions)]
     pub(crate) fn from_xml_reader(
         xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
@@ -493,6 +501,7 @@ impl DocumentReader {
         self.pending_num_pr_ilvl = None;
         self.pending_paragraph_list = None;
         self.pending_paragraph_alignment = None;
+        self.pending_paragraph_style_id = None;
         self.pending_paragraph_classification = None;
         self.current_paragraph_block = ParagraphBlockKind::Paragraph;
         self.paragraph_started_emitted = false;
@@ -781,9 +790,11 @@ impl DocumentReader {
                     val.as_deref().and_then(properties::parse_alignment);
             }
             b"pStyle" if self.in_ppr && !self.paragraph_started_emitted => {
-                self.pending_paragraph_classification = read_val_attribute(tag)
-                    .filter(|s| !s.is_empty())
-                    .and_then(|s| self.data.style_list.classify(&s));
+                let style_id = read_val_attribute(tag).filter(|s| !s.is_empty());
+                self.pending_paragraph_style_id = style_id.clone();
+                self.pending_paragraph_classification = style_id
+                    .as_deref()
+                    .and_then(|s| self.data.style_list.classify(s));
             }
             b"numId" if self.in_numpr => {
                 if let Some(val) = read_val_attribute(tag) {
@@ -1542,6 +1553,7 @@ impl DocumentReader {
         self.pending_text.clear();
         self.paragraph_started_emitted = false;
         self.pending_paragraph_alignment = None;
+        self.pending_paragraph_style_id = None;
         self.pending_paragraph_classification = None;
         self.pending_paragraph_list = None;
         self.current_paragraph_block = ParagraphBlockKind::Paragraph;
@@ -1559,6 +1571,7 @@ impl DocumentReader {
                     self.pending_preformatted_close = false;
                     self.current_paragraph_block = ParagraphBlockKind::Preformatted;
                     self.paragraph_started_emitted = true;
+                    self.pending_paragraph_style_id = None;
                     self.pending_paragraph_classification = None;
                     return;
                 }
@@ -1566,16 +1579,39 @@ impl DocumentReader {
             }
 
             let list_classification = match self.pending_paragraph_list.take() {
-                None => None,
                 Some((num_id, raw_ilvl)) => {
+                    // Branch 1 & 2: direct numPr present.
+                    // numbering.resolve(0, _) already returns is_list:false, so
+                    // numId=0 (ECMA-376 §17.9.18 explicit clear) is handled here.
                     let ilvl = core::cmp::min(raw_ilvl, MAX_LIST_LEVEL);
                     let result = self.data.numbering.resolve(num_id, ilvl);
                     result
                         .is_list
                         .then_some((num_id, ilvl, result.is_ordered, result.style_type))
                 }
+                None => {
+                    // Branch 3: no direct numPr — resolve via pStyle chain.
+                    match self
+                        .pending_paragraph_style_id
+                        .as_deref()
+                        .and_then(|sid| self.data.style_list.resolve_num_pr(sid))
+                    {
+                        Some((num_id, raw_ilvl)) => {
+                            let ilvl = core::cmp::min(raw_ilvl, MAX_LIST_LEVEL);
+                            let result = self.data.numbering.resolve(num_id, ilvl);
+                            result.is_list.then_some((
+                                num_id,
+                                ilvl,
+                                result.is_ordered,
+                                result.style_type,
+                            ))
+                        }
+                        None => None,
+                    }
+                }
             };
 
+            self.pending_paragraph_style_id = None;
             let kind = match self.pending_paragraph_classification.take() {
                 Some(crate::styles::StyleClassification::Heading { level }) => {
                     self.flush_list_stack();
@@ -1591,10 +1627,12 @@ impl DocumentReader {
                 }
                 _ => match list_classification {
                     None => {
-                        // Intentional: do NOT flush the list stack here. A plain paragraph
-                        // following a list item attaches as continuation content of the
-                        // open item. The list closes only at heading / block quote /
-                        // preformatted / table boundary / cell boundary / end of document.
+                        // Spec-compliant: a paragraph with no effective numPr (neither
+                        // direct <w:numPr> nor via the pStyle → basedOn chain) closes
+                        // any open list. The previous continuation-paragraph heuristic
+                        // was removed in favour of pStyle-chain numPr resolution
+                        // (see `styles::StyleList::resolve_num_pr`).
+                        self.flush_list_stack();
                         ParagraphBlockKind::Paragraph
                     }
                     Some((num_id, ilvl, is_ordered, style_type)) => {
@@ -3103,7 +3141,7 @@ mod tests {
     }
 
     #[test]
-    fn non_list_paragraph_between_list_items_attaches_as_continuation() {
+    fn non_list_paragraph_between_list_items_closes_and_reopens_list() {
         let body = format!(
             "{}{}{}",
             list_paragraph(1, 0, "one"),
@@ -3135,6 +3173,7 @@ mod tests {
                     content: "one".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartParagraph {
                     alignment: None,
                     id: None,
@@ -3143,7 +3182,6 @@ mod tests {
                     content: "plain".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
-                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
@@ -3542,7 +3580,7 @@ mod tests {
     }
 
     #[test]
-    fn multiple_continuation_paragraphs_attach_to_same_item() {
+    fn multiple_plain_paragraphs_after_list_item_are_siblings() {
         let body = format!(
             "{}{}{}{}",
             list_paragraph(1, 0, "one"),
@@ -3575,6 +3613,7 @@ mod tests {
                     content: "one".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartParagraph {
                     alignment: None,
                     id: None,
@@ -3591,7 +3630,6 @@ mod tests {
                     content: "second continuation".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
-                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
@@ -3613,7 +3651,7 @@ mod tests {
     }
 
     #[test]
-    fn trailing_continuation_paragraphs_close_with_list_at_document_end() {
+    fn trailing_plain_paragraphs_close_list_before_document_end() {
         let body = format!(
             "{}{}{}",
             list_paragraph(1, 0, "one"),
@@ -3645,6 +3683,7 @@ mod tests {
                     content: "one".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartParagraph {
                     alignment: None,
                     id: None,
@@ -3661,14 +3700,13 @@ mod tests {
                     content: "trailing second".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
-                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::EndDocument,
             ]
         );
     }
 
     #[test]
-    fn continuation_then_deeper_level_nests_under_continuation_owner() {
+    fn plain_paragraph_then_deeper_level_reopens_with_phantom_parent() {
         let body = format!(
             "{}{}{}",
             list_paragraph(1, 0, "outer"),
@@ -3700,6 +3738,7 @@ mod tests {
                     content: "outer".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartParagraph {
                     alignment: None,
                     id: None,
@@ -3708,6 +3747,12 @@ mod tests {
                     content: "continuation".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 1,
@@ -3730,7 +3775,7 @@ mod tests {
     }
 
     #[test]
-    fn continuation_paragraph_inside_table_cell_attaches_then_cell_end_closes_list() {
+    fn plain_paragraph_inside_table_cell_closes_list_before_cell_end() {
         let body = format!(
             "<w:tbl><w:tr><w:tc>{}{}</w:tc></w:tr></w:tbl>",
             list_paragraph(1, 0, "cell item"),
@@ -3768,6 +3813,7 @@ mod tests {
                     content: "cell item".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartParagraph {
                     alignment: None,
                     id: None,
@@ -3776,7 +3822,6 @@ mod tests {
                     content: "continuation".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
-                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::EndTableCell,
                 docspec_core::Event::EndTableRow,
                 docspec_core::Event::EndTable,
@@ -3895,7 +3940,7 @@ mod tests {
     }
 
     #[test]
-    fn calibre_demo_continued_lists_pattern_produces_continuous_numbering() {
+    fn calibre_demo_interrupted_list_reopens_with_continuous_numbering() {
         let body = format!(
             "{}{}{}{}{}",
             list_paragraph(7, 0, "One"),
@@ -3955,6 +4000,7 @@ mod tests {
                     content: "Two".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartParagraph {
                     alignment: None,
                     id: None,
@@ -3963,7 +4009,6 @@ mod tests {
                     content: "An interruption in our regularly scheduled listing, for this essential and very relevant public service announcement.".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
-                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("7".to_string()),
                     level: 0,

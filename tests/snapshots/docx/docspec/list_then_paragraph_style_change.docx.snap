@@ -1,0 +1,36 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+assertion_line: 56
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartUnorderedListItem { id: Some("9"), level: 0, style_type: Disc }
+       2: StartParagraph { alignment: None, id: None }
+       3: Text { content: "List item one" }
+       4: EndParagraph
+       5: EndUnorderedListItem
+       6: StartUnorderedListItem { id: Some("9"), level: 0, style_type: Disc }
+       7: StartParagraph { alignment: None, id: None }
+       8: Text { content: "List item two" }
+       9: EndParagraph
+      10: EndUnorderedListItem
+      11: StartUnorderedListItem { id: Some("9"), level: 0, style_type: Disc }
+      12: StartParagraph { alignment: None, id: None }
+      13: Text { content: "List item three" }
+      14: EndParagraph
+      15: EndUnorderedListItem
+      16: StartParagraph { alignment: None, id: None }
+      17: Text { content: "Body paragraph one." }
+      18: EndParagraph
+      19: StartParagraph { alignment: None, id: None }
+      20: Text { content: "Body paragraph two." }
+      21: EndParagraph
+      22: StartParagraph { alignment: None, id: None }
+      23: Text { content: "Body paragraph three." }
+      24: EndParagraph
+      25: EndDocument
+  ],
+  terminal: Ok,
+}

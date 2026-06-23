@@ -1,0 +1,17 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+assertion_line: 56
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartUnorderedListItem { id: Some("2"), level: 0, style_type: Disc }
+       2: StartParagraph { alignment: None, id: None }
+       3: Text { content: "Chain inherited list item." }
+       4: EndParagraph
+       5: EndUnorderedListItem
+       6: EndDocument
+  ],
+  terminal: Ok,
+}

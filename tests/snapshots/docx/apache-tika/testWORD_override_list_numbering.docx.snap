@@ -1,5 +1,6 @@
 ---
 source: crates/docspec-docx-reader/tests/snapshots.rs
+assertion_line: 56
 expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
@@ -109,19 +110,19 @@ ReaderFixtureSnapshot {
      102: StartParagraph { alignment: None, id: None }
      103: Text { content: "5th" }
      104: EndParagraph
-     105: StartParagraph { alignment: None, id: None }
-     106: EndParagraph
-     107: StartParagraph { alignment: None, id: None }
-     108: StartTextStyle { kind: Bold, id: None }
-     109: Text { content: "Test 2:" }
-     110: EndTextStyle
-     111: Text { content: " List with " }
-     112: Text { content: "restartAt" }
-     113: Text { content: " modified and skipped levels" }
-     114: EndParagraph
-     115: StartParagraph { alignment: None, id: None }
-     116: EndParagraph
-     117: EndOrderedListItem
+     105: EndOrderedListItem
+     106: StartParagraph { alignment: None, id: None }
+     107: EndParagraph
+     108: StartParagraph { alignment: None, id: None }
+     109: StartTextStyle { kind: Bold, id: None }
+     110: Text { content: "Test 2:" }
+     111: EndTextStyle
+     112: Text { content: " List with " }
+     113: Text { content: "restartAt" }
+     114: Text { content: " modified and skipped levels" }
+     115: EndParagraph
+     116: StartParagraph { alignment: None, id: None }
+     117: EndParagraph
      118: StartOrderedListItem { id: Some("6"), level: 0, start: Some(1), style_type: Decimal }
      119: StartParagraph { alignment: None, id: None }
      120: Text { content: "1" }
@@ -172,23 +173,23 @@ ReaderFixtureSnapshot {
      165: StartParagraph { alignment: None, id: None }
      166: Text { content: "2.b" }
      167: EndParagraph
-     168: StartParagraph { alignment: None, id: None }
-     169: EndParagraph
+     168: EndOrderedListItem
+     169: EndOrderedListItem
      170: StartParagraph { alignment: None, id: None }
-     171: StartTextStyle { kind: Bold, id: None }
-     172: Text { content: "Test 3:" }
-     173: EndTextStyle
-     174: Text { content: " List with " }
-     175: Text { content: "LegalNumbering" }
-     176: Text { content: " and " }
-     177: Text { content: "modified " }
-     178: Text { content: "startAt" }
-     179: Text { content: " value" }
-     180: EndParagraph
-     181: StartParagraph { alignment: None, id: None }
+     171: EndParagraph
+     172: StartParagraph { alignment: None, id: None }
+     173: StartTextStyle { kind: Bold, id: None }
+     174: Text { content: "Test 3:" }
+     175: EndTextStyle
+     176: Text { content: " List with " }
+     177: Text { content: "LegalNumbering" }
+     178: Text { content: " and " }
+     179: Text { content: "modified " }
+     180: Text { content: "startAt" }
+     181: Text { content: " value" }
      182: EndParagraph
-     183: EndOrderedListItem
-     184: EndOrderedListItem
+     183: StartParagraph { alignment: None, id: None }
+     184: EndParagraph
      185: StartOrderedListItem { id: Some("9"), level: 0, start: Some(1), style_type: Decimal }
      186: StartParagraph { alignment: None, id: None }
      187: Text { content: "(1))" }
@@ -228,18 +229,18 @@ ReaderFixtureSnapshot {
      221: StartParagraph { alignment: None, id: None }
      222: Text { content: "2" }
      223: EndParagraph
-     224: StartParagraph { alignment: None, id: None }
-     225: EndParagraph
-     226: StartParagraph { alignment: None, id: None }
-     227: StartTextStyle { kind: Bold, id: None }
-     228: Text { content: "Test 4:" }
-     229: EndTextStyle
-     230: Text { content: " " }
-     231: Text { content: "ListFormatOverride" }
-     232: EndParagraph
-     233: StartParagraph { alignment: None, id: None }
-     234: EndParagraph
-     235: EndOrderedListItem
+     224: EndOrderedListItem
+     225: StartParagraph { alignment: None, id: None }
+     226: EndParagraph
+     227: StartParagraph { alignment: None, id: None }
+     228: StartTextStyle { kind: Bold, id: None }
+     229: Text { content: "Test 4:" }
+     230: EndTextStyle
+     231: Text { content: " " }
+     232: Text { content: "ListFormatOverride" }
+     233: EndParagraph
+     234: StartParagraph { alignment: None, id: None }
+     235: EndParagraph
      236: StartOrderedListItem { id: Some("19"), level: 0, start: Some(1), style_type: Decimal }
      237: StartParagraph { alignment: None, id: None }
      238: Text { content: "1" }
@@ -269,14 +270,14 @@ ReaderFixtureSnapshot {
      262: StartParagraph { alignment: None, id: None }
      263: Text { content: "4" }
      264: EndParagraph
-     265: StartParagraph { alignment: None, id: None }
-     266: EndParagraph
-     267: StartParagraph { alignment: None, id: None }
-     268: Text { content: "Test 5: More formatting variants" }
-     269: EndParagraph
-     270: StartParagraph { alignment: None, id: None }
-     271: EndParagraph
-     272: EndOrderedListItem
+     265: EndOrderedListItem
+     266: StartParagraph { alignment: None, id: None }
+     267: EndParagraph
+     268: StartParagraph { alignment: None, id: None }
+     269: Text { content: "Test 5: More formatting variants" }
+     270: EndParagraph
+     271: StartParagraph { alignment: None, id: None }
+     272: EndParagraph
      273: StartOrderedListItem { id: Some("31"), level: 0, start: Some(1), style_type: Decimal }
      274: StartParagraph { alignment: None, id: None }
      275: Text { content: "00" }
@@ -286,26 +287,28 @@ ReaderFixtureSnapshot {
      279: StartParagraph { alignment: None, id: None }
      280: Text { content: "01" }
      281: EndParagraph
-     282: StartParagraph { alignment: None, id: None }
-     283: Text { content: "01." }
-     284: EndParagraph
-     285: StartParagraph { alignment: None, id: None }
-     286: Text { content: "01." }
-     287: EndParagraph
-     288: StartOrderedListItem { id: Some("31"), level: 1, start: None, style_type: Decimal }
-     289: StartOrderedListItem { id: Some("31"), level: 2, start: None, style_type: Decimal }
-     290: StartParagraph { alignment: None, id: None }
-     291: Text { content: "01..1" }
-     292: EndParagraph
-     293: EndOrderedListItem
-     294: EndOrderedListItem
+     282: EndOrderedListItem
+     283: StartParagraph { alignment: None, id: None }
+     284: Text { content: "01." }
+     285: EndParagraph
+     286: StartParagraph { alignment: None, id: None }
+     287: Text { content: "01." }
+     288: EndParagraph
+     289: StartOrderedListItem { id: Some("31"), level: 0, start: None, style_type: Decimal }
+     290: StartOrderedListItem { id: Some("31"), level: 1, start: None, style_type: Decimal }
+     291: StartOrderedListItem { id: Some("31"), level: 2, start: None, style_type: Decimal }
+     292: StartParagraph { alignment: None, id: None }
+     293: Text { content: "01..1" }
+     294: EndParagraph
      295: EndOrderedListItem
-     296: StartOrderedListItem { id: Some("31"), level: 0, start: None, style_type: Decimal }
-     297: StartParagraph { alignment: None, id: None }
-     298: Text { content: "02" }
-     299: EndParagraph
-     300: EndOrderedListItem
-     301: EndDocument
+     296: EndOrderedListItem
+     297: EndOrderedListItem
+     298: StartOrderedListItem { id: Some("31"), level: 0, start: None, style_type: Decimal }
+     299: StartParagraph { alignment: None, id: None }
+     300: Text { content: "02" }
+     301: EndParagraph
+     302: EndOrderedListItem
+     303: EndDocument
   ],
   terminal: Ok,
 }

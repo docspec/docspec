@@ -1,6 +1,7 @@
 ---
-source: crates/docspec-docx-reader/tests/pandoc_corpus.rs
-expression: snapshot
+source: crates/docspec-docx-reader/tests/snapshots.rs
+assertion_line: 56
+expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
   events: [
@@ -45,12 +46,12 @@ ReaderFixtureSnapshot {
       38: StartParagraph { alignment: None, id: None }
       39: Text { content: "four" }
       40: EndParagraph
-      41: StartParagraph { alignment: None, id: None }
-      42: Text { content: "Sub paragraph" }
-      43: EndParagraph
-      44: EndUnorderedListItem
-      45: EndUnorderedListItem
-      46: EndUnorderedListItem
+      41: EndUnorderedListItem
+      42: EndUnorderedListItem
+      43: EndUnorderedListItem
+      44: StartParagraph { alignment: None, id: None }
+      45: Text { content: "Sub paragraph" }
+      46: EndParagraph
       47: StartUnorderedListItem { id: Some("4"), level: 0, style_type: Disc }
       48: StartParagraph { alignment: None, id: None }
       49: Text { content: "Same list" }

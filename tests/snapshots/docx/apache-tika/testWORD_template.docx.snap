@@ -1,5 +1,6 @@
 ---
 source: crates/docspec-docx-reader/tests/snapshots.rs
+assertion_line: 56
 expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
@@ -28,35 +29,41 @@ ReaderFixtureSnapshot {
       21: StartParagraph { alignment: None, id: None }
       22: Text { content: "Guitarist" }
       23: EndParagraph
-      24: StartParagraph { alignment: None, id: None }
-      25: Text { content: "Slept with one eye open gripping my pillow tight" }
-      26: EndParagraph
-      27: StartParagraph { alignment: None, id: None }
-      28: Text { content: "E" }
-      29: Text { content: "ducation" }
-      30: EndParagraph
-      31: StartParagraph { alignment: None, id: None }
-      32: Text { content: "[Dates From - To]" }
-      33: EndParagraph
-      34: StartParagraph { alignment: None, id: None }
-      35: Text { content: "[School Name, Location]" }
-      36: EndParagraph
-      37: StartParagraph { alignment: None, id: None }
-      38: Text { content: "[Degree]" }
-      39: EndParagraph
-      40: StartParagraph { alignment: None, id: None }
-      41: Text { content: "Click here to enter text." }
-      42: EndParagraph
+      24: StartUnorderedListItem { id: Some("4"), level: 0, style_type: Disc }
+      25: StartParagraph { alignment: None, id: None }
+      26: Text { content: "Slept with one eye open gripping my pillow tight" }
+      27: EndParagraph
+      28: EndUnorderedListItem
+      29: StartParagraph { alignment: None, id: None }
+      30: Text { content: "E" }
+      31: Text { content: "ducation" }
+      32: EndParagraph
+      33: StartParagraph { alignment: None, id: None }
+      34: Text { content: "[Dates From - To]" }
+      35: EndParagraph
+      36: StartParagraph { alignment: None, id: None }
+      37: Text { content: "[School Name, Location]" }
+      38: EndParagraph
+      39: StartParagraph { alignment: None, id: None }
+      40: Text { content: "[Degree]" }
+      41: EndParagraph
+      42: StartUnorderedListItem { id: Some("4"), level: 0, style_type: Disc }
       43: StartParagraph { alignment: None, id: None }
-      44: Text { content: "Click here to enter text" }
+      44: Text { content: "Click here to enter text." }
       45: EndParagraph
-      46: StartParagraph { alignment: None, id: None }
-      47: Text { content: "References" }
-      48: EndParagraph
-      49: StartParagraph { alignment: None, id: None }
-      50: Text { content: "References are available upon request." }
-      51: EndParagraph
-      52: EndDocument
+      46: EndUnorderedListItem
+      47: StartUnorderedListItem { id: Some("4"), level: 0, style_type: Disc }
+      48: StartParagraph { alignment: None, id: None }
+      49: Text { content: "Click here to enter text" }
+      50: EndParagraph
+      51: EndUnorderedListItem
+      52: StartParagraph { alignment: None, id: None }
+      53: Text { content: "References" }
+      54: EndParagraph
+      55: StartParagraph { alignment: None, id: None }
+      56: Text { content: "References are available upon request." }
+      57: EndParagraph
+      58: EndDocument
   ],
   terminal: Ok,
 }

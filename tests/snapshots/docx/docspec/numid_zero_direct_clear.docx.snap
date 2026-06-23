@@ -1,0 +1,15 @@
+---
+source: crates/docspec-docx-reader/tests/snapshots.rs
+assertion_line: 56
+expression: from_reader_snapshot
+---
+ReaderFixtureSnapshot {
+  events: [
+       0: StartDocument { id: None, language: None, metadata: None }
+       1: StartParagraph { alignment: None, id: None }
+       2: Text { content: "Not a list item despite the style." }
+       3: EndParagraph
+       4: EndDocument
+  ],
+  terminal: Ok,
+}
