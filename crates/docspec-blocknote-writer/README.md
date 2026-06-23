@@ -29,7 +29,7 @@ Two color-bearing style kinds emit JSON keys in the inline `styles` object:
 - **`textColor`** — emitted when the reader sends `StartTextStyle { kind: TextColor(Color) }`. The RGB value is snapped to the nearest BlockNote palette color and written as a string, e.g. `"textColor":"red"`.
 - **`backgroundColor`** — emitted when the reader sends `StartTextStyle { kind: Mark(Color) }`. Same palette snap, written as e.g. `"backgroundColor":"blue"`.
 
-Pure black `(0, 0, 0)` is treated as BlockNote's default and produces no key for either style. Non-RGB colors are also omitted. Any other RGB color is snapped to one of the 9 named palette entries.
+Pure black `(0, 0, 0)` and pure white `(255, 255, 255)` are both treated as BlockNote's default and produce no key for either style. White is filtered because it is the standard page-default color and the OOXML idiom for "no visible shading" (`<w:shd w:val="clear" w:fill="FFFFFF"/>`); without this guard, every such no-op shading would snap to the pastel `"gray"` palette entry. Non-RGB colors are also omitted. Any other RGB color is snapped to one of the 9 named palette entries.
 
 #### Palette
 

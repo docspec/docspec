@@ -2,11 +2,18 @@
 //!
 //! Colors are snapped to the nearest named palette entry using squared Euclidean
 //! distance in 8-bit sRGB space. No perceptual weighting, no gamma correction.
-//! Pure black `(0, 0, 0)` returns `None` (`BlockNote` default — no key emitted).
+//! Pure black `(0, 0, 0)` and pure white `(255, 255, 255)` both return `None`
+//! (`BlockNote` default — no key emitted). White is the page-default color for
+//! a standard document and is OOXML's idiom for "no visible shading"
+//! (`<w:shd w:val="clear" w:fill="FFFFFF"/>`); without this guard, white would
+//! snap to the pastel `"gray"` palette entry (235, 236, 237) — the closest
+//! entry to white at squared distance 1085 — and paint a spurious gray
+//! background on every paragraph that carries this no-op shading.
 
 /// Snaps an RGB color to the nearest `BlockNote` text-color palette entry.
 ///
-/// Returns `None` for pure black `(0, 0, 0)` (`BlockNote` default).
+/// Returns `None` for pure black `(0, 0, 0)` and pure white `(255, 255, 255)`
+/// (both treated as `BlockNote` default).
 #[inline]
 #[must_use]
 pub fn nearest_text_color(color: &docspec_core::Color) -> Option<&'static str> {
@@ -15,7 +22,8 @@ pub fn nearest_text_color(color: &docspec_core::Color) -> Option<&'static str> {
 
 /// Snaps an RGB color to the nearest `BlockNote` background-color palette entry.
 ///
-/// Returns `None` for pure black `(0, 0, 0)` (`BlockNote` default).
+/// Returns `None` for pure black `(0, 0, 0)` and pure white `(255, 255, 255)`
+/// (both treated as `BlockNote` default).
 #[inline]
 #[must_use]
 pub fn nearest_background_color(color: &docspec_core::Color) -> Option<&'static str> {
@@ -29,7 +37,7 @@ fn nearest(
     let docspec_core::Color::Rgb { r, g, b } = color else {
         return None;
     };
-    if (r, g, b) == (0, 0, 0) {
+    if (r, g, b) == (0, 0, 0) || (r, g, b) == (255, 255, 255) {
         return None;
     }
     palette
@@ -137,6 +145,30 @@ mod tests {
     fn nearest_background_color_black_returns_none() {
         assert_eq!(
             nearest_background_color(&Color::Rgb { r: 0, g: 0, b: 0 }),
+            None
+        );
+    }
+
+    #[test]
+    fn nearest_text_color_white_returns_none() {
+        assert_eq!(
+            nearest_text_color(&Color::Rgb {
+                r: 255,
+                g: 255,
+                b: 255
+            }),
+            None
+        );
+    }
+
+    #[test]
+    fn nearest_background_color_white_returns_none() {
+        assert_eq!(
+            nearest_background_color(&Color::Rgb {
+                r: 255,
+                g: 255,
+                b: 255
+            }),
             None
         );
     }
