@@ -101,6 +101,7 @@ struct ResolvedRowProperties {
 
 struct ParagraphParseState {
     props: ResolvedParagraphProperties,
+    properties_seen: bool,
     paragraph_emitted: bool,
     block_kind: ParagraphBlockKind,
     block_start_emitted: bool,
@@ -116,6 +117,7 @@ impl Default for ParagraphParseState {
     fn default() -> Self {
         Self {
             props: ResolvedParagraphProperties::default(),
+            properties_seen: false,
             paragraph_emitted: false,
             block_kind: ParagraphBlockKind::Paragraph,
             block_start_emitted: false,
@@ -164,33 +166,10 @@ pub struct DocxData {
     pub image_map: ImageMap,
 }
 
-#[non_exhaustive]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum DeniedKind {
-    // 9 doc-level denied containers.
-    /// `<mc:Fallback>` subtree — deduplicates images that appear in both `<mc:Choice><w:drawing>` and `<mc:Fallback><w:pict>`.
-    McFallback,
-    Object,
-    Del,
-    MoveFrom,
-    TblPr,
-    TblGrid,
-    TblPrEx,
-    SdtPr,
-    SdtEndPr,
-    // 4 one-shot suppression markers.
-    PPr,
-    RPr,
-    TrPr,
-    TcPr,
-}
-
 /// Streaming parser for the DOCX main document XML part.
 pub struct DocumentReader {
     /// Reusable buffer for quick-xml event reading.
     buf: Vec<u8>,
-    /// Stack of denied subtrees and one-shot suppression markers.
-    denied_stack: Vec<DeniedKind>,
     /// True when a preformatted paragraph ended but the block close is deferred until the next boundary.
     pending_preformatted_close: bool,
     /// Style kinds currently opened for the active run.
@@ -203,8 +182,8 @@ pub struct DocumentReader {
     pending_error: Option<Error>,
     /// Package-level data (styles, future: theme, numbering).
     data: DocxData,
-    /// Hyperlink relationship map from the package. Consulted in `handle_start`
-    /// when processing `<w:hyperlink r:id="...">` to resolve the URL.
+    /// Hyperlink relationship map from the package. Consulted while parsing
+    /// `<w:hyperlink r:id="...">` to resolve the URL.
     hyperlink_map: HyperlinkMap,
     /// Open list nesting stack. Each entry represents one open list level.
     list_stack: Vec<ListStackEntry>,
@@ -225,7 +204,6 @@ impl fmt::Debug for DocumentReader {
         let mut debug = f.debug_struct("DocumentReader");
         debug
             .field("buf", &self.buf)
-            .field("denied_stack", &self.denied_stack)
             .field(
                 "pending_preformatted_close",
                 &self.pending_preformatted_close,
@@ -263,7 +241,6 @@ impl DocumentReader {
         } = data;
         Self {
             buf: Vec::with_capacity(4096),
-            denied_stack: Vec::new(),
             pending_preformatted_close: false,
             open_styles: Vec::new(),
             phase: Phase::NotStarted,
@@ -701,9 +678,10 @@ impl DocumentReader {
     ) -> Result<()> {
         let local_name = start.local_name();
         match local_name.as_ref() {
-            b"rPr" if !*content_emitted => {
+            b"rPr" if !*content_emitted && props.is_none() => {
                 *props = Some(self.parse_rpr(start)?);
             }
+            b"rPr" => self.consume_current_start(start)?,
             b"t" => {
                 let text = self.collect_text_content()?;
                 let text = Self::normalize_symbol_text(props.as_ref(), text);
@@ -744,7 +722,7 @@ impl DocumentReader {
                     .read_to_end_into(end.name(), &mut self.buf)
                     .map_err(map_quick_xml_error)?;
             }
-            _ if is_denied_container(local_name.as_ref()).is_some() => {
+            _ if is_denied_container(local_name.as_ref()) => {
                 let end = start.to_end().into_owned();
                 self.xml
                     .read_to_end_into(end.name(), &mut self.buf)
@@ -763,7 +741,7 @@ impl DocumentReader {
     ) {
         let local_name = empty.local_name();
         match local_name.as_ref() {
-            b"rPr" if !*content_emitted => {
+            b"rPr" if !*content_emitted && props.is_none() => {
                 *props = Some(ResolvedRunProperties {
                     kinds: Vec::new(),
                     text_color: None,
@@ -1088,7 +1066,7 @@ impl DocumentReader {
         self.queue.push_back(end_event);
     }
 
-    fn emit_empty_paragraph(&mut self) {
+    fn parse_empty_p(&mut self) {
         let props = ResolvedParagraphProperties::default();
         let (block_kind, block_start_emitted) = self.resolve_paragraph_block_kind(&props);
         if !block_start_emitted {
@@ -1263,10 +1241,12 @@ impl DocumentReader {
         state: &mut ParagraphParseState,
     ) -> Result<bool> {
         match start.local_name().as_ref() {
-            b"pPr" if !state.paragraph_emitted => {
+            b"pPr" if !state.paragraph_emitted && !state.properties_seen => {
                 state.props = self.parse_ppr(start)?;
+                state.properties_seen = true;
                 self.resolve_local_ppr(state);
             }
+            b"pPr" => self.consume_current_start(start)?,
             b"tab" => {
                 self.emit_local_tab(state);
                 self.consume_current_start(start)?;
@@ -1306,7 +1286,7 @@ impl DocumentReader {
                 self.ensure_local_paragraph_started(state);
                 self.parse_pict_subtree()?;
             }
-            local if is_denied_container(local).is_some() => self.consume_current_start(start)?,
+            local if is_denied_container(local) => self.consume_current_start(start)?,
             _ => {}
         }
         Ok(false)
@@ -1318,8 +1298,9 @@ impl DocumentReader {
         state: &mut ParagraphParseState,
     ) -> Result<()> {
         match empty.local_name().as_ref() {
-            b"pPr" if !state.paragraph_emitted => {
+            b"pPr" if !state.paragraph_emitted && !state.properties_seen => {
                 state.props = ResolvedParagraphProperties::default();
+                state.properties_seen = true;
                 self.resolve_local_ppr(state);
             }
             b"tab" => self.emit_local_tab(state),
@@ -1515,8 +1496,14 @@ impl DocumentReader {
 
             match event {
                 quick_xml::events::Event::Start(start) => match start.local_name().as_ref() {
-                    b"tcPr" if !cell_started => {
+                    b"tcPr" if !cell_started && cell_props.is_none() => {
                         cell_props = Some(self.parse_tcpr(&start)?);
+                    }
+                    b"tcPr" => {
+                        let end = start.to_end().into_owned();
+                        self.xml
+                            .read_to_end_into(end.name(), &mut self.buf)
+                            .map_err(map_quick_xml_error)?;
                     }
                     b"p" => {
                         if !cell_started {
@@ -1534,9 +1521,8 @@ impl DocumentReader {
                         }
                         self.parse_tbl(&start, false)?;
                     }
-                    _ if is_denied_container(start.local_name().as_ref()).is_some()
-                        || denied_kind_for(start.local_name().as_ref())
-                            == Some(DeniedKind::TcPr) =>
+                    _ if is_denied_container(start.local_name().as_ref())
+                        || start.local_name().as_ref() == b"tcPr" =>
                     {
                         let end = start.to_end().into_owned();
                         self.xml
@@ -1545,8 +1531,11 @@ impl DocumentReader {
                     }
                     _ => {}
                 },
-                quick_xml::events::Event::Empty(empty) => {
-                    if empty.local_name().as_ref() == b"p" {
+                quick_xml::events::Event::Empty(empty) => match empty.local_name().as_ref() {
+                    b"tcPr" if !cell_started && cell_props.is_none() => {
+                        cell_props = Some(ResolvedCellProperties::default());
+                    }
+                    b"p" => {
                         if !cell_started {
                             let colspan = cell_props.as_ref().and_then(|props| props.colspan);
                             self.emit_table_cell_start(is_header, colspan);
@@ -1558,7 +1547,8 @@ impl DocumentReader {
                         });
                         self.queue.push_back(Event::EndParagraph);
                     }
-                }
+                    _ => {}
+                },
                 quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"tc" => {
                     self.flush_list_stack();
                     self.flush_pending_preformatted_close();
@@ -1602,11 +1592,17 @@ impl DocumentReader {
 
             match event {
                 quick_xml::events::Event::Start(start) => match start.local_name().as_ref() {
-                    b"trPr" if !row_started => {
+                    b"trPr" if !row_started && row_props.is_none() => {
                         row_props = Some(self.parse_trpr(&start)?);
                         if row_props.as_ref().is_some_and(|props| !props.is_header) {
                             *header_band_active = false;
                         }
+                    }
+                    b"trPr" => {
+                        let end = start.to_end().into_owned();
+                        self.xml
+                            .read_to_end_into(end.name(), &mut self.buf)
+                            .map_err(map_quick_xml_error)?;
                     }
                     b"tc" => {
                         let row_is_header = row_props.as_ref().is_some_and(|props| props.is_header);
@@ -1619,9 +1615,8 @@ impl DocumentReader {
                         }
                         self.parse_tc(&start, row_is_header && *header_band_active)?;
                     }
-                    _ if is_denied_container(start.local_name().as_ref()).is_some()
-                        || denied_kind_for(start.local_name().as_ref())
-                            == Some(DeniedKind::TrPr) =>
+                    _ if is_denied_container(start.local_name().as_ref())
+                        || start.local_name().as_ref() == b"trPr" =>
                     {
                         let end = start.to_end().into_owned();
                         self.xml
@@ -1630,8 +1625,12 @@ impl DocumentReader {
                     }
                     _ => {}
                 },
-                quick_xml::events::Event::Empty(empty) => {
-                    if empty.local_name().as_ref() == b"tc" {
+                quick_xml::events::Event::Empty(empty) => match empty.local_name().as_ref() {
+                    b"trPr" if !row_started && row_props.is_none() => {
+                        row_props = Some(ResolvedRowProperties::default());
+                        *header_band_active = false;
+                    }
+                    b"tc" => {
                         let row_is_header = row_props.as_ref().is_some_and(|props| props.is_header);
                         if !row_started {
                             if !row_is_header {
@@ -1642,7 +1641,8 @@ impl DocumentReader {
                         }
                         self.emit_empty_table_cell(row_is_header && *header_band_active, None);
                     }
-                }
+                    _ => {}
+                },
                 quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"tr" => {
                     self.flush_pending_preformatted_close();
                     if row_started {
@@ -1685,7 +1685,7 @@ impl DocumentReader {
                     if start.local_name().as_ref() == b"tr" {
                         self.parse_tr(&start, &mut header_band_active)?;
                     }
-                    if is_denied_container(start.local_name().as_ref()).is_some() {
+                    if is_denied_container(start.local_name().as_ref()) {
                         let end = start.to_end().into_owned();
                         self.xml
                             .read_to_end_into(end.name(), &mut self.buf)
@@ -1722,51 +1722,6 @@ impl DocumentReader {
         }
     }
 
-    fn handle_empty(&mut self, tag: &BytesStart<'_>) {
-        let local_name = tag.local_name();
-        let local = local_name.as_ref();
-        if !self.denied_stack.is_empty() || is_denied_container(local).is_some() {
-            return;
-        }
-        match local {
-            value if !self.denied_stack.is_empty() || is_denied_container(value).is_some() => {}
-            b"tbl" => {
-                self.flush_list_stack();
-                self.flush_pending_preformatted_close();
-                self.queue.push_back(Event::StartTable { id: None });
-                self.queue.push_back(Event::EndTable);
-            }
-            b"p" => self.emit_empty_paragraph(),
-            b"hyperlink" => Self::handle_empty_hyperlink(),
-            _ => {}
-        }
-    }
-
-    fn handle_empty_hyperlink() {}
-
-    fn handle_end(&mut self, local: &[u8]) {
-        if let Some(&top) = self.denied_stack.last() {
-            if denied_kind_for(local) == Some(top) {
-                self.denied_stack.pop();
-            }
-            return;
-        }
-
-        match local {
-            b"r" => {
-                while self.open_styles.pop().is_some() {
-                    self.queue.push_back(Event::EndTextStyle);
-                }
-            }
-            b"tbl" => {
-                self.flush_list_stack();
-                self.flush_pending_preformatted_close();
-                self.queue.push_back(Event::EndTable);
-            }
-            _ => {}
-        }
-    }
-
     fn handle_eof(&mut self) {
         self.flush_list_stack();
         self.flush_pending_preformatted_close();
@@ -1777,12 +1732,6 @@ impl DocumentReader {
     fn handle_start(&mut self, tag: &BytesStart<'_>) -> Result<()> {
         let local_name = tag.local_name();
         let local = local_name.as_ref();
-        if !self.denied_stack.is_empty() {
-            if let Some(kind) = is_denied_container(local) {
-                self.denied_stack.push(kind);
-            }
-            return Ok(());
-        }
         if local == b"drawing" {
             self.parse_drawing_subtree()?;
             return Ok(());
@@ -1795,16 +1744,26 @@ impl DocumentReader {
             self.parse_tbl(tag, true)?;
             return Ok(());
         }
-        let denied_container = is_denied_container(local);
-        match (local, denied_container) {
-            (_, Some(kind)) => self.denied_stack.push(kind),
-            (b"p", _) => {
+        match local {
+            _ if is_denied_container(local) => {
+                let end = tag.to_end().into_owned();
+                self.xml
+                    .read_to_end_into(end.name(), &mut self.buf)
+                    .map_err(map_quick_xml_error)?;
+            }
+            b"p" => {
                 self.parse_p(tag)?;
                 return Ok(());
             }
             _ => {}
         }
         Ok(())
+    }
+
+    fn handle_empty_body_tag(&mut self, tag: &BytesStart<'_>) {
+        if tag.local_name().as_ref() == b"p" {
+            self.parse_empty_p();
+        }
     }
 
     fn parse_drawing_subtree(&mut self) -> Result<()> {
@@ -2083,9 +2042,9 @@ impl DocumentReader {
 
         match event {
             quick_xml::events::Event::Start(tag) => self.handle_start(&tag)?,
-            quick_xml::events::Event::End(tag) => self.handle_end(tag.local_name().as_ref()),
-            quick_xml::events::Event::Empty(tag) => self.handle_empty(&tag),
-            quick_xml::events::Event::Text(_)
+            quick_xml::events::Event::Empty(tag) => self.handle_empty_body_tag(&tag),
+            quick_xml::events::Event::End(_)
+            | quick_xml::events::Event::Text(_)
             | quick_xml::events::Event::GeneralRef(_)
             | quick_xml::events::Event::CData(_)
             | quick_xml::events::Event::Comment(_)
@@ -2133,43 +2092,21 @@ impl DocumentReader {
     }
 }
 
-/// Returns Some only for elements whose entire subtree should be silently dropped
-/// when they appear at the document level. Does NOT include one-shot suppression
-/// markers (PPr/RPr/TrPr/TcPr).
-fn is_denied_container(local: &[u8]) -> Option<DeniedKind> {
-    match local {
-        b"Fallback" => Some(DeniedKind::McFallback),
-        b"object" => Some(DeniedKind::Object),
-        b"del" => Some(DeniedKind::Del),
-        b"moveFrom" => Some(DeniedKind::MoveFrom),
-        b"tblPr" => Some(DeniedKind::TblPr),
-        b"tblGrid" => Some(DeniedKind::TblGrid),
-        b"tblPrEx" => Some(DeniedKind::TblPrEx),
-        b"sdtPr" => Some(DeniedKind::SdtPr),
-        b"sdtEndPr" => Some(DeniedKind::SdtEndPr),
-        _ => None,
-    }
-}
-
-/// Returns Some for any element that can ever be on the denied stack.
-/// Superset of `is_denied_container`: adds PPr/RPr/TrPr/TcPr.
-fn denied_kind_for(local: &[u8]) -> Option<DeniedKind> {
-    match local {
-        b"Fallback" => Some(DeniedKind::McFallback),
-        b"object" => Some(DeniedKind::Object),
-        b"del" => Some(DeniedKind::Del),
-        b"moveFrom" => Some(DeniedKind::MoveFrom),
-        b"tblPr" => Some(DeniedKind::TblPr),
-        b"tblGrid" => Some(DeniedKind::TblGrid),
-        b"tblPrEx" => Some(DeniedKind::TblPrEx),
-        b"sdtPr" => Some(DeniedKind::SdtPr),
-        b"sdtEndPr" => Some(DeniedKind::SdtEndPr),
-        b"pPr" => Some(DeniedKind::PPr),
-        b"rPr" => Some(DeniedKind::RPr),
-        b"trPr" => Some(DeniedKind::TrPr),
-        b"tcPr" => Some(DeniedKind::TcPr),
-        _ => None,
-    }
+/// Returns true for elements whose entire subtree should be silently dropped
+/// when they appear at the document level.
+fn is_denied_container(local: &[u8]) -> bool {
+    matches!(
+        local,
+        b"Fallback"
+            | b"object"
+            | b"del"
+            | b"moveFrom"
+            | b"tblPr"
+            | b"tblGrid"
+            | b"tblPrEx"
+            | b"sdtPr"
+            | b"sdtEndPr"
+    )
 }
 
 fn read_val_attribute(tag: &BytesStart<'_>) -> Option<String> {
@@ -2536,6 +2473,30 @@ mod tests {
     }
 
     #[test]
+    fn parse_p_second_ppr_is_ignored() {
+        let doc = document_with_body(
+            r#"<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>text</w:t></w:r></w:p>"#,
+        );
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                Event::StartParagraph {
+                    alignment: Some(TextAlignment::Center),
+                    id: None,
+                },
+                Event::Text {
+                    content: "text".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
     fn parse_p_heading_via_pstyle() {
         let styles = r#"<w:style w:type="paragraph" w:styleId="Heading1">
     <w:name w:val="heading 1"/>
@@ -2840,9 +2801,56 @@ mod tests {
     }
 
     #[test]
+    fn parse_tc_second_tcpr_is_ignored() {
+        let mut reader = make_reader(
+            r#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:tcPr><w:gridSpan w:val="1"/></w:tcPr><w:p/></w:tc>"#,
+        );
+        let start = read_first_start(&mut reader);
+        reader.parse_tc(&start, false).expect("tc parses");
+
+        assert_eq!(
+            drain_queue(&mut reader),
+            vec![
+                start_cell(Some(2)),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndTableCell,
+            ]
+        );
+    }
+
+    #[test]
     fn parse_tr_header_row() {
         let mut reader = make_reader(
             r#"<w:tr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h</w:t></w:r></w:p></w:tc></w:tr>"#,
+        );
+        let start = read_first_start(&mut reader);
+        let mut header_band_active = true;
+        reader
+            .parse_tr(&start, &mut header_band_active)
+            .expect("tr parses");
+
+        assert!(header_band_active);
+        assert_eq!(
+            drain_queue(&mut reader),
+            vec![
+                Event::StartTableRow { id: None },
+                start_header(None),
+                start_para(),
+                Event::Text {
+                    content: "h".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_tr_second_trpr_is_ignored() {
+        let mut reader = make_reader(
+            r#"<w:tr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trPr><w:tblHeader/></w:trPr><w:trPr></w:trPr><w:tc><w:p><w:r><w:t>h</w:t></w:r></w:p></w:tc></w:tr>"#,
         );
         let start = read_first_start(&mut reader);
         let mut header_band_active = true;
@@ -3058,6 +3066,54 @@ mod tests {
     }
 
     #[test]
+    fn deleted_run_subtree_is_skipped() {
+        let doc = document_with_body(
+            "<w:p><w:r><w:t>A</w:t></w:r><w:del><w:r><w:t>DELETED</w:t></w:r></w:del><w:r><w:t>B</w:t></w:r></w:p>",
+        );
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::Text {
+                    content: "A".to_string(),
+                },
+                Event::Text {
+                    content: "B".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn pict_subtree_without_image_data_is_skipped() {
+        let doc = document_with_body(
+            "<w:p><w:r><w:t>A</w:t><w:pict><v:shape><w:r><w:t>HIDDEN</w:t></w:r></v:shape></w:pict><w:t>B</w:t></w:r></w:p>",
+        );
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::Text {
+                    content: "A".to_string(),
+                },
+                Event::Text {
+                    content: "B".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
     fn parse_r_styled_text() {
         let doc = document_with_body("<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>bold</w:t></w:r></w:p>");
         let mut reader = make_reader(&doc);
@@ -3073,6 +3129,32 @@ mod tests {
                 },
                 Event::Text {
                     content: "bold".to_string(),
+                },
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_r_second_rpr_is_ignored() {
+        let doc = document_with_body(
+            "<w:p><w:r><w:rPr><w:b/></w:rPr><w:rPr><w:i/></w:rPr><w:t>styled</w:t></w:r></w:p>",
+        );
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                Event::Text {
+                    content: "styled".to_string(),
                 },
                 Event::EndTextStyle,
                 Event::EndParagraph,
