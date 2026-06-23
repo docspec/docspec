@@ -2412,6 +2412,100 @@ mod tests {
     }
 
     #[test]
+    fn table_cell_with_colspan_emits_props_with_colspan() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            Event::StartTableCell {
+                colspan: Some(3),
+                id: None,
+                rowspan: None,
+            },
+            text("merged"),
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"colspan":3},"content":[{"type":"text","text":"merged","styles":{}}]}]}]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn table_cell_with_rowspan_emits_props_with_rowspan() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            Event::StartTableCell {
+                colspan: None,
+                id: None,
+                rowspan: Some(2),
+            },
+            text("merged"),
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"rowspan":2},"content":[{"type":"text","text":"merged","styles":{}}]}]}]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn table_cell_with_colspan_and_rowspan_emits_both_props() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            Event::StartTableCell {
+                colspan: Some(3),
+                id: None,
+                rowspan: Some(2),
+            },
+            text("merged"),
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"colspan":3,"rowspan":2},"content":[{"type":"text","text":"merged","styles":{}}]}]}]},"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn table_header_cell_with_colspan_emits_props_with_colspan() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            Event::StartTableHeader {
+                abbr: None,
+                colspan: Some(2),
+                id: None,
+                rowspan: None,
+                scope: None,
+            },
+            text("H"),
+            Event::EndTableHeader,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"colspan":2},"content":[{"type":"text","text":"H","styles":{}}]}]}]},"children":[]}]"#
+        );
+    }
+
+    #[test]
     fn table_preceded_by_paragraph_closes_paragraph() {
         let json = run_events(&[
             start_document(),
