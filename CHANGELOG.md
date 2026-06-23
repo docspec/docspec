@@ -12,6 +12,16 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.19.0](https://github.com/docspec/docspec/compare/v1.18.0...v1.19.0) - 2026-06-23
+
+### Added
+
+- *(blocknote-writer)* propagate colspan and rowspan to tableCell props
+
+### Other
+
+- update Cargo.lock dependencies
+
 ## [1.18.0](https://github.com/docspec/docspec/compare/v1.17.0...v1.18.0) - 2026-06-23
 
 ### Added
