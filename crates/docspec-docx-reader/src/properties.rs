@@ -152,12 +152,40 @@ pub fn parse_highlight_val(val: Option<&str>) -> Option<Color> {
         })
 }
 
-/// Parses the `w:fill` attribute of a `<w:shd>` element.
+/// Parses a `<w:shd>` element into its single visible shading color, honoring
+/// the `w:val` pattern attribute per ECMA-376 §17.3.5 and §17.18.78.
 ///
-/// Returns `None` for absent attribute, `"auto"`, or non-hex values.
-/// The `w:val` pattern attribute is intentionally ignored.
-pub fn parse_shd_fill(fill: Option<&str>) -> Option<Color> {
-    parse_hex_color(fill?)
+/// `<w:shd>` carries three components: a pattern (`w:val`), a pattern color
+/// (`w:color`), and a fill color (`w:fill`). The pattern is a mask laid over
+/// the fill; the visible color depends on which pattern is selected:
+///
+/// - **`nil` / `clear` ("No Pattern")** — the mask is fully transparent, so the
+///   visible color is purely `w:fill`. `w:color` has no effect (spec §17.3.5,
+///   color attribute: "If the shading style ... specifies the use of no shading
+///   format or is omitted, then this property has no effect.").
+/// - **`solid` (100% Fill Pattern)** — the pattern fully covers the area, so the
+///   visible color is `w:color` (falling back to `w:fill` if absent).
+/// - **All other patterns (`pct10`…`pct95`, `*Stripe`, `*Cross`, etc.)** — the
+///   rendered color is a per-pixel blend of `w:color` (overlay via the mask)
+///   and `w:fill` (background). We approximate with `w:fill`, which is the
+///   dominant area for sub-100% patterns.
+///
+/// `w:val` is `use="required"` per the XSD (`CT_Shd`, page 3827). A missing
+/// val is malformed; the parser defensively treats it as `clear`.
+///
+/// Returns `None` whenever the chosen color attribute is absent, `"auto"`
+/// (consumer default → transparent per spec §17.3.5), or non-hex.
+pub fn parse_shd(val: Option<&str>, color: Option<&str>, fill: Option<&str>) -> Option<Color> {
+    match val.unwrap_or("clear") {
+        // Solid fill — pattern color covers the area; fall back to fill.
+        "solid" => color
+            .and_then(parse_hex_color)
+            .or_else(|| fill.and_then(parse_hex_color)),
+        // `nil`/`clear` (No Pattern) emit the fill alone; partial / striped /
+        // cross patterns (`pct10`…`pct95`, `*Stripe`, `*Cross`, etc.) approximate
+        // the rendered color with the fill (the dominant area for sub-100% masks).
+        _ => parse_hex_color(fill?),
+    }
 }
 
 /// Parse a `w:char` attribute value (hex string, typically 4 digits, u16 range)
@@ -630,23 +658,13 @@ mod tests {
     }
 
     // ============================================================================
-    // parse_shd_fill tests (5 cases)
+    // parse_shd tests
     // ============================================================================
 
     #[test]
-    fn parse_shd_fill_none_input_returns_none() {
-        assert_eq!(parse_shd_fill(None), None);
-    }
-
-    #[test]
-    fn parse_shd_fill_auto_returns_none() {
-        assert_eq!(parse_shd_fill(Some("auto")), None);
-    }
-
-    #[test]
-    fn parse_shd_fill_valid_hex_returns_color() {
+    fn parse_shd_clear_with_fill_returns_fill() {
         assert_eq!(
-            parse_shd_fill(Some("FFFF00")),
+            parse_shd(Some("clear"), None, Some("FFFF00")),
             Some(Color::Rgb {
                 r: 255,
                 g: 255,
@@ -656,15 +674,155 @@ mod tests {
     }
 
     #[test]
-    fn parse_shd_fill_invalid_hex_returns_none() {
-        assert_eq!(parse_shd_fill(Some("xyz")), None);
+    fn parse_shd_clear_with_auto_fill_returns_none() {
+        assert_eq!(parse_shd(Some("clear"), None, Some("auto")), None);
     }
 
     #[test]
-    fn parse_shd_fill_black_returns_some() {
+    fn parse_shd_clear_with_no_fill_returns_none() {
+        assert_eq!(parse_shd(Some("clear"), None, None), None);
+    }
+
+    #[test]
+    fn parse_shd_clear_ignores_color_attribute() {
         assert_eq!(
-            parse_shd_fill(Some("000000")),
+            parse_shd(Some("clear"), Some("FF0000"), Some("00FF00")),
+            Some(Color::Rgb { r: 0, g: 255, b: 0 })
+        );
+    }
+
+    #[test]
+    fn parse_shd_nil_treated_same_as_clear_with_fill() {
+        assert_eq!(
+            parse_shd(Some("nil"), None, Some("FFFF00")),
+            Some(Color::Rgb {
+                r: 255,
+                g: 255,
+                b: 0
+            })
+        );
+    }
+
+    #[test]
+    fn parse_shd_nil_with_no_fill_returns_none() {
+        assert_eq!(parse_shd(Some("nil"), None, None), None);
+    }
+
+    #[test]
+    fn parse_shd_nil_ignores_color_attribute() {
+        assert_eq!(parse_shd(Some("nil"), Some("FF0000"), None), None);
+    }
+
+    #[test]
+    fn parse_shd_solid_uses_color_over_fill() {
+        assert_eq!(
+            parse_shd(Some("solid"), Some("FF0000"), Some("0000FF")),
+            Some(Color::Rgb { r: 255, g: 0, b: 0 })
+        );
+    }
+
+    #[test]
+    fn parse_shd_solid_falls_back_to_fill_when_color_absent() {
+        assert_eq!(
+            parse_shd(Some("solid"), None, Some("0000FF")),
+            Some(Color::Rgb { r: 0, g: 0, b: 255 })
+        );
+    }
+
+    #[test]
+    fn parse_shd_solid_falls_back_to_fill_when_color_is_auto() {
+        assert_eq!(
+            parse_shd(Some("solid"), Some("auto"), Some("0000FF")),
+            Some(Color::Rgb { r: 0, g: 0, b: 255 })
+        );
+    }
+
+    #[test]
+    fn parse_shd_solid_returns_none_when_both_color_and_fill_absent() {
+        assert_eq!(parse_shd(Some("solid"), None, None), None);
+    }
+
+    #[test]
+    fn parse_shd_solid_returns_none_when_both_color_and_fill_are_auto() {
+        assert_eq!(parse_shd(Some("solid"), Some("auto"), Some("auto")), None);
+    }
+
+    #[test]
+    fn parse_shd_pct10_uses_fill_for_partial_pattern() {
+        assert_eq!(
+            parse_shd(Some("pct10"), Some("FF0000"), Some("0000FF")),
+            Some(Color::Rgb { r: 0, g: 0, b: 255 })
+        );
+    }
+
+    #[test]
+    fn parse_shd_pct50_with_auto_fill_returns_none() {
+        assert_eq!(parse_shd(Some("pct50"), Some("FF0000"), Some("auto")), None);
+    }
+
+    #[test]
+    fn parse_shd_horz_stripe_uses_fill() {
+        assert_eq!(
+            parse_shd(Some("horzStripe"), None, Some("FF0000")),
+            Some(Color::Rgb { r: 255, g: 0, b: 0 })
+        );
+    }
+
+    #[test]
+    fn parse_shd_unknown_pattern_uses_fill() {
+        assert_eq!(
+            parse_shd(Some("madeUpPattern"), None, Some("00FF00")),
+            Some(Color::Rgb { r: 0, g: 255, b: 0 })
+        );
+    }
+
+    #[test]
+    fn parse_shd_missing_val_defensively_treated_as_clear() {
+        assert_eq!(
+            parse_shd(None, None, Some("FFFF00")),
+            Some(Color::Rgb {
+                r: 255,
+                g: 255,
+                b: 0
+            })
+        );
+    }
+
+    #[test]
+    fn parse_shd_missing_val_with_no_fill_returns_none() {
+        assert_eq!(parse_shd(None, None, None), None);
+    }
+
+    #[test]
+    fn parse_shd_invalid_hex_fill_returns_none() {
+        assert_eq!(parse_shd(Some("clear"), None, Some("xyz")), None);
+    }
+
+    #[test]
+    fn parse_shd_invalid_hex_color_on_solid_falls_back_to_fill() {
+        assert_eq!(
+            parse_shd(Some("solid"), Some("xyz"), Some("00FF00")),
+            Some(Color::Rgb { r: 0, g: 255, b: 0 })
+        );
+    }
+
+    #[test]
+    fn parse_shd_explicit_black_fill_is_preserved() {
+        assert_eq!(
+            parse_shd(Some("clear"), None, Some("000000")),
             Some(Color::Rgb { r: 0, g: 0, b: 0 })
+        );
+    }
+
+    #[test]
+    fn parse_shd_explicit_white_fill_is_preserved() {
+        assert_eq!(
+            parse_shd(Some("clear"), None, Some("FFFFFF")),
+            Some(Color::Rgb {
+                r: 255,
+                g: 255,
+                b: 255
+            })
         );
     }
 

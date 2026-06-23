@@ -758,8 +758,11 @@ impl DocumentReader {
                 self.pending_run_mark = properties::parse_highlight_val(val.as_deref());
             }
             b"shd" => {
+                let val = read_attribute(tag, b"w:val");
+                let color = read_attribute(tag, b"w:color");
                 let fill = read_attribute(tag, b"w:fill");
-                self.pending_run_shade = properties::parse_shd_fill(fill.as_deref());
+                self.pending_run_shade =
+                    properties::parse_shd(val.as_deref(), color.as_deref(), fill.as_deref());
             }
             b"rFonts" => {
                 self.pending_run_font = read_rfonts_symbol(tag);
