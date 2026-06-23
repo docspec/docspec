@@ -2725,10 +2725,7 @@ mod tests {
     }
 
     #[test]
-    fn image_inside_table_cell_is_dropped() {
-        // Drives an Image event between StartTableCell / EndTableCell. BlockNote
-        // cell content is InlineContent[] — block-level events (including images)
-        // are silently dropped per the documented cell-content semantics.
+    fn image_inside_table_cell_is_lifted_after_table() {
         let json = run_events(&[
             start_document(),
             start_table(),
@@ -2738,7 +2735,7 @@ mod tests {
                 source: ImageSource::Uri {
                     uri: "https://example.com/img.png".to_string(),
                 },
-                alt: Some("dropped".to_string()),
+                alt: Some("in cell".to_string()),
                 title: None,
                 decorative: false,
                 id: None,
@@ -2750,7 +2747,346 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/img.png","caption":"in cell"},"content":null,"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn multiple_images_in_same_cell_lift_in_document_order() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/a.png".to_string(),
+                },
+                alt: Some("A".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/b.png".to_string(),
+                },
+                alt: Some("B".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/a.png","caption":"A"},"content":null,"children":[]},{"type":"image","props":{"url":"https://example.com/b.png","caption":"B"},"content":null,"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn images_in_different_cells_lift_in_document_order() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/cell1.png".to_string(),
+                },
+                alt: Some("cell1".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndTableCell,
+            start_table_cell(),
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/cell2.png".to_string(),
+                },
+                alt: Some("cell2".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]},{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/cell1.png","caption":"cell1"},"content":null,"children":[]},{"type":"image","props":{"url":"https://example.com/cell2.png","caption":"cell2"},"content":null,"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn text_around_image_in_cell_stays_in_cell_while_image_lifts() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("before"),
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/img.png".to_string(),
+                },
+                alt: Some("middle".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            text("after"),
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"before","styles":{}},{"type":"text","text":"after","styles":{}}]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/img.png","caption":"middle"},"content":null,"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn asset_image_in_cell_lifts_as_data_uri_block() {
+        let handle = Arc::new(MockAssetHandle::new(
+            "png1",
+            "image/png",
+            &[0x89, 0x50, 0x4E, 0x47],
+        ));
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::Image {
+                source: ImageSource::Asset(handle),
+                alt: Some("png".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"data:image/png;base64,iVBORw==","caption":"png"},"content":null,"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn image_id_in_cell_survives_lift() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/img.png".to_string(),
+                },
+                alt: None,
+                title: None,
+                decorative: false,
+                id: Some("img-99".to_string()),
+            },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"id":"img-99","type":"image","props":{"url":"https://example.com/img.png","caption":""},"content":null,"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn image_inside_nested_table_cell_lifts_after_nested_table() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/nested.png".to_string(),
+                },
+                alt: Some("nested".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/nested.png","caption":"nested"},"content":null,"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn outer_cell_image_and_nested_cell_image_lift_in_document_order() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/outer.png".to_string(),
+                },
+                alt: Some("outer".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/nested.png".to_string(),
+                },
+                alt: Some("nested".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/outer.png","caption":"outer"},"content":null,"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/nested.png","caption":"nested"},"content":null,"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn image_inside_header_cell_lifts_after_table() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            Event::StartTableHeader {
+                id: None,
+                scope: None,
+                abbr: None,
+                colspan: None,
+                rowspan: None,
+            },
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/header.png".to_string(),
+                },
+                alt: Some("header".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndTableHeader,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/header.png","caption":"header"},"content":null,"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn two_separate_tables_each_lift_their_own_in_cell_image() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/t1.png".to_string(),
+                },
+                alt: Some("t1".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/t2.png".to_string(),
+                },
+                alt: Some("t2".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/t1.png","caption":"t1"},"content":null,"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/t2.png","caption":"t2"},"content":null,"children":[]}]"#
+        );
+    }
+
+    #[test]
+    fn image_inside_paragraph_inside_cell_lifts_after_table() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            start_paragraph(),
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/wrapped.png".to_string(),
+                },
+                alt: Some("wrapped".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndParagraph,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/wrapped.png","caption":"wrapped"},"content":null,"children":[]}]"#
         );
     }
 
