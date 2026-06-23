@@ -1763,7 +1763,7 @@ mod events {
 
         assert_eq!(
             format!("{reader:?}"),
-            "DocxReader { inner: DocumentReader { buf: [], denied_stack: [], in_paragraph: false, in_ppr: false, pending_paragraph_alignment: None, pending_paragraph_classification: None, current_paragraph_block: Paragraph, pending_preformatted_close: false, paragraph_started_emitted: false, open_styles: [], phase: \"<phase>\", queue: [], data: \"<DocxData>\", hyperlink_map: {}, hyperlink_depth: 0, pending_link: None, list_stack: [], seen_lists: {}, pending_paragraph_list: None, in_numpr: false, pending_num_pr_id: None, pending_num_pr_ilvl: None, xml: \"<quick_xml::Reader>\", archive: \"<Arc<Mutex<ZipArchive>>>\", content_types: \"<Arc<ContentTypes>>\" } }"
+            "DocxReader { inner: DocumentReader { buf: [], denied_stack: [], pending_preformatted_close: false, open_styles: [], phase: \"<phase>\", queue: [], data: \"<DocxData>\", hyperlink_map: {}, hyperlink_depth: 0, pending_link: None, list_stack: [], seen_lists: {}, xml: \"<quick_xml::Reader>\", archive: \"<Arc<Mutex<ZipArchive>>>\", content_types: \"<Arc<ContentTypes>>\" } }"
         );
     }
 
