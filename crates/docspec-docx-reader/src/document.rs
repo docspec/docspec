@@ -89,6 +89,16 @@ struct ResolvedParagraphProperties {
     list_info: Option<(u32, u32)>,
 }
 
+#[derive(Debug, Default, PartialEq, Eq)]
+struct ResolvedCellProperties {
+    colspan: Option<u32>,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+struct ResolvedRowProperties {
+    is_header: bool,
+}
+
 struct ParagraphParseState {
     props: ResolvedParagraphProperties,
     paragraph_emitted: bool,
@@ -176,10 +186,6 @@ enum DeniedKind {
 }
 
 /// Streaming parser for the DOCX main document XML part.
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "DocumentReader tracks independent boolean parser states; grouping them would obscure the streaming state machine"
-)]
 pub struct DocumentReader {
     /// Reusable buffer for quick-xml event reading.
     buf: Vec<u8>,
@@ -200,29 +206,6 @@ pub struct DocumentReader {
     /// Hyperlink relationship map from the package. Consulted in `handle_start`
     /// when processing `<w:hyperlink r:id="...">` to resolve the URL.
     hyperlink_map: HyperlinkMap,
-    /// Whether currently inside a `<w:tcPr>` element that is still legal (first child of cell).
-    in_tcpr: bool,
-    /// Whether currently inside a `<w:trPr>` element that is still legal (first child of row).
-    in_trpr: bool,
-    /// Colspan captured from `<w:gridSpan>` while inside `<w:tcPr>`.
-    pending_colspan: Option<u32>,
-    /// True once `StartTableCell` or `StartTableHeader` has been queued for the current cell.
-    cell_started_emitted: bool,
-    /// Whether currently inside a `<w:tc>` element.
-    in_table_cell: bool,
-    /// True when the most recent cell was emitted as `StartTableHeader` (so `</w:tc>` emits `EndTableHeader`).
-    current_cell_is_header: bool,
-    /// True when `<w:tblHeader/>` (truthy `CT_OnOff`) has been seen in the current `<w:trPr>`.
-    pending_row_is_header: bool,
-    /// True once `StartTableRow` has been queued for the current row.
-    row_started_emitted: bool,
-    /// Stack of outer row state saved while parsing rows inside nested tables.
-    /// Tuple order: `pending_row_is_header`, `row_started_emitted`, `in_trpr`.
-    nested_row_state_stack: Vec<(bool, bool, bool)>,
-    /// Count of currently-open `<w:tbl>` elements (for nested-table depth tracking).
-    table_depth: u32,
-    /// True while the contiguous header band at the top of the outermost table is still open.
-    header_band_open: bool,
     /// Open list nesting stack. Each entry represents one open list level.
     list_stack: Vec<ListStackEntry>,
     /// Set of numIds whose first item has been emitted document-wide.
@@ -254,20 +237,8 @@ impl fmt::Debug for DocumentReader {
             .field("hyperlink_map", &self.hyperlink_map)
             .field("list_stack", &self.list_stack)
             .field("seen_lists", &self.seen_lists);
-        if std::env::var_os("DOCSPEC_DEBUG_DEFERRED_TABLE_SCAFFOLD").is_some() {
-            debug
-                .field("in_tcpr", &self.in_tcpr)
-                .field("in_trpr", &self.in_trpr)
-                .field("pending_colspan", &self.pending_colspan)
-                .field("cell_started_emitted", &self.cell_started_emitted)
-                .field("in_table_cell", &self.in_table_cell)
-                .field("current_cell_is_header", &self.current_cell_is_header)
-                .field("pending_row_is_header", &self.pending_row_is_header)
-                .field("row_started_emitted", &self.row_started_emitted)
-                .field("pending_error", &self.pending_error)
-                .field("nested_row_state_stack", &self.nested_row_state_stack)
-                .field("table_depth", &self.table_depth)
-                .field("header_band_open", &self.header_band_open);
+        if std::env::var_os("DOCSPEC_DEBUG_PENDING_ERROR").is_some() {
+            debug.field("pending_error", &self.pending_error);
         }
         debug.field("xml", &"<quick_xml::Reader>");
         debug.field("archive", &"<Arc<Mutex<ZipArchive>>>");
@@ -305,17 +276,6 @@ impl DocumentReader {
                 image_map,
             },
             hyperlink_map,
-            in_tcpr: false,
-            in_trpr: false,
-            pending_colspan: None,
-            cell_started_emitted: false,
-            in_table_cell: false,
-            current_cell_is_header: false,
-            pending_row_is_header: false,
-            row_started_emitted: false,
-            nested_row_state_stack: Vec::new(),
-            table_depth: 0,
-            header_band_open: false,
             list_stack: Vec::new(),
             seen_lists: std::collections::HashSet::new(),
             xml,
@@ -1129,7 +1089,6 @@ impl DocumentReader {
     }
 
     fn emit_empty_paragraph(&mut self) {
-        self.ensure_cell_started();
         let props = ResolvedParagraphProperties::default();
         let (block_kind, block_start_emitted) = self.resolve_paragraph_block_kind(&props);
         if !block_start_emitted {
@@ -1142,7 +1101,6 @@ impl DocumentReader {
         if state.paragraph_emitted {
             return;
         }
-        self.ensure_cell_started();
         if !state.block_start_emitted {
             self.emit_paragraph_start_for_block(&state.props, &state.block_kind);
             state.block_start_emitted = true;
@@ -1425,6 +1383,345 @@ impl DocumentReader {
         }
     }
 
+    fn parse_tcpr(&mut self, _start: &BytesStart<'_>) -> Result<ResolvedCellProperties> {
+        let mut colspan = None;
+        loop {
+            self.buf.clear();
+            let event = self
+                .xml
+                .read_event_into(&mut self.buf)
+                .map_err(map_quick_xml_error)?
+                .into_owned();
+
+            match event {
+                quick_xml::events::Event::Empty(empty) => {
+                    if empty.local_name().as_ref() == b"gridSpan" {
+                        let val = read_val_attribute(&empty);
+                        colspan = properties::parse_grid_span_value(val.as_deref());
+                    }
+                }
+                quick_xml::events::Event::Start(start) => {
+                    if start.local_name().as_ref() == b"gridSpan" {
+                        let val = read_val_attribute(&start);
+                        colspan = properties::parse_grid_span_value(val.as_deref());
+                    }
+                    let end = start.to_end().into_owned();
+                    self.xml
+                        .read_to_end_into(end.name(), &mut self.buf)
+                        .map_err(map_quick_xml_error)?;
+                }
+                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"tcPr" => {
+                    return Ok(ResolvedCellProperties { colspan });
+                }
+                quick_xml::events::Event::Eof => {
+                    return Err(parse_error(
+                        "malformed document.xml: unexpected EOF inside <w:tcPr>".to_string(),
+                    ));
+                }
+                quick_xml::events::Event::End(_)
+                | quick_xml::events::Event::Text(_)
+                | quick_xml::events::Event::GeneralRef(_)
+                | quick_xml::events::Event::CData(_)
+                | quick_xml::events::Event::Comment(_)
+                | quick_xml::events::Event::Decl(_)
+                | quick_xml::events::Event::PI(_)
+                | quick_xml::events::Event::DocType(_) => {}
+            }
+        }
+    }
+
+    fn parse_trpr(&mut self, _start: &BytesStart<'_>) -> Result<ResolvedRowProperties> {
+        let mut is_header = false;
+        loop {
+            self.buf.clear();
+            let event = self
+                .xml
+                .read_event_into(&mut self.buf)
+                .map_err(map_quick_xml_error)?
+                .into_owned();
+
+            match event {
+                quick_xml::events::Event::Empty(empty) => {
+                    if empty.local_name().as_ref() == b"tblHeader" {
+                        is_header = parse_on_off_attribute(&empty);
+                    }
+                }
+                quick_xml::events::Event::Start(start) => {
+                    if start.local_name().as_ref() == b"tblHeader" {
+                        is_header = parse_on_off_attribute(&start);
+                    }
+                    let end = start.to_end().into_owned();
+                    self.xml
+                        .read_to_end_into(end.name(), &mut self.buf)
+                        .map_err(map_quick_xml_error)?;
+                }
+                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"trPr" => {
+                    return Ok(ResolvedRowProperties { is_header });
+                }
+                quick_xml::events::Event::Eof => {
+                    return Err(parse_error(
+                        "malformed document.xml: unexpected EOF inside <w:trPr>".to_string(),
+                    ));
+                }
+                quick_xml::events::Event::End(_)
+                | quick_xml::events::Event::Text(_)
+                | quick_xml::events::Event::GeneralRef(_)
+                | quick_xml::events::Event::CData(_)
+                | quick_xml::events::Event::Comment(_)
+                | quick_xml::events::Event::Decl(_)
+                | quick_xml::events::Event::PI(_)
+                | quick_xml::events::Event::DocType(_) => {}
+            }
+        }
+    }
+
+    fn emit_table_cell_start(&mut self, is_header: bool, colspan: Option<u32>) {
+        if is_header {
+            self.queue.push_back(Event::StartTableHeader {
+                scope: Some(TableHeaderScope::Column),
+                abbr: None,
+                colspan,
+                rowspan: None,
+                id: None,
+            });
+        } else {
+            self.queue.push_back(Event::StartTableCell {
+                colspan,
+                rowspan: None,
+                id: None,
+            });
+        }
+    }
+
+    fn emit_empty_table_cell(&mut self, is_header: bool, colspan: Option<u32>) {
+        self.emit_table_cell_start(is_header, colspan);
+        if is_header {
+            self.queue.push_back(Event::EndTableHeader);
+        } else {
+            self.queue.push_back(Event::EndTableCell);
+        }
+    }
+
+    fn parse_tc(&mut self, _start: &BytesStart<'_>, is_header: bool) -> Result<()> {
+        let mut cell_props: Option<ResolvedCellProperties> = None;
+        let mut cell_started = false;
+        loop {
+            self.buf.clear();
+            let event = self
+                .xml
+                .read_event_into(&mut self.buf)
+                .map_err(map_quick_xml_error)?
+                .into_owned();
+
+            match event {
+                quick_xml::events::Event::Start(start) => match start.local_name().as_ref() {
+                    b"tcPr" if !cell_started => {
+                        cell_props = Some(self.parse_tcpr(&start)?);
+                    }
+                    b"p" => {
+                        if !cell_started {
+                            let colspan = cell_props.as_ref().and_then(|props| props.colspan);
+                            self.emit_table_cell_start(is_header, colspan);
+                            cell_started = true;
+                        }
+                        self.parse_p(&start)?;
+                    }
+                    b"tbl" => {
+                        if !cell_started {
+                            let colspan = cell_props.as_ref().and_then(|props| props.colspan);
+                            self.emit_table_cell_start(is_header, colspan);
+                            cell_started = true;
+                        }
+                        self.parse_tbl(&start, false)?;
+                    }
+                    _ if is_denied_container(start.local_name().as_ref()).is_some()
+                        || denied_kind_for(start.local_name().as_ref())
+                            == Some(DeniedKind::TcPr) =>
+                    {
+                        let end = start.to_end().into_owned();
+                        self.xml
+                            .read_to_end_into(end.name(), &mut self.buf)
+                            .map_err(map_quick_xml_error)?;
+                    }
+                    _ => {}
+                },
+                quick_xml::events::Event::Empty(empty) => {
+                    if empty.local_name().as_ref() == b"p" {
+                        if !cell_started {
+                            let colspan = cell_props.as_ref().and_then(|props| props.colspan);
+                            self.emit_table_cell_start(is_header, colspan);
+                            cell_started = true;
+                        }
+                        self.queue.push_back(Event::StartParagraph {
+                            alignment: None,
+                            id: None,
+                        });
+                        self.queue.push_back(Event::EndParagraph);
+                    }
+                }
+                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"tc" => {
+                    self.flush_list_stack();
+                    self.flush_pending_preformatted_close();
+                    if !cell_started {
+                        let colspan = cell_props.as_ref().and_then(|props| props.colspan);
+                        self.emit_empty_table_cell(is_header, colspan);
+                    } else if is_header {
+                        self.queue.push_back(Event::EndTableHeader);
+                    } else {
+                        self.queue.push_back(Event::EndTableCell);
+                    }
+                    return Ok(());
+                }
+                quick_xml::events::Event::Eof => {
+                    return Err(parse_error(
+                        "malformed document.xml: unexpected EOF inside <w:tc>".to_string(),
+                    ));
+                }
+                quick_xml::events::Event::End(_)
+                | quick_xml::events::Event::Text(_)
+                | quick_xml::events::Event::GeneralRef(_)
+                | quick_xml::events::Event::CData(_)
+                | quick_xml::events::Event::Comment(_)
+                | quick_xml::events::Event::Decl(_)
+                | quick_xml::events::Event::PI(_)
+                | quick_xml::events::Event::DocType(_) => {}
+            }
+        }
+    }
+
+    fn parse_tr(&mut self, _start: &BytesStart<'_>, header_band_active: &mut bool) -> Result<()> {
+        let mut row_props: Option<ResolvedRowProperties> = None;
+        let mut row_started = false;
+        loop {
+            self.buf.clear();
+            let event = self
+                .xml
+                .read_event_into(&mut self.buf)
+                .map_err(map_quick_xml_error)?
+                .into_owned();
+
+            match event {
+                quick_xml::events::Event::Start(start) => match start.local_name().as_ref() {
+                    b"trPr" if !row_started => {
+                        row_props = Some(self.parse_trpr(&start)?);
+                        if row_props.as_ref().is_some_and(|props| !props.is_header) {
+                            *header_band_active = false;
+                        }
+                    }
+                    b"tc" => {
+                        let row_is_header = row_props.as_ref().is_some_and(|props| props.is_header);
+                        if !row_started {
+                            if !row_is_header {
+                                *header_band_active = false;
+                            }
+                            self.queue.push_back(Event::StartTableRow { id: None });
+                            row_started = true;
+                        }
+                        self.parse_tc(&start, row_is_header && *header_band_active)?;
+                    }
+                    _ if is_denied_container(start.local_name().as_ref()).is_some()
+                        || denied_kind_for(start.local_name().as_ref())
+                            == Some(DeniedKind::TrPr) =>
+                    {
+                        let end = start.to_end().into_owned();
+                        self.xml
+                            .read_to_end_into(end.name(), &mut self.buf)
+                            .map_err(map_quick_xml_error)?;
+                    }
+                    _ => {}
+                },
+                quick_xml::events::Event::Empty(empty) => {
+                    if empty.local_name().as_ref() == b"tc" {
+                        let row_is_header = row_props.as_ref().is_some_and(|props| props.is_header);
+                        if !row_started {
+                            if !row_is_header {
+                                *header_band_active = false;
+                            }
+                            self.queue.push_back(Event::StartTableRow { id: None });
+                            row_started = true;
+                        }
+                        self.emit_empty_table_cell(row_is_header && *header_band_active, None);
+                    }
+                }
+                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"tr" => {
+                    self.flush_pending_preformatted_close();
+                    if row_started {
+                        self.queue.push_back(Event::EndTableRow);
+                    }
+                    return Ok(());
+                }
+                quick_xml::events::Event::Eof => {
+                    return Err(parse_error(
+                        "malformed document.xml: unexpected EOF inside <w:tr>".to_string(),
+                    ));
+                }
+                quick_xml::events::Event::End(_)
+                | quick_xml::events::Event::Text(_)
+                | quick_xml::events::Event::GeneralRef(_)
+                | quick_xml::events::Event::CData(_)
+                | quick_xml::events::Event::Comment(_)
+                | quick_xml::events::Event::Decl(_)
+                | quick_xml::events::Event::PI(_)
+                | quick_xml::events::Event::DocType(_) => {}
+            }
+        }
+    }
+
+    fn parse_tbl(&mut self, _start: &BytesStart<'_>, is_outermost: bool) -> Result<()> {
+        self.flush_list_stack();
+        self.flush_pending_preformatted_close();
+        self.queue.push_back(Event::StartTable { id: None });
+        let mut header_band_active = is_outermost;
+        loop {
+            self.buf.clear();
+            let event = self
+                .xml
+                .read_event_into(&mut self.buf)
+                .map_err(map_quick_xml_error)?
+                .into_owned();
+
+            match event {
+                quick_xml::events::Event::Start(start) => {
+                    if start.local_name().as_ref() == b"tr" {
+                        self.parse_tr(&start, &mut header_band_active)?;
+                    }
+                    if is_denied_container(start.local_name().as_ref()).is_some() {
+                        let end = start.to_end().into_owned();
+                        self.xml
+                            .read_to_end_into(end.name(), &mut self.buf)
+                            .map_err(map_quick_xml_error)?;
+                    }
+                }
+                quick_xml::events::Event::Empty(empty) => {
+                    if empty.local_name().as_ref() == b"tr" {
+                        header_band_active = false;
+                        self.queue.push_back(Event::StartTableRow { id: None });
+                        self.queue.push_back(Event::EndTableRow);
+                    }
+                }
+                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"tbl" => {
+                    self.flush_list_stack();
+                    self.flush_pending_preformatted_close();
+                    self.queue.push_back(Event::EndTable);
+                    return Ok(());
+                }
+                quick_xml::events::Event::Eof => {
+                    return Err(parse_error(
+                        "malformed document.xml: unexpected EOF inside <w:tbl>".to_string(),
+                    ));
+                }
+                quick_xml::events::Event::End(_)
+                | quick_xml::events::Event::Text(_)
+                | quick_xml::events::Event::GeneralRef(_)
+                | quick_xml::events::Event::CData(_)
+                | quick_xml::events::Event::Comment(_)
+                | quick_xml::events::Event::Decl(_)
+                | quick_xml::events::Event::PI(_)
+                | quick_xml::events::Event::DocType(_) => {}
+            }
+        }
+    }
+
     fn handle_empty(&mut self, tag: &BytesStart<'_>) {
         let local_name = tag.local_name();
         let local = local_name.as_ref();
@@ -1433,16 +1730,11 @@ impl DocumentReader {
         }
         match local {
             value if !self.denied_stack.is_empty() || is_denied_container(value).is_some() => {}
-            b"gridSpan" if self.in_tcpr => {
-                let val = read_val_attribute(tag);
-                self.pending_colspan = properties::parse_grid_span_value(val.as_deref());
-            }
-            b"tblHeader" if self.in_trpr => {
-                self.pending_row_is_header =
-                    properties::parse_on_off(read_val_attribute(tag).as_deref());
-            }
-            b"vMerge" if self.in_tcpr => {
-                // vMerge (rowspan) deferred — requires event model change or table buffering, out of scope
+            b"tbl" => {
+                self.flush_list_stack();
+                self.flush_pending_preformatted_close();
+                self.queue.push_back(Event::StartTable { id: None });
+                self.queue.push_back(Event::EndTable);
             }
             b"p" => self.emit_empty_paragraph(),
             b"hyperlink" => Self::handle_empty_hyperlink(),
@@ -1461,13 +1753,6 @@ impl DocumentReader {
         }
 
         match local {
-            b"tcPr" if self.in_tcpr => {
-                self.in_tcpr = false;
-                self.ensure_cell_started();
-            }
-            b"trPr" if self.in_trpr => {
-                self.in_trpr = false;
-            }
             b"r" => {
                 while self.open_styles.pop().is_some() {
                     self.queue.push_back(Event::EndTextStyle);
@@ -1476,33 +1761,7 @@ impl DocumentReader {
             b"tbl" => {
                 self.flush_list_stack();
                 self.flush_pending_preformatted_close();
-                self.table_depth = self.table_depth.saturating_sub(1);
                 self.queue.push_back(Event::EndTable);
-            }
-            b"tr" => {
-                self.ensure_row_started();
-                self.flush_pending_preformatted_close();
-                self.queue.push_back(Event::EndTableRow);
-                if self.table_depth > 1 {
-                    if let Some((pending_row_is_header, row_started_emitted, in_trpr)) =
-                        self.nested_row_state_stack.pop()
-                    {
-                        self.pending_row_is_header = pending_row_is_header;
-                        self.row_started_emitted = row_started_emitted;
-                        self.in_trpr = in_trpr;
-                    }
-                }
-            }
-            b"tc" => {
-                self.ensure_cell_started();
-                self.flush_list_stack();
-                self.flush_pending_preformatted_close();
-                if self.current_cell_is_header && self.table_depth == 1 {
-                    self.queue.push_back(Event::EndTableHeader);
-                } else {
-                    self.queue.push_back(Event::EndTableCell);
-                }
-                self.in_table_cell = false;
             }
             _ => {}
         }
@@ -1532,10 +1791,10 @@ impl DocumentReader {
             self.parse_pict_subtree()?;
             return Ok(());
         }
-        if self.handle_table_start(local, tag) {
+        if local == b"tbl" {
+            self.parse_tbl(tag, true)?;
             return Ok(());
         }
-
         let denied_container = is_denied_container(local);
         match (local, denied_container) {
             (_, Some(kind)) => self.denied_stack.push(kind),
@@ -1807,70 +2066,6 @@ impl DocumentReader {
         )))
     }
 
-    fn handle_table_start(&mut self, local: &[u8], tag: &BytesStart<'_>) -> bool {
-        match local {
-            b"tbl" => {
-                self.ensure_cell_started();
-                self.flush_list_stack();
-                self.flush_pending_preformatted_close();
-                self.table_depth = self.table_depth.saturating_add(1);
-                if self.table_depth == 1 {
-                    self.header_band_open = true;
-                }
-                self.queue.push_back(Event::StartTable { id: None });
-                true
-            }
-            b"tr" => {
-                if self.table_depth > 1 {
-                    self.nested_row_state_stack.push((
-                        self.pending_row_is_header,
-                        self.row_started_emitted,
-                        self.in_trpr,
-                    ));
-                }
-                self.start_table_row();
-                true
-            }
-            b"trPr" => {
-                if self.row_started_emitted {
-                    // Out-of-order trPr: row content already emitted; silently consume
-                    self.denied_stack.push(DeniedKind::TrPr);
-                } else {
-                    self.in_trpr = true;
-                }
-                true
-            }
-            b"tblHeader" if self.in_trpr => {
-                self.pending_row_is_header =
-                    properties::parse_on_off(read_val_attribute(tag).as_deref());
-                true
-            }
-            b"tc" => {
-                self.start_table_cell();
-                true
-            }
-            b"tcPr" => {
-                if self.cell_started_emitted {
-                    // Out-of-order tcPr: cell content already emitted; silently consume
-                    self.denied_stack.push(DeniedKind::TcPr);
-                } else {
-                    self.in_tcpr = true;
-                }
-                true
-            }
-            b"gridSpan" if self.in_tcpr => {
-                let val = read_val_attribute(tag);
-                self.pending_colspan = properties::parse_grid_span_value(val.as_deref());
-                true
-            }
-            b"vMerge" if self.in_tcpr => {
-                // vMerge (rowspan) deferred — requires event model change or table buffering, out of scope
-                true
-            }
-            _ => false,
-        }
-    }
-
     fn read_until_event(&mut self) -> Result<()> {
         let event = self
             .xml
@@ -1902,72 +2097,6 @@ impl DocumentReader {
 
         self.buf.clear();
         Ok(())
-    }
-
-    /// Resets cell state at the start of a new `<w:tc>` element.
-    ///
-    /// `current_cell_is_header` is only reset at the outermost table level. Inside a nested
-    /// table, the outer cell's header flag must be preserved so that the outer `</w:tc>` emits
-    /// the matching `EndTableHeader` (nested tables never emit headers — see `ensure_cell_started`).
-    fn start_table_cell(&mut self) {
-        self.cell_started_emitted = false;
-        self.in_table_cell = true;
-        if self.table_depth <= 1 {
-            self.current_cell_is_header = false;
-        }
-        self.pending_colspan = None;
-        self.in_tcpr = false;
-    }
-
-    /// Resets row state at the start of a new `<w:tr>` element.
-    fn start_table_row(&mut self) {
-        self.row_started_emitted = false;
-        self.pending_row_is_header = false;
-        self.in_trpr = false;
-    }
-
-    /// Queues `StartTableRow` once row properties have been parsed.
-    ///
-    /// Also implements the OOXML §17.4.49 contiguous-from-top rule: if this row is NOT a header
-    /// row in the outermost table, the header band is permanently closed for the remainder of
-    /// that table.
-    fn ensure_row_started(&mut self) {
-        if !self.row_started_emitted {
-            // OOXML §17.4.49: close the header band on the first non-header row in the outermost table.
-            if self.table_depth == 1 && !self.pending_row_is_header {
-                self.header_band_open = false;
-            }
-            self.queue.push_back(Event::StartTableRow { id: None });
-            self.row_started_emitted = true;
-        }
-    }
-
-    /// Queues `StartTableCell` or `StartTableHeader` once cell properties have been parsed.
-    ///
-    /// The header decision uses: `pending_row_is_header && header_band_open && table_depth == 1`.
-    fn ensure_cell_started(&mut self) {
-        if self.in_table_cell && !self.cell_started_emitted {
-            self.ensure_row_started();
-            let is_header_cell =
-                self.pending_row_is_header && self.header_band_open && self.table_depth == 1;
-            if is_header_cell {
-                self.queue.push_back(Event::StartTableHeader {
-                    scope: Some(TableHeaderScope::Column),
-                    abbr: None,
-                    colspan: self.pending_colspan,
-                    rowspan: None,
-                    id: None,
-                });
-                self.current_cell_is_header = true;
-            } else {
-                self.queue.push_back(Event::StartTableCell {
-                    colspan: self.pending_colspan,
-                    rowspan: None,
-                    id: None,
-                });
-            }
-            self.cell_started_emitted = true;
-        }
     }
 
     /// Returns the next parsed `DocSpec` event from `document.xml`.
@@ -2564,6 +2693,28 @@ mod tests {
         }
     }
 
+    fn start_cell(colspan: Option<u32>) -> Event {
+        Event::StartTableCell {
+            colspan,
+            rowspan: None,
+            id: None,
+        }
+    }
+
+    fn start_header(colspan: Option<u32>) -> Event {
+        Event::StartTableHeader {
+            abbr: None,
+            colspan,
+            id: None,
+            rowspan: None,
+            scope: Some(TableHeaderScope::Column),
+        }
+    }
+
+    fn drain_queue(reader: &mut DocumentReader) -> Vec<Event> {
+        reader.queue.drain(..).collect()
+    }
+
     fn parse_rpr_fragment(xml_fragment: &str) -> ResolvedRunProperties {
         let mut reader = make_reader(xml_fragment);
         let mut buf = Vec::new();
@@ -2579,6 +2730,266 @@ mod tests {
                 Err(err) => panic!("unexpected XML error: {err}"),
             }
         }
+    }
+
+    #[test]
+    fn parse_tcpr_gridspan() {
+        let mut reader = make_reader(
+            r#"<w:tcPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:gridSpan w:val="3"/></w:tcPr>"#,
+        );
+        let start = read_first_start(&mut reader);
+        let parsed = reader.parse_tcpr(&start).expect("tcPr parses");
+
+        assert_eq!(parsed, ResolvedCellProperties { colspan: Some(3) });
+    }
+
+    #[test]
+    fn parse_tcpr_empty_returns_none_colspan() {
+        let mut reader = make_reader(
+            r#"<w:tcPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:tcPr>"#,
+        );
+        let start = read_first_start(&mut reader);
+        let parsed = reader.parse_tcpr(&start).expect("tcPr parses");
+
+        assert_eq!(parsed, ResolvedCellProperties { colspan: None });
+    }
+
+    #[test]
+    fn parse_trpr_tblheader() {
+        let mut reader = make_reader(
+            r#"<w:trPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tblHeader/></w:trPr>"#,
+        );
+        let start = read_first_start(&mut reader);
+        let parsed = reader.parse_trpr(&start).expect("trPr parses");
+
+        assert_eq!(parsed, ResolvedRowProperties { is_header: true });
+    }
+
+    #[test]
+    fn parse_trpr_empty_returns_false() {
+        let mut reader = make_reader(
+            r#"<w:trPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:trPr>"#,
+        );
+        let start = read_first_start(&mut reader);
+        let parsed = reader.parse_trpr(&start).expect("trPr parses");
+
+        assert_eq!(parsed, ResolvedRowProperties { is_header: false });
+    }
+
+    #[test]
+    fn parse_tc_data_cell() {
+        let mut reader = make_reader(
+            r#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc>"#,
+        );
+        let start = read_first_start(&mut reader);
+        reader.parse_tc(&start, false).expect("tc parses");
+
+        assert_eq!(
+            drain_queue(&mut reader),
+            vec![
+                start_cell(None),
+                start_para(),
+                Event::Text {
+                    content: "cell".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndTableCell,
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_tc_header_cell() {
+        let mut reader = make_reader(
+            r#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>head</w:t></w:r></w:p></w:tc>"#,
+        );
+        let start = read_first_start(&mut reader);
+        reader.parse_tc(&start, true).expect("tc parses");
+
+        assert_eq!(
+            drain_queue(&mut reader),
+            vec![
+                start_header(None),
+                start_para(),
+                Event::Text {
+                    content: "head".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndTableHeader,
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_tc_colspan() {
+        let mut reader = make_reader(
+            r#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p/></w:tc>"#,
+        );
+        let start = read_first_start(&mut reader);
+        reader.parse_tc(&start, false).expect("tc parses");
+
+        assert_eq!(
+            drain_queue(&mut reader),
+            vec![
+                start_cell(Some(2)),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndTableCell,
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_tr_header_row() {
+        let mut reader = make_reader(
+            r#"<w:tr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h</w:t></w:r></w:p></w:tc></w:tr>"#,
+        );
+        let start = read_first_start(&mut reader);
+        let mut header_band_active = true;
+        reader
+            .parse_tr(&start, &mut header_band_active)
+            .expect("tr parses");
+
+        assert!(header_band_active);
+        assert_eq!(
+            drain_queue(&mut reader),
+            vec![
+                Event::StartTableRow { id: None },
+                start_header(None),
+                start_para(),
+                Event::Text {
+                    content: "h".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_tr_data_row_closes_band() {
+        let mut reader = make_reader(
+            r#"<w:tr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tc><w:p><w:r><w:t>d</w:t></w:r></w:p></w:tc></w:tr>"#,
+        );
+        let start = read_first_start(&mut reader);
+        let mut header_band_active = true;
+        reader
+            .parse_tr(&start, &mut header_band_active)
+            .expect("tr parses");
+
+        assert!(!header_band_active);
+        assert_eq!(
+            drain_queue(&mut reader),
+            vec![
+                Event::StartTableRow { id: None },
+                start_cell(None),
+                start_para(),
+                Event::Text {
+                    content: "d".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_tr_after_band_closed() {
+        let mut reader = make_reader(
+            r#"<w:tr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>d</w:t></w:r></w:p></w:tc></w:tr>"#,
+        );
+        let start = read_first_start(&mut reader);
+        let mut header_band_active = false;
+        reader
+            .parse_tr(&start, &mut header_band_active)
+            .expect("tr parses");
+
+        assert!(!header_band_active);
+        assert_eq!(
+            drain_queue(&mut reader),
+            vec![
+                Event::StartTableRow { id: None },
+                start_cell(None),
+                start_para(),
+                Event::Text {
+                    content: "d".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_tbl_outermost_with_header_band() {
+        let doc = document_with_body(
+            "<w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>d</w:t></w:r></w:p></w:tc></w:tr></w:tbl>",
+        );
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                Event::StartTable { id: None },
+                Event::StartTableRow { id: None },
+                start_header(None),
+                start_para(),
+                Event::Text {
+                    content: "h".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                Event::StartTableRow { id: None },
+                start_cell(None),
+                start_para(),
+                Event::Text {
+                    content: "d".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_tbl_nested_no_header_band() {
+        let doc = document_with_body(
+            "<w:tbl><w:tr><w:tc><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>nested</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:tc></w:tr></w:tbl>",
+        );
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                Event::StartTable { id: None },
+                Event::StartTableRow { id: None },
+                start_cell(None),
+                Event::StartTable { id: None },
+                Event::StartTableRow { id: None },
+                start_cell(None),
+                start_para(),
+                Event::Text {
+                    content: "nested".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
