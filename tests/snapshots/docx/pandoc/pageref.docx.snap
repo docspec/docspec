@@ -6,13 +6,11 @@ ReaderFixtureSnapshot {
   events: [
     StartDocument { id: None, language: None, metadata: None },
     StartParagraph { alignment: None, id: None },
-    Text { content: "\t" },
     Text { content: "Title" },
     Text { content: "\t" },
     Text { content: "2" },
     EndParagraph,
     StartParagraph { alignment: None, id: None },
-    Text { content: "\t" },
     Text { content: "Title2" },
     Text { content: "\t" },
     Text { content: "2" },

@@ -11,7 +11,6 @@ ReaderFixtureSnapshot {
     StartParagraph { alignment: None, id: None },
     EndParagraph,
     StartParagraph { alignment: None, id: None },
-    Text { content: "\t" },
     Text { content: "Five years have passed, five summers with the length" },
     EndParagraph,
     EndDocument,

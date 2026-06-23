@@ -29,8 +29,7 @@ enum Phase {
 
 /// The kind of block-level element opened for the current paragraph.
 ///
-/// Set in `ensure_paragraph_started()` based on `pending_paragraph_classification`.
-/// Consumed in `end_paragraph()` to emit the matching End event.
+/// Resolved by paragraph parsing and used to emit matching block start/end events.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ParagraphBlockKind {
     /// Plain paragraph (default).
@@ -81,6 +80,31 @@ struct ResolvedRunProperties {
     text_color: Option<Color>,
     mark: Option<Color>,
     font: Option<crate::symbol_fonts::SymbolFont>,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+struct ResolvedParagraphProperties {
+    alignment: Option<TextAlignment>,
+    classification: Option<crate::styles::StyleClassification>,
+    list_info: Option<(u32, u32)>,
+}
+
+struct ParagraphParseState {
+    props: ResolvedParagraphProperties,
+    paragraph_emitted: bool,
+    block_kind: ParagraphBlockKind,
+    block_start_emitted: bool,
+}
+
+impl Default for ParagraphParseState {
+    fn default() -> Self {
+        Self {
+            props: ResolvedParagraphProperties::default(),
+            paragraph_emitted: false,
+            block_kind: ParagraphBlockKind::Paragraph,
+            block_start_emitted: false,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -174,22 +198,8 @@ pub struct DocumentReader {
     buf: Vec<u8>,
     /// Stack of denied subtrees and one-shot suppression markers.
     denied_stack: Vec<DeniedKind>,
-    /// Whether the reader is currently inside a `<w:p>` element.
-    in_paragraph: bool,
-    /// Whether currently inside a `<w:pPr>` element that is still legal (first child of paragraph).
-    in_ppr: bool,
-    /// Paragraph alignment captured from `<w:jc>` while inside `<w:pPr>`.
-    pending_paragraph_alignment: Option<TextAlignment>,
-    /// Style classification pending for the current paragraph, set by `<w:pStyle>` parsing.
-    /// Consumed and cleared by `ensure_paragraph_started()`.
-    pending_paragraph_classification: Option<crate::styles::StyleClassification>,
-    /// The block kind opened for the current paragraph.
-    /// Set in `ensure_paragraph_started()`, consumed in `end_paragraph()`.
-    current_paragraph_block: ParagraphBlockKind,
     /// True when a preformatted paragraph ended but the block close is deferred until the next boundary.
     pending_preformatted_close: bool,
-    /// True once `StartParagraph` has been queued for the current paragraph.
-    paragraph_started_emitted: bool,
     /// Style kinds currently opened for the active run.
     open_styles: Vec<TextStyleKind>,
     /// Document processing phase.
@@ -239,16 +249,6 @@ pub struct DocumentReader {
     /// Set of numIds whose first item has been emitted document-wide.
     /// Persists across non-list paragraph breaks.
     seen_lists: std::collections::HashSet<u32>,
-    /// (numId, ilvl) captured from `<w:numPr>` during `<w:pPr>` parsing.
-    /// Consumed by `ensure_paragraph_started`.
-    pending_paragraph_list: Option<(u32, u32)>,
-    /// True while inside `<w:numPr>` and capturing children.
-    /// Mirrors the `in_ppr` field pattern.
-    in_numpr: bool,
-    /// w:numId captured from `<w:numId w:val="..."/>` inside `<w:numPr>` (None until seen).
-    pending_num_pr_id: Option<u32>,
-    /// w:ilvl captured from `<w:ilvl w:val="..."/>` inside `<w:numPr>` (None until seen).
-    pending_num_pr_ilvl: Option<u32>,
     /// The quick-xml reader streaming from the document entry.
     xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
     /// Shared DOCX ZIP archive — used to stream embedded asset bytes on demand.
@@ -268,22 +268,10 @@ impl fmt::Debug for DocumentReader {
         debug
             .field("buf", &self.buf)
             .field("denied_stack", &self.denied_stack)
-            .field("in_paragraph", &self.in_paragraph)
-            .field("in_ppr", &self.in_ppr)
-            .field(
-                "pending_paragraph_alignment",
-                &self.pending_paragraph_alignment,
-            )
-            .field(
-                "pending_paragraph_classification",
-                &self.pending_paragraph_classification,
-            )
-            .field("current_paragraph_block", &self.current_paragraph_block)
             .field(
                 "pending_preformatted_close",
                 &self.pending_preformatted_close,
             )
-            .field("paragraph_started_emitted", &self.paragraph_started_emitted)
             .field("open_styles", &self.open_styles)
             .field("phase", &"<phase>")
             .field("queue", &self.queue)
@@ -292,11 +280,7 @@ impl fmt::Debug for DocumentReader {
             .field("hyperlink_depth", &self.hyperlink_depth)
             .field("pending_link", &pending_link)
             .field("list_stack", &self.list_stack)
-            .field("seen_lists", &self.seen_lists)
-            .field("pending_paragraph_list", &self.pending_paragraph_list)
-            .field("in_numpr", &self.in_numpr)
-            .field("pending_num_pr_id", &self.pending_num_pr_id)
-            .field("pending_num_pr_ilvl", &self.pending_num_pr_ilvl);
+            .field("seen_lists", &self.seen_lists);
         if std::env::var_os("DOCSPEC_DEBUG_DEFERRED_TABLE_SCAFFOLD").is_some() {
             debug
                 .field("in_tcpr", &self.in_tcpr)
@@ -336,13 +320,7 @@ impl DocumentReader {
         Self {
             buf: Vec::with_capacity(4096),
             denied_stack: Vec::new(),
-            in_paragraph: false,
-            in_ppr: false,
-            pending_paragraph_alignment: None,
-            pending_paragraph_classification: None,
-            current_paragraph_block: ParagraphBlockKind::Paragraph,
             pending_preformatted_close: false,
-            paragraph_started_emitted: false,
             open_styles: Vec::new(),
             phase: Phase::NotStarted,
             queue: VecDeque::new(),
@@ -369,10 +347,6 @@ impl DocumentReader {
             pending_link: None,
             list_stack: Vec::new(),
             seen_lists: std::collections::HashSet::new(),
-            pending_paragraph_list: None,
-            in_numpr: false,
-            pending_num_pr_id: None,
-            pending_num_pr_ilvl: None,
             xml,
             archive,
             content_types,
@@ -405,67 +379,6 @@ impl DocumentReader {
 }
 
 impl DocumentReader {
-    /// Prepare the queue for the next inline event: open every structural ancestor
-    /// (cell, paragraph) and flush every deferred start (text, link, run styles).
-    /// Each underlying call is idempotent.
-    fn ensure_inline_context(&mut self) {
-        self.ensure_cell_started();
-        self.ensure_paragraph_started();
-        self.flush_pending_link_start();
-    }
-
-    fn emit_line_break(&mut self) {
-        self.ensure_inline_context();
-        self.queue.push_back(Event::LineBreak);
-    }
-
-    fn emit_tab(&mut self) {
-        self.ensure_inline_context();
-        self.queue.push_back(Event::Text {
-            content: "\t".to_string(),
-        });
-    }
-
-    fn end_paragraph(&mut self) {
-        self.ensure_paragraph_started();
-        while self.open_styles.pop().is_some() {
-            self.queue.push_back(Event::EndTextStyle);
-        }
-        if let Some(link) = self.pending_link.take() {
-            if link.link_started {
-                self.queue.push_back(Event::EndLink);
-            }
-        }
-        self.hyperlink_depth = 0;
-        let end_event = match &self.current_paragraph_block {
-            ParagraphBlockKind::Paragraph
-            | ParagraphBlockKind::OrderedListItem { .. }
-            | ParagraphBlockKind::UnorderedListItem { .. } => Event::EndParagraph,
-            ParagraphBlockKind::Heading { .. } => Event::EndHeading,
-            ParagraphBlockKind::BlockQuote => Event::EndBlockQuote,
-            ParagraphBlockKind::Preformatted => {
-                self.pending_preformatted_close = true;
-                self.reset_paragraph_state();
-                return;
-            }
-        };
-        self.queue.push_back(end_event);
-        self.reset_paragraph_state();
-    }
-
-    fn reset_paragraph_state(&mut self) {
-        self.in_paragraph = false;
-        self.in_ppr = false;
-        self.in_numpr = false;
-        self.pending_num_pr_id = None;
-        self.pending_num_pr_ilvl = None;
-        self.pending_paragraph_list = None;
-        self.pending_paragraph_alignment = None;
-        self.pending_paragraph_classification = None;
-        self.current_paragraph_block = ParagraphBlockKind::Paragraph;
-        self.paragraph_started_emitted = false;
-    }
-
     fn flush_pending_preformatted_close(&mut self) {
         if self.pending_preformatted_close {
             self.queue.push_back(Event::EndPreformatted);
@@ -570,9 +483,6 @@ impl DocumentReader {
         if !should_start {
             return;
         }
-
-        self.ensure_cell_started();
-        self.ensure_paragraph_started();
 
         if let Some(link) = self.pending_link.as_mut() {
             if !link.link_started {
@@ -761,8 +671,6 @@ impl DocumentReader {
         props: Option<&ResolvedRunProperties>,
         content_emitted: &mut bool,
     ) {
-        self.ensure_cell_started();
-        self.ensure_paragraph_started();
         self.flush_pending_link_start();
         if *content_emitted {
             return;
@@ -890,8 +798,6 @@ impl DocumentReader {
                 *props = Some(self.parse_rpr(start)?);
             }
             b"t" => {
-                self.ensure_cell_started();
-                self.ensure_paragraph_started();
                 let text = self.collect_text_content()?;
                 let text = Self::normalize_symbol_text(props.as_ref(), text);
                 if !text.is_empty() {
@@ -1020,54 +926,446 @@ impl DocumentReader {
                     if content_emitted {
                         self.close_run_styles(props.as_ref());
                     }
-                    self.handle_eof();
                     return Ok(());
                 }
             }
         }
     }
 
-    fn handle_paragraph_property_leaf(&mut self, local: &[u8], tag: &BytesStart<'_>) -> bool {
-        match local {
-            b"jc" if self.in_ppr => {
-                let val = read_val_attribute(tag);
-                self.pending_paragraph_alignment =
-                    val.as_deref().and_then(properties::parse_alignment);
-            }
-            b"pStyle" if self.in_ppr && !self.paragraph_started_emitted => {
-                self.pending_paragraph_classification = read_val_attribute(tag)
-                    .filter(|s| !s.is_empty())
-                    .and_then(|s| self.data.style_list.classify(&s));
-            }
-            b"numId" if self.in_numpr => {
-                if let Some(val) = read_val_attribute(tag) {
-                    if let Ok(n) = val.parse::<u32>() {
-                        self.pending_num_pr_id = Some(n);
-                    }
+    fn parse_numpr(&mut self, _start: &BytesStart<'_>) -> Result<Option<(u32, u32)>> {
+        let mut num_id = None;
+        let mut ilvl = None;
+
+        loop {
+            self.buf.clear();
+            let event = self
+                .xml
+                .read_event_into(&mut self.buf)
+                .map_err(map_quick_xml_error)?
+                .into_owned();
+            match event {
+                quick_xml::events::Event::Empty(empty) => match empty.name().as_ref() {
+                    b"w:numId" => num_id = parse_u32_attr(&empty, b"w:val"),
+                    b"w:ilvl" => ilvl = parse_u32_attr(&empty, b"w:val"),
+                    _ => {}
+                },
+                quick_xml::events::Event::Start(start) => {
+                    let end = start.to_end().into_owned();
+                    self.xml
+                        .read_to_end_into(end.name(), &mut self.buf)
+                        .map_err(map_quick_xml_error)?;
+                }
+                quick_xml::events::Event::End(end) if end.name().as_ref() == b"w:numPr" => {
+                    return Ok(num_id.map(|num_id| (num_id, ilvl.unwrap_or(0))));
+                }
+                quick_xml::events::Event::End(_)
+                | quick_xml::events::Event::Text(_)
+                | quick_xml::events::Event::GeneralRef(_)
+                | quick_xml::events::Event::CData(_)
+                | quick_xml::events::Event::Comment(_)
+                | quick_xml::events::Event::Decl(_)
+                | quick_xml::events::Event::PI(_)
+                | quick_xml::events::Event::DocType(_) => {}
+                quick_xml::events::Event::Eof => {
+                    return Err(parse_error(
+                        "malformed document.xml: unexpected EOF inside <w:numPr>".to_string(),
+                    ));
                 }
             }
-            b"ilvl" if self.in_numpr => {
-                if let Some(val) = read_val_attribute(tag) {
-                    if let Ok(n) = val.parse::<u32>() {
-                        self.pending_num_pr_ilvl = Some(n);
-                    }
-                }
-            }
-            _ => return false,
         }
-        true
     }
 
-    fn handle_inline_atom(&mut self, local: &[u8]) -> bool {
-        if !self.in_paragraph {
-            return false;
+    fn parse_ppr(&mut self, _start: &BytesStart<'_>) -> Result<ResolvedParagraphProperties> {
+        let mut props = ResolvedParagraphProperties::default();
+
+        loop {
+            self.buf.clear();
+            let event = self
+                .xml
+                .read_event_into(&mut self.buf)
+                .map_err(map_quick_xml_error)?
+                .into_owned();
+            match event {
+                quick_xml::events::Event::Empty(empty) => match empty.local_name().as_ref() {
+                    b"jc" => {
+                        let val = read_val_attribute(&empty);
+                        props.alignment = val.as_deref().and_then(properties::parse_alignment);
+                    }
+                    b"pStyle" => {
+                        props.classification = read_val_attribute(&empty)
+                            .filter(|s| !s.is_empty())
+                            .and_then(|s| self.data.style_list.classify(&s));
+                    }
+                    _ => {}
+                },
+                quick_xml::events::Event::Start(start) => match start.local_name().as_ref() {
+                    b"jc" => {
+                        let val = read_val_attribute(&start);
+                        props.alignment = val.as_deref().and_then(properties::parse_alignment);
+                        let end = start.to_end().into_owned();
+                        self.xml
+                            .read_to_end_into(end.name(), &mut self.buf)
+                            .map_err(map_quick_xml_error)?;
+                    }
+                    b"pStyle" => {
+                        props.classification = read_val_attribute(&start)
+                            .filter(|s| !s.is_empty())
+                            .and_then(|s| self.data.style_list.classify(&s));
+                        let end = start.to_end().into_owned();
+                        self.xml
+                            .read_to_end_into(end.name(), &mut self.buf)
+                            .map_err(map_quick_xml_error)?;
+                    }
+                    b"numPr" => {
+                        props.list_info = self.parse_numpr(&start)?;
+                    }
+                    b"rPr" => {
+                        let end = start.to_end().into_owned();
+                        self.xml
+                            .read_to_end_into(end.name(), &mut self.buf)
+                            .map_err(map_quick_xml_error)?;
+                    }
+                    _ => {}
+                },
+                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"pPr" => {
+                    return Ok(props);
+                }
+                quick_xml::events::Event::End(_)
+                | quick_xml::events::Event::Text(_)
+                | quick_xml::events::Event::GeneralRef(_)
+                | quick_xml::events::Event::CData(_)
+                | quick_xml::events::Event::Comment(_)
+                | quick_xml::events::Event::Decl(_)
+                | quick_xml::events::Event::PI(_)
+                | quick_xml::events::Event::DocType(_) => {}
+                quick_xml::events::Event::Eof => {
+                    return Err(parse_error(
+                        "malformed document.xml: unexpected EOF inside <w:pPr>".to_string(),
+                    ));
+                }
+            }
         }
-        match local {
-            b"br" => self.emit_line_break(),
-            b"tab" => self.emit_tab(),
-            _ => return false,
+    }
+
+    fn resolve_paragraph_block_kind(
+        &mut self,
+        props: &ResolvedParagraphProperties,
+    ) -> (ParagraphBlockKind, bool) {
+        if self.pending_preformatted_close {
+            if matches!(
+                props.classification.as_ref(),
+                Some(crate::styles::StyleClassification::Code)
+            ) {
+                self.queue.push_back(Event::LineBreak);
+                self.pending_preformatted_close = false;
+                return (ParagraphBlockKind::Preformatted, true);
+            }
+            self.flush_pending_preformatted_close();
         }
-        true
+
+        let list_classification = props.list_info.and_then(|(num_id, raw_ilvl)| {
+            let ilvl = core::cmp::min(raw_ilvl, MAX_LIST_LEVEL);
+            let result = self.data.numbering.resolve(num_id, ilvl);
+            result
+                .is_list
+                .then_some((num_id, ilvl, result.is_ordered, result.style_type))
+        });
+
+        let block_kind = match props.classification.as_ref() {
+            Some(crate::styles::StyleClassification::Heading { level }) => {
+                self.flush_list_stack();
+                ParagraphBlockKind::Heading { level: *level }
+            }
+            Some(crate::styles::StyleClassification::BlockQuote) => {
+                self.flush_list_stack();
+                ParagraphBlockKind::BlockQuote
+            }
+            Some(crate::styles::StyleClassification::Code) => {
+                self.flush_list_stack();
+                ParagraphBlockKind::Preformatted
+            }
+            _ => match list_classification {
+                None => ParagraphBlockKind::Paragraph,
+                Some((num_id, ilvl, is_ordered, style_type)) => {
+                    self.reconcile_list_stack(num_id, ilvl, is_ordered);
+                    let start = self.compute_start(num_id);
+                    if is_ordered {
+                        ParagraphBlockKind::OrderedListItem {
+                            num_id,
+                            ilvl,
+                            start,
+                            style_type,
+                        }
+                    } else {
+                        ParagraphBlockKind::UnorderedListItem {
+                            num_id,
+                            ilvl,
+                            style_type,
+                        }
+                    }
+                }
+            },
+        };
+        (block_kind, false)
+    }
+
+    fn emit_paragraph_start_for_block(
+        &mut self,
+        props: &ResolvedParagraphProperties,
+        block_kind: &ParagraphBlockKind,
+    ) {
+        match block_kind {
+            ParagraphBlockKind::Paragraph => {
+                self.queue.push_back(Event::StartParagraph {
+                    alignment: props.alignment.clone(),
+                    id: None,
+                });
+            }
+            ParagraphBlockKind::Heading { level } => {
+                self.queue.push_back(Event::StartHeading {
+                    level: *level,
+                    id: None,
+                });
+            }
+            ParagraphBlockKind::BlockQuote => {
+                self.queue.push_back(Event::StartBlockQuote { id: None });
+            }
+            ParagraphBlockKind::Preformatted => {
+                self.queue.push_back(Event::StartPreformatted {
+                    id: None,
+                    syntax: None,
+                });
+            }
+            ParagraphBlockKind::OrderedListItem {
+                num_id,
+                ilvl,
+                start,
+                style_type,
+            } => {
+                self.emit_list_item_start_ordered(*num_id, *ilvl, *start, *style_type);
+                self.queue.push_back(Event::StartParagraph {
+                    alignment: props.alignment.clone(),
+                    id: None,
+                });
+            }
+            ParagraphBlockKind::UnorderedListItem {
+                num_id,
+                ilvl,
+                style_type,
+            } => {
+                self.emit_list_item_start_unordered(*num_id, *ilvl, *style_type);
+                self.queue.push_back(Event::StartParagraph {
+                    alignment: props.alignment.clone(),
+                    id: None,
+                });
+            }
+        }
+    }
+
+    fn close_paragraph_block(&mut self, block_kind: &ParagraphBlockKind) {
+        while self.open_styles.pop().is_some() {
+            self.queue.push_back(Event::EndTextStyle);
+        }
+        if let Some(link) = self.pending_link.take() {
+            if link.link_started {
+                self.queue.push_back(Event::EndLink);
+            }
+        }
+        self.hyperlink_depth = 0;
+
+        let end_event = match block_kind {
+            ParagraphBlockKind::Paragraph
+            | ParagraphBlockKind::OrderedListItem { .. }
+            | ParagraphBlockKind::UnorderedListItem { .. } => Event::EndParagraph,
+            ParagraphBlockKind::Heading { .. } => Event::EndHeading,
+            ParagraphBlockKind::BlockQuote => Event::EndBlockQuote,
+            ParagraphBlockKind::Preformatted => {
+                self.pending_preformatted_close = true;
+                return;
+            }
+        };
+        self.queue.push_back(end_event);
+    }
+
+    fn emit_empty_paragraph(&mut self) {
+        self.ensure_cell_started();
+        let props = ResolvedParagraphProperties::default();
+        let (block_kind, block_start_emitted) = self.resolve_paragraph_block_kind(&props);
+        if !block_start_emitted {
+            self.emit_paragraph_start_for_block(&props, &block_kind);
+        }
+        self.close_paragraph_block(&block_kind);
+    }
+
+    fn ensure_local_paragraph_started(&mut self, state: &mut ParagraphParseState) {
+        if state.paragraph_emitted {
+            return;
+        }
+        self.ensure_cell_started();
+        if !state.block_start_emitted {
+            self.emit_paragraph_start_for_block(&state.props, &state.block_kind);
+            state.block_start_emitted = true;
+        }
+        state.paragraph_emitted = true;
+    }
+
+    fn resolve_local_ppr(&mut self, state: &mut ParagraphParseState) {
+        let (block_kind, block_start_emitted) = self.resolve_paragraph_block_kind(&state.props);
+        state.block_kind = block_kind;
+        state.block_start_emitted = block_start_emitted;
+    }
+
+    fn emit_local_tab(&mut self, state: &mut ParagraphParseState) {
+        self.ensure_local_paragraph_started(state);
+        self.flush_pending_link_start();
+        self.queue.push_back(Event::Text {
+            content: "\t".to_string(),
+        });
+    }
+
+    fn emit_local_line_break(&mut self, state: &mut ParagraphParseState) {
+        self.ensure_local_paragraph_started(state);
+        self.flush_pending_link_start();
+        self.queue.push_back(Event::LineBreak);
+    }
+
+    fn close_hyperlink(&mut self) {
+        if self.hyperlink_depth == 0 {
+            return;
+        }
+        if self.hyperlink_depth == 1 {
+            if let Some(link) = self.pending_link.take() {
+                if link.link_started {
+                    self.queue.push_back(Event::EndLink);
+                }
+            }
+        }
+        self.hyperlink_depth = self.hyperlink_depth.saturating_sub(1);
+    }
+
+    fn consume_current_start(&mut self, start: &BytesStart<'_>) -> Result<()> {
+        let end = start.to_end().into_owned();
+        self.xml
+            .read_to_end_into(end.name(), &mut self.buf)
+            .map_err(map_quick_xml_error)?;
+        Ok(())
+    }
+
+    fn handle_paragraph_start_child(
+        &mut self,
+        start: &BytesStart<'_>,
+        state: &mut ParagraphParseState,
+    ) -> Result<()> {
+        match start.local_name().as_ref() {
+            b"pPr" if !state.paragraph_emitted => {
+                state.props = self.parse_ppr(start)?;
+                self.resolve_local_ppr(state);
+            }
+            b"tab" => {
+                self.emit_local_tab(state);
+                self.consume_current_start(start)?;
+            }
+            b"br" => {
+                self.emit_local_line_break(state);
+                self.consume_current_start(start)?;
+            }
+            b"r" => {
+                self.ensure_local_paragraph_started(state);
+                self.parse_r(start)?;
+            }
+            b"hyperlink" => {
+                self.ensure_local_paragraph_started(state);
+                self.handle_hyperlink_start(
+                    start,
+                    matches!(state.block_kind, ParagraphBlockKind::Preformatted),
+                );
+            }
+            b"drawing" => {
+                self.ensure_local_paragraph_started(state);
+                self.flush_pending_link_start();
+                self.parse_drawing_subtree()?;
+            }
+            b"pict" => {
+                self.ensure_local_paragraph_started(state);
+                self.flush_pending_link_start();
+                self.parse_pict_subtree()?;
+            }
+            local if is_denied_container(local).is_some() => self.consume_current_start(start)?,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn handle_paragraph_empty_child(
+        &mut self,
+        empty: &BytesStart<'_>,
+        state: &mut ParagraphParseState,
+    ) {
+        match empty.local_name().as_ref() {
+            b"pPr" if !state.paragraph_emitted => {
+                state.props = ResolvedParagraphProperties::default();
+                self.resolve_local_ppr(state);
+            }
+            b"tab" => self.emit_local_tab(state),
+            b"br" => self.emit_local_line_break(state),
+            b"r" | b"drawing" | b"pict" => self.ensure_local_paragraph_started(state),
+            b"hyperlink" => {
+                self.ensure_local_paragraph_started(state);
+                self.handle_hyperlink_start(
+                    empty,
+                    matches!(state.block_kind, ParagraphBlockKind::Preformatted),
+                );
+                let _ = self.pending_link.take();
+                self.hyperlink_depth = self.hyperlink_depth.saturating_sub(1);
+            }
+            _ => {}
+        }
+    }
+
+    fn finish_paragraph_parse(&mut self, state: &mut ParagraphParseState) {
+        self.ensure_local_paragraph_started(state);
+        self.close_paragraph_block(&state.block_kind);
+    }
+
+    fn parse_p(&mut self, _start: &BytesStart<'_>) -> Result<()> {
+        let mut state = ParagraphParseState::default();
+        loop {
+            self.buf.clear();
+            let event = self
+                .xml
+                .read_event_into(&mut self.buf)
+                .map_err(map_quick_xml_error)?
+                .into_owned();
+
+            match event {
+                quick_xml::events::Event::Start(start) => {
+                    self.handle_paragraph_start_child(&start, &mut state)?;
+                }
+                quick_xml::events::Event::Empty(empty) => {
+                    self.handle_paragraph_empty_child(&empty, &mut state);
+                }
+                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"hyperlink" => {
+                    self.close_hyperlink();
+                }
+                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"p" => {
+                    self.finish_paragraph_parse(&mut state);
+                    return Ok(());
+                }
+                quick_xml::events::Event::End(_)
+                | quick_xml::events::Event::Text(_)
+                | quick_xml::events::Event::GeneralRef(_)
+                | quick_xml::events::Event::CData(_)
+                | quick_xml::events::Event::Comment(_)
+                | quick_xml::events::Event::Decl(_)
+                | quick_xml::events::Event::PI(_)
+                | quick_xml::events::Event::DocType(_) => {}
+                quick_xml::events::Event::Eof => {
+                    self.finish_paragraph_parse(&mut state);
+                    self.handle_eof();
+                    return Ok(());
+                }
+            }
+        }
     }
 
     fn handle_empty(&mut self, tag: &BytesStart<'_>) {
@@ -1076,17 +1374,8 @@ impl DocumentReader {
         if !self.denied_stack.is_empty() || is_denied_container(local).is_some() {
             return;
         }
-        if self.handle_paragraph_property_leaf(local, tag) {
-            return;
-        }
-        if self.handle_inline_atom(local) {
-            return;
-        }
         match local {
             value if !self.denied_stack.is_empty() || is_denied_container(value).is_some() => {}
-            b"pPr" if self.in_paragraph && !self.paragraph_started_emitted => {
-                self.ensure_paragraph_started();
-            }
             b"gridSpan" if self.in_tcpr => {
                 let val = read_val_attribute(tag);
                 self.pending_colspan = properties::parse_grid_span_value(val.as_deref());
@@ -1098,14 +1387,7 @@ impl DocumentReader {
             b"vMerge" if self.in_tcpr => {
                 // vMerge (rowspan) deferred — requires event model change or table buffering, out of scope
             }
-            b"rPr" if self.in_ppr => {}
-            b"rPr" if self.in_paragraph && !self.in_ppr => {}
-            b"r" if self.in_paragraph => {}
-            b"p" if !self.in_paragraph => {
-                self.ensure_cell_started();
-                self.start_paragraph();
-                self.end_paragraph();
-            }
+            b"p" => self.emit_empty_paragraph(),
             b"hyperlink" => Self::handle_empty_hyperlink(),
             _ => {}
         }
@@ -1122,20 +1404,6 @@ impl DocumentReader {
         }
 
         match local {
-            b"p" if self.in_paragraph => self.end_paragraph(),
-            b"numPr" if self.in_numpr => {
-                if let Some(num_id) = self.pending_num_pr_id {
-                    let ilvl = self.pending_num_pr_ilvl.unwrap_or(0);
-                    self.pending_paragraph_list = Some((num_id, ilvl));
-                }
-                self.in_numpr = false;
-                self.pending_num_pr_id = None;
-                self.pending_num_pr_ilvl = None;
-            }
-            b"pPr" if self.in_ppr => {
-                self.ensure_paragraph_started();
-                self.in_ppr = false;
-            }
             b"tcPr" if self.in_tcpr => {
                 self.in_tcpr = false;
                 self.ensure_cell_started();
@@ -1194,9 +1462,6 @@ impl DocumentReader {
     }
 
     fn handle_eof(&mut self) {
-        if self.in_paragraph {
-            self.end_paragraph();
-        }
         self.flush_list_stack();
         self.flush_pending_preformatted_close();
         self.queue.push_back(Event::EndDocument);
@@ -1213,70 +1478,28 @@ impl DocumentReader {
             return Ok(());
         }
         if local == b"drawing" {
-            self.handle_drawing_start()?;
+            self.parse_drawing_subtree()?;
             return Ok(());
         }
         if local == b"pict" {
-            self.handle_pict_start()?;
+            self.parse_pict_subtree()?;
             return Ok(());
         }
         if self.handle_table_start(local, tag) {
-            return Ok(());
-        }
-        if self.handle_paragraph_property_leaf(local, tag) {
-            return Ok(());
-        }
-        if self.handle_inline_atom(local) {
             return Ok(());
         }
 
         let denied_container = is_denied_container(local);
         match (local, denied_container) {
             (_, Some(kind)) => self.denied_stack.push(kind),
-            (b"pPr", _) if self.in_paragraph => {
-                if self.paragraph_started_emitted {
-                    // Out-of-order pPr: StartParagraph already emitted; silently consume
-                    self.denied_stack.push(DeniedKind::PPr);
-                } else {
-                    self.in_ppr = true;
-                    self.pending_paragraph_alignment = None;
-                }
-            }
-            (b"numPr", _) if self.in_ppr && !self.paragraph_started_emitted => {
-                self.in_numpr = true;
-                self.pending_num_pr_id = None;
-                self.pending_num_pr_ilvl = None;
-            }
-            (b"rPr", _) if self.in_ppr => {
-                self.denied_stack.push(DeniedKind::RPr);
-            }
-            (b"rPr", _) if self.in_paragraph && !self.in_ppr => {
-                self.denied_stack.push(DeniedKind::RPr);
-            }
-            (b"p", _) if !self.in_paragraph => {
-                self.ensure_cell_started();
-                self.start_paragraph();
-            }
-            (b"r", _) if self.in_paragraph => {
-                self.parse_r(tag)?;
+            (b"p", _) => {
+                self.parse_p(tag)?;
                 return Ok(());
             }
-            (b"hyperlink", _) if !self.in_paragraph => {
-                self.hyperlink_depth = self.hyperlink_depth.saturating_add(1);
-            }
-            (b"hyperlink", _) => self.handle_hyperlink_start(tag),
+            (b"hyperlink", _) => self.handle_hyperlink_start(tag, false),
             _ => {}
         }
         Ok(())
-    }
-
-    fn handle_drawing_start(&mut self) -> Result<()> {
-        if self.in_paragraph {
-            self.ensure_cell_started();
-            self.ensure_paragraph_started();
-            self.flush_pending_link_start();
-        }
-        self.parse_drawing_subtree()
     }
 
     fn parse_drawing_subtree(&mut self) -> Result<()> {
@@ -1322,17 +1545,6 @@ impl DocumentReader {
         }
 
         Ok(())
-    }
-
-    /// Handles a `<w:pict>` start tag by preparing inline state and scanning its VML subtree.
-    fn handle_pict_start(&mut self) -> Result<()> {
-        // TODO(vml-headers): <w:pict> inside <w:hdr>/<w:ftr>/<w:footnotes> parts is not processed (those parts are not opened by this reader).
-        if self.in_paragraph {
-            self.ensure_cell_started();
-            self.ensure_paragraph_started();
-            self.flush_pending_link_start();
-        }
-        self.parse_pict_subtree()
     }
 
     /// Parses a `<w:pict>` subtree and emits images for VML `<v:imagedata>` elements.
@@ -1549,12 +1761,12 @@ impl DocumentReader {
         )))
     }
 
-    fn handle_hyperlink_start(&mut self, tag: &BytesStart<'_>) {
+    fn handle_hyperlink_start(&mut self, tag: &BytesStart<'_>, is_preformatted: bool) {
         self.hyperlink_depth = self.hyperlink_depth.saturating_add(1);
         if self.hyperlink_depth != 1 || self.pending_link.is_some() {
             return;
         }
-        if self.current_paragraph_block == ParagraphBlockKind::Preformatted {
+        if is_preformatted {
             return;
         }
 
@@ -1682,140 +1894,6 @@ impl DocumentReader {
 
         self.buf.clear();
         Ok(())
-    }
-
-    fn start_paragraph(&mut self) {
-        self.in_paragraph = true;
-        self.paragraph_started_emitted = false;
-        self.pending_paragraph_alignment = None;
-        self.pending_paragraph_classification = None;
-        self.pending_paragraph_list = None;
-        self.current_paragraph_block = ParagraphBlockKind::Paragraph;
-    }
-
-    /// Queues the appropriate Start event once paragraph properties have been parsed.
-    fn ensure_paragraph_started(&mut self) {
-        if self.in_paragraph && !self.paragraph_started_emitted {
-            if self.pending_preformatted_close {
-                if matches!(
-                    self.pending_paragraph_classification.as_ref(),
-                    Some(crate::styles::StyleClassification::Code)
-                ) {
-                    self.queue.push_back(Event::LineBreak);
-                    self.pending_preformatted_close = false;
-                    self.current_paragraph_block = ParagraphBlockKind::Preformatted;
-                    self.paragraph_started_emitted = true;
-                    self.pending_paragraph_classification = None;
-                    return;
-                }
-                self.flush_pending_preformatted_close();
-            }
-
-            let list_classification = match self.pending_paragraph_list.take() {
-                None => None,
-                Some((num_id, raw_ilvl)) => {
-                    let ilvl = core::cmp::min(raw_ilvl, MAX_LIST_LEVEL);
-                    let result = self.data.numbering.resolve(num_id, ilvl);
-                    result
-                        .is_list
-                        .then_some((num_id, ilvl, result.is_ordered, result.style_type))
-                }
-            };
-
-            let kind = match self.pending_paragraph_classification.take() {
-                Some(crate::styles::StyleClassification::Heading { level }) => {
-                    self.flush_list_stack();
-                    ParagraphBlockKind::Heading { level }
-                }
-                Some(crate::styles::StyleClassification::BlockQuote) => {
-                    self.flush_list_stack();
-                    ParagraphBlockKind::BlockQuote
-                }
-                Some(crate::styles::StyleClassification::Code) => {
-                    self.flush_list_stack();
-                    ParagraphBlockKind::Preformatted
-                }
-                _ => match list_classification {
-                    None => {
-                        // Intentional: do NOT flush the list stack here. A plain paragraph
-                        // following a list item attaches as continuation content of the
-                        // open item. The list closes only at heading / block quote /
-                        // preformatted / table boundary / cell boundary / end of document.
-                        ParagraphBlockKind::Paragraph
-                    }
-                    Some((num_id, ilvl, is_ordered, style_type)) => {
-                        self.reconcile_list_stack(num_id, ilvl, is_ordered);
-                        let start = self.compute_start(num_id);
-                        if is_ordered {
-                            ParagraphBlockKind::OrderedListItem {
-                                num_id,
-                                ilvl,
-                                start,
-                                style_type,
-                            }
-                        } else {
-                            ParagraphBlockKind::UnorderedListItem {
-                                num_id,
-                                ilvl,
-                                style_type,
-                            }
-                        }
-                    }
-                },
-            };
-            self.current_paragraph_block = kind;
-            self.emit_paragraph_start_for_current_block();
-            self.paragraph_started_emitted = true;
-        }
-    }
-
-    fn emit_paragraph_start_for_current_block(&mut self) {
-        match &self.current_paragraph_block {
-            ParagraphBlockKind::Paragraph => {
-                self.queue.push_back(Event::StartParagraph {
-                    alignment: self.pending_paragraph_alignment.clone(),
-                    id: None,
-                });
-            }
-            ParagraphBlockKind::Heading { level } => {
-                self.queue.push_back(Event::StartHeading {
-                    level: *level,
-                    id: None,
-                });
-            }
-            ParagraphBlockKind::BlockQuote => {
-                self.queue.push_back(Event::StartBlockQuote { id: None });
-            }
-            ParagraphBlockKind::Preformatted => {
-                self.queue.push_back(Event::StartPreformatted {
-                    id: None,
-                    syntax: None,
-                });
-            }
-            ParagraphBlockKind::OrderedListItem {
-                num_id,
-                ilvl,
-                start,
-                style_type,
-            } => {
-                self.emit_list_item_start_ordered(*num_id, *ilvl, *start, *style_type);
-                self.queue.push_back(Event::StartParagraph {
-                    alignment: self.pending_paragraph_alignment.clone(),
-                    id: None,
-                });
-            }
-            ParagraphBlockKind::UnorderedListItem {
-                num_id,
-                ilvl,
-                style_type,
-            } => {
-                self.emit_list_item_start_unordered(*num_id, *ilvl, *style_type);
-                self.queue.push_back(Event::StartParagraph {
-                    alignment: self.pending_paragraph_alignment.clone(),
-                    id: None,
-                });
-            }
-        }
     }
 
     /// Resets cell state at the start of a new `<w:tc>` element.
@@ -1976,6 +2054,10 @@ fn read_decoded_attribute(tag: &BytesStart<'_>, name: &[u8]) -> Option<String> {
     quick_xml::escape::unescape(&value)
         .ok()
         .map(std::borrow::Cow::into_owned)
+}
+
+fn parse_u32_attr(tag: &BytesStart<'_>, name: &[u8]) -> Option<u32> {
+    read_attribute(tag, name)?.parse::<u32>().ok()
 }
 
 fn read_rfonts_symbol(tag: &BytesStart<'_>) -> Option<crate::symbol_fonts::SymbolFont> {
@@ -2159,6 +2241,22 @@ mod tests {
         DocumentReader::from_xml_reader(xml, data)
     }
 
+    fn read_first_start(reader: &mut DocumentReader) -> BytesStart<'static> {
+        loop {
+            reader.buf.clear();
+            match reader
+                .xml
+                .read_event_into(&mut reader.buf)
+                .expect("valid XML event")
+                .into_owned()
+            {
+                quick_xml::events::Event::Start(start) => return start,
+                quick_xml::events::Event::Eof => panic!("expected start tag"),
+                _ => {}
+            }
+        }
+    }
+
     fn make_reader_with_images(
         document_xml: &str,
         image_map: crate::rels::ImageMap,
@@ -2172,6 +2270,131 @@ mod tests {
             image_map,
         };
         DocumentReader::from_xml_reader(xml, data)
+    }
+
+    #[test]
+    fn parse_numpr_with_both() {
+        let mut reader = make_reader(
+            r#"<w:numPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:numId w:val="7"/><w:ilvl w:val="2"/></w:numPr>"#,
+        );
+        let start = read_first_start(&mut reader);
+        let parsed = reader.parse_numpr(&start).expect("numPr parses");
+        assert_eq!(parsed, Some((7, 2)));
+    }
+
+    #[test]
+    fn parse_numpr_no_ilvl_defaults_to_zero() {
+        let mut reader = make_reader(
+            r#"<w:numPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:numId w:val="7"/></w:numPr>"#,
+        );
+        let start = read_first_start(&mut reader);
+        let parsed = reader.parse_numpr(&start).expect("numPr parses");
+        assert_eq!(parsed, Some((7, 0)));
+    }
+
+    #[test]
+    fn parse_numpr_unknown_children() {
+        let mut reader = make_reader(
+            r#"<w:numPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:unknown><w:numId w:val="9"/></w:unknown><w:numId w:val="3"/><w:ilvl w:val="1"/></w:numPr>"#,
+        );
+        let start = read_first_start(&mut reader);
+        let parsed = reader.parse_numpr(&start).expect("numPr parses");
+        assert_eq!(parsed, Some((3, 1)));
+    }
+
+    #[test]
+    fn parse_ppr_all_three() {
+        let styles = r#"<w:style w:type="paragraph" w:styleId="Heading2">
+    <w:name w:val="heading 2"/>
+</w:style>"#;
+        let mut reader = make_reader_with_styles(
+            r#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:jc w:val="center"/><w:pStyle w:val="Heading2"/><w:numPr><w:numId w:val="4"/><w:ilvl w:val="1"/></w:numPr></w:pPr>"#,
+            styles,
+        );
+        let start = read_first_start(&mut reader);
+        let parsed = reader.parse_ppr(&start).expect("pPr parses");
+        assert_eq!(
+            parsed,
+            ResolvedParagraphProperties {
+                alignment: Some(TextAlignment::Center),
+                classification: Some(crate::styles::StyleClassification::Heading { level: 2 }),
+                list_info: Some((4, 1)),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_ppr_empty_returns_default() {
+        let mut reader = make_reader(
+            r#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:pPr>"#,
+        );
+        let start = read_first_start(&mut reader);
+        let parsed = reader.parse_ppr(&start).expect("pPr parses");
+        assert_eq!(parsed, ResolvedParagraphProperties::default());
+    }
+
+    #[test]
+    fn parse_p_empty() {
+        let doc = document_with_body("<w:p></w:p>");
+        let mut reader = make_reader(&doc);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_p_one_styled_run() {
+        let doc = document_with_body("<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>bold</w:t></w:r></w:p>");
+        let mut reader = make_reader(&doc);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                Event::Text {
+                    content: "bold".to_string(),
+                },
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_p_heading_via_pstyle() {
+        let styles = r#"<w:style w:type="paragraph" w:styleId="Heading1">
+    <w:name w:val="heading 1"/>
+</w:style>"#;
+        let doc = document_with_body(
+            r#"<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>title</w:t></w:r></w:p>"#,
+        );
+        let mut reader = make_reader_with_styles(&doc, styles);
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_doc(),
+                Event::StartHeading { level: 1, id: None },
+                Event::Text {
+                    content: "title".to_string(),
+                },
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
     }
 
     fn image_rel(target: &str, is_external: bool) -> crate::rels::ImageRel {
@@ -3608,7 +3831,6 @@ mod tests {
                 docspec_core::Event::EndDocument,
             ]
         );
-        assert_eq!(reader.pending_paragraph_list, None);
     }
 
     #[test]
@@ -3643,11 +3865,10 @@ mod tests {
                 docspec_core::Event::EndDocument,
             ]
         );
-        assert_eq!(reader.pending_paragraph_list, None);
     }
 
     #[test]
-    fn numpr_without_num_id_leaves_pending_paragraph_list_none() {
+    fn numpr_without_num_id_emits_plain_paragraph() {
         let doc = r#"<?xml version="1.0" encoding="UTF-8"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
@@ -3678,7 +3899,6 @@ mod tests {
                 docspec_core::Event::EndDocument,
             ]
         );
-        assert_eq!(reader.pending_paragraph_list, None);
     }
 
     fn make_reader_with_styles_and_numbering(
