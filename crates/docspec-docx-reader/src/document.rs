@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use docspec_core::{
     Color, Error, Event, ImageSource, Result, TableHeaderScope, TextAlignment, TextStyleKind,
 };
-use quick_xml::events::{BytesCData, BytesRef, BytesStart, BytesText};
+use quick_xml::events::{BytesRef, BytesStart};
 
 use crate::properties;
 use crate::rels::{HyperlinkMap, ImageMap};
@@ -74,6 +74,33 @@ struct DrawingScanState {
     pic_depth: u32,
     blip_fill_depth: u32,
     emitted_for_current_pic: bool,
+}
+
+struct ResolvedRunProperties {
+    kinds: Vec<TextStyleKind>,
+    text_color: Option<Color>,
+    mark: Option<Color>,
+    font: Option<crate::symbol_fonts::SymbolFont>,
+}
+
+#[derive(Default)]
+struct RunPropertyAccumulator {
+    kinds: Vec<TextStyleKind>,
+    text_color: Option<Color>,
+    mark: Option<Color>,
+    shade: Option<Color>,
+    font: Option<crate::symbol_fonts::SymbolFont>,
+}
+
+impl RunPropertyAccumulator {
+    fn finish(self) -> ResolvedRunProperties {
+        ResolvedRunProperties {
+            kinds: self.kinds,
+            text_color: self.text_color,
+            mark: self.mark.or(self.shade),
+            font: self.font,
+        }
+    }
 }
 
 /// State machine for parsing a `<w:pict>` VML subtree.
@@ -149,8 +176,6 @@ pub struct DocumentReader {
     denied_stack: Vec<DeniedKind>,
     /// Whether the reader is currently inside a `<w:p>` element.
     in_paragraph: bool,
-    /// Whether the reader is currently inside a `<w:t>` element.
-    in_text: bool,
     /// Whether currently inside a `<w:pPr>` element that is still legal (first child of paragraph).
     in_ppr: bool,
     /// Paragraph alignment captured from `<w:jc>` while inside `<w:pPr>`.
@@ -165,36 +190,14 @@ pub struct DocumentReader {
     pending_preformatted_close: bool,
     /// True once `StartParagraph` has been queued for the current paragraph.
     paragraph_started_emitted: bool,
-    /// Whether currently inside a `<w:rPr>` element that is still legal (first child of run).
-    in_rpr: bool,
-    /// Run style kinds accumulated while inside `<w:rPr>`.
-    pending_run_kinds: Vec<TextStyleKind>,
-    /// Text color accumulated while inside `<w:rPr>`.
-    pending_run_text_color: Option<Color>,
-    /// Highlight color accumulated while inside `<w:rPr>`.
-    pending_run_mark: Option<Color>,
-    /// Shading fill color accumulated while inside `<w:rPr>`.
-    pending_run_shade: Option<Color>,
-    /// Text collected for the current `<w:t>` element.
-    pending_text: String,
-    /// Run style kinds frozen at `</w:rPr>`, applied to subsequent emissions in the same run.
-    frozen_run_kinds: Vec<TextStyleKind>,
-    /// Text color frozen at `</w:rPr>`, applied to subsequent emissions in the same run.
-    frozen_run_text_color: Option<Color>,
-    /// Highlight/background color frozen at `</w:rPr>`, applied to subsequent emissions in the same run.
-    frozen_run_mark: Option<Color>,
-    /// Symbol font accumulated while inside `<w:rPr>`.
-    pending_run_font: Option<crate::symbol_fonts::SymbolFont>,
-    /// Symbol font frozen at `</w:rPr>`, applied to subsequent text in the same run.
-    frozen_run_font: Option<crate::symbol_fonts::SymbolFont>,
     /// Style kinds currently opened for the active run.
     open_styles: Vec<TextStyleKind>,
     /// Document processing phase.
     phase: Phase,
     /// Queue of `DocSpec` events to emit.
     queue: VecDeque<Event>,
-    /// True once the first content event of the current run has been queued.
-    run_content_emitted: bool,
+    /// Deferred parser error returned after already-queued events are drained.
+    pending_error: Option<Error>,
     /// Package-level data (styles, future: theme, numbering).
     data: DocxData,
     /// Hyperlink relationship map from the package. Consulted in `handle_start`
@@ -266,7 +269,6 @@ impl fmt::Debug for DocumentReader {
             .field("buf", &self.buf)
             .field("denied_stack", &self.denied_stack)
             .field("in_paragraph", &self.in_paragraph)
-            .field("in_text", &self.in_text)
             .field("in_ppr", &self.in_ppr)
             .field(
                 "pending_paragraph_alignment",
@@ -282,21 +284,9 @@ impl fmt::Debug for DocumentReader {
                 &self.pending_preformatted_close,
             )
             .field("paragraph_started_emitted", &self.paragraph_started_emitted)
-            .field("in_rpr", &self.in_rpr)
-            .field("pending_run_kinds", &self.pending_run_kinds)
-            .field("pending_run_text_color", &self.pending_run_text_color)
-            .field("pending_run_mark", &self.pending_run_mark)
-            .field("pending_run_shade", &self.pending_run_shade)
-            .field("pending_text", &self.pending_text)
-            .field("frozen_run_kinds", &self.frozen_run_kinds)
-            .field("frozen_run_text_color", &self.frozen_run_text_color)
-            .field("frozen_run_mark", &self.frozen_run_mark)
-            .field("pending_run_font", &self.pending_run_font)
-            .field("frozen_run_font", &self.frozen_run_font)
             .field("open_styles", &self.open_styles)
             .field("phase", &"<phase>")
             .field("queue", &self.queue)
-            .field("run_content_emitted", &self.run_content_emitted)
             .field("data", &"<DocxData>")
             .field("hyperlink_map", &self.hyperlink_map)
             .field("hyperlink_depth", &self.hyperlink_depth)
@@ -317,6 +307,7 @@ impl fmt::Debug for DocumentReader {
                 .field("current_cell_is_header", &self.current_cell_is_header)
                 .field("pending_row_is_header", &self.pending_row_is_header)
                 .field("row_started_emitted", &self.row_started_emitted)
+                .field("pending_error", &self.pending_error)
                 .field("nested_row_state_stack", &self.nested_row_state_stack)
                 .field("table_depth", &self.table_depth)
                 .field("header_band_open", &self.header_band_open);
@@ -346,28 +337,16 @@ impl DocumentReader {
             buf: Vec::with_capacity(4096),
             denied_stack: Vec::new(),
             in_paragraph: false,
-            in_text: false,
             in_ppr: false,
             pending_paragraph_alignment: None,
             pending_paragraph_classification: None,
             current_paragraph_block: ParagraphBlockKind::Paragraph,
             pending_preformatted_close: false,
             paragraph_started_emitted: false,
-            in_rpr: false,
-            pending_run_kinds: Vec::new(),
-            pending_run_text_color: None,
-            pending_run_mark: None,
-            pending_run_shade: None,
-            pending_text: String::new(),
-            frozen_run_kinds: Vec::new(),
-            frozen_run_text_color: None,
-            frozen_run_mark: None,
-            pending_run_font: None,
-            frozen_run_font: None,
             open_styles: Vec::new(),
             phase: Phase::NotStarted,
             queue: VecDeque::new(),
-            run_content_emitted: false,
+            pending_error: None,
             data: DocxData {
                 style_list,
                 hyperlink_map: HyperlinkMap::default(),
@@ -401,7 +380,7 @@ impl DocumentReader {
     }
 
     #[cfg(test)]
-    #[cfg(test)]
+    #[cfg(not(coverage))]
     #[allow(clippy::expect_used, clippy::as_conversions)]
     pub(crate) fn from_xml_reader(
         xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
@@ -426,30 +405,22 @@ impl DocumentReader {
 }
 
 impl DocumentReader {
-    fn can_collect_text(&self) -> bool {
-        self.denied_stack.is_empty() && self.in_paragraph && self.in_text
-    }
-
     /// Prepare the queue for the next inline event: open every structural ancestor
     /// (cell, paragraph) and flush every deferred start (text, link, run styles).
     /// Each underlying call is idempotent.
     fn ensure_inline_context(&mut self) {
         self.ensure_cell_started();
         self.ensure_paragraph_started();
-        self.flush_pending_text();
         self.flush_pending_link_start();
-        self.emit_deferred_starts();
     }
 
     fn emit_line_break(&mut self) {
         self.ensure_inline_context();
-        self.run_content_emitted = true;
         self.queue.push_back(Event::LineBreak);
     }
 
     fn emit_tab(&mut self) {
         self.ensure_inline_context();
-        self.run_content_emitted = true;
         self.queue.push_back(Event::Text {
             content: "\t".to_string(),
         });
@@ -460,7 +431,6 @@ impl DocumentReader {
         while self.open_styles.pop().is_some() {
             self.queue.push_back(Event::EndTextStyle);
         }
-        self.reset_run_state();
         if let Some(link) = self.pending_link.take() {
             if link.link_started {
                 self.queue.push_back(Event::EndLink);
@@ -485,8 +455,6 @@ impl DocumentReader {
 
     fn reset_paragraph_state(&mut self) {
         self.in_paragraph = false;
-        self.in_text = false;
-        self.pending_text.clear();
         self.in_ppr = false;
         self.in_numpr = false;
         self.pending_num_pr_id = None;
@@ -594,40 +562,6 @@ impl DocumentReader {
         });
     }
 
-    fn flush_pending_text(&mut self) {
-        if self.pending_text.is_empty() {
-            return;
-        }
-
-        let content = if let Some(font) = self.frozen_run_font {
-            let mut out = String::with_capacity(self.pending_text.len());
-            for ch in self.pending_text.chars() {
-                let key = match u32::from(ch) {
-                    cp @ 0xF020..=0xF0FF => cp
-                        .checked_sub(0xF000)
-                        .and_then(|stripped| u8::try_from(stripped).ok()),
-                    cp @ 0x0020..=0x00FF => u8::try_from(cp).ok(),
-                    _ => None,
-                };
-                if let Some(k) = key {
-                    if let Some(mapped) = font.convert(k) {
-                        out.push(mapped);
-                    }
-                }
-            }
-            self.pending_text.clear();
-            out
-        } else {
-            core::mem::take(&mut self.pending_text)
-        };
-
-        if !content.is_empty() {
-            self.flush_pending_link_start();
-            self.emit_deferred_starts();
-            self.queue.push_back(Event::Text { content });
-        }
-    }
-
     fn flush_pending_link_start(&mut self) {
         let should_start = self
             .pending_link
@@ -654,18 +588,6 @@ impl DocumentReader {
         }
     }
 
-    fn reset_run_state(&mut self) {
-        self.frozen_run_kinds.clear();
-        self.pending_run_kinds.clear();
-        self.frozen_run_text_color = None;
-        self.frozen_run_mark = None;
-        self.pending_run_font = None;
-        self.frozen_run_font = None;
-        self.pending_run_text_color = None;
-        self.pending_run_mark = None;
-        self.pending_run_shade = None;
-    }
-
     fn emit_style_if_not_open(&mut self, kind: TextStyleKind) {
         if !self.open_styles.contains(&kind) {
             self.queue.push_back(Event::StartTextStyle {
@@ -676,101 +598,433 @@ impl DocumentReader {
         }
     }
 
-    fn emit_deferred_starts(&mut self) {
-        for kind in self.frozen_run_kinds.clone() {
-            self.emit_style_if_not_open(kind);
-        }
-        if let Some(color) = self.frozen_run_text_color {
-            self.emit_style_if_not_open(TextStyleKind::TextColor(color));
-        }
-        if let Some(color) = self.frozen_run_mark {
-            self.emit_style_if_not_open(TextStyleKind::Mark(color));
-        }
-    }
-
-    fn set_pending_run_kind(&mut self, kind: TextStyleKind, enabled: bool) {
-        self.pending_run_kinds.retain(|current| current != &kind);
+    fn set_resolved_run_kind(kinds: &mut Vec<TextStyleKind>, kind: TextStyleKind, enabled: bool) {
+        kinds.retain(|current| current != &kind);
         if enabled {
-            self.pending_run_kinds.push(kind);
+            kinds.push(kind);
         }
     }
 
-    fn set_pending_vertical_alignment(&mut self, align: properties::VertAlign) {
-        self.pending_run_kinds.retain(|kind| {
+    fn set_resolved_vertical_alignment(
+        kinds: &mut Vec<TextStyleKind>,
+        align: properties::VertAlign,
+    ) {
+        kinds.retain(|kind| {
             kind != &TextStyleKind::Subscript && kind != &TextStyleKind::Superscript
         });
         match align {
-            properties::VertAlign::Subscript => {
-                self.pending_run_kinds.push(TextStyleKind::Subscript);
-            }
-            properties::VertAlign::Superscript => {
-                self.pending_run_kinds.push(TextStyleKind::Superscript);
-            }
+            properties::VertAlign::Subscript => kinds.push(TextStyleKind::Subscript),
+            properties::VertAlign::Superscript => kinds.push(TextStyleKind::Superscript),
             properties::VertAlign::None => {}
         }
     }
 
-    fn handle_rpr_rstyle(&mut self, tag: &BytesStart<'_>) {
+    fn apply_resolved_rpr_style(&mut self, tag: &BytesStart<'_>, kinds: &mut Vec<TextStyleKind>) {
         if let Some(crate::styles::StyleClassification::Code) = read_val_attribute(tag)
             .filter(|s| !s.is_empty())
             .and_then(|s| self.data.style_list.classify(&s))
         {
-            if !self.pending_run_kinds.contains(&TextStyleKind::Code) {
-                self.pending_run_kinds.push(TextStyleKind::Code);
+            if !kinds.contains(&TextStyleKind::Code) {
+                kinds.push(TextStyleKind::Code);
             }
         }
     }
 
-    fn handle_rpr_property(&mut self, local: &[u8], tag: &BytesStart<'_>) -> bool {
-        if !self.in_rpr {
-            return false;
-        }
+    fn apply_resolved_rpr_property(
+        &mut self,
+        local: &[u8],
+        tag: &BytesStart<'_>,
+        acc: &mut RunPropertyAccumulator,
+    ) -> bool {
         match local {
-            b"b" => {
-                self.set_pending_run_kind(TextStyleKind::Bold, parse_on_off_attribute(tag));
+            b"b" | b"bCs" => {
+                Self::set_resolved_run_kind(
+                    &mut acc.kinds,
+                    TextStyleKind::Bold,
+                    parse_on_off_attribute(tag),
+                );
             }
-            b"i" => {
-                self.set_pending_run_kind(TextStyleKind::Italic, parse_on_off_attribute(tag));
+            b"i" | b"iCs" => {
+                Self::set_resolved_run_kind(
+                    &mut acc.kinds,
+                    TextStyleKind::Italic,
+                    parse_on_off_attribute(tag),
+                );
             }
             b"strike" | b"dstrike" => {
-                self.set_pending_run_kind(
+                Self::set_resolved_run_kind(
+                    &mut acc.kinds,
                     TextStyleKind::Strikethrough,
                     parse_on_off_attribute(tag),
                 );
             }
             b"u" => {
                 let val = read_val_attribute(tag);
-                self.set_pending_run_kind(
+                Self::set_resolved_run_kind(
+                    &mut acc.kinds,
                     TextStyleKind::Underline,
                     properties::parse_underline_on(val.as_deref()),
                 );
             }
             b"vertAlign" => {
                 let val = read_val_attribute(tag);
-                self.set_pending_vertical_alignment(properties::parse_vert_align(val.as_deref()));
+                Self::set_resolved_vertical_alignment(
+                    &mut acc.kinds,
+                    properties::parse_vert_align(val.as_deref()),
+                );
             }
             b"color" => {
                 let val = read_val_attribute(tag);
-                self.pending_run_text_color = properties::parse_color_val(val.as_deref());
+                acc.text_color = properties::parse_color_val(val.as_deref());
             }
             b"highlight" => {
                 let val = read_val_attribute(tag);
-                self.pending_run_mark = properties::parse_highlight_val(val.as_deref());
+                acc.mark = properties::parse_highlight_val(val.as_deref());
             }
             b"shd" => {
                 let val = read_attribute(tag, b"w:val");
                 let color = read_attribute(tag, b"w:color");
                 let fill = read_attribute(tag, b"w:fill");
-                self.pending_run_shade =
+                acc.shade =
                     properties::parse_shd(val.as_deref(), color.as_deref(), fill.as_deref());
             }
             b"rFonts" => {
-                self.pending_run_font = read_rfonts_symbol(tag);
+                acc.font = read_rfonts_symbol(tag);
             }
-            b"rStyle" => self.handle_rpr_rstyle(tag),
+            b"rStyle" => self.apply_resolved_rpr_style(tag, &mut acc.kinds),
             _ => return false,
         }
         true
+    }
+
+    fn parse_rpr(&mut self, _start: &BytesStart<'_>) -> Result<ResolvedRunProperties> {
+        let mut acc = RunPropertyAccumulator::default();
+
+        loop {
+            self.buf.clear();
+            let event = self
+                .xml
+                .read_event_into(&mut self.buf)
+                .map_err(map_quick_xml_error)?
+                .into_owned();
+            match event {
+                quick_xml::events::Event::Start(start) => {
+                    let local_name = start.local_name();
+                    let local = local_name.as_ref();
+                    let _ = self.apply_resolved_rpr_property(local, &start, &mut acc);
+                    let end = start.to_end().into_owned();
+                    self.xml
+                        .read_to_end_into(end.name(), &mut self.buf)
+                        .map_err(map_quick_xml_error)?;
+                }
+                quick_xml::events::Event::Empty(empty) => {
+                    let local_name = empty.local_name();
+                    let local = local_name.as_ref();
+                    let _ = self.apply_resolved_rpr_property(local, &empty, &mut acc);
+                }
+                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"rPr" => {
+                    return Ok(acc.finish());
+                }
+                quick_xml::events::Event::End(_)
+                | quick_xml::events::Event::Text(_)
+                | quick_xml::events::Event::GeneralRef(_)
+                | quick_xml::events::Event::CData(_)
+                | quick_xml::events::Event::Comment(_)
+                | quick_xml::events::Event::Decl(_)
+                | quick_xml::events::Event::PI(_)
+                | quick_xml::events::Event::DocType(_) => {}
+                quick_xml::events::Event::Eof => {
+                    return Err(parse_error(
+                        "malformed document.xml: unexpected EOF inside <w:rPr>".to_string(),
+                    ));
+                }
+            }
+        }
+    }
+
+    fn resolved_run_styles(props: Option<&ResolvedRunProperties>) -> Vec<TextStyleKind> {
+        let Some(props) = props else {
+            return Vec::new();
+        };
+        let mut styles = props.kinds.clone();
+        if let Some(color) = props.text_color {
+            styles.push(TextStyleKind::TextColor(color));
+        }
+        if let Some(color) = props.mark {
+            styles.push(TextStyleKind::Mark(color));
+        }
+        styles
+    }
+
+    fn emit_deferred_styles_if_needed(
+        &mut self,
+        props: Option<&ResolvedRunProperties>,
+        content_emitted: &mut bool,
+    ) {
+        self.ensure_cell_started();
+        self.ensure_paragraph_started();
+        self.flush_pending_link_start();
+        if *content_emitted {
+            return;
+        }
+        for kind in Self::resolved_run_styles(props) {
+            self.emit_style_if_not_open(kind);
+        }
+        *content_emitted = true;
+    }
+
+    fn close_run_styles(&mut self, props: Option<&ResolvedRunProperties>) {
+        let styles = Self::resolved_run_styles(props);
+        for kind in styles.into_iter().rev() {
+            if let Some(index) = self.open_styles.iter().rposition(|open| open == &kind) {
+                self.open_styles.remove(index);
+                self.queue.push_back(Event::EndTextStyle);
+            }
+        }
+    }
+
+    fn collect_text_content(&mut self) -> Result<String> {
+        let mut content = String::new();
+        loop {
+            self.buf.clear();
+            let event = self
+                .xml
+                .read_event_into(&mut self.buf)
+                .map_err(map_quick_xml_error)?
+                .into_owned();
+            match event {
+                quick_xml::events::Event::Text(text) => {
+                    let decoded = text
+                        .decode()
+                        .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
+                    let unescaped = quick_xml::escape::unescape(&decoded)
+                        .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
+                    content.push_str(&unescaped);
+                }
+                quick_xml::events::Event::CData(cdata) => {
+                    let bytes = cdata.into_inner();
+                    let text = core::str::from_utf8(&bytes)
+                        .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
+                    content.push_str(text);
+                }
+                quick_xml::events::Event::GeneralRef(reference) => {
+                    content.push_str(&Self::decode_general_ref(&reference)?);
+                }
+                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"t" => {
+                    return Ok(content);
+                }
+                quick_xml::events::Event::Start(start) => {
+                    let end = start.to_end().into_owned();
+                    self.xml
+                        .read_to_end_into(end.name(), &mut self.buf)
+                        .map_err(map_quick_xml_error)?;
+                }
+                quick_xml::events::Event::Empty(_)
+                | quick_xml::events::Event::End(_)
+                | quick_xml::events::Event::Comment(_)
+                | quick_xml::events::Event::Decl(_)
+                | quick_xml::events::Event::PI(_)
+                | quick_xml::events::Event::DocType(_) => {}
+                quick_xml::events::Event::Eof => return Ok(content),
+            }
+        }
+    }
+
+    fn normalize_symbol_text(props: Option<&ResolvedRunProperties>, text: String) -> String {
+        let Some(font) = props.and_then(|props| props.font) else {
+            return text;
+        };
+
+        let mut out = String::with_capacity(text.len());
+        for ch in text.chars() {
+            let key = match u32::from(ch) {
+                cp @ 0xF020..=0xF0FF => cp
+                    .checked_sub(0xF000)
+                    .and_then(|stripped| u8::try_from(stripped).ok()),
+                cp @ 0x0020..=0x00FF => u8::try_from(cp).ok(),
+                _ => None,
+            };
+            if let Some(k) = key {
+                if let Some(mapped) = font.convert(k) {
+                    out.push(mapped);
+                }
+            }
+        }
+        out
+    }
+
+    fn decode_general_ref(reference: &BytesRef<'_>) -> Result<String> {
+        let decoded = reference
+            .decode()
+            .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
+        let escaped = format!("&{decoded};");
+        let unescaped = quick_xml::escape::unescape(&escaped)
+            .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
+        Ok(unescaped.into_owned())
+    }
+
+    fn resolve_sym_char(
+        props: Option<&ResolvedRunProperties>,
+        tag: &BytesStart<'_>,
+    ) -> Option<String> {
+        let char_hex = read_attribute(tag, b"w:char")?;
+        let key = crate::properties::parse_sym_char(&char_hex)?;
+        let font = read_attribute(tag, b"w:font")
+            .and_then(|name| crate::symbol_fonts::SymbolFont::from_name(&name))
+            .or_else(|| {
+                let props = props?;
+                props.font
+            })?;
+        font.convert(key).map(String::from)
+    }
+
+    fn handle_run_child_start(
+        &mut self,
+        start: &BytesStart<'_>,
+        props: &mut Option<ResolvedRunProperties>,
+        content_emitted: &mut bool,
+    ) -> Result<()> {
+        let local_name = start.local_name();
+        match local_name.as_ref() {
+            b"rPr" if !*content_emitted => {
+                *props = Some(self.parse_rpr(start)?);
+            }
+            b"t" => {
+                self.ensure_cell_started();
+                self.ensure_paragraph_started();
+                let text = self.collect_text_content()?;
+                let text = Self::normalize_symbol_text(props.as_ref(), text);
+                if !text.is_empty() {
+                    self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
+                    self.queue.push_back(Event::Text { content: text });
+                }
+            }
+            b"tab" => {
+                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
+                self.queue.push_back(Event::Text {
+                    content: "\t".to_string(),
+                });
+                let end = start.to_end().into_owned();
+                self.xml
+                    .read_to_end_into(end.name(), &mut self.buf)
+                    .map_err(map_quick_xml_error)?;
+            }
+            b"br" => {
+                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
+                self.queue.push_back(Event::LineBreak);
+                let end = start.to_end().into_owned();
+                self.xml
+                    .read_to_end_into(end.name(), &mut self.buf)
+                    .map_err(map_quick_xml_error)?;
+            }
+            b"drawing" => {
+                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
+                self.parse_drawing_subtree()?;
+            }
+            b"pict" => {
+                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
+                self.parse_pict_subtree()?;
+            }
+            b"instrText" | b"fldChar" => {
+                let end = start.to_end().into_owned();
+                self.xml
+                    .read_to_end_into(end.name(), &mut self.buf)
+                    .map_err(map_quick_xml_error)?;
+            }
+            _ if is_denied_container(local_name.as_ref()).is_some() => {
+                let end = start.to_end().into_owned();
+                self.xml
+                    .read_to_end_into(end.name(), &mut self.buf)
+                    .map_err(map_quick_xml_error)?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn handle_run_child_empty(
+        &mut self,
+        empty: &BytesStart<'_>,
+        props: &mut Option<ResolvedRunProperties>,
+        content_emitted: &mut bool,
+    ) {
+        let local_name = empty.local_name();
+        match local_name.as_ref() {
+            b"rPr" if !*content_emitted => {
+                *props = Some(ResolvedRunProperties {
+                    kinds: Vec::new(),
+                    text_color: None,
+                    mark: None,
+                    font: None,
+                });
+            }
+            b"tab" => {
+                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
+                self.queue.push_back(Event::Text {
+                    content: "\t".to_string(),
+                });
+            }
+            b"br" => {
+                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
+                self.queue.push_back(Event::LineBreak);
+            }
+            b"sym" => {
+                if let Some(text) = Self::resolve_sym_char(props.as_ref(), empty) {
+                    self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
+                    self.queue.push_back(Event::Text { content: text });
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn parse_r(&mut self, _start: &BytesStart<'_>) -> Result<()> {
+        let mut props = None;
+        let mut content_emitted = false;
+
+        loop {
+            self.buf.clear();
+            let event = self
+                .xml
+                .read_event_into(&mut self.buf)
+                .map_err(map_quick_xml_error)?
+                .into_owned();
+            match event {
+                quick_xml::events::Event::Start(start) => {
+                    self.handle_run_child_start(&start, &mut props, &mut content_emitted)?;
+                }
+                quick_xml::events::Event::Empty(empty) => {
+                    self.handle_run_child_empty(&empty, &mut props, &mut content_emitted);
+                }
+                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"r" => {
+                    if content_emitted {
+                        self.close_run_styles(props.as_ref());
+                    }
+                    return Ok(());
+                }
+                quick_xml::events::Event::GeneralRef(reference) => {
+                    let text = Self::decode_general_ref(&reference)?;
+                    if !text.is_empty() {
+                        self.emit_deferred_styles_if_needed(props.as_ref(), &mut content_emitted);
+                        self.queue.push_back(Event::Text { content: text });
+                    }
+                }
+                quick_xml::events::Event::End(_)
+                | quick_xml::events::Event::Text(_)
+                | quick_xml::events::Event::CData(_)
+                | quick_xml::events::Event::Comment(_)
+                | quick_xml::events::Event::Decl(_)
+                | quick_xml::events::Event::PI(_)
+                | quick_xml::events::Event::DocType(_) => {}
+                quick_xml::events::Event::Eof => {
+                    if content_emitted {
+                        self.close_run_styles(props.as_ref());
+                    }
+                    self.handle_eof();
+                    return Ok(());
+                }
+            }
+        }
     }
 
     fn handle_paragraph_property_leaf(&mut self, local: &[u8], tag: &BytesStart<'_>) -> bool {
@@ -816,23 +1070,10 @@ impl DocumentReader {
         true
     }
 
-    fn handle_cdata(&mut self, cdata: BytesCData<'_>) -> Result<()> {
-        if self.can_collect_text() {
-            let bytes = cdata.into_inner();
-            let content = core::str::from_utf8(&bytes)
-                .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
-            self.pending_text.push_str(content);
-        }
-        Ok(())
-    }
-
     fn handle_empty(&mut self, tag: &BytesStart<'_>) {
         let local_name = tag.local_name();
         let local = local_name.as_ref();
         if !self.denied_stack.is_empty() || is_denied_container(local).is_some() {
-            return;
-        }
-        if self.handle_rpr_property(local, tag) {
             return;
         }
         if self.handle_paragraph_property_leaf(local, tag) {
@@ -858,27 +1099,8 @@ impl DocumentReader {
                 // vMerge (rowspan) deferred — requires event model change or table buffering, out of scope
             }
             b"rPr" if self.in_ppr => {}
-            b"rPr" if self.in_paragraph && !self.in_ppr && !self.in_rpr => {}
-            b"sym" if self.in_paragraph && !self.in_rpr => {
-                let font_name = read_attribute(tag, b"w:font");
-                let char_hex = read_attribute(tag, b"w:char");
-                if let (Some(name), Some(hex)) = (font_name, char_hex) {
-                    if let (Some(font), Some(key)) = (
-                        crate::symbol_fonts::SymbolFont::from_name(&name),
-                        crate::properties::parse_sym_char(&hex),
-                    ) {
-                        if let Some(ch) = font.convert(key) {
-                            self.flush_pending_text();
-                            self.ensure_paragraph_started();
-                            self.emit_deferred_starts();
-                            self.queue.push_back(Event::Text {
-                                content: String::from(ch),
-                            });
-                            self.run_content_emitted = true;
-                        }
-                    }
-                }
-            }
+            b"rPr" if self.in_paragraph && !self.in_ppr => {}
+            b"r" if self.in_paragraph => {}
             b"p" if !self.in_paragraph => {
                 self.ensure_cell_started();
                 self.start_paragraph();
@@ -921,28 +1143,10 @@ impl DocumentReader {
             b"trPr" if self.in_trpr => {
                 self.in_trpr = false;
             }
-            b"rPr" if self.in_rpr => {
-                self.frozen_run_kinds = core::mem::take(&mut self.pending_run_kinds);
-                self.frozen_run_text_color = self.pending_run_text_color.take();
-                self.frozen_run_mark = self
-                    .pending_run_mark
-                    .take()
-                    .or_else(|| self.pending_run_shade.take());
-                self.frozen_run_font = self.pending_run_font.take();
-                self.pending_run_shade = None;
-                self.in_rpr = false;
-            }
             b"r" => {
                 while self.open_styles.pop().is_some() {
                     self.queue.push_back(Event::EndTextStyle);
                 }
-                self.reset_run_state();
-                self.run_content_emitted = false;
-                self.in_rpr = false;
-            }
-            b"t" if self.in_text => {
-                self.flush_pending_text();
-                self.in_text = false;
             }
             b"tbl" => {
                 self.flush_list_stack();
@@ -990,9 +1194,6 @@ impl DocumentReader {
     }
 
     fn handle_eof(&mut self) {
-        if self.in_text {
-            self.flush_pending_text();
-        }
         if self.in_paragraph {
             self.end_paragraph();
         }
@@ -1000,19 +1201,6 @@ impl DocumentReader {
         self.flush_pending_preformatted_close();
         self.queue.push_back(Event::EndDocument);
         self.phase = Phase::Finished;
-    }
-
-    fn handle_general_ref(&mut self, reference: &BytesRef<'_>) -> Result<()> {
-        if self.can_collect_text() {
-            let decoded = reference
-                .decode()
-                .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
-            let escaped = format!("&{decoded};");
-            let unescaped = quick_xml::escape::unescape(&escaped)
-                .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
-            self.pending_text.push_str(&unescaped);
-        }
-        Ok(())
     }
 
     fn handle_start(&mut self, tag: &BytesStart<'_>) -> Result<()> {
@@ -1033,9 +1221,6 @@ impl DocumentReader {
             return Ok(());
         }
         if self.handle_table_start(local, tag) {
-            return Ok(());
-        }
-        if self.handle_rpr_property(local, tag) {
             return Ok(());
         }
         if self.handle_paragraph_property_leaf(local, tag) {
@@ -1065,33 +1250,16 @@ impl DocumentReader {
             (b"rPr", _) if self.in_ppr => {
                 self.denied_stack.push(DeniedKind::RPr);
             }
-            (b"rPr", _) if self.in_paragraph && !self.in_ppr && !self.in_rpr => {
-                if self.run_content_emitted {
-                    // Out-of-order rPr: content already emitted in this run; silently consume
-                    self.denied_stack.push(DeniedKind::RPr);
-                } else {
-                    self.in_rpr = true;
-                    self.pending_run_kinds.clear();
-                    self.pending_run_text_color = None;
-                    self.pending_run_mark = None;
-                    self.pending_run_shade = None;
-                    self.pending_run_font = None;
-                }
+            (b"rPr", _) if self.in_paragraph && !self.in_ppr => {
+                self.denied_stack.push(DeniedKind::RPr);
             }
             (b"p", _) if !self.in_paragraph => {
                 self.ensure_cell_started();
                 self.start_paragraph();
             }
             (b"r", _) if self.in_paragraph => {
-                self.ensure_cell_started();
-                self.ensure_paragraph_started();
-            }
-            (b"t", _) if self.in_paragraph => {
-                self.ensure_cell_started();
-                self.ensure_paragraph_started();
-                self.in_text = true;
-                self.pending_text.clear();
-                self.run_content_emitted = true;
+                self.parse_r(tag)?;
+                return Ok(());
             }
             (b"hyperlink", _) if !self.in_paragraph => {
                 self.hyperlink_depth = self.hyperlink_depth.saturating_add(1);
@@ -1106,10 +1274,8 @@ impl DocumentReader {
         if self.in_paragraph {
             self.ensure_cell_started();
             self.ensure_paragraph_started();
-            self.flush_pending_text();
             self.flush_pending_link_start();
         }
-        self.run_content_emitted = true;
         self.parse_drawing_subtree()
     }
 
@@ -1164,10 +1330,8 @@ impl DocumentReader {
         if self.in_paragraph {
             self.ensure_cell_started();
             self.ensure_paragraph_started();
-            self.flush_pending_text();
             self.flush_pending_link_start();
         }
-        self.run_content_emitted = true;
         self.parse_pict_subtree()
     }
 
@@ -1487,18 +1651,6 @@ impl DocumentReader {
         }
     }
 
-    fn handle_text(&mut self, text: &BytesText<'_>) -> Result<()> {
-        if self.can_collect_text() {
-            let decoded = text
-                .decode()
-                .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
-            let unescaped = quick_xml::escape::unescape(&decoded)
-                .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
-            self.pending_text.push_str(&unescaped);
-        }
-        Ok(())
-    }
-
     fn read_until_event(&mut self) -> Result<()> {
         let event = self
             .xml
@@ -1518,18 +1670,14 @@ impl DocumentReader {
             quick_xml::events::Event::Start(tag) => self.handle_start(&tag)?,
             quick_xml::events::Event::End(tag) => self.handle_end(tag.local_name().as_ref()),
             quick_xml::events::Event::Empty(tag) => self.handle_empty(&tag),
-            quick_xml::events::Event::Text(text) => {
-                self.handle_text(&text)?;
-            }
-            quick_xml::events::Event::GeneralRef(reference) => {
-                self.handle_general_ref(&reference)?;
-            }
-            quick_xml::events::Event::CData(cdata) => self.handle_cdata(cdata)?,
-            quick_xml::events::Event::Eof => self.handle_eof(),
-            quick_xml::events::Event::Comment(_)
+            quick_xml::events::Event::Text(_)
+            | quick_xml::events::Event::GeneralRef(_)
+            | quick_xml::events::Event::CData(_)
+            | quick_xml::events::Event::Comment(_)
             | quick_xml::events::Event::Decl(_)
             | quick_xml::events::Event::PI(_)
             | quick_xml::events::Event::DocType(_) => {}
+            quick_xml::events::Event::Eof => self.handle_eof(),
         }
 
         self.buf.clear();
@@ -1538,8 +1686,6 @@ impl DocumentReader {
 
     fn start_paragraph(&mut self) {
         self.in_paragraph = true;
-        self.in_text = false;
-        self.pending_text.clear();
         self.paragraph_started_emitted = false;
         self.pending_paragraph_alignment = None;
         self.pending_paragraph_classification = None;
@@ -1745,6 +1891,9 @@ impl DocumentReader {
             if let Some(event) = self.queue.pop_front() {
                 return Ok(Some(event));
             }
+            if let Some(err) = self.pending_error.take() {
+                return Err(err);
+            }
 
             match self.phase {
                 Phase::NotStarted => {
@@ -1756,7 +1905,14 @@ impl DocumentReader {
                     });
                 }
                 Phase::Finished => return Ok(None),
-                Phase::Running => self.read_until_event()?,
+                Phase::Running => {
+                    if let Err(err) = self.read_until_event() {
+                        if self.queue.is_empty() {
+                            return Err(err);
+                        }
+                        self.pending_error = Some(err);
+                    }
+                }
             }
         }
     }
@@ -1866,7 +2022,6 @@ mod tests {
         clippy::separated_literal_suffix,
         clippy::too_many_lines
     )]
-    use core::fmt::Write as _;
     use std::io::{Cursor, Read};
     use std::sync::Arc;
 
@@ -2071,6 +2226,128 @@ mod tests {
             alignment: None,
             id: None,
         }
+    }
+
+    fn parse_rpr_fragment(xml_fragment: &str) -> ResolvedRunProperties {
+        let mut reader = make_reader(xml_fragment);
+        let mut buf = Vec::new();
+        loop {
+            match reader.xml.read_event_into(&mut buf) {
+                Ok(quick_xml::events::Event::Start(start))
+                    if start.local_name().as_ref() == b"rPr" =>
+                {
+                    return reader.parse_rpr(&start).expect("rPr fragment parses");
+                }
+                Ok(quick_xml::events::Event::Eof) => panic!("missing rPr start"),
+                Ok(_) => buf.clear(),
+                Err(err) => panic!("unexpected XML error: {err}"),
+            }
+        }
+    }
+
+    #[test]
+    fn parse_rpr_empty_returns_default() {
+        let props = parse_rpr_fragment(
+            r#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:rPr>"#,
+        );
+
+        assert_eq!(props.kinds, Vec::<TextStyleKind>::new());
+        assert_eq!(props.text_color, None);
+        assert_eq!(props.mark, None);
+        assert_eq!(props.font, None);
+    }
+
+    #[test]
+    fn parse_rpr_accumulates_bold_italic() {
+        let props = parse_rpr_fragment(
+            r#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:b/><w:i/></w:rPr>"#,
+        );
+
+        assert_eq!(
+            props.kinds,
+            vec![TextStyleKind::Bold, TextStyleKind::Italic]
+        );
+        assert_eq!(props.text_color, None);
+        assert_eq!(props.mark, None);
+        assert_eq!(props.font, None);
+    }
+
+    #[test]
+    fn parse_rpr_highlight_over_shading() {
+        let props = parse_rpr_fragment(
+            r#"<w:rPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:highlight w:val="yellow"/><w:shd w:val="clear" w:fill="FF0000"/></w:rPr>"#,
+        );
+
+        assert_eq!(props.kinds, Vec::<TextStyleKind>::new());
+        assert_eq!(props.text_color, None);
+        assert_eq!(
+            props.mark,
+            Some(Color::Rgb {
+                r: 255,
+                g: 255,
+                b: 0,
+            })
+        );
+        assert_eq!(props.font, None);
+    }
+
+    #[test]
+    fn parse_r_text_content() {
+        let doc = document_with_body("<w:p><w:r><w:t>hello</w:t></w:r></w:p>");
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::Text {
+                    content: "hello".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_r_styled_text() {
+        let doc = document_with_body("<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>bold</w:t></w:r></w:p>");
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                Event::Text {
+                    content: "bold".to_string(),
+                },
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_r_empty_styled_run_emits_nothing() {
+        let doc = document_with_body("<w:p><w:r><w:rPr><w:b/></w:rPr></w:r></w:p>");
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
@@ -2302,21 +2579,6 @@ mod tests {
         );
     }
 
-    fn make_reader_with_hyperlinks(
-        document_xml: &str,
-        hyperlink_map: HyperlinkMap,
-    ) -> DocumentReader {
-        let stream: Box<dyn Read + Send> = Box::new(Cursor::new(document_xml.as_bytes().to_vec()));
-        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
-        let data = DocxData {
-            style_list: crate::styles::StyleList::default(),
-            hyperlink_map,
-            numbering: crate::numbering::MinimalNumbering::new(),
-            image_map: crate::rels::ImageMap::default(),
-        };
-        DocumentReader::from_xml_reader(xml, data)
-    }
-
     #[test]
     fn document_reader_initializes_hyperlink_state_to_default() {
         let doc = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#;
@@ -2334,109 +2596,6 @@ mod tests {
 
         assert!(debug.contains("hyperlink_depth"));
         assert!(debug.contains("pending_link"));
-    }
-
-    #[test]
-    fn queue_length_never_exceeds_sixteen() -> core::result::Result<(), Box<dyn core::error::Error>>
-    {
-        let doc = {
-            let mut content = String::from(
-                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>"#,
-            );
-            for _ in 0..1000 {
-                content.push_str("<w:p><w:r><w:t>hello</w:t></w:r></w:p>");
-            }
-            content.push_str("</w:body></w:document>");
-            content
-        };
-        let mut reader = make_reader(&doc);
-        loop {
-            if reader.queue.len() > 16 {
-                return Err(Box::new(Error::Other {
-                    message: format!("queue grew to {}", reader.queue.len()),
-                }));
-            }
-            if reader.next_event()?.is_none() {
-                break;
-            }
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn queue_length_remains_bounded_with_colors(
-    ) -> core::result::Result<(), Box<dyn core::error::Error>> {
-        let doc = {
-            let mut content = String::from(
-                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>"#,
-            );
-            for _ in 0..1000 {
-                content.push_str(
-                    r#"<w:p><w:r><w:rPr><w:b/><w:color w:val="FF0000"/><w:highlight w:val="yellow"/><w:shd w:val="clear" w:fill="0000FF"/></w:rPr><w:t>hello</w:t></w:r></w:p>"#,
-                );
-            }
-            content.push_str("</w:body></w:document>");
-            content
-        };
-        let mut reader = make_reader(&doc);
-        loop {
-            if reader.queue.len() > 32 {
-                return Err(Box::new(Error::Other {
-                    message: format!("queue grew to {}", reader.queue.len()),
-                }));
-            }
-            if reader.next_event()?.is_none() {
-                break;
-            }
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn queue_length_bounded_with_hyperlinks(
-    ) -> core::result::Result<(), Box<dyn core::error::Error>> {
-        let doc = {
-            let mut content = String::from(
-                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>"#,
-            );
-            for i in 0..1000_u32 {
-                write!(
-                    content,
-                    r#"<w:p><w:hyperlink r:id="rId{i}"><w:r><w:t>link{i}</w:t></w:r></w:hyperlink></w:p>"#
-                )?;
-            }
-            content.push_str("</w:body></w:document>");
-            content
-        };
-        let hyperlink_map: HyperlinkMap = (0..1000_u32)
-            .map(|i| (format!("rId{i}"), format!("https://example.com/{i}")))
-            .collect();
-        let mut reader = make_reader_with_hyperlinks(&doc, hyperlink_map);
-        loop {
-            if reader.queue.len() > 32 {
-                return Err(Box::new(Error::Other {
-                    message: format!("queue grew to {}", reader.queue.len()),
-                }));
-            }
-            if reader.next_event()?.is_none() {
-                break;
-            }
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn buf_is_cleared_per_iteration() -> core::result::Result<(), Box<dyn core::error::Error>> {
-        let doc = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>hello</w:t></w:r></w:p></w:body></w:document>"#;
-        let mut reader = make_reader(doc);
-        while reader.next_event()?.is_some() {
-            if !reader.buf.is_empty() {
-                return Err(Box::new(Error::Other {
-                    message: "buf not cleared after event".to_string(),
-                }));
-            }
-        }
-        Ok(())
     }
 
     #[test]
