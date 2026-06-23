@@ -796,13 +796,47 @@ impl<W: Write> BlockNoteWriter<W> {
         self.json.key("cells").open_array()
     }
 
-    fn handle_table_cell(&mut self, id: Option<&str>) -> Result<()> {
+    fn handle_start_table_cell_event(&mut self, event: Event) -> Result<()> {
+        match event {
+            Event::StartTableCell {
+                colspan,
+                id,
+                rowspan,
+                ..
+            }
+            | Event::StartTableHeader {
+                colspan,
+                id,
+                rowspan,
+                ..
+            } => self.handle_table_cell(id.as_deref(), colspan, rowspan),
+            _ => Ok(()),
+        }
+    }
+
+    fn handle_table_cell(
+        &mut self,
+        id: Option<&str>,
+        colspan: Option<u32>,
+        rowspan: Option<u32>,
+    ) -> Result<()> {
         if self.drop_inside_list_depth.is_positive() {
             return Ok(());
         }
         self.json.open_object()?;
         self.json.key("type").value("tableCell")?;
         self.write_id(id)?;
+        if colspan.is_some() || rowspan.is_some() {
+            self.json.key("props").object(|j| {
+                if let Some(n) = colspan {
+                    j.key("colspan").value(n)?;
+                }
+                if let Some(n) = rowspan {
+                    j.key("rowspan").value(n)?;
+                }
+                Ok(())
+            })?;
+        }
         self.json.key("content").open_array()?;
         self.context.in_table_cell = true;
         self.context.in_text_block = false;
@@ -1174,8 +1208,8 @@ impl<W: Write> EventSink for BlockNoteWriter<W> {
             Event::EndTable => self.handle_end_table(),
             Event::StartTableRow { id, .. } => self.handle_start_table_row(id.as_deref()),
             Event::EndTableRow => self.handle_end_table_row(),
-            Event::StartTableCell { id, .. } | Event::StartTableHeader { id, .. } => {
-                self.handle_table_cell(id.as_deref())
+            event @ (Event::StartTableCell { .. } | Event::StartTableHeader { .. }) => {
+                self.handle_start_table_cell_event(event)
             }
             Event::EndTableCell | Event::EndTableHeader => self.handle_end_table_cell(),
             Event::StartLink { href, .. } => self.handle_start_link(&href),
