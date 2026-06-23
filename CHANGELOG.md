@@ -12,6 +12,16 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.16.2](https://github.com/docspec/docspec/compare/v1.16.1...v1.16.2) - 2026-06-23
+
+### Fixed
+
+- *(docx-reader,blocknote-writer)* drop spurious gray background from no-op OOXML shading
+
+### Other
+
+- update Cargo.lock dependencies
+
 ## [1.16.1](https://github.com/docspec/docspec/compare/v1.16.0...v1.16.1) - 2026-06-23
 
 ### Fixed
