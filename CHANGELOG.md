@@ -12,6 +12,16 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.15.0](https://github.com/docspec/docspec/compare/v1.14.0...v1.15.0) - 2026-06-23
+
+### Added
+
+- *(docx-reader)* parse w:pict VML images
+
+### Other
+
+- update Cargo.lock dependencies
+
 ## [1.14.0](https://github.com/docspec/docspec/compare/v1.13.1...v1.14.0) - 2026-06-23
 
 ### Added
