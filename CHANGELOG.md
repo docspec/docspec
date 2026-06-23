@@ -12,6 +12,12 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.14.0](https://github.com/docspec/docspec/compare/v1.13.1...v1.14.0) - 2026-06-23
+
+### Added
+
+- *(docx-reader)* parse w:pict VML images
+
 ## [1.13.1](https://github.com/docspec/docspec/compare/v1.13.0...v1.13.1) - 2026-06-22
 
 ### Fixed
