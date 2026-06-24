@@ -521,7 +521,7 @@ dependencies = [
 
 [[package]]
 name = "docspec"
-version = "1.18.1"
+version = "1.18.2"
 dependencies = [
  "docspec-blocknote-writer",
  "docspec-core",
@@ -540,7 +540,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-blocknote-writer"
-version = "1.18.1"
+version = "1.18.2"
 dependencies = [
  "base64",
  "docspec-core",
@@ -552,7 +552,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-cli"
-version = "1.18.1"
+version = "1.18.2"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -571,14 +571,14 @@ dependencies = [
 
 [[package]]
 name = "docspec-core"
-version = "1.18.1"
+version = "1.18.2"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "docspec-docx-reader"
-version = "1.18.1"
+version = "1.18.2"
 dependencies = [
  "docspec-blocknote-writer",
  "docspec-core",
@@ -593,7 +593,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-html-reader"
-version = "1.18.1"
+version = "1.18.2"
 dependencies = [
  "docspec-core",
  "docspec-test-utils",
@@ -602,7 +602,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-html-writer"
-version = "1.18.1"
+version = "1.18.2"
 dependencies = [
  "docspec-core",
  "docspec-test-utils",
@@ -611,7 +611,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-http"
-version = "1.18.1"
+version = "1.18.2"
 dependencies = [
  "axum",
  "clap",
@@ -636,7 +636,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-json"
-version = "1.18.1"
+version = "1.18.2"
 dependencies = [
  "docspec-core",
  "struson",
@@ -644,7 +644,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-markdown-reader"
-version = "1.18.1"
+version = "1.18.2"
 dependencies = [
  "docspec-core",
  "docspec-test-utils",
@@ -655,14 +655,14 @@ dependencies = [
 
 [[package]]
 name = "docspec-markdown-writer"
-version = "1.18.1"
+version = "1.18.2"
 dependencies = [
  "docspec-core",
 ]
 
 [[package]]
 name = "docspec-oxa-writer"
-version = "1.18.1"
+version = "1.18.2"
 dependencies = [
  "docspec-core",
  "docspec-json",
@@ -672,7 +672,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-pandoc-native-writer"
-version = "1.18.1"
+version = "1.18.2"
 dependencies = [
  "docspec-core",
  "docspec-test-utils",
@@ -680,7 +680,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-test-utils"
-version = "1.18.1"
+version = "1.18.2"
 dependencies = [
  "docspec-core",
  "docspec-docx-reader",
@@ -690,7 +690,7 @@ dependencies = [
 
 [[package]]
 name = "docspec-wasm"
-version = "1.18.1"
+version = "1.18.2"
 dependencies = [
  "docspec",
  "docspec-core",
