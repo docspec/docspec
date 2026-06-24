@@ -181,6 +181,32 @@ async fn post_conversion_empty_body() {
 }
 
 #[tokio::test]
+async fn post_conversion_accepts_body_over_axum_default_limit() {
+    // Reason: axum's `Bytes` extractor caps request bodies at
+    // `const DEFAULT_LIMIT: usize = 2_097_152;` (2 MiB) by default. The
+    // router disables this via `DefaultBodyLimit::disable()` to honor the
+    // README's `Body size: No limit` pledge. A body of 2 MiB + 1 byte
+    // would 413 before this fix — verifying 200 OK here is the regression
+    // guard.
+    const TWO_MIB: usize = 2 * 1024 * 1024;
+    let large_body = "a".repeat(TWO_MIB + 1);
+
+    let response = app()
+        .oneshot(post_markdown(large_body))
+        .await
+        .expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content-type present"),
+        OUTPUT_MIME
+    );
+}
+
+#[tokio::test]
 async fn post_conversion_missing_content_type() {
     let request = common::request("POST", "/conversion", &[], Body::from("# Hello"));
 

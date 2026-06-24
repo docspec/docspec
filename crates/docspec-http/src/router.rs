@@ -25,6 +25,7 @@ impl MakeRequestId for EchoOnly {
 #[inline]
 pub fn router() -> Router {
     use axum::body::Body;
+    use axum::extract::DefaultBodyLimit;
     use axum::http::header::HeaderName;
     use axum::middleware::{self, Next};
     use axum::routing::{get, post};
@@ -85,6 +86,12 @@ pub fn router() -> Router {
         .fallback(not_found)
         .layer(
             ServiceBuilder::new()
+                // Reason: axum's `Bytes`/`String`/`Json` extractors silently
+                // cap request bodies at 2 MiB by default. The README pledges
+                // `Body size: No limit ... DoS risk is accepted.`, so we
+                // disable the cap globally. Without this layer the
+                // `/conversion` handler would 413 on bodies >2 MiB.
+                .layer(DefaultBodyLimit::disable())
                 .layer(SetRequestIdLayer::new(
                     x_request_id.clone(),
                     MakeRequestUuid,
