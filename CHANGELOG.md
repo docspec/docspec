@@ -12,6 +12,16 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.18.3](https://github.com/docspec/docspec/compare/v1.18.2...v1.18.3) - 2026-06-24
+
+### Fixed
+
+- *(http)* remove default 2 MiB request body cap
+
+### Other
+
+- update Cargo.lock dependencies
+
 ## [1.18.2](https://github.com/docspec/docspec/compare/v1.18.1...v1.18.2) - 2026-06-24
 
 ### Fixed
