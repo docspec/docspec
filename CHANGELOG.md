@@ -12,6 +12,19 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.18.1](https://github.com/docspec/docspec/compare/v1.18.0...v1.18.1) - 2026-06-24
+
+### Fixed
+
+- *(docx-reader)* migrate paragraph-level parsing to recursive descent
+- *(docx-reader)* migrate run-level parsing to recursive descent
+
+### Other
+
+- *(docx-reader)* replace denied state machine with read_to_end_into and remove dead dispatch
+- *(docx-reader)* migrate table parsing to recursive descent
+- *(docx-reader)* migrate hyperlink parsing to recursive descent
+
 ## [1.18.0](https://github.com/docspec/docspec/compare/v1.17.0...v1.18.0) - 2026-06-23
 
 ### Added
