@@ -1001,6 +1001,7 @@ impl DocumentReader {
     ) {
         match block_kind {
             ParagraphBlockKind::Paragraph => {
+                self.flush_list_stack();
                 self.queue.push_back(Event::StartParagraph {
                     alignment: props.alignment.clone(),
                     id: None,
@@ -2239,6 +2240,23 @@ mod tests {
     <w:lvl w:ilvl="1"><w:numFmt w:val="decimal"/></w:lvl>
 </w:abstractNum>
 <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>"#,
+        );
+        crate::numbering::parse_numbering(Cursor::new(xml.into_bytes()))
+            .expect("valid numbering XML")
+    }
+
+    fn two_decimal_numbering() -> crate::numbering::MinimalNumbering {
+        let xml = numbering_xml(
+            r#"<w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>
+    <w:lvl w:ilvl="1"><w:numFmt w:val="decimal"/></w:lvl>
+</w:abstractNum>
+<w:abstractNum w:abstractNumId="2">
+    <w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl>
+    <w:lvl w:ilvl="1"><w:numFmt w:val="decimal"/></w:lvl>
+</w:abstractNum>
+<w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+<w:num w:numId="2"><w:abstractNumId w:val="2"/></w:num>"#,
         );
         crate::numbering::parse_numbering(Cursor::new(xml.into_bytes()))
             .expect("valid numbering XML")
@@ -4072,7 +4090,7 @@ mod tests {
     }
 
     #[test]
-    fn non_list_paragraph_between_list_items_attaches_as_continuation() {
+    fn non_list_paragraph_between_list_items_breaks_list() {
         let body = format!(
             "{}{}{}",
             list_paragraph(1, 0, "one"),
@@ -4104,6 +4122,7 @@ mod tests {
                     content: "one".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartParagraph {
                     alignment: None,
                     id: None,
@@ -4112,7 +4131,6 @@ mod tests {
                     content: "plain".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
-                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
@@ -4508,7 +4526,7 @@ mod tests {
     }
 
     #[test]
-    fn multiple_continuation_paragraphs_attach_to_same_item() {
+    fn multiple_plain_paragraphs_after_list_item_emit_as_top_level_siblings() {
         let body = format!(
             "{}{}{}{}",
             list_paragraph(1, 0, "one"),
@@ -4541,6 +4559,7 @@ mod tests {
                     content: "one".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartParagraph {
                     alignment: None,
                     id: None,
@@ -4557,7 +4576,6 @@ mod tests {
                     content: "second continuation".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
-                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
@@ -4579,7 +4597,7 @@ mod tests {
     }
 
     #[test]
-    fn trailing_continuation_paragraphs_close_with_list_at_document_end() {
+    fn trailing_plain_paragraphs_after_list_at_document_end_emit_as_top_level_siblings() {
         let body = format!(
             "{}{}{}",
             list_paragraph(1, 0, "one"),
@@ -4611,6 +4629,7 @@ mod tests {
                     content: "one".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartParagraph {
                     alignment: None,
                     id: None,
@@ -4627,14 +4646,13 @@ mod tests {
                     content: "trailing second".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
-                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::EndDocument,
             ]
         );
     }
 
     #[test]
-    fn continuation_then_deeper_level_nests_under_continuation_owner() {
+    fn plain_paragraph_then_deeper_level_starts_new_list_with_phantom_level_zero_wrapper() {
         let body = format!(
             "{}{}{}",
             list_paragraph(1, 0, "outer"),
@@ -4666,6 +4684,7 @@ mod tests {
                     content: "outer".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartParagraph {
                     alignment: None,
                     id: None,
@@ -4674,6 +4693,12 @@ mod tests {
                     content: "continuation".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 1,
@@ -4696,7 +4721,7 @@ mod tests {
     }
 
     #[test]
-    fn continuation_paragraph_inside_table_cell_attaches_then_cell_end_closes_list() {
+    fn plain_paragraph_inside_table_cell_breaks_list_immediately() {
         let body = format!(
             "<w:tbl><w:tr><w:tc>{}{}</w:tc></w:tr></w:tbl>",
             list_paragraph(1, 0, "cell item"),
@@ -4734,6 +4759,7 @@ mod tests {
                     content: "cell item".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartParagraph {
                     alignment: None,
                     id: None,
@@ -4742,7 +4768,6 @@ mod tests {
                     content: "continuation".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
-                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::EndTableCell,
                 docspec_core::Event::EndTableRow,
                 docspec_core::Event::EndTable,
@@ -4921,6 +4946,7 @@ mod tests {
                     content: "Two".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartParagraph {
                     alignment: None,
                     id: None,
@@ -4929,7 +4955,6 @@ mod tests {
                     content: "An interruption in our regularly scheduled listing, for this essential and very relevant public service announcement.".to_string(),
                 },
                 docspec_core::Event::EndParagraph,
-                docspec_core::Event::EndOrderedListItem,
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("7".to_string()),
                     level: 0,
@@ -4960,6 +4985,176 @@ mod tests {
                 },
                 docspec_core::Event::EndParagraph,
                 docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn different_num_id_at_same_level_emits_two_distinct_lists() {
+        let body = format!(
+            "{}{}",
+            list_paragraph(1, 0, "first"),
+            list_paragraph(2, 0, "second")
+        );
+        let doc = document_with_body(&body);
+        let mut reader = make_reader_with_numbering(&doc, two_decimal_numbering());
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "first".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("2".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "second".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn plain_paragraph_between_two_same_num_id_lists_breaks_list_preserves_counter() {
+        let body = format!(
+            "{}{}{}",
+            list_paragraph(1, 0, "one"),
+            plain_paragraph("interrupt"),
+            list_paragraph(1, 0, "two")
+        );
+        let doc = document_with_body(&body);
+        let mut reader = make_reader_with_numbering(&doc, decimal_numbering());
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "one".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "interrupt".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: None,
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "two".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn trailing_plain_paragraphs_after_list_emit_as_top_level_siblings() {
+        let body = format!(
+            "{}{}{}",
+            list_paragraph(1, 0, "item"),
+            plain_paragraph("tail1"),
+            plain_paragraph("tail2")
+        );
+        let doc = document_with_body(&body);
+        let mut reader = make_reader_with_numbering(&doc, decimal_numbering());
+        let events = collect_events(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                docspec_core::Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                docspec_core::Event::StartOrderedListItem {
+                    id: Some("1".to_string()),
+                    level: 0,
+                    start: Some(1),
+                    style_type: ListStyleType::Decimal,
+                },
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "item".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::EndOrderedListItem,
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "tail1".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
+                docspec_core::Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                docspec_core::Event::Text {
+                    content: "tail2".to_string(),
+                },
+                docspec_core::Event::EndParagraph,
                 docspec_core::Event::EndDocument,
             ]
         );
