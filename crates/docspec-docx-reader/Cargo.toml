@@ -12,7 +12,7 @@ exclude = ["tests/fixtures/**", "tests/snapshots/**"]
 
 [dependencies]
 docspec-core = { workspace = true }
-quick-xml = "0.40"
+quick-xml = "0.41"
 zip = { version = "8", default-features = false, features = ["deflate"] }
 flate2 = "1"
 
