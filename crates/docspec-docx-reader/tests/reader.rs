@@ -7,6 +7,7 @@
     clippy::redundant_test_prefix,
     clippy::std_instead_of_core,
     clippy::tests_outside_test_module,
+    clippy::too_many_lines,
     clippy::unwrap_used
 )]
 
@@ -7123,7 +7124,7 @@ mod cross_feature_lists {
     }
 
     #[test]
-    fn same_num_id_continuation_paragraph_attaches_and_second_item_keeps_start_none() {
+    fn plain_paragraph_between_same_num_id_items_breaks_list_but_preserves_counter() {
         let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
@@ -7143,10 +7144,10 @@ mod cross_feature_lists {
                 start_paragraph(),
                 text("one"),
                 Event::EndParagraph,
+                Event::EndOrderedListItem,
                 start_paragraph(),
                 text("break"),
                 Event::EndParagraph,
-                Event::EndOrderedListItem,
                 start_ordered("1", None),
                 start_paragraph(),
                 text("two"),
@@ -7275,6 +7276,118 @@ mod cross_feature_lists {
                 Event::EndTableCell,
                 Event::EndTableRow,
                 Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn two_distinct_num_id_lists_with_intervening_plain_paragraphs_emit_as_separate_lists() {
+        let numbering_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="0">
+    <w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:lvlJc w:val="left"/></w:lvl>
+  </w:abstractNum>
+  <w:abstractNum w:abstractNumId="1">
+    <w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:lvlJc w:val="left"/></w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="7"><w:abstractNumId w:val="0"/></w:num>
+  <w:num w:numId="8"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#;
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:pPr><w:numPr><w:numId w:val="7"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>L1-1</w:t></w:r></w:p>
+    <w:p><w:pPr><w:numPr><w:numId w:val="7"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>L1-2</w:t></w:r></w:p>
+    <w:p><w:pPr><w:numPr><w:numId w:val="7"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>L1-3</w:t></w:r></w:p>
+    <w:p><w:pPr><w:numPr><w:numId w:val="7"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>L1-4</w:t></w:r></w:p>
+    <w:p><w:pPr><w:numPr><w:numId w:val="7"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>L1-5</w:t></w:r></w:p>
+    <w:p><w:pPr><w:numPr><w:numId w:val="7"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>L1-6</w:t></w:r></w:p>
+    <w:p><w:r><w:t>NOTE ...</w:t></w:r></w:p>
+    <w:p><w:r><w:t>In addition ...</w:t></w:r></w:p>
+    <w:p><w:pPr><w:numPr><w:numId w:val="8"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>L2-1</w:t></w:r></w:p>
+    <w:p><w:pPr><w:numPr><w:numId w:val="8"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>L2-2</w:t></w:r></w:p>
+    <w:p><w:pPr><w:numPr><w:numId w:val="8"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>L2-3</w:t></w:r></w:p>
+    <w:p><w:pPr><w:numPr><w:numId w:val="8"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>L2-4</w:t></w:r></w:p>
+    <w:p><w:pPr><w:numPr><w:numId w:val="8"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>L2-5</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Thank you</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Signatures</w:t></w:r></w:p>
+  </w:body>
+</w:document>"#;
+
+        let events = collect_events(build_docx(document_xml, numbering_xml));
+
+        assert_eq!(
+            events,
+            vec![
+                start_document(),
+                start_ordered("7", Some(1)),
+                start_paragraph(),
+                text("L1-1"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                start_ordered("7", None),
+                start_paragraph(),
+                text("L1-2"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                start_ordered("7", None),
+                start_paragraph(),
+                text("L1-3"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                start_ordered("7", None),
+                start_paragraph(),
+                text("L1-4"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                start_ordered("7", None),
+                start_paragraph(),
+                text("L1-5"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                start_ordered("7", None),
+                start_paragraph(),
+                text("L1-6"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                start_paragraph(),
+                text("NOTE ..."),
+                Event::EndParagraph,
+                start_paragraph(),
+                text("In addition ..."),
+                Event::EndParagraph,
+                start_ordered("8", Some(1)),
+                start_paragraph(),
+                text("L2-1"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                start_ordered("8", None),
+                start_paragraph(),
+                text("L2-2"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                start_ordered("8", None),
+                start_paragraph(),
+                text("L2-3"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                start_ordered("8", None),
+                start_paragraph(),
+                text("L2-4"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                start_ordered("8", None),
+                start_paragraph(),
+                text("L2-5"),
+                Event::EndParagraph,
+                Event::EndOrderedListItem,
+                start_paragraph(),
+                text("Thank you"),
+                Event::EndParagraph,
+                start_paragraph(),
+                text("Signatures"),
+                Event::EndParagraph,
                 Event::EndDocument,
             ]
         );

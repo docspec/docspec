@@ -1,5 +1,6 @@
 ---
 source: crates/docspec-docx-reader/tests/snapshots.rs
+assertion_line: 56
 expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
@@ -40,6 +41,8 @@ ReaderFixtureSnapshot {
     Text { content: " " },
     Text { content: "list" },
     EndParagraph,
+    EndUnorderedListItem,
+    EndUnorderedListItem,
     StartParagraph { alignment: None, id: None },
     Text { content: "Back " },
     Text { content: "to" },
@@ -48,8 +51,6 @@ ReaderFixtureSnapshot {
     Text { content: "level" },
     Text { content: "." },
     EndParagraph,
-    EndUnorderedListItem,
-    EndUnorderedListItem,
     EndDocument,
   ],
   terminal: Ok,

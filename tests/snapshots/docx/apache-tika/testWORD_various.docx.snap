@@ -1,5 +1,6 @@
 ---
 source: crates/docspec-docx-reader/tests/snapshots.rs
+assertion_line: 56
 expression: from_reader_snapshot
 ---
 ReaderFixtureSnapshot {
@@ -105,10 +106,10 @@ ReaderFixtureSnapshot {
     StartParagraph { alignment: None, id: None },
     Text { content: "Bullet 3" },
     EndParagraph,
+    EndUnorderedListItem,
     StartParagraph { alignment: None, id: None },
     Text { content: "Here is a numbered list:" },
     EndParagraph,
-    EndUnorderedListItem,
     StartOrderedListItem { id: Some("2"), level: 0, start: Some(1), style_type: Decimal },
     StartParagraph { alignment: None, id: None },
     Text { content: "Number bullet 1" },
@@ -123,6 +124,7 @@ ReaderFixtureSnapshot {
     StartParagraph { alignment: None, id: None },
     Text { content: "Number bullet 3" },
     EndParagraph,
+    EndOrderedListItem,
     StartParagraph { alignment: None, id: None },
     EndParagraph,
     StartParagraph { alignment: None, id: None },
@@ -144,7 +146,6 @@ ReaderFixtureSnapshot {
     EndParagraph,
     StartParagraph { alignment: None, id: None },
     EndParagraph,
-    EndOrderedListItem,
     StartTable { id: None },
     StartTableRow { id: None },
     StartTableCell { colspan: None, id: None, rowspan: None },
