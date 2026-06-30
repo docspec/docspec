@@ -70,7 +70,11 @@ jobs:
 
   release-plz-pr:
     name: Open / update release PR
-    needs: [test, clippy, fmt, docker-build]
+    # Must run AFTER `release-plz-release` so the new tag and crates.io publish
+    # are visible. Otherwise the PR job computes the next-version diff against
+    # the still-old crates.io baseline and re-includes commits the release job
+    # is in the middle of publishing, producing duplicate CHANGELOG entries.
+    needs: [test, clippy, fmt, docker-build, release-plz-release]
     if: >-
       github.event_name == 'push'
       && github.ref == 'refs/heads/main'
