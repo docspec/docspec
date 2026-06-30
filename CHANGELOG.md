@@ -12,6 +12,12 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.20.0](https://github.com/docspec/docspec/compare/v1.19.0...v1.20.0) - 2026-06-30
+
+### Added
+
+- *(docx-reader)* emit effective counter as start value on list resumption
+
 ## [1.19.0](https://github.com/docspec/docspec/compare/v1.18.3...v1.19.0) - 2026-06-30
 
 ### Added
