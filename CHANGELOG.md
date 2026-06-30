@@ -12,6 +12,17 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.18.3](https://github.com/docspec/docspec/compare/v1.18.2...v1.18.3) - 2026-06-30
+
+### Fixed
+
+- *(docx-reader)* eagerly close lists on non-numbered paragraphs
+- *(deps)* update rust crate quick-xml to 0.41
+
+### Other
+
+- update Cargo.lock dependencies
+
 ## [1.18.2](https://github.com/docspec/docspec/compare/v1.18.1...v1.18.2) - 2026-06-24
 
 ### Fixed
