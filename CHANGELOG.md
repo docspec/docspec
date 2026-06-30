@@ -12,6 +12,16 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.21.0](https://github.com/docspec/docspec/compare/v1.20.0...v1.21.0) - 2026-06-30
+
+### Added
+
+- *(docx-reader)* emit effective counter as start value on list resumption
+
+### Other
+
+- update Cargo.lock dependencies
+
 ## [1.20.0](https://github.com/docspec/docspec/compare/v1.19.0...v1.20.0) - 2026-06-30
 
 ### Added
