@@ -432,20 +432,25 @@ impl DocumentReader {
         acc: &mut RunPropertyAccumulator,
     ) -> bool {
         match local {
-            b"b" | b"bCs" => {
+            b"b" => {
                 Self::set_resolved_run_kind(
                     &mut acc.kinds,
                     TextStyleKind::Bold,
                     parse_on_off_attribute(tag),
                 );
             }
-            b"i" | b"iCs" => {
+            b"i" => {
                 Self::set_resolved_run_kind(
                     &mut acc.kinds,
                     TextStyleKind::Italic,
                     parse_on_off_attribute(tag),
                 );
             }
+            // <w:bCs> per ECMA-376 §17.3.2.2 and <w:iCs> per §17.3.2.21 apply only
+            // to complex-script runs. DocSpec runs are not complex-script, so these
+            // properties are silently ignored; §17.3.2.1 governs <w:b> and §17.3.2.20
+            // governs <w:i> for non-complex-script text.
+            b"bCs" | b"iCs" => {}
             b"strike" | b"dstrike" => {
                 Self::set_resolved_run_kind(
                     &mut acc.kinds,
@@ -2482,6 +2487,124 @@ mod tests {
                 },
                 Event::Text {
                     content: "bold".to_string(),
+                },
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn b_cs_alone_does_not_emit_bold() {
+        let doc =
+            document_with_body("<w:p><w:r><w:rPr><w:bCs/></w:rPr><w:t>text</w:t></w:r></w:p>");
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::Text {
+                    content: "text".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn i_cs_alone_does_not_emit_italic() {
+        let doc =
+            document_with_body("<w:p><w:r><w:rPr><w:iCs/></w:rPr><w:t>text</w:t></w:r></w:p>");
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::Text {
+                    content: "text".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn b_with_b_cs_still_emits_bold_once() {
+        let doc = document_with_body(
+            "<w:p><w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t>bold</w:t></w:r></w:p>",
+        );
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                Event::Text {
+                    content: "bold".to_string(),
+                },
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn b_with_b_cs_off_still_emits_bold() {
+        let doc = document_with_body(
+            r#"<w:p><w:r><w:rPr><w:b/><w:bCs w:val="false"/></w:rPr><w:t>bold</w:t></w:r></w:p>"#,
+        );
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                Event::Text {
+                    content: "bold".to_string(),
+                },
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn i_with_i_cs_still_emits_italic_once() {
+        let doc = document_with_body(
+            "<w:p><w:r><w:rPr><w:i/><w:iCs/></w:rPr><w:t>italic</w:t></w:r></w:p>",
+        );
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Italic,
+                    id: None,
+                },
+                Event::Text {
+                    content: "italic".to_string(),
                 },
                 Event::EndTextStyle,
                 Event::EndParagraph,
