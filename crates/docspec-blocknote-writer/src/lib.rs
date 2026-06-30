@@ -158,7 +158,7 @@ pub mod palette;
 use std::io::Write;
 
 use docspec_core::{
-    Depth, Error, Event, EventSink, ImageSource, Result, TextAlignment, TextStyleKind,
+    BlockKind, Depth, Error, Event, EventSink, ImageSource, Result, TextAlignment, TextStyleKind,
 };
 use docspec_json::{JsonEmitter, Null, StrusonBackend};
 
@@ -169,32 +169,6 @@ macro_rules! close_text_block {
         $writer.context.in_text_block = false;
         Ok(())
     }};
-}
-
-macro_rules! return_if_table_cell {
-    ($writer:expr) => {
-        if $writer.context.in_table_cell {
-            return Ok(());
-        }
-    };
-}
-
-macro_rules! drop_block_in_list_start {
-    ($writer:expr) => {
-        if $writer.in_any_list_item() || $writer.drop_inside_list_depth.is_positive() {
-            $writer.drop_inside_list_depth.inc();
-            return Ok(());
-        }
-    };
-}
-
-macro_rules! drop_block_in_list_end {
-    ($writer:expr) => {
-        if $writer.drop_inside_list_depth.is_positive() {
-            $writer.drop_inside_list_depth.dec();
-            return Ok(());
-        }
-    };
 }
 
 /// Represents the kind of list (ordered or unordered).
@@ -212,6 +186,68 @@ enum ListContentState {
     Open,
     Closed,
 }
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+enum BlockquoteContentState {
+    /// Quote is open but no content has been emitted yet.
+    /// The writer has NOT yet decided whether to open `"content": [` or `"children": [`.
+    #[default]
+    Pending,
+    /// `"content": [` is open and we're emitting inline content into it.
+    InContent,
+    /// `"content": []` has been written and closed; `"children": [` is open
+    /// and we're emitting block children into it.
+    InChildren,
+}
+
+#[derive(Debug)]
+enum DrainDestination {
+    DocumentRoot,
+    Ancestor {
+        ancestor_index: usize,
+        kind: BlockKind,
+    },
+}
+
+/// Block-level events that are leaves (no Start/End counterpart) in the `DocSpec` stream.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum BlockLeafKind {
+    Image,
+    Divider,
+}
+
+/// Represents a potential child block kind for the `blocknote_accepts_child` predicate.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum ChildKind {
+    Container(BlockKind),
+    Leaf(BlockLeafKind),
+}
+
+/// Returns true iff `BlockNote`'s default schema allows `child` to appear inside `parent`.
+/// Captures the schema constraint, NOT writer policy (drop/lift is the policy layer).
+fn blocknote_accepts_child(parent: Option<BlockKind>, child: ChildKind) -> bool {
+    match parent {
+        None => true,
+        Some(
+            BlockKind::Blockquote
+            | BlockKind::Heading
+            | BlockKind::OrderedListItem
+            | BlockKind::UnorderedListItem,
+        ) => !matches!(
+            child,
+            ChildKind::Container(
+                BlockKind::TableRow | BlockKind::TableCell | BlockKind::TableHeader
+            )
+        ),
+        Some(_) => false,
+    }
+}
+
+const _: BlockLeafKind = BlockLeafKind::Image;
+const _: BlockLeafKind = BlockLeafKind::Divider;
+const _: ChildKind = ChildKind::Container(BlockKind::Paragraph);
+const _: ChildKind = ChildKind::Leaf(BlockLeafKind::Image);
+const _: fn(Option<BlockKind>, ChildKind) -> bool = blocknote_accepts_child;
 
 /// Represents a single entry in the list stack, tracking list nesting state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -256,34 +292,39 @@ fn non_default_alignment_value(alignment: Option<&TextAlignment>) -> Option<&'st
 /// * `W` - Any type implementing [`Write`]
 pub struct BlockNoteWriter<W: Write> {
     blockquote_depth: Depth,
-    blockquote_force_closed_count: Depth,
+    /// Per-blockquote content state stack. One entry is pushed on each `StartBlockQuote` and
+    /// popped on the matching `EndBlockQuote`. Tracks whether the current blockquote has opened
+    /// its `"content": [` array (inline content), its `"children": [` array (block children),
+    /// or neither yet (pending).
+    blockquote_content_states: Vec<BlockquoteContentState>,
     context: BlockContext,
-    drop_inside_list_depth: Depth,
-    dropped_list_depth: Depth,
     /// Whether the writer is currently inside an open link inline container.
     in_link: bool,
     json: JsonEmitter<StrusonBackend<W>>,
     /// Whether at least one `StyledText` has been emitted into the current link's content array.
     link_emitted_styled_text: bool,
     /// Events deferred for replay at the outermost `EndTable` as top-level siblings:
-    /// nested-table substreams and in-cell `Image` events. Both are illegal inside
-    /// `BlockNote`'s `tableCell.content`; co-buffering preserves their document order.
+    /// nested-table substreams, in-cell `Image` events, and block-level events started
+    /// inside a table cell. All are illegal inside `BlockNote`'s `tableCell.content`;
+    /// co-buffering preserves their document order.
     lifted_nested_events: Vec<Event>,
+    /// Tracks nesting depth of non-table block-level subtrees currently being buffered
+    /// for lift (e.g. a heading or blockquote that started inside a table cell). Increments
+    /// on each non-table block-level start event while buffering; decrements on the
+    /// matching end. Zero means we are not currently inside such a subtree.
+    lifted_subtree_depth: Depth,
     list_stack: Vec<ListStackEntry>,
+    /// Ordered stack of open block containers in emission order.
+    /// Pushed when an outer container is opened in the EMITTED output (not while buffering).
+    /// Used to compute the nearest valid drain destination for lifted events.
+    /// Contains: `Blockquote`, `OrderedListItem`, `UnorderedListItem`, `Table` (tables listed for
+    /// completeness but never serve as drain destinations per predicate).
+    open_block_ancestors: Vec<BlockKind>,
     open_styles: Vec<TextStyleKind>,
     table_depth: Depth,
 }
 
 impl<W: Write> BlockNoteWriter<W> {
-    fn close_blockquote_for_sibling(&mut self) -> Result<()> {
-        self.close_open_link_if_any()?;
-        self.close_content_block()?;
-        self.blockquote_depth.dec();
-        self.blockquote_force_closed_count.inc();
-        self.context.in_text_block = self.blockquote_depth.is_positive();
-        Ok(())
-    }
-
     fn close_content_block(&mut self) -> Result<()> {
         self.json.close_array()?;
         self.json.key("children").array(|_| Ok(()))?;
@@ -300,6 +341,10 @@ impl<W: Write> BlockNoteWriter<W> {
         }
         let popped_entry = self.list_stack.pop();
         if let Some(list_entry) = popped_entry {
+            let ancestor_kind = match list_entry.kind {
+                ListKind::Ordered => BlockKind::OrderedListItem,
+                ListKind::Unordered => BlockKind::UnorderedListItem,
+            };
             if list_entry.content_state == ListContentState::Open {
                 self.close_open_link_if_any()?;
                 self.json.close_array()?;
@@ -310,6 +355,7 @@ impl<W: Write> BlockNoteWriter<W> {
                 self.json.key("children").array(|_| Ok(()))?;
             }
             self.json.close_object()?;
+            self.pop_ancestor(ancestor_kind);
         }
         Ok(())
     }
@@ -319,7 +365,7 @@ impl<W: Write> BlockNoteWriter<W> {
             self.close_open_list_items()?;
         }
         if self.blockquote_depth.is_positive() {
-            return self.close_blockquote_for_sibling();
+            return self.prepare_blockquote_children();
         }
         if self.context.in_text_block {
             self.close_open_link_if_any()?;
@@ -352,10 +398,46 @@ impl<W: Write> BlockNoteWriter<W> {
         self.json.open_object()?;
         self.json.key("type").value("quote")?;
         self.write_id(id)?;
-        self.json.key("content").open_array()?;
         self.blockquote_depth.inc();
+        self.blockquote_content_states
+            .push(BlockquoteContentState::Pending);
+        self.open_block_ancestors.push(BlockKind::Blockquote);
         self.context.blockquote_has_content = false;
-        self.context.in_text_block = true;
+        Ok(())
+    }
+
+    fn prepare_blockquote_inline_content(&mut self) -> Result<()> {
+        if self.blockquote_content_states.last() == Some(&BlockquoteContentState::Pending) {
+            self.json.key("content").open_array()?;
+            if let Some(state) = self.blockquote_content_states.last_mut() {
+                *state = BlockquoteContentState::InContent;
+            }
+            self.context.in_text_block = true;
+        }
+        Ok(())
+    }
+
+    fn prepare_blockquote_children(&mut self) -> Result<()> {
+        match self.blockquote_content_states.last().copied() {
+            Some(BlockquoteContentState::Pending) => {
+                self.json.key("content").open_array()?;
+                self.json.close_array()?;
+                self.json.key("children").open_array()?;
+                if let Some(state) = self.blockquote_content_states.last_mut() {
+                    *state = BlockquoteContentState::InChildren;
+                }
+            }
+            Some(BlockquoteContentState::InContent) => {
+                self.close_open_link_if_any()?;
+                self.json.close_array()?;
+                self.context.in_text_block = false;
+                self.json.key("children").open_array()?;
+                if let Some(state) = self.blockquote_content_states.last_mut() {
+                    *state = BlockquoteContentState::InChildren;
+                }
+            }
+            Some(BlockquoteContentState::InChildren) | None => {}
+        }
         Ok(())
     }
 
@@ -394,10 +476,6 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn handle_end_list_item(&mut self) -> Result<()> {
-        if self.dropped_list_depth.is_positive() {
-            self.dropped_list_depth.dec();
-            return Ok(());
-        }
         if self.list_stack.is_empty() {
             return Ok(());
         }
@@ -405,10 +483,10 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn handle_end_paragraph(&mut self) -> Result<()> {
-        if self.drop_inside_list_depth.is_positive() || self.dropped_list_depth.is_positive() {
-            return Ok(());
-        }
+        let in_current_blockquote_list_item =
+            self.blockquote_depth.is_positive() && self.current_blockquote_contains_list_item();
         if !self.list_stack.is_empty()
+            && (self.blockquote_depth.is_zero() || in_current_blockquote_list_item)
             && self
                 .list_stack
                 .last()
@@ -421,6 +499,15 @@ impl<W: Write> BlockNoteWriter<W> {
             self.json.close_object()?;
             self.context.in_text_block = false;
             return Ok(());
+        }
+        if self.blockquote_depth.is_positive()
+            && self.context.in_text_block
+            && self
+                .blockquote_content_states
+                .last()
+                .is_some_and(|state| *state == BlockquoteContentState::InChildren)
+        {
+            return close_text_block!(self);
         }
         if self.in_list_item_content() {
             if let Some(entry) = self.list_stack.last_mut() {
@@ -438,7 +525,6 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn handle_end_table(&mut self) -> Result<()> {
-        drop_block_in_list_end!(self);
         if self.table_depth.is_zero() {
             return Ok(());
         }
@@ -446,14 +532,12 @@ impl<W: Write> BlockNoteWriter<W> {
         self.json.close_object()?;
         self.json.key("children").array(|_| Ok(()))?;
         self.json.close_object()?;
-        self.table_depth.reset();
+        self.pop_ancestor(BlockKind::Table);
+        self.table_depth.dec();
         Ok(())
     }
 
     fn handle_end_table_cell(&mut self) -> Result<()> {
-        if self.drop_inside_list_depth.is_positive() {
-            return Ok(());
-        }
         self.close_open_link_if_any()?;
         self.json.close_array()?;
         self.json.close_object()?;
@@ -462,27 +546,40 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn handle_end_table_row(&mut self) -> Result<()> {
-        if self.drop_inside_list_depth.is_positive() {
-            return Ok(());
-        }
         self.json.close_array()?;
         self.json.close_object()
     }
 
     fn handle_end_blockquote(&mut self) -> Result<()> {
-        drop_block_in_list_end!(self);
-        return_if_table_cell!(self);
-        if self.blockquote_force_closed_count.is_positive() {
-            self.blockquote_force_closed_count.dec();
+        if self.blockquote_depth.is_zero() {
             return Ok(());
         }
-        if self.blockquote_depth.is_zero() || !self.context.in_text_block {
-            return Ok(());
+        let state = self.blockquote_content_states.pop().unwrap_or_default();
+        match state {
+            BlockquoteContentState::Pending => {
+                self.json.key("content").open_array()?;
+                self.json.close_array()?;
+                self.json.key("children").open_array()?;
+                self.json.close_array()?;
+            }
+            BlockquoteContentState::InContent => {
+                self.close_open_link_if_any()?;
+                self.json.close_array()?;
+                self.context.in_text_block = false;
+                self.json.key("children").open_array()?;
+                self.json.close_array()?;
+            }
+            BlockquoteContentState::InChildren => {
+                self.json.close_array()?;
+            }
         }
-        self.close_open_link_if_any()?;
-        self.close_content_block()?;
+        self.pop_ancestor(BlockKind::Blockquote);
         self.blockquote_depth.dec();
-        self.context.in_text_block = self.blockquote_depth.is_positive();
+        self.context.in_text_block = self
+            .blockquote_content_states
+            .last()
+            .is_some_and(|s| *s == BlockquoteContentState::InContent);
+        self.json.close_object()?;
         Ok(())
     }
 
@@ -504,13 +601,7 @@ impl<W: Write> BlockNoteWriter<W> {
         alt: Option<String>,
         id: Option<&str>,
     ) -> Result<()> {
-        if self.context.in_table_cell || self.drop_inside_list_depth.is_positive() {
-            return Ok(());
-        }
-        if self.in_any_list_item() {
-            return Ok(());
-        }
-        self.close_for_block_sibling()?;
+        self.prepare_for_child_block()?;
         let caption = alt.unwrap_or_default();
 
         match source {
@@ -561,9 +652,6 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn handle_line_break(&mut self) -> Result<()> {
-        if self.drop_inside_list_depth.is_positive() {
-            return Ok(());
-        }
         if self.context.in_text_block || self.context.in_table_cell || self.in_list_item_content() {
             self.handle_text("\n")
         } else {
@@ -580,15 +668,13 @@ impl<W: Write> BlockNoteWriter<W> {
         if self.context.in_table_cell {
             return Ok(());
         }
-        // Paragraphs nested inside a dropped block must not mutate list state or emit JSON;
-        // they are absorbed along with the surrounding dropped block.
-        if self.drop_inside_list_depth.is_positive() || self.dropped_list_depth.is_positive() {
-            return Ok(());
-        }
+        let in_current_blockquote_list_item =
+            self.blockquote_depth.is_positive() && self.current_blockquote_contains_list_item();
         // Second and subsequent paragraphs inside a list item dispatch as child paragraph blocks
         // in the item's children[] array (T11). Must be checked before in_list_item_content()
         // because content may still be open when first_paragraph_consumed is set.
         if !self.list_stack.is_empty()
+            && (self.blockquote_depth.is_zero() || in_current_blockquote_list_item)
             && self
                 .list_stack
                 .last()
@@ -621,14 +707,30 @@ impl<W: Write> BlockNoteWriter<W> {
             self.context.in_text_block = true;
             return Ok(());
         }
-        if !self.list_stack.is_empty() {
+        if !self.list_stack.is_empty()
+            && (self.blockquote_depth.is_zero() || in_current_blockquote_list_item)
+        {
             self.initialize_current_list_item_content(alignment)?;
             return Ok(());
         }
         if self.blockquote_depth.is_positive() {
+            if self
+                .blockquote_content_states
+                .last()
+                .is_some_and(|state| *state == BlockquoteContentState::InChildren)
+            {
+                self.json.open_object()?;
+                self.write_id(id)?;
+                self.json.key("type").value("paragraph")?;
+                self.write_paragraph_props(alignment)?;
+                self.json.key("content").open_array()?;
+                self.context.in_text_block = true;
+                return Ok(());
+            }
             if self.context.blockquote_has_content {
                 self.handle_text("\n\n")?;
             }
+            self.prepare_blockquote_inline_content()?;
             return Ok(());
         }
         self.json.open_object()?;
@@ -667,9 +769,6 @@ impl<W: Write> BlockNoteWriter<W> {
     ///
     /// Drops `title` and `id` — `BlockNote`'s inline link schema has no slot for these.
     fn handle_start_link(&mut self, href: &str) -> Result<()> {
-        if self.drop_inside_list_depth.is_positive() || self.dropped_list_depth.is_positive() {
-            return Ok(());
-        }
         if self.list_stack.last().is_some_and(|entry| {
             entry.content_state == ListContentState::Pending && !entry.first_paragraph_consumed
         }) {
@@ -712,6 +811,25 @@ impl<W: Write> BlockNoteWriter<W> {
         Ok(())
     }
 
+    fn current_blockquote_contains_list_item(&self) -> bool {
+        let Some(blockquote_index) = self
+            .open_block_ancestors
+            .iter()
+            .rposition(|kind| *kind == BlockKind::Blockquote)
+        else {
+            return false;
+        };
+        self.open_block_ancestors
+            .iter()
+            .skip(blockquote_index.saturating_add(1))
+            .any(|kind| {
+                matches!(
+                    kind,
+                    BlockKind::OrderedListItem | BlockKind::UnorderedListItem
+                )
+            })
+    }
+
     fn handle_start_list_item(
         &mut self,
         kind: ListKind,
@@ -719,12 +837,12 @@ impl<W: Write> BlockNoteWriter<W> {
         level: u32,
         start: Option<u64>,
     ) -> Result<()> {
-        if self.context.in_table_cell || self.drop_inside_list_depth.is_positive() {
-            self.dropped_list_depth.inc();
-            return Ok(());
-        }
         if self.blockquote_depth.is_positive() {
-            self.close_blockquote_for_sibling()?;
+            self.prepare_blockquote_children()?;
+            if !self.current_blockquote_contains_list_item() {
+                self.open_list_item_object(kind, id, level, start)?;
+                return Ok(());
+            }
         }
         if self.list_stack.is_empty() {
             self.close_for_block_sibling()?;
@@ -773,8 +891,7 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn handle_start_table(&mut self, id: Option<&str>) -> Result<()> {
-        drop_block_in_list_start!(self);
-        self.close_for_block_sibling()?;
+        self.prepare_for_child_block()?;
         self.json.open_object()?;
         self.json.key("type").value("table")?;
         self.write_id(id)?;
@@ -783,14 +900,12 @@ impl<W: Write> BlockNoteWriter<W> {
         self.json.key("columnWidths").array(|_| Ok(()))?;
         self.json.key("rows").open_array()?;
         self.table_depth.inc();
+        self.open_block_ancestors.push(BlockKind::Table);
         self.context.in_text_block = false;
         Ok(())
     }
 
     fn handle_start_table_row(&mut self, id: Option<&str>) -> Result<()> {
-        if self.drop_inside_list_depth.is_positive() {
-            return Ok(());
-        }
         self.json.open_object()?;
         self.write_id(id)?;
         self.json.key("cells").open_array()
@@ -820,9 +935,6 @@ impl<W: Write> BlockNoteWriter<W> {
         colspan: Option<u32>,
         rowspan: Option<u32>,
     ) -> Result<()> {
-        if self.drop_inside_list_depth.is_positive() {
-            return Ok(());
-        }
         self.json.open_object()?;
         self.json.key("type").value("tableCell")?;
         self.write_id(id)?;
@@ -844,11 +956,9 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn handle_text(&mut self, content: &str) -> Result<()> {
-        if self.drop_inside_list_depth.is_positive()
-            || self.dropped_list_depth.is_positive()
-            || (!self.context.in_text_block
-                && !self.context.in_table_cell
-                && !self.in_list_item_content())
+        if !self.context.in_text_block
+            && !self.context.in_table_cell
+            && !self.in_list_item_content()
         {
             return Ok(());
         }
@@ -922,14 +1032,14 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn handle_text_event(&mut self, content: &str) -> Result<()> {
-        if self.drop_inside_list_depth.is_positive() || self.dropped_list_depth.is_positive() {
-            return Ok(());
-        }
         // Auto-open paragraph for orphan text (e.g., text after image closed paragraph)
         if self.list_stack.last().is_some_and(|entry| {
             entry.content_state == ListContentState::Pending && !entry.first_paragraph_consumed
         }) {
             self.initialize_current_list_item_content(None)?;
+        }
+        if self.blockquote_depth.is_positive() && !self.context.in_text_block {
+            self.prepare_blockquote_inline_content()?;
         }
         if !self.context.in_text_block
             && self.blockquote_depth.is_zero()
@@ -939,17 +1049,6 @@ impl<W: Write> BlockNoteWriter<W> {
             self.handle_paragraph(None, None)?;
         }
         self.handle_text(content)
-    }
-
-    /// Returns true when any list item is currently open on the stack, regardless of whether
-    /// its `content[]` or `children[]` array is the active emission target. Drop trigger for
-    /// non-paragraph block events that must be suppressed anywhere inside a list item per the
-    /// module-level policy (headings, images, code blocks, blockquotes, tables, thematic
-    /// breaks). Broader than `in_list_item_content`, which is true only while `content[]` is
-    /// open — `in_any_list_item` also returns true after a multi-paragraph or nested-list
-    /// transition has moved emission into `children[]`.
-    fn in_any_list_item(&self) -> bool {
-        !self.list_stack.is_empty()
     }
 
     fn in_list_item_content(&self) -> bool {
@@ -968,17 +1067,60 @@ impl<W: Write> BlockNoteWriter<W> {
     pub fn new(writer: W) -> Self {
         Self {
             blockquote_depth: Depth::default(),
-            blockquote_force_closed_count: Depth::default(),
+            blockquote_content_states: Vec::new(),
             context: BlockContext::default(),
-            drop_inside_list_depth: Depth::default(),
-            dropped_list_depth: Depth::default(),
             in_link: false,
             json: JsonEmitter::new(StrusonBackend::new(writer)),
             lifted_nested_events: Vec::new(),
+            lifted_subtree_depth: Depth::default(),
             link_emitted_styled_text: false,
             list_stack: Vec::new(),
+            open_block_ancestors: Vec::new(),
             open_styles: Vec::new(),
             table_depth: Depth::default(),
+        }
+    }
+
+    fn current_drain_destination(&self) -> DrainDestination {
+        for (idx, kind) in self.open_block_ancestors.iter().enumerate().rev() {
+            if blocknote_accepts_child(Some(*kind), ChildKind::Container(BlockKind::Heading)) {
+                return DrainDestination::Ancestor {
+                    ancestor_index: idx,
+                    kind: *kind,
+                };
+            }
+        }
+        DrainDestination::DocumentRoot
+    }
+
+    fn compute_rebase_offset(&self, buffered: &[Event]) -> u32 {
+        let min_buffered_level = buffered
+            .iter()
+            .filter_map(|event| match event {
+                Event::StartOrderedListItem { level, .. }
+                | Event::StartUnorderedListItem { level, .. } => Some(*level),
+                _ => None,
+            })
+            .min();
+
+        let Some(min_level) = min_buffered_level else {
+            return 0;
+        };
+
+        let required_min_level = self
+            .list_stack
+            .last()
+            .map_or(0, |entry| entry.level.saturating_add(1));
+        required_min_level.saturating_sub(min_level)
+    }
+
+    fn pop_ancestor(&mut self, kind: BlockKind) {
+        if let Some(pos) = self
+            .open_block_ancestors
+            .iter()
+            .rposition(|entry| *entry == kind)
+        {
+            self.open_block_ancestors.remove(pos);
         }
     }
 
@@ -1048,6 +1190,26 @@ impl<W: Write> BlockNoteWriter<W> {
         Ok(())
     }
 
+    fn prepare_list_item_children(&mut self) -> Result<()> {
+        self.open_current_list_item_children()
+    }
+
+    fn prepare_for_child_block(&mut self) -> Result<()> {
+        match self.current_drain_destination() {
+            DrainDestination::Ancestor {
+                kind: BlockKind::Blockquote,
+                ..
+            } => self.prepare_blockquote_children(),
+            DrainDestination::Ancestor {
+                kind: BlockKind::OrderedListItem | BlockKind::UnorderedListItem,
+                ..
+            } => self.prepare_list_item_children(),
+            DrainDestination::Ancestor { .. } | DrainDestination::DocumentRoot => {
+                self.close_for_block_sibling()
+            }
+        }
+    }
+
     fn open_list_item_object(
         &mut self,
         kind: ListKind,
@@ -1077,6 +1239,11 @@ impl<W: Write> BlockNoteWriter<W> {
             level,
             start: checked_start,
         });
+        let ancestor_kind = match kind {
+            ListKind::Ordered => BlockKind::OrderedListItem,
+            ListKind::Unordered => BlockKind::UnorderedListItem,
+        };
+        self.open_block_ancestors.push(ancestor_kind);
         Ok(())
     }
 
@@ -1099,11 +1266,19 @@ impl<W: Write> BlockNoteWriter<W> {
     fn omit_future_text_style(_style: &TextStyleKind) {}
 
     fn should_buffer_for_lift(&self, event: &Event) -> bool {
-        match event {
-            Event::StartTable { .. } => self.table_depth.is_positive(),
-            Event::Image { .. } if self.context.in_table_cell => true,
-            _ => self.table_depth.get() >= 2,
+        if self.table_depth.get() >= 2 || self.lifted_subtree_depth.is_positive() {
+            return true;
         }
+        if self.context.in_table_cell && Self::is_block_level_start(event) {
+            return true;
+        }
+        if matches!(event, Event::Image { .. }) && self.context.in_table_cell {
+            return true;
+        }
+        if matches!(event, Event::StartTable { .. }) && self.table_depth.is_positive() {
+            return true;
+        }
+        false
     }
 
     fn update_lift_depth(&mut self, event: &Event) {
@@ -1111,6 +1286,19 @@ impl<W: Write> BlockNoteWriter<W> {
             Event::StartTable { .. } => self.table_depth.inc(),
             Event::EndTable => self.table_depth.dec(),
             _ => {}
+        }
+        let non_leaf_block_start =
+            Self::is_block_level_start(event) && !matches!(event, Event::ThematicBreak { .. });
+        let non_leaf_block_end =
+            Self::is_block_level_end(event) && !matches!(event, Event::ThematicBreak { .. });
+        if non_leaf_block_start
+            && ((self.context.in_table_cell && self.table_depth.get() == 1)
+                || self.lifted_subtree_depth.is_positive())
+        {
+            self.lifted_subtree_depth.inc();
+        }
+        if non_leaf_block_end && self.lifted_subtree_depth.is_positive() {
+            self.lifted_subtree_depth.dec();
         }
     }
 
@@ -1120,10 +1308,94 @@ impl<W: Write> BlockNoteWriter<W> {
 
     fn drain_lifted_nested_events(&mut self) -> Result<()> {
         let buffered = core::mem::take(&mut self.lifted_nested_events);
+        if buffered.is_empty() {
+            return Ok(());
+        }
+        match self.current_drain_destination() {
+            DrainDestination::Ancestor {
+                ancestor_index,
+                kind: BlockKind::Blockquote,
+            } => {
+                let _ = ancestor_index;
+                self.prepare_blockquote_children()?;
+            }
+            DrainDestination::Ancestor {
+                ancestor_index,
+                kind: BlockKind::OrderedListItem | BlockKind::UnorderedListItem,
+            } => {
+                let _ = ancestor_index;
+                self.prepare_list_item_children()?;
+            }
+            DrainDestination::Ancestor { ancestor_index, .. } => {
+                let _ = ancestor_index;
+                self.close_for_block_sibling()?;
+            }
+            DrainDestination::DocumentRoot => {
+                self.close_for_block_sibling()?;
+            }
+        }
+        let rebase_offset = match self.current_drain_destination() {
+            DrainDestination::Ancestor {
+                kind: BlockKind::OrderedListItem | BlockKind::UnorderedListItem,
+                ..
+            } => self.compute_rebase_offset(&buffered),
+            DrainDestination::Ancestor { .. } | DrainDestination::DocumentRoot => 0,
+        };
         for ev in buffered {
-            self.handle_event(ev)?;
+            let rebased_event = if rebase_offset > 0 {
+                match ev {
+                    Event::StartOrderedListItem {
+                        id,
+                        level,
+                        start,
+                        style_type,
+                    } => Event::StartOrderedListItem {
+                        id,
+                        level: level.saturating_add(rebase_offset),
+                        start,
+                        style_type,
+                    },
+                    Event::StartUnorderedListItem {
+                        id,
+                        level,
+                        style_type,
+                    } => Event::StartUnorderedListItem {
+                        id,
+                        level: level.saturating_add(rebase_offset),
+                        style_type,
+                    },
+                    other => other,
+                }
+            } else {
+                ev
+            };
+            self.handle_event(rebased_event)?;
         }
         Ok(())
+    }
+
+    fn is_block_level_start(event: &Event) -> bool {
+        matches!(
+            event,
+            Event::StartHeading { .. }
+                | Event::StartBlockQuote { .. }
+                | Event::StartPreformatted { .. }
+                | Event::StartOrderedListItem { .. }
+                | Event::StartUnorderedListItem { .. }
+                | Event::ThematicBreak { .. }
+        )
+    }
+
+    fn is_block_level_end(event: &Event) -> bool {
+        matches!(
+            event,
+            Event::EndHeading
+                | Event::EndBlockQuote
+                | Event::EndPreformatted
+                | Event::EndOrderedListItem
+                | Event::EndUnorderedListItem
+                | Event::ThematicBreak { .. }
+        )
     }
 }
 
@@ -1145,21 +1417,10 @@ impl<W: Write> EventSink for BlockNoteWriter<W> {
             Event::StartDocument { .. } => self.json.open_array(),
             Event::EndDocument => self.handle_end_document(),
             Event::StartHeading { level, id, .. } => {
-                return_if_table_cell!(self);
-                drop_block_in_list_start!(self);
-                self.close_for_block_sibling()?;
+                self.prepare_for_child_block()?;
                 self.handle_heading(level, id.as_deref())
             }
-            Event::EndHeading => {
-                drop_block_in_list_end!(self);
-                if !self.context.in_text_block {
-                    return Ok(());
-                }
-                close_text_block!(self)
-            }
-            Event::EndPreformatted => {
-                drop_block_in_list_end!(self);
-                return_if_table_cell!(self);
+            Event::EndHeading | Event::EndPreformatted => {
                 if !self.context.in_text_block {
                     return Ok(());
                 }
@@ -1170,24 +1431,16 @@ impl<W: Write> EventSink for BlockNoteWriter<W> {
             }
             Event::EndParagraph => self.handle_end_paragraph(),
             Event::StartBlockQuote { id, .. } => {
-                return_if_table_cell!(self);
-                drop_block_in_list_start!(self);
-                self.close_for_block_sibling()?;
+                self.prepare_for_child_block()?;
                 self.handle_blockquote(id.as_deref())
             }
             Event::EndBlockQuote => self.handle_end_blockquote(),
             Event::StartPreformatted { id, syntax, .. } => {
-                return_if_table_cell!(self);
-                drop_block_in_list_start!(self);
-                self.close_for_block_sibling()?;
+                self.prepare_for_child_block()?;
                 self.handle_preformatted(id.as_deref(), syntax.as_deref())
             }
             Event::ThematicBreak { id, .. } => {
-                return_if_table_cell!(self);
-                if self.in_any_list_item() || self.drop_inside_list_depth.is_positive() {
-                    return Ok(());
-                }
-                self.close_for_block_sibling()?;
+                self.prepare_for_child_block()?;
                 self.handle_divider(id.as_deref())
             }
             Event::Text { content } => self.handle_text_event(&content),
@@ -1247,6 +1500,148 @@ mod tests {
     }
 
     #[test]
+    fn blockquote_state_stack_empty_after_new() {
+        let mut buf = Vec::new();
+        let writer = BlockNoteWriter::new(&mut buf);
+        assert!(writer.blockquote_content_states.is_empty());
+    }
+
+    #[test]
+    fn current_drain_destination_unit_walks_stack_top_to_bottom() {
+        let mut buf = Vec::new();
+        let mut writer = BlockNoteWriter::new(&mut buf);
+
+        writer.open_block_ancestors.push(BlockKind::OrderedListItem);
+        writer.open_block_ancestors.push(BlockKind::Table);
+        writer.open_block_ancestors.push(BlockKind::Blockquote);
+
+        assert!(matches!(
+            writer.current_drain_destination(),
+            DrainDestination::Ancestor {
+                ancestor_index: 2,
+                kind: BlockKind::Blockquote,
+            }
+        ));
+    }
+
+    #[test]
+    fn current_drain_destination_skips_table_to_document_root() {
+        let mut buf = Vec::new();
+        let mut writer = BlockNoteWriter::new(&mut buf);
+        writer.open_block_ancestors.push(BlockKind::Table);
+
+        assert!(matches!(
+            writer.current_drain_destination(),
+            DrainDestination::DocumentRoot
+        ));
+    }
+
+    #[test]
+    fn compute_rebase_offset_without_list_items_is_zero() {
+        let mut buf = Vec::new();
+        let writer = BlockNoteWriter::new(&mut buf);
+
+        assert_eq!(
+            writer.compute_rebase_offset(&[Event::StartParagraph {
+                alignment: None,
+                id: None,
+            }]),
+            0
+        );
+    }
+
+    #[test]
+    fn compute_rebase_offset_without_destination_list_is_zero_for_level_zero() {
+        let mut buf = Vec::new();
+        let writer = BlockNoteWriter::new(&mut buf);
+
+        assert_eq!(
+            writer.compute_rebase_offset(&[Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            }]),
+            0
+        );
+    }
+
+    #[test]
+    fn compute_rebase_offset_uses_current_list_stack_level() {
+        let mut buf = Vec::new();
+        let mut writer = BlockNoteWriter::new(&mut buf);
+        writer.list_stack.push(ListStackEntry {
+            children_array_open: true,
+            content_state: ListContentState::Closed,
+            first_paragraph_consumed: true,
+            kind: ListKind::Unordered,
+            level: 2,
+            start: None,
+        });
+
+        assert_eq!(
+            writer.compute_rebase_offset(&[
+                Event::StartOrderedListItem {
+                    id: None,
+                    level: 4,
+                    start: Some(1),
+                    style_type: docspec_core::ListStyleType::Decimal,
+                },
+                Event::StartUnorderedListItem {
+                    id: None,
+                    level: 0,
+                    style_type: docspec_core::ListStyleType::Disc,
+                },
+            ]),
+            3
+        );
+    }
+
+    #[test]
+    fn compute_rebase_offset_does_not_lower_already_nested_items() {
+        let mut buf = Vec::new();
+        let mut writer = BlockNoteWriter::new(&mut buf);
+        writer.list_stack.push(ListStackEntry {
+            children_array_open: true,
+            content_state: ListContentState::Closed,
+            first_paragraph_consumed: true,
+            kind: ListKind::Unordered,
+            level: 1,
+            start: None,
+        });
+
+        assert_eq!(
+            writer.compute_rebase_offset(&[Event::StartUnorderedListItem {
+                id: None,
+                level: 4,
+                style_type: docspec_core::ListStyleType::Disc,
+            }]),
+            0
+        );
+    }
+
+    #[test]
+    fn close_for_block_sibling_with_open_blockquote_prepares_children() {
+        let mut buf = Vec::new();
+        let mut writer = BlockNoteWriter::new(&mut buf);
+        assert!(writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .is_ok());
+        assert!(writer
+            .handle_event(Event::StartBlockQuote { id: None })
+            .is_ok());
+
+        assert!(writer.close_for_block_sibling().is_ok());
+        assert_eq!(
+            writer.blockquote_content_states.last(),
+            Some(&BlockquoteContentState::InChildren)
+        );
+    }
+
+    #[test]
     fn close_for_block_sibling_with_nonempty_list_stack_closes_all_items() {
         // Drives close_open_list_items call inside close_for_block_sibling (line 264).
         // After opening a list item, list_stack is non-empty; calling the private
@@ -1278,5 +1673,543 @@ mod tests {
         );
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         assert!(writer.finish().is_ok());
+    }
+}
+
+#[cfg(test)]
+mod accepts_child_tests {
+    #![allow(clippy::bool_assert_comparison)]
+    use super::*;
+    use docspec_core::BlockKind;
+
+    #[test]
+    fn document_root_accepts_all_block_kinds() {
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::Blockquote)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::Caption)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::DefinitionDetail)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::DefinitionList)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::DefinitionTerm)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::Document)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::Footnote)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::Heading)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::Link)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::OrderedListItem)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::Paragraph)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::Preformatted)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::Table)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::TableCell)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::TableHeader)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::TableRow)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Container(BlockKind::UnorderedListItem)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Leaf(BlockLeafKind::Image)),
+            true
+        );
+        assert_eq!(
+            blocknote_accepts_child(None, ChildKind::Leaf(BlockLeafKind::Divider)),
+            true
+        );
+    }
+
+    #[test]
+    fn heading_accepts_paragraph_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Heading),
+                ChildKind::Container(BlockKind::Paragraph),
+            ),
+            true
+        );
+    }
+
+    #[test]
+    fn list_item_accepts_heading_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::OrderedListItem),
+                ChildKind::Container(BlockKind::Heading),
+            ),
+            true
+        );
+    }
+
+    #[test]
+    fn blockquote_accepts_list_item_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Blockquote),
+                ChildKind::Container(BlockKind::UnorderedListItem),
+            ),
+            true
+        );
+    }
+
+    #[test]
+    fn table_cell_rejects_heading() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::TableCell),
+                ChildKind::Container(BlockKind::Heading),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn table_cell_rejects_list_item() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::TableCell),
+                ChildKind::Container(BlockKind::OrderedListItem),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn code_block_rejects_heading() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Preformatted),
+                ChildKind::Container(BlockKind::Heading),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn paragraph_rejects_blocks() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Paragraph),
+                ChildKind::Container(BlockKind::Blockquote),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn heading_rejects_table_row_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Heading),
+                ChildKind::Container(BlockKind::TableRow),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn heading_rejects_table_cell_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Heading),
+                ChildKind::Container(BlockKind::TableCell),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn heading_rejects_table_header_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Heading),
+                ChildKind::Container(BlockKind::TableHeader),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn heading_accepts_image_leaf() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Heading),
+                ChildKind::Leaf(BlockLeafKind::Image)
+            ),
+            true
+        );
+    }
+
+    #[test]
+    fn heading_accepts_divider_leaf() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Heading),
+                ChildKind::Leaf(BlockLeafKind::Divider),
+            ),
+            true
+        );
+    }
+
+    #[test]
+    fn blockquote_accepts_heading_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Blockquote),
+                ChildKind::Container(BlockKind::Heading),
+            ),
+            true
+        );
+    }
+
+    #[test]
+    fn blockquote_accepts_table_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Blockquote),
+                ChildKind::Container(BlockKind::Table),
+            ),
+            true
+        );
+    }
+
+    #[test]
+    fn blockquote_rejects_table_row_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Blockquote),
+                ChildKind::Container(BlockKind::TableRow),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn blockquote_rejects_table_cell_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Blockquote),
+                ChildKind::Container(BlockKind::TableCell),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn blockquote_rejects_table_header_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Blockquote),
+                ChildKind::Container(BlockKind::TableHeader),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn ordered_list_item_accepts_image_leaf() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::OrderedListItem),
+                ChildKind::Leaf(BlockLeafKind::Image),
+            ),
+            true
+        );
+    }
+
+    #[test]
+    fn ordered_list_item_rejects_table_row_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::OrderedListItem),
+                ChildKind::Container(BlockKind::TableRow),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn ordered_list_item_rejects_table_cell_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::OrderedListItem),
+                ChildKind::Container(BlockKind::TableCell),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn ordered_list_item_rejects_table_header_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::OrderedListItem),
+                ChildKind::Container(BlockKind::TableHeader),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn unordered_list_item_accepts_preformatted_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::UnorderedListItem),
+                ChildKind::Container(BlockKind::Preformatted),
+            ),
+            true
+        );
+    }
+
+    #[test]
+    fn unordered_list_item_accepts_divider_leaf() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::UnorderedListItem),
+                ChildKind::Leaf(BlockLeafKind::Divider),
+            ),
+            true
+        );
+    }
+
+    #[test]
+    fn unordered_list_item_rejects_table_row_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::UnorderedListItem),
+                ChildKind::Container(BlockKind::TableRow),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn unordered_list_item_rejects_table_cell_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::UnorderedListItem),
+                ChildKind::Container(BlockKind::TableCell),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn unordered_list_item_rejects_table_header_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::UnorderedListItem),
+                ChildKind::Container(BlockKind::TableHeader),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn caption_rejects_paragraph_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Caption),
+                ChildKind::Container(BlockKind::Paragraph),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn definition_list_rejects_definition_term_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::DefinitionList),
+                ChildKind::Container(BlockKind::DefinitionTerm),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn definition_term_rejects_paragraph_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::DefinitionTerm),
+                ChildKind::Container(BlockKind::Paragraph),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn definition_detail_rejects_paragraph_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::DefinitionDetail),
+                ChildKind::Container(BlockKind::Paragraph),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn footnote_rejects_paragraph_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Footnote),
+                ChildKind::Container(BlockKind::Paragraph),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn link_rejects_paragraph_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Link),
+                ChildKind::Container(BlockKind::Paragraph),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn document_container_rejects_paragraph_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Document),
+                ChildKind::Container(BlockKind::Paragraph),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn preformatted_rejects_image_leaf() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Preformatted),
+                ChildKind::Leaf(BlockLeafKind::Image),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn paragraph_rejects_divider_leaf() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Paragraph),
+                ChildKind::Leaf(BlockLeafKind::Divider),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn table_rejects_table_row_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Table),
+                ChildKind::Container(BlockKind::TableRow),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn table_rejects_image_leaf() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::Table),
+                ChildKind::Leaf(BlockLeafKind::Image)
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn table_row_rejects_table_cell_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::TableRow),
+                ChildKind::Container(BlockKind::TableCell),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn table_row_rejects_heading_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::TableRow),
+                ChildKind::Container(BlockKind::Heading),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn table_header_rejects_heading_child() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::TableHeader),
+                ChildKind::Container(BlockKind::Heading),
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn table_header_rejects_divider_leaf() {
+        assert_eq!(
+            blocknote_accepts_child(
+                Some(BlockKind::TableHeader),
+                ChildKind::Leaf(BlockLeafKind::Divider),
+            ),
+            false
+        );
     }
 }

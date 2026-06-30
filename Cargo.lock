@@ -544,6 +544,7 @@ version = "1.18.3"
 dependencies = [
  "base64",
  "docspec-core",
+ "docspec-docx-reader",
  "docspec-json",
  "docspec-test-utils",
  "paste",

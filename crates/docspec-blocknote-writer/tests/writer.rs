@@ -1,6 +1,11 @@
 //! Integration tests for `BlockNoteWriter`.
 
-#![allow(clippy::expect_used, clippy::redundant_test_prefix)]
+#![allow(
+    clippy::expect_used,
+    clippy::redundant_test_prefix,
+    clippy::items_after_statements,
+    clippy::indexing_slicing
+)]
 
 #[cfg(test)]
 mod tests {
@@ -1766,7 +1771,7 @@ mod tests {
     }
 
     #[test]
-    fn image_in_blockquote_emits_sibling() {
+    fn image_in_blockquote_emits_as_child() {
         let mut buf = Vec::<u8>::new();
         let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 
@@ -1791,17 +1796,15 @@ mod tests {
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"quote","content":[],"children":[]},{"type":"image","props":{"url":"https://example.com/logo.png","caption":"logo"},"content":null,"children":[]}]"#
+            r#"[{"type":"quote","content":[],"children":[{"type":"image","props":{"url":"https://example.com/logo.png","caption":"logo"},"content":null,"children":[]}]}]"#
         );
     }
 
     #[test]
-    fn nested_blockquote_emits_sibling() {
+    fn nested_blockquote_emits_as_child() {
         let mut buf = Vec::<u8>::new();
         let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 
-        // Test actual nesting: send StartBlockQuote while another is open
-        // Sibling emission should close outer quote and emit inner as sibling
         assert!(writer.handle_event(start_document()).is_ok());
         assert!(writer.handle_event(start_blockquote()).is_ok());
         assert!(writer.handle_event(start_paragraph()).is_ok());
@@ -1813,19 +1816,68 @@ mod tests {
         assert!(writer.handle_event(text("inner")).is_ok());
         assert!(writer.handle_event(Event::EndParagraph).is_ok());
         assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
-        // Outer was force-closed by sibling emission, so only close inner
+        // StackTrackingSink auto-closes outer blockquote on EndDocument
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         assert!(writer.finish().is_ok());
 
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"outer","styles":{}}],"children":[]},{"type":"quote","content":[{"type":"text","text":"inner","styles":{}}],"children":[]}]"#
+            r#"[{"type":"quote","content":[{"type":"text","text":"outer","styles":{}}],"children":[{"type":"quote","content":[{"type":"text","text":"inner","styles":{}}],"children":[]}]}]"#
         );
     }
 
     #[test]
-    fn heading_in_blockquote_emits_sibling() {
+    fn blockquote_with_inline_then_block_child_transitions_state() {
+        let mut buf = Vec::<u8>::new();
+        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
+
+        // > inline text
+        // > ## block heading
+        assert!(writer.handle_event(start_document()).is_ok());
+        assert!(writer.handle_event(start_blockquote()).is_ok());
+        assert!(writer.handle_event(start_paragraph()).is_ok());
+        assert!(writer.handle_event(text("inline")).is_ok());
+        assert!(writer.handle_event(Event::EndParagraph).is_ok());
+        assert!(writer.handle_event(start_heading(2)).is_ok());
+        assert!(writer.handle_event(text("block")).is_ok());
+        assert!(writer.handle_event(Event::EndHeading).is_ok());
+        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
+        assert!(writer.handle_event(Event::EndDocument).is_ok());
+        assert!(writer.finish().is_ok());
+
+        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[{"type":"text","text":"inline","styles":{}}],"children":[{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"block","styles":{}}],"children":[]}]}]"#
+        );
+    }
+
+    #[test]
+    fn blockquote_with_inline_heading_then_paragraph_keeps_paragraph_child() {
+        let json = run_events(&[
+            start_document(),
+            start_blockquote(),
+            start_paragraph(),
+            text("inline"),
+            Event::EndParagraph,
+            start_heading(2),
+            text("heading"),
+            Event::EndHeading,
+            start_paragraph(),
+            text("after"),
+            Event::EndParagraph,
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[{"type":"text","text":"inline","styles":{}}],"children":[{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"heading","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
+        );
+    }
+
+    #[test]
+    fn heading_in_blockquote_emits_as_child() {
         let mut buf = Vec::<u8>::new();
         let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 
@@ -1842,12 +1894,12 @@ mod tests {
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"quote","content":[],"children":[]},{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Title","styles":{}}],"children":[]}]"#
+            r#"[{"type":"quote","content":[],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Title","styles":{}}],"children":[]}]}]"#
         );
     }
 
     #[test]
-    fn code_block_in_blockquote_emits_sibling() {
+    fn code_block_in_blockquote_emits_as_child() {
         let mut buf = Vec::<u8>::new();
         let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 
@@ -1866,7 +1918,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"quote","content":[],"children":[]},{"type":"codeBlock","props":{"language":"rust"},"content":[{"type":"text","text":"fn main() {}","styles":{}}],"children":[]}]"#
+            r#"[{"type":"quote","content":[],"children":[{"type":"codeBlock","props":{"language":"rust"},"content":[{"type":"text","text":"fn main() {}","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -1900,7 +1952,7 @@ mod tests {
     }
 
     #[test]
-    fn thematic_break_in_blockquote_emits_sibling() {
+    fn thematic_break_in_blockquote_emits_as_child() {
         let mut buf = Vec::<u8>::new();
         let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
 
@@ -1917,7 +1969,7 @@ mod tests {
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
         assert_eq!(
             json,
-            r#"[{"type":"quote","content":[],"children":[]},{"type":"divider"}]"#
+            r#"[{"type":"quote","content":[],"children":[{"type":"divider"}]}]"#
         );
     }
 
@@ -2733,7 +2785,7 @@ mod tests {
     }
 
     #[test]
-    fn outer_table_inside_list_item_drops_table_and_nested_table_alike() {
+    fn outer_table_inside_list_item_with_nested_table_lifts_into_outer_list_item_children() {
         let json = run_events(&[
             start_document(),
             Event::StartUnorderedListItem {
@@ -2761,7 +2813,281 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"bullet","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"bullet","styles":{}}],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"dropped","styles":{}}]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"also dropped","styles":{}}]}]}]},"children":[]}]}]"#
+        );
+    }
+
+    #[test]
+    fn list_inside_table_cell_inside_list_item_lifts_into_outer_list_item_children() {
+        let json = run_events(&[
+            start_document(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 1,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            text("lifted"),
+            Event::EndUnorderedListItem,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"lifted","styles":{}}],"children":[]}]}]"#
+        );
+    }
+
+    #[test]
+    fn lifted_list_under_list_item_does_not_close_outer_item() {
+        let json = run_events(&[
+            start_document(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            text("outer"),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            text("lifted"),
+            Event::EndUnorderedListItem,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            start_paragraph(),
+            text("after"),
+            Event::EndParagraph,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"outer","styles":{}}],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"lifted","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
+        );
+    }
+
+    #[test]
+    fn lifted_nested_list_rebases_minimum_level_correctly() {
+        let json = run_events(&[
+            start_document(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            text("level 0"),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 1,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            text("level 1"),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 2,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            text("level 2"),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::StartOrderedListItem {
+                id: None,
+                level: 0,
+                start: Some(4),
+                style_type: docspec_core::ListStyleType::Decimal,
+            },
+            text("lifted 0"),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 1,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            text("lifted 1"),
+            Event::EndUnorderedListItem,
+            Event::EndOrderedListItem,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndUnorderedListItem,
+            Event::EndUnorderedListItem,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"level 0","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"level 1","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"level 2","styles":{}}],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"numberedListItem","props":{"start":4},"content":[{"type":"text","text":"lifted 0","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"lifted 1","styles":{}}],"children":[]}]}]}]}]}]"#
+        );
+    }
+
+    #[test]
+    fn lifted_list_into_blockquote_no_rebasing() {
+        let json = run_events(&[
+            start_document(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            text("outer"),
+            start_blockquote(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            text("quoted lifted"),
+            Event::EndUnorderedListItem,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndBlockQuote,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"outer","styles":{}}],"children":[{"type":"quote","content":[],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"quoted lifted","styles":{}}],"children":[]}]}]}]"#
+        );
+    }
+
+    #[test]
+    fn heading_inside_table_cell_inside_blockquote_lifts_into_blockquote_children() {
+        let json = run_events(&[
+            start_document(),
+            start_blockquote(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            start_heading(2),
+            text("lifted heading"),
+            Event::EndHeading,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"lifted heading","styles":{}}],"children":[]}]}]"#
+        );
+    }
+
+    #[test]
+    fn image_inside_cell_inside_blockquote_inside_list_item_lifts_into_blockquote() {
+        let json = run_events(&[
+            start_document(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            start_blockquote(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/in-quote.png".to_string(),
+                },
+                alt: Some("in quote".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndBlockQuote,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"quote","content":[],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/in-quote.png","caption":"in quote"},"content":null,"children":[]}]}]}]"#
+        );
+    }
+
+    #[test]
+    fn image_inside_cell_inside_list_item_inside_blockquote_lifts_into_list_item() {
+        let json = run_events(&[
+            start_document(),
+            start_blockquote(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::Image {
+                source: ImageSource::Uri {
+                    uri: "https://example.com/in-list.png".to_string(),
+                },
+                alt: Some("in list".to_string()),
+                title: None,
+                decorative: false,
+                id: None,
+            },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndUnorderedListItem,
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[],"children":[{"type":"bulletListItem","content":[],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/in-list.png","caption":"in list"},"content":null,"children":[]}]}]}]"#
+        );
+    }
+
+    #[test]
+    fn blockquote_inside_table_cell_inside_list_item_lifts_into_outer_list_item_children() {
+        let json = run_events(&[
+            start_document(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            start_blockquote(),
+            text("lifted quote"),
+            Event::EndBlockQuote,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"quote","content":[{"type":"text","text":"lifted quote","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -3282,36 +3608,32 @@ mod tests {
     }
 
     #[test]
-    fn list_inside_table_cell_is_dropped() {
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_table()).is_ok());
-        assert!(writer.handle_event(start_table_row()).is_ok());
-        assert!(writer.handle_event(start_table_cell()).is_ok());
-        assert!(writer
-            .handle_event(Event::StartUnorderedListItem {
+    fn list_inside_table_cell_lifts_after_table() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
-            })
-            .is_ok());
-        assert!(writer.handle_event(text("dropped")).is_ok());
-        assert!(writer.handle_event(Event::EndUnorderedListItem).is_ok());
-        assert!(writer.handle_event(Event::EndTableCell).is_ok());
-        assert!(writer.handle_event(Event::EndTableRow).is_ok());
-        assert!(writer.handle_event(Event::EndTable).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+            },
+            text("dropped"),
+            Event::EndUnorderedListItem,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"dropped","styles":{}}],"children":[]}]"#
         );
     }
 
     #[test]
-    fn list_inside_blockquote_emits_sibling() {
+    fn list_inside_blockquote_emits_as_child() {
         let json = run_events(&[
             start_document(),
             start_blockquote(),
@@ -3327,12 +3649,39 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"quote","content":[],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"quoted bullet","styles":{}}],"children":[]}]"#
+            r#"[{"type":"quote","content":[],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"quoted bullet","styles":{}}],"children":[]}]}]"#
         );
     }
 
     #[test]
-    fn nested_table_with_list_in_cell_lifts_table_drops_list() {
+    fn consecutive_same_level_list_items_inside_blockquote_are_siblings() {
+        let json = run_events(&[
+            start_document(),
+            start_blockquote(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            text("first"),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            text("second"),
+            Event::EndUnorderedListItem,
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+        );
+    }
+
+    #[test]
+    fn nested_table_with_list_in_cell_lifts_table_and_list_after_outer_table() {
         let json = run_events(&[
             start_document(),
             start_table(),
@@ -3359,7 +3708,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"outer","styles":{}}]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"outer","styles":{}}]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"inner dropped","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -3649,7 +3998,7 @@ mod tests {
     }
 
     #[test]
-    fn heading_inside_list_item_is_dropped() {
+    fn heading_inside_list_item_emits_as_child() {
         let json = run_events(&[
             start_document(),
             Event::StartUnorderedListItem {
@@ -3666,12 +4015,12 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"item","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"h","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"item","styles":{}}],"children":[]}]}]"#
         );
     }
 
     #[test]
-    fn image_inside_list_item_is_dropped() {
+    fn image_inside_list_item_emits_as_child() {
         let json = run_events(&[
             start_document(),
             Event::StartUnorderedListItem {
@@ -3693,12 +4042,12 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"image","props":{"url":"https://example.com/img.png","caption":""},"content":null,"children":[]}]}]"#
         );
     }
 
     #[test]
-    fn code_block_inside_list_item_is_dropped() {
+    fn code_block_inside_list_item_emits_as_child() {
         let json = run_events(&[
             start_document(),
             Event::StartUnorderedListItem {
@@ -3714,12 +4063,12 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"codeBlock","content":[{"type":"text","text":"code","styles":{}}],"children":[]}]}]"#
         );
     }
 
     #[test]
-    fn nested_blockquote_inside_list_item_is_dropped() {
+    fn nested_blockquote_inside_list_item_emits_as_child() {
         let json = run_events(&[
             start_document(),
             Event::StartUnorderedListItem {
@@ -3735,12 +4084,12 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"quote","content":[{"type":"text","text":"q","styles":{}}],"children":[]}]}]"#
         );
     }
 
     #[test]
-    fn divider_inside_list_item_is_dropped() {
+    fn divider_inside_list_item_emits_as_child() {
         let json = run_events(&[
             start_document(),
             Event::StartUnorderedListItem {
@@ -3754,12 +4103,12 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"divider"}]}]"#
         );
     }
 
     #[test]
-    fn table_inside_list_item_is_dropped() {
+    fn table_inside_list_item_emits_as_child() {
         let json = run_events(&[
             start_document(),
             Event::StartUnorderedListItem {
@@ -3779,12 +4128,12 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"cell","styles":{}}]}]}]},"children":[]}]}]"#
         );
     }
 
     #[test]
-    fn text_after_dropped_block_in_list_item_is_preserved() {
+    fn text_after_block_child_in_list_item_appears_after_child() {
         let json = run_events(&[
             start_document(),
             Event::StartUnorderedListItem {
@@ -3802,35 +4151,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"before","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
-        );
-    }
-
-    #[test]
-    fn drop_counter_returns_to_zero_after_end() {
-        let json = run_events(&[
-            start_document(),
-            Event::StartUnorderedListItem {
-                id: None,
-                level: 0,
-                style_type: docspec_core::ListStyleType::Disc,
-            },
-            start_heading(1),
-            text("dropped"),
-            Event::EndHeading,
-            Event::EndUnorderedListItem,
-            Event::StartUnorderedListItem {
-                id: None,
-                level: 0,
-                style_type: docspec_core::ListStyleType::Disc,
-            },
-            text("second"),
-            Event::EndUnorderedListItem,
-            Event::EndDocument,
-        ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"before","styles":{}}],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"dropped","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -3839,11 +4160,7 @@ mod tests {
     // ============================================================================
 
     #[test]
-    fn heading_inside_table_cell_is_dropped() {
-        // Drives return_if_table_cell! returning early in the StartHeading match arm
-        // (the in_table_cell=true case). EndHeading with in_text_block=false is also
-        // driven (the !in_text_block guard fires). Heading text is flattened into the
-        // cell's inline content — only the heading *structure* is dropped.
+    fn heading_inside_table_cell_lifts_after_table() {
         let json = run_events(&[
             start_document(),
             start_table(),
@@ -3857,18 +4174,14 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        // Text is flattened into cell inline content (BlockNote cell flattening policy).
         assert_eq!(
             json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"h","styles":{}}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"h","styles":{}}],"children":[]}]"#
         );
     }
 
     #[test]
-    fn blockquote_inside_table_cell_is_dropped() {
-        // Drives return_if_table_cell! returning early in both the StartBlockQuote and
-        // EndBlockQuote match arms. blockquote_depth is never incremented; text is
-        // flattened into the cell's inline content.
+    fn blockquote_inside_table_cell_lifts_after_table() {
         let json = run_events(&[
             start_document(),
             start_table(),
@@ -3884,15 +4197,12 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"q","styles":{}}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"quote","content":[{"type":"text","text":"q","styles":{}}],"children":[]}]"#
         );
     }
 
     #[test]
-    fn preformatted_inside_table_cell_is_dropped() {
-        // Drives return_if_table_cell! returning early in both the StartPreformatted and
-        // EndPreformatted match arms. Code-block structure is never emitted; text is
-        // flattened into the cell's inline content.
+    fn preformatted_inside_table_cell_lifts_after_table() {
         let json = run_events(&[
             start_document(),
             start_table(),
@@ -3908,16 +4218,12 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"code","styles":{}}]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"codeBlock","content":[{"type":"text","text":"code","styles":{}}],"children":[]}]"#
         );
     }
 
     #[test]
-    fn line_break_inside_dropped_heading_in_list_is_dropped() {
-        // Drives handle_line_break when drop_inside_list_depth > 0.
-        // A LineBreak inside a heading that is itself inside a list item is silently
-        // discarded — neither the line break nor any surrounding text from the dropped
-        // block appears in the output.
+    fn line_break_inside_heading_in_list_item_preserved_in_child() {
         let json = run_events(&[
             start_document(),
             Event::StartUnorderedListItem {
@@ -3936,7 +4242,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"item","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"head","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"more","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"item","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -4091,53 +4397,6 @@ mod tests {
     }
 
     #[test]
-    fn start_heading_inside_table_cell_is_silently_dropped() {
-        // Drives return_if_table_cell! return branch in the StartHeading arm (line 843).
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_table()).is_ok());
-        assert!(writer.handle_event(start_table_row()).is_ok());
-        assert!(writer.handle_event(start_table_cell()).is_ok());
-        assert!(writer.handle_event(start_heading(1)).is_ok());
-        assert!(writer.handle_event(Event::EndTableCell).is_ok());
-        assert!(writer.handle_event(Event::EndTableRow).is_ok());
-        assert!(writer.handle_event(Event::EndTable).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
-        );
-    }
-
-    #[test]
-    fn start_heading_inside_list_hits_drop_block_macro() {
-        // Drives drop_block_in_list_start! return branch in StartHeading arm (line 844)
-        // and drop_block_in_list_end! return branch in EndHeading arm (line 849).
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer
-            .handle_event(Event::StartUnorderedListItem {
-                id: None,
-                level: 0,
-                style_type: docspec_core::ListStyleType::Disc,
-            })
-            .is_ok());
-        assert!(writer.handle_event(start_heading(1)).is_ok());
-        assert!(writer.handle_event(Event::EndHeading).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
-        );
-    }
-
-    #[test]
     fn end_heading_closes_open_heading_block() {
         // Drives close_text_block! in the EndHeading arm (line 853) via raw BlockNoteWriter.
         let mut buf = Vec::<u8>::new();
@@ -4152,53 +4411,6 @@ mod tests {
         assert_eq!(
             json,
             r#"[{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"Heading text","styles":{}}],"children":[]}]"#
-        );
-    }
-
-    #[test]
-    fn end_preformatted_inside_list_hits_drop_macro() {
-        // Drives drop_block_in_list_start! in StartPreformatted arm (line 886) and
-        // drop_block_in_list_end! in EndPreformatted arm (line 856).
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer
-            .handle_event(Event::StartUnorderedListItem {
-                id: None,
-                level: 0,
-                style_type: docspec_core::ListStyleType::Disc,
-            })
-            .is_ok());
-        assert!(writer.handle_event(start_preformatted(None)).is_ok());
-        assert!(writer.handle_event(Event::EndPreformatted).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
-        );
-    }
-
-    #[test]
-    fn end_preformatted_inside_table_cell_is_dropped() {
-        // Drives return_if_table_cell! return branch in EndPreformatted arm (line 857).
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_table()).is_ok());
-        assert!(writer.handle_event(start_table_row()).is_ok());
-        assert!(writer.handle_event(start_table_cell()).is_ok());
-        assert!(writer.handle_event(Event::EndPreformatted).is_ok());
-        assert!(writer.handle_event(Event::EndTableCell).is_ok());
-        assert!(writer.handle_event(Event::EndTableRow).is_ok());
-        assert!(writer.handle_event(Event::EndTable).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
         );
     }
 
@@ -4223,142 +4435,95 @@ mod tests {
     }
 
     #[test]
-    fn start_blockquote_inside_table_cell_is_dropped() {
-        // Drives return_if_table_cell! return branch in StartBlockQuote arm (line 866).
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_table()).is_ok());
-        assert!(writer.handle_event(start_table_row()).is_ok());
-        assert!(writer.handle_event(start_table_cell()).is_ok());
-        assert!(writer.handle_event(start_blockquote()).is_ok());
-        assert!(writer.handle_event(Event::EndTableCell).is_ok());
-        assert!(writer.handle_event(Event::EndTableRow).is_ok());
-        assert!(writer.handle_event(Event::EndTable).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+    fn thematic_break_inside_table_cell_lifts_after_table() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            Event::ThematicBreak { id: None },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"divider"}]"#
         );
     }
 
     #[test]
-    fn start_blockquote_inside_list_hits_drop_block_macro() {
-        // Drives drop_block_in_list_start! in StartBlockQuote arm (line 867) and
-        // drop_block_in_list_end! in EndBlockQuote arm (line 872).
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer
-            .handle_event(Event::StartUnorderedListItem {
+    fn multiple_block_kinds_in_same_cell_all_lift_in_order() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            start_heading(1),
+            text("H"),
+            Event::EndHeading,
+            Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
-            })
-            .is_ok());
-        assert!(writer.handle_event(start_blockquote()).is_ok());
-        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+            },
+            text("item"),
+            Event::EndUnorderedListItem,
+            start_blockquote(),
+            text("Q"),
+            Event::EndBlockQuote,
+            Event::ThematicBreak { id: None },
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"H","styles":{}}],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"item","styles":{}}],"children":[]},{"type":"quote","content":[{"type":"text","text":"Q","styles":{}}],"children":[]},{"type":"divider"}]"#
         );
     }
 
     #[test]
-    fn end_blockquote_inside_table_cell_is_dropped() {
-        // Drives return_if_table_cell! return branch in EndBlockQuote arm (line 873).
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_table()).is_ok());
-        assert!(writer.handle_event(start_table_row()).is_ok());
-        assert!(writer.handle_event(start_table_cell()).is_ok());
-        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
-        assert!(writer.handle_event(Event::EndTableCell).is_ok());
-        assert!(writer.handle_event(Event::EndTableRow).is_ok());
-        assert!(writer.handle_event(Event::EndTable).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+    fn cell_with_only_lifted_content_has_empty_content_array() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            start_heading(2),
+            text("title"),
+            Event::EndHeading,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"title","styles":{}}],"children":[]}]"#
         );
     }
 
     #[test]
-    fn start_preformatted_inside_table_cell_is_dropped() {
-        // Drives return_if_table_cell! return branch in StartPreformatted arm (line 885).
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_table()).is_ok());
-        assert!(writer.handle_event(start_table_row()).is_ok());
-        assert!(writer.handle_event(start_table_cell()).is_ok());
-        assert!(writer.handle_event(start_preformatted(None)).is_ok());
-        assert!(writer.handle_event(Event::EndTableCell).is_ok());
-        assert!(writer.handle_event(Event::EndTableRow).is_ok());
-        assert!(writer.handle_event(Event::EndTable).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+    fn text_inside_lifted_heading_in_cell_preserved_after_lift() {
+        let json = run_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            start_heading(2),
+            text("Inner"),
+            Event::EndHeading,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
         assert_eq!(
             json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
-        );
-    }
-
-    #[test]
-    fn thematic_break_inside_table_cell_is_dropped() {
-        // Drives return_if_table_cell! return branch in ThematicBreak arm (line 891).
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_table()).is_ok());
-        assert!(writer.handle_event(start_table_row()).is_ok());
-        assert!(writer.handle_event(start_table_cell()).is_ok());
-        assert!(writer
-            .handle_event(Event::ThematicBreak { id: None })
-            .is_ok());
-        assert!(writer.handle_event(Event::EndTableCell).is_ok());
-        assert!(writer.handle_event(Event::EndTableRow).is_ok());
-        assert!(writer.handle_event(Event::EndTable).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]}]"#
-        );
-    }
-
-    #[test]
-    fn end_table_inside_list_hits_drop_macro() {
-        // Drives drop_block_in_list_start! in StartTable arm (line 604) and
-        // drop_block_in_list_end! in EndTable arm (line 348).
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer
-            .handle_event(Event::StartUnorderedListItem {
-                id: None,
-                level: 0,
-                style_type: docspec_core::ListStyleType::Disc,
-            })
-            .is_ok());
-        assert!(writer.handle_event(start_table()).is_ok());
-        assert!(writer.handle_event(Event::EndTable).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
+            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"Inner","styles":{}}],"children":[]}]"#
         );
     }
 
@@ -4590,9 +4755,7 @@ mod tests {
     }
 
     #[test]
-    fn all_block_types_inside_list_item_are_dropped() {
-        // Exercises drop_block_in_list_start! and drop_block_in_list_end! for all block types
-        // inside a list item: heading, preformatted, blockquote, table, thematic break
+    fn all_block_types_inside_list_item_emit_as_children() {
         let json = run_events(&[
             start_document(),
             Event::StartUnorderedListItem {
@@ -4601,28 +4764,23 @@ mod tests {
                 style_type: docspec_core::ListStyleType::Disc,
             },
             text("before"),
-            // Heading inside list item → dropped
             start_heading(1),
             text("heading"),
             Event::EndHeading,
-            // Preformatted inside list item → dropped
             start_preformatted(None),
             text("code"),
             Event::EndPreformatted,
-            // BlockQuote inside list item → dropped
             start_blockquote(),
             text("quote"),
             Event::EndBlockQuote,
-            // ThematicBreak inside list item → dropped
             Event::ThematicBreak { id: None },
             text("after"),
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        // Only "before" and "after" should appear; all block content dropped
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"before","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"before","styles":{}}],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"heading","styles":{}}],"children":[]},{"type":"codeBlock","content":[{"type":"text","text":"code","styles":{}}],"children":[]},{"type":"quote","content":[{"type":"text","text":"quote","styles":{}}],"children":[]},{"type":"divider"},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -4648,7 +4806,7 @@ mod tests {
     }
 
     #[test]
-    fn image_after_children_transition_inside_list_item_is_dropped() {
+    fn image_after_children_transition_inside_list_item_emits_as_child() {
         let json = list_item_with_children_transition_then(vec![Event::Image {
             source: ImageSource::Uri {
                 uri: "https://example.com/leaked.png".to_string(),
@@ -4660,21 +4818,21 @@ mod tests {
         }]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/leaked.png","caption":"leaked"},"content":null,"children":[]}]}]"#
         );
     }
 
     #[test]
-    fn thematic_break_after_children_transition_inside_list_item_is_dropped() {
+    fn thematic_break_after_children_transition_inside_list_item_emits_as_child() {
         let json = list_item_with_children_transition_then(vec![Event::ThematicBreak { id: None }]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]},{"type":"divider"}]}]"#
         );
     }
 
     #[test]
-    fn heading_after_children_transition_inside_list_item_is_dropped() {
+    fn heading_after_children_transition_inside_list_item_emits_as_child() {
         let json = list_item_with_children_transition_then(vec![
             start_heading(2),
             text("leaked-heading"),
@@ -4682,12 +4840,12 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]},{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"leaked-heading","styles":{}}],"children":[]}]}]"#
         );
     }
 
     #[test]
-    fn blockquote_after_children_transition_inside_list_item_is_dropped() {
+    fn blockquote_after_children_transition_inside_list_item_emits_as_child() {
         let json = list_item_with_children_transition_then(vec![
             start_blockquote(),
             text("leaked-quote"),
@@ -4695,12 +4853,12 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]},{"type":"quote","content":[{"type":"text","text":"leaked-quote","styles":{}}],"children":[]}]}]"#
         );
     }
 
     #[test]
-    fn preformatted_after_children_transition_inside_list_item_is_dropped() {
+    fn preformatted_after_children_transition_inside_list_item_emits_as_child() {
         let json = list_item_with_children_transition_then(vec![
             start_preformatted(None),
             text("leaked-code"),
@@ -4708,12 +4866,12 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]},{"type":"codeBlock","content":[{"type":"text","text":"leaked-code","styles":{}}],"children":[]}]}]"#
         );
     }
 
     #[test]
-    fn table_after_children_transition_inside_list_item_is_dropped() {
+    fn table_after_children_transition_inside_list_item_emits_as_child() {
         let json = list_item_with_children_transition_then(vec![
             start_table(),
             start_table_row(),
@@ -4725,7 +4883,36 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"leaked-cell","styles":{}}]}]}]},"children":[]}]}]"#
+        );
+    }
+
+    #[test]
+    fn list_item_with_multiple_block_children_emits_all_in_order() {
+        let json = run_events(&[
+            start_document(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            start_heading(2),
+            text("a"),
+            Event::EndHeading,
+            start_paragraph(),
+            text("b"),
+            Event::EndParagraph,
+            start_blockquote(),
+            start_paragraph(),
+            text("c"),
+            Event::EndParagraph,
+            Event::EndBlockQuote,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"a","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"b","styles":{}}],"children":[]},{"type":"quote","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -4833,7 +5020,7 @@ mod tests {
     }
 
     #[test]
-    fn start_list_item_inside_dropped_block_in_list_item_is_silently_dropped() {
+    fn list_item_inside_blockquote_child_of_list_item_nests_in_blockquote() {
         let json = run_events(&[
             start_document(),
             Event::StartUnorderedListItem {
@@ -4856,12 +5043,12 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"outer","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"outer","styles":{}}],"children":[{"type":"quote","content":[],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"inner","styles":{}}],"children":[]}]}]}]"#
         );
     }
 
     #[test]
-    fn paragraph_events_inside_dropped_block_in_list_item_are_fully_absorbed() {
+    fn paragraph_inside_blockquote_child_of_list_item_renders_in_blockquote() {
         let json = run_events(&[
             start_document(),
             Event::StartUnorderedListItem {
@@ -4871,7 +5058,7 @@ mod tests {
             },
             start_blockquote(),
             start_paragraph(),
-            text("dropped"),
+            text("quoted"),
             Event::EndParagraph,
             Event::EndBlockQuote,
             start_paragraph(),
@@ -4882,7 +5069,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"real","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"quote","content":[{"type":"text","text":"quoted","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"real","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -4948,7 +5135,7 @@ mod tests {
     }
 
     #[test]
-    fn dropped_heading_before_first_aligned_list_paragraph_does_not_steal_alignment() {
+    fn heading_child_before_aligned_paragraph_child_in_list_item() {
         let json = run_events(&[
             start_document(),
             Event::StartUnorderedListItem {
@@ -4967,12 +5154,12 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"textAlignment":"center"},"content":[{"type":"text","text":"real","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"dropped","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"center"},"content":[{"type":"text","text":"real","styles":{}}],"children":[]}]}]"#
         );
     }
 
     #[test]
-    fn dropped_link_before_first_aligned_list_paragraph_does_not_steal_alignment() {
+    fn heading_child_with_link_before_aligned_paragraph_child_in_list_item() {
         let json = run_events(&[
             start_document(),
             Event::StartUnorderedListItem {
@@ -4997,7 +5184,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","props":{"textAlignment":"right"},"content":[{"type":"text","text":"real","styles":{}}],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"link","href":"https://dropped.example","content":[{"type":"text","text":"dropped","styles":{}}]}],"children":[]},{"type":"paragraph","props":{"textAlignment":"right"},"content":[{"type":"text","text":"real","styles":{}}],"children":[]}]}]"#
         );
     }
 
@@ -5304,7 +5491,7 @@ mod tests {
     }
 
     #[test]
-    fn link_in_dropped_heading_inside_list_emits_no_link() {
+    fn link_in_heading_child_of_list_item_emits_in_heading_content() {
         let json = run_events(&[
             start_document(),
             Event::StartUnorderedListItem {
@@ -5326,7 +5513,7 @@ mod tests {
         ]);
         assert_eq!(
             json,
-            r#"[{"type":"bulletListItem","content":[],"children":[]}]"#
+            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"link","href":"https://x","content":[{"type":"text","text":"hidden","styles":{}}]}],"children":[]}]}]"#
         );
     }
 
@@ -5395,6 +5582,48 @@ mod tests {
             counting.total_writes > 64,
             "expected many small writes for 1MB payload; got {} writes",
             counting.total_writes
+        );
+    }
+
+    #[test]
+    fn sample_docx_lifts_list_from_requirements_cell() {
+        let bytes = std::fs::read("tests/fixtures/sample.docx").expect("fixture file");
+        let reader = docspec_docx_reader::DocxReader::from_reader(std::io::Cursor::new(bytes))
+            .expect("reader creation");
+        let mut buf = Vec::<u8>::new();
+        let writer = BlockNoteWriter::new(&mut buf);
+        let sink = StackTrackingSink::new(writer);
+        docspec_core::pipe(reader, sink).expect("pipe");
+        let actual_json = String::from_utf8(buf).expect("valid utf-8");
+        const EXPECTED_JSON: &str = r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"colspan":2},"content":[{"type":"text","text":"Project properties","styles":{"bold":true}},{"type":"text","text":" ","styles":{"bold":true}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Title","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"Mapping hybrid governance ","styles":{}},{"type":"text","text":"for sustainable global value chains","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Group","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"PAP","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Project type","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"Master thesis ","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Credits","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"18-24","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Supervisor(s)","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"Dr.","styles":{}},{"type":"text","text":" Otto. Hospes","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Examiner(s)","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"Prof.","styles":{}},{"type":"text","text":" Katrien Termeer and ","styles":{}},{"type":"text","text":"Dr.","styles":{}},{"type":"text","text":" Otto Hospes","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Contact info","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"Dr.","styles":{}},{"type":"text","text":" Otto Hospes","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Begin date","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"asap","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"End date","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"November 2016","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Description","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"This master thesis project is part of a larger (PhD) project that examines the potential for developing synergies between public and private governance for sustainable global value chains (GVCs). A central aim of the PhD project is to develop innovative governance arrangements with public authorities in both producing/exporting and importing countries.  ","styles":{}},{"type":"text","text":"Private governance initiatives are considered more effective than state-led initiatives in addressing environmental and social problems in global value chains. However, these private initiatives are increasingly criticised for their limitations in addressing land conflicts and smallholder concerns, their bias towards a single-commodity approach and their lack of area-based governance. These criticisms are paralleled by an increasing role of public actors in developing public sustainability schemes or quasi-accreditation policies for private standards. While currently these public and private initiatives often exist next to each other or even compete, there is great potential for synergies because public and private actors can complement each other’s roles in GVCs. ","styles":{}},{"type":"text","text":"The first objective of the master thesis project is to map different forms of h","styles":{}},{"type":"text","text":"ybrid governance of global value chains. ","styles":{}},{"type":"text","text":"For this purpose the following preliminary classification can be tested and adjusted: a) private certification programmes with government involvement through official recognition of the standard; b) social-private partnerships (roundtables) for specific commodities with limited government involvement through subsidies; c) public-private partnerships with direct involvement of public authorities; d) public-private value chain initiatives with explicit linkages with area-based public policies in the producing country. The second objective is to ","styles":{}},{"type":"text","text":"make an inventory and classification of ","styles":{}},{"type":"text","text":"different scientific concepts that are used ","styles":{}},{"type":"text","text":"by scholars ","styles":{}},{"type":"text","text":"to understand and analyse hybrid governance forms, arrangements and interactions  involving public and private actors.","styles":{}},{"type":"text","text":" ","styles":{}},{"type":"text","text":"The third objective is to conduct a quick scan of the underlying motives and perceived challenges and obstacles for organizing synergies between private and public forms of governance. ","styles":{}},{"type":"text","text":"Data collection and methods consists of three steps: ","styles":{}},{"type":"text","text":"1. ","styles":{}},{"type":"text","text":"systematic literature review","styles":{}},{"type":"text","text":"; 2. ","styles":{}},{"type":"text","text":"analysis of  professional reports of public and private actors involved in certification programmes, social-private partnerships or public-private partnerships; ","styles":{}},{"type":"text","text":"3. ","styles":{}},{"type":"text","text":"interviews with stakeholders that are involved in the larger (PhD) project. ","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Requirements","styles":{"bold":true}},{"type":"text","text":" and skills","styles":{"bold":true}}]},{"type":"tableCell","content":[]}]}]},"children":[]},{"id":"2","type":"bulletListItem","props":{"textAlignment":"justify"},"content":[{"type":"text","text":"Bachelor BIN or BEB; enrolled in master program MID or MME ","styles":{}}],"children":[]},{"id":"2","type":"bulletListItem","content":[{"type":"text","text":"Ambition to develop a master thesis that can serve as a basis for ","styles":{}},{"type":"text","text":"writing and publishing ","styles":{}},{"type":"text","text":"a scientific article","styles":{}}],"children":[]},{"id":"2","type":"bulletListItem","props":{"textAlignment":"justify"},"content":[{"type":"text","text":"Skills: 1. Good English writing; 2. Experience with organizing Endnote libraries 3. ","styles":{}},{"type":"text","text":"Experience with organizing search queries through Scopus, google advanced search, and other search machines. ","styles":{}}],"children":[]},{"type":"paragraph","content":[],"children":[]},{"type":"paragraph","content":[],"children":[]},{"type":"paragraph","content":[],"children":[]},{"type":"paragraph","content":[],"children":[]}]"#;
+        assert_eq!(actual_json, EXPECTED_JSON);
+    }
+
+    #[test]
+    fn sample_docx_table_cell_with_lift_is_empty() {
+        let bytes = std::fs::read("tests/fixtures/sample.docx").expect("fixture file");
+        let reader = docspec_docx_reader::DocxReader::from_reader(std::io::Cursor::new(bytes))
+            .expect("reader creation");
+        let mut buf = Vec::<u8>::new();
+        let writer = BlockNoteWriter::new(&mut buf);
+        let sink = StackTrackingSink::new(writer);
+        docspec_core::pipe(reader, sink).expect("pipe");
+        let actual_json = String::from_utf8(buf).expect("valid utf-8");
+        let output: serde_json::Value = serde_json::from_str(&actual_json).expect("valid json");
+        let table = output
+            .as_array()
+            .expect("top-level array")
+            .iter()
+            .find(|b| b["type"] == "table")
+            .expect("table block");
+        let rows = table["content"]["rows"].as_array().expect("rows array");
+        let last_row = rows.last().expect("last row");
+        let cells = last_row["cells"].as_array().expect("cells array");
+        let lifted_cell = &cells[1];
+        assert_eq!(
+            lifted_cell["content"],
+            serde_json::json!([]),
+            "cell that contained the bullet list must be empty after lift"
         );
     }
 }
