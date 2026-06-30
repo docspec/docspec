@@ -16,6 +16,9 @@ docspec-json = { workspace = true }
 
 [dev-dependencies]
 docspec-test-utils = { workspace = true }
+# Used only in the sample.docx end-to-end integration test (sample_docx_lifts_list_from_requirements_cell).
+# A dev-only dep keeps it out of the published crate's runtime dependency graph.
+docspec-docx-reader = { path = "../docspec-docx-reader" }
 paste = "1"
 serde_json = "1"
 

@@ -125,19 +125,25 @@ let json = String::from_utf8(buf)?;
 
 ## Limitations
 
-**Table cell content**: BlockNote's `tableCell.content` is `InlineContent[]` and cannot hold block-level types. Block-level events inside a cell are handled as follows:
+### Table cell content
 
-- `StartParagraph` / `EndParagraph` boundaries are absorbed silently (adjacent paragraphs concatenate without separator)
-- `Text` and `LineBreak` are preserved
-- Headings, code blocks, blockquotes, and list items are dropped silently
-- Images are lifted: each `Image` event encountered inside a cell is buffered and replayed as a top-level sibling block immediately after the enclosing outermost table closes, preserving document order with any other lifted content from the same table. Inline text adjacent to a lifted image in the same cell stays in that cell — only the image moves out.
-- Nested tables are lifted: their events are buffered between the inner `StartTable` and matching `EndTable`, then replayed as top-level sibling blocks immediately after the enclosing outermost table closes. Deep nesting (`A` containing `B` containing `C`) flattens to a top-level sequence (`A, B, C`) in document order. Inline text adjacent to a nested table in the same outer cell stays in that outer cell. Images inside a nested cell lift through the recursive drain — they emit as siblings of the already-lifted nested table.
+BlockNote's `tableCell.content` is `InlineContent[]` and cannot hold block-level types. Block-level events inside a cell — headings, lists, blockquotes, code blocks, dividers, images, nested tables — are buffered and **lifted and replayed as siblings** of the enclosing table.
 
-**Non-paragraph children inside list items**: headings, images, code blocks, and blockquotes that appear as children of a list item are dropped. The first paragraph's inline content populates the item's `content[]` array; each subsequent paragraph becomes a child `paragraph` block in `children[]`.
+Lift destination: the buffered blocks are drained into the nearest still-open ancestor that accepts block children — a list item or blockquote when one is open, otherwise document root. List item levels are rebased during drain to preserve nesting consistency.
 
-**Blockquote + list interaction**: a list item encountered while inside a blockquote force-closes the blockquote and emits the list item at the top level as a sibling.
+Inline text adjacent to lifted content stays in the cell. Paragraph boundaries are absorbed silently.
 
-**Image-in-link**: BlockNote does not allow block-level images inside inline links. The reader closes the link before emitting the image as a sibling block, and the writer serialises that sequence directly. Content preceding the image stays inside the link; the image becomes a sibling block after the link closes; content following the image appears outside the link, losing its link wrapper. The link is empty only when the image is the sole link label, e.g. `[![alt](img.png)](url)`. All variants are lossy mappings of the original "image-inside-link" structure.
+### List item children
+
+Headings, blockquotes, code blocks, tables, dividers, images, and nested lists inside a list item are emitted as blocks in the item's `children[]` array. The first paragraph's inline content populates the item's `content[]`; subsequent paragraphs become child `paragraph` blocks in `children[]`.
+
+### Blockquote children
+
+Headings, lists, code blocks, images, dividers, and nested quotes inside a blockquote are emitted as blocks in the quote's `children[]` array. Inline content (text, formatted runs) populates `content[]` until a block child arrives, at which point the writer transitions to children-only mode.
+
+### Image in links
+
+Images inside a link span are emitted as plain text using the alt-text of the image. This is a BlockNote limitation: BlockNote's inline content cannot contain image nodes.
 
 ## API Documentation
 

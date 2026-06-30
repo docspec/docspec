@@ -169,13 +169,11 @@ mod tests {
     #[test]
     fn pipeline_list_inside_blockquote_inside_list_item_is_well_formed() {
         // Regression for cmark-gfm/test.md edge case.
-        // A list nested inside a blockquote that is itself inside a list item
-        // must NOT cause premature emission of the outer list item's End event.
         let markdown = "5) I2\n   > text\n   > - [f]\n";
         let actual = run_pipeline(markdown);
         assert_json_eq(
             &actual,
-            r#"[{"type":"numberedListItem","props":{"start":5},"content":[{"type":"text","text":"I2","styles":{}}],"children":[]}]"#,
+            r#"[{"type":"numberedListItem","props":{"start":5},"content":[{"type":"text","text":"I2","styles":{}}],"children":[{"type":"quote","content":[{"type":"text","text":"text","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"[","styles":{}},{"type":"text","text":"f","styles":{}},{"type":"text","text":"]","styles":{}}],"children":[]}]}]}]"#,
         );
     }
 
