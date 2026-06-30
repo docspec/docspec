@@ -12,6 +12,16 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.19.0](https://github.com/docspec/docspec/compare/v1.18.3...v1.19.0) - 2026-06-30
+
+### Added
+
+- *(blocknote-writer)* unified lift policy for block nesting and cell content
+
+### Fixed
+
+- *(docx-reader)* ignore w:bCs and w:iCs in non-complex-script bold/italic detection
+
 ## [1.18.3](https://github.com/docspec/docspec/compare/v1.18.2...v1.18.3) - 2026-06-30
 
 ### Fixed
