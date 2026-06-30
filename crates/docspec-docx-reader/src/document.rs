@@ -187,9 +187,11 @@ pub struct DocumentReader {
     hyperlink_map: HyperlinkMap,
     /// Open list nesting stack. Each entry represents one open list level.
     list_stack: Vec<ListStackEntry>,
-    /// Set of numIds whose first item has been emitted document-wide.
+    /// Counter per (numId, ilvl) tracking how many items at each level have been emitted
+    /// document-wide. Used to compute the effective start value per OOXML §17.9.17:
+    /// "counting the number of paragraphs at this level since the last restart".
     /// Persists across non-list paragraph breaks.
-    seen_lists: std::collections::HashSet<u32>,
+    list_counters: std::collections::HashMap<(u32, u32), u64>,
     /// The quick-xml reader streaming from the document entry.
     xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
     /// Shared DOCX ZIP archive — used to stream embedded asset bytes on demand.
@@ -214,7 +216,7 @@ impl fmt::Debug for DocumentReader {
             .field("data", &"<DocxData>")
             .field("hyperlink_map", &self.hyperlink_map)
             .field("list_stack", &self.list_stack)
-            .field("seen_lists", &self.seen_lists);
+            .field("list_counters", &self.list_counters);
         if std::env::var_os("DOCSPEC_DEBUG_PENDING_ERROR").is_some() {
             debug.field("pending_error", &self.pending_error);
         }
@@ -254,7 +256,7 @@ impl DocumentReader {
             },
             hyperlink_map,
             list_stack: Vec::new(),
-            seen_lists: std::collections::HashSet::new(),
+            list_counters: std::collections::HashMap::new(),
             xml,
             archive,
             content_types,
@@ -300,11 +302,28 @@ impl DocumentReader {
         }
     }
 
-    fn compute_start(&mut self, num_id: u32) -> Option<u64> {
-        self.seen_lists.insert(num_id).then_some(1)
+    /// Increments the counter for `(num_id, ilvl)` and returns the start value to emit.
+    ///
+    /// Returns `Some(counter)` when this is the first item for this level, or when the
+    /// list is resuming after a break (non-sequential). Returns `None` when the item
+    /// immediately follows the previous item at the same level with no intervening
+    /// non-list content (sequential continuation).
+    fn compute_start(&mut self, num_id: u32, ilvl: u32, sequential: bool) -> Option<u64> {
+        let counter = self.list_counters.entry((num_id, ilvl)).or_insert(0);
+        let is_first = *counter == 0;
+        let emitted_counter = counter.saturating_add(1);
+        *counter = emitted_counter;
+        (is_first || !sequential).then_some(emitted_counter)
     }
 
-    fn reconcile_list_stack(&mut self, num_id: u32, ilvl: u32, is_ordered: bool) {
+    /// Reconciles the list stack for a new item at `(num_id, ilvl)`.
+    ///
+    /// Returns `true` if a same-level entry was found and popped from the stack
+    /// (the new item is a sequential continuation of the previous item at this level).
+    /// Returns `false` if the stack had no entry at this level (the list is starting
+    /// fresh or resuming after a break).
+    fn reconcile_list_stack(&mut self, num_id: u32, ilvl: u32, is_ordered: bool) -> bool {
+        let mut found_sequential = false;
         while let Some(top) = self.list_stack.last().copied() {
             match top.ilvl.cmp(&ilvl) {
                 core::cmp::Ordering::Greater => {
@@ -314,6 +333,7 @@ impl DocumentReader {
                 core::cmp::Ordering::Equal => {
                     self.list_stack.pop();
                     self.emit_list_item_end(top.is_ordered);
+                    found_sequential = true;
                     break;
                 }
                 core::cmp::Ordering::Less => break,
@@ -345,6 +365,7 @@ impl DocumentReader {
             ilvl,
             is_ordered,
         });
+        found_sequential
     }
 
     fn emit_list_item_start_ordered(
@@ -977,8 +998,8 @@ impl DocumentReader {
             _ => match list_classification {
                 None => ParagraphBlockKind::Paragraph,
                 Some((num_id, ilvl, is_ordered, style_type)) => {
-                    self.reconcile_list_stack(num_id, ilvl, is_ordered);
-                    let start = self.compute_start(num_id);
+                    let sequential = self.reconcile_list_stack(num_id, ilvl, is_ordered);
+                    let start = self.compute_start(num_id, ilvl, sequential);
                     if is_ordered {
                         ParagraphBlockKind::OrderedListItem {
                             num_id,
@@ -4125,7 +4146,7 @@ mod tests {
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 1,
-                    start: None,
+                    start: Some(1),
                     style_type: ListStyleType::Decimal,
                 },
                 docspec_core::Event::StartParagraph {
@@ -4179,7 +4200,7 @@ mod tests {
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 1,
-                    start: None,
+                    start: Some(1),
                     style_type: ListStyleType::Decimal,
                 },
                 docspec_core::Event::StartParagraph {
@@ -4257,7 +4278,7 @@ mod tests {
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
-                    start: None,
+                    start: Some(2),
                     style_type: ListStyleType::Decimal,
                 },
                 docspec_core::Event::StartParagraph {
@@ -4702,7 +4723,7 @@ mod tests {
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
-                    start: None,
+                    start: Some(2),
                     style_type: ListStyleType::Decimal,
                 },
                 docspec_core::Event::StartParagraph {
@@ -4825,7 +4846,7 @@ mod tests {
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 1,
-                    start: None,
+                    start: Some(1),
                     style_type: ListStyleType::Decimal,
                 },
                 docspec_core::Event::StartParagraph {
@@ -4945,7 +4966,7 @@ mod tests {
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
-                    start: None,
+                    start: Some(2),
                     style_type: ListStyleType::Decimal,
                 },
                 docspec_core::Event::StartParagraph {
@@ -5081,7 +5102,7 @@ mod tests {
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("7".to_string()),
                     level: 0,
-                    start: None,
+                    start: Some(3),
                     style_type: ListStyleType::Decimal,
                 },
                 docspec_core::Event::StartParagraph {
@@ -5211,7 +5232,7 @@ mod tests {
                 docspec_core::Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 0,
-                    start: None,
+                    start: Some(2),
                     style_type: ListStyleType::Decimal,
                 },
                 docspec_core::Event::StartParagraph {

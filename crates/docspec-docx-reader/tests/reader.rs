@@ -1764,7 +1764,7 @@ mod events {
 
         assert_eq!(
             format!("{reader:?}"),
-            "DocxReader { inner: DocumentReader { buf: [], pending_preformatted_close: false, open_styles: [], phase: \"<phase>\", queue: [], data: \"<DocxData>\", hyperlink_map: {}, list_stack: [], seen_lists: {}, xml: \"<quick_xml::Reader>\", archive: \"<Arc<Mutex<ZipArchive>>>\", content_types: \"<Arc<ContentTypes>>\" } }"
+            "DocxReader { inner: DocumentReader { buf: [], pending_preformatted_close: false, open_styles: [], phase: \"<phase>\", queue: [], data: \"<DocxData>\", hyperlink_map: {}, list_stack: [], list_counters: {}, xml: \"<quick_xml::Reader>\", archive: \"<Arc<Mutex<ZipArchive>>>\", content_types: \"<Arc<ContentTypes>>\" } }"
         );
     }
 
@@ -5813,7 +5813,7 @@ mod happy_path_lists {
                 Event::StartOrderedListItem {
                     id: Some("1".to_string()),
                     level: 1,
-                    start: None,
+                    start: Some(1),
                     style_type: ListStyleType::Decimal,
                 },
                 start_paragraph(),
@@ -7148,7 +7148,7 @@ mod cross_feature_lists {
                 start_paragraph(),
                 text("break"),
                 Event::EndParagraph,
-                start_ordered("1", None),
+                start_ordered("1", Some(2)),
                 start_paragraph(),
                 text("two"),
                 Event::EndParagraph,
