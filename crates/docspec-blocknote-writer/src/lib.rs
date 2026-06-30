@@ -70,6 +70,12 @@
 //! - [`StartOrderedListItem`](docspec_core::Event::StartOrderedListItem) → `numberedListItem`
 //!   (the `start` field, when present on the first item, becomes the `start` prop)
 //!
+//! The `id` field on `Start*ListItem` events is dropped — list items never emit an `id` key,
+//! matching how `paragraph` blocks behave when their source has no id. Upstream readers (notably
+//! the DOCX reader) use this field to carry the OOXML `numId`, which is shared across every item
+//! in the same list rather than uniquely identifying one item, so propagating it as `BlockNote`'s
+//! per-block `id` would be misleading.
+//!
 //! Nesting uses `BlockNote`'s native `children: Block[]` arrays. `DocSpec`'s `level: u32` field
 //! drives the nesting depth: a level increase opens a new `children` array; a level decrease
 //! closes the appropriate number of open items and children arrays.
@@ -833,20 +839,19 @@ impl<W: Write> BlockNoteWriter<W> {
     fn handle_start_list_item(
         &mut self,
         kind: ListKind,
-        id: Option<&str>,
         level: u32,
         start: Option<u64>,
     ) -> Result<()> {
         if self.blockquote_depth.is_positive() {
             self.prepare_blockquote_children()?;
             if !self.current_blockquote_contains_list_item() {
-                self.open_list_item_object(kind, id, level, start)?;
+                self.open_list_item_object(kind, level, start)?;
                 return Ok(());
             }
         }
         if self.list_stack.is_empty() {
             self.close_for_block_sibling()?;
-            self.open_list_item_object(kind, id, level, start)?;
+            self.open_list_item_object(kind, level, start)?;
             return Ok(());
         }
 
@@ -862,7 +867,7 @@ impl<W: Write> BlockNoteWriter<W> {
 
         if effective_level > stack_top_level {
             self.open_current_list_item_children()?;
-            self.open_list_item_object(kind, id, effective_level, start)?;
+            self.open_list_item_object(kind, effective_level, start)?;
             return Ok(());
         }
 
@@ -871,7 +876,7 @@ impl<W: Write> BlockNoteWriter<W> {
             if self.list_stack.is_empty() {
                 self.close_for_block_sibling()?;
             }
-            self.open_list_item_object(kind, id, effective_level, start)?;
+            self.open_list_item_object(kind, effective_level, start)?;
             return Ok(());
         }
 
@@ -886,7 +891,7 @@ impl<W: Write> BlockNoteWriter<W> {
         if self.list_stack.is_empty() {
             self.close_for_block_sibling()?;
         }
-        self.open_list_item_object(kind, id, effective_level, start)?;
+        self.open_list_item_object(kind, effective_level, start)?;
         Ok(())
     }
 
@@ -1213,12 +1218,10 @@ impl<W: Write> BlockNoteWriter<W> {
     fn open_list_item_object(
         &mut self,
         kind: ListKind,
-        id: Option<&str>,
         level: u32,
         start: Option<u64>,
     ) -> Result<()> {
         self.json.open_object()?;
-        self.write_id(id)?;
         let type_name = match kind {
             ListKind::Ordered => "numberedListItem",
             ListKind::Unordered => "bulletListItem",
@@ -1450,11 +1453,11 @@ impl<W: Write> EventSink for BlockNoteWriter<W> {
                 source, alt, id, ..
             } => self.handle_image(source, alt, id.as_deref()),
             Event::LineBreak | Event::SoftBreak => self.handle_line_break(),
-            Event::StartOrderedListItem {
-                id, level, start, ..
-            } => self.handle_start_list_item(ListKind::Ordered, id.as_deref(), level, start),
-            Event::StartUnorderedListItem { id, level, .. } => {
-                self.handle_start_list_item(ListKind::Unordered, id.as_deref(), level, None)
+            Event::StartOrderedListItem { level, start, .. } => {
+                self.handle_start_list_item(ListKind::Ordered, level, start)
+            }
+            Event::StartUnorderedListItem { level, .. } => {
+                self.handle_start_list_item(ListKind::Unordered, level, None)
             }
             Event::EndOrderedListItem | Event::EndUnorderedListItem => self.handle_end_list_item(),
             Event::StartTable { id, .. } => self.handle_start_table(id.as_deref()),

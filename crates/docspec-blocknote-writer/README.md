@@ -20,7 +20,7 @@ Converts a DocSpec event stream into [BlockNote](https://www.blocknotejs.org/) J
 Inline styles are consumed from `StartTextStyle`/`EndTextStyle` spans around `Text` events. Bold, italic, code, strikethrough, and underline render as BlockNote style flags. Subscript and superscript are accepted but omitted because BlockNote's default schema has no equivalent representation.
 Inline links (`StartLink`/`EndLink`) emit a `link` inline type with the `href`. The optional `title` field is dropped (BlockNote's default link schema has no title).
 
-List items support arbitrary nesting via BlockNote's native `children: Block[]` arrays. The `start` prop on `numberedListItem` is preserved when the first item in a sequence carries an explicit start number.
+List items support arbitrary nesting via BlockNote's native `children: Block[]` arrays. The `start` prop on `numberedListItem` is preserved when the first item in a sequence carries an explicit start number. The `id` field on `Start*ListItem` events is dropped — list items never emit an `id` key, regardless of source. Upstream readers such as `docspec-docx-reader` set this field to the OOXML `numId`, which is shared by every item in the same list and so is not a per-item identifier.
 
 ### Color Styles
 
