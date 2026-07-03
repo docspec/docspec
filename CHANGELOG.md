@@ -12,6 +12,16 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.20.1](https://github.com/docspec/docspec/compare/v1.20.0...v1.20.1) - 2026-07-03
+
+### Fixed
+
+- *(blocknote-writer)* drop id field on list items
+
+### Other
+
+- update Cargo.lock dependencies
+
 ## [1.20.0](https://github.com/docspec/docspec/compare/v1.19.0...v1.20.0) - 2026-06-30
 
 ### Added
