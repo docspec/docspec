@@ -10,6 +10,7 @@ use docspec_core::{
 };
 use quick_xml::events::{BytesRef, BytesStart};
 
+use crate::field_codes::{self, HyperlinkFieldArgs};
 use crate::properties;
 use crate::rels::{HyperlinkMap, ImageMap};
 use crate::styles::StyleList;
@@ -113,6 +114,29 @@ enum HyperlinkParseEnd {
     Eof,
 }
 
+/// One open complex-field context on the field nesting stack.
+///
+/// A `<w:fldChar w:fldCharType="begin"/>` pushes a new `FieldContext`; the
+/// matching `end` pops and emits any wrapped events. While the field is open
+/// its instruction text is collected (between `begin` and `separate`) and the
+/// queue index at `separate` is recorded so the display content (between
+/// `separate` and `end`) can be drained back out at close time.
+#[derive(Debug, Default)]
+struct FieldContext {
+    /// Concatenated text content of every `<w:instrText>` element seen between
+    /// `begin` and `separate`. Parsed at `separate` into `parsed`.
+    instr: String,
+    /// `self.queue.len()` captured at `<w:fldChar w:fldCharType="separate"/>`.
+    /// `None` until `separate` is seen — a field that ends without ever
+    /// reaching `separate` carries no display content and emits nothing.
+    content_start: Option<usize>,
+    /// `Some(args)` when [`instr`] parses as a `HYPERLINK` instruction, set at
+    /// `separate`. Used at close time to wrap the buffered display content and
+    /// (by outer fields) to detect nested-link cases that must collapse to a
+    /// single `StartLink`/`EndLink` pair.
+    parsed: Option<HyperlinkFieldArgs>,
+}
+
 impl Default for ParagraphParseState {
     fn default() -> Self {
         Self {
@@ -185,6 +209,10 @@ pub struct DocumentReader {
     /// Hyperlink relationship map from the package. Consulted while parsing
     /// `<w:hyperlink r:id="...">` to resolve the URL.
     hyperlink_map: HyperlinkMap,
+    /// Open complex-field (`<w:fldChar>` / `<w:instrText>`) nesting stack.
+    /// Pushed on `begin`, popped on `end`. Used to wrap HYPERLINK field display
+    /// content in `StartLink`/`EndLink` events (OOXML §17.16.5.25).
+    field_stack: Vec<FieldContext>,
     /// Open list nesting stack. Each entry represents one open list level.
     list_stack: Vec<ListStackEntry>,
     /// Counter per (numId, ilvl) tracking how many items at each level have been emitted
@@ -215,6 +243,7 @@ impl fmt::Debug for DocumentReader {
             .field("queue", &self.queue)
             .field("data", &"<DocxData>")
             .field("hyperlink_map", &self.hyperlink_map)
+            .field("field_stack", &self.field_stack)
             .field("list_stack", &self.list_stack)
             .field("list_counters", &self.list_counters);
         if std::env::var_os("DOCSPEC_DEBUG_PENDING_ERROR").is_some() {
@@ -255,6 +284,7 @@ impl DocumentReader {
                 image_map,
             },
             hyperlink_map,
+            field_stack: Vec::new(),
             list_stack: Vec::new(),
             list_counters: std::collections::HashMap::new(),
             xml,
@@ -601,7 +631,7 @@ impl DocumentReader {
         }
     }
 
-    fn collect_text_content(&mut self) -> Result<String> {
+    fn collect_text_content_until(&mut self, end_local_name: &[u8]) -> Result<String> {
         let mut content = String::new();
         loop {
             self.buf.clear();
@@ -628,7 +658,9 @@ impl DocumentReader {
                 quick_xml::events::Event::GeneralRef(reference) => {
                     content.push_str(&Self::decode_general_ref(&reference)?);
                 }
-                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"t" => {
+                quick_xml::events::Event::End(end)
+                    if end.local_name().as_ref() == end_local_name =>
+                {
                     return Ok(content);
                 }
                 quick_xml::events::Event::Start(start) => {
@@ -709,7 +741,7 @@ impl DocumentReader {
             }
             b"rPr" => self.consume_current_start(start)?,
             b"t" => {
-                let text = self.collect_text_content()?;
+                let text = self.collect_text_content_until(b"t")?;
                 let text = Self::normalize_symbol_text(props.as_ref(), text);
                 if !text.is_empty() {
                     self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
@@ -742,11 +774,13 @@ impl DocumentReader {
                 self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
                 self.parse_pict_subtree()?;
             }
-            b"instrText" | b"fldChar" => {
-                let end = start.to_end().into_owned();
-                self.xml
-                    .read_to_end_into(end.name(), &mut self.buf)
-                    .map_err(map_quick_xml_error)?;
+            b"instrText" => {
+                let text = self.collect_text_content_until(b"instrText")?;
+                self.append_field_instruction_text(&text);
+            }
+            b"fldChar" => {
+                self.handle_fld_char(start);
+                self.consume_current_start(start)?;
             }
             _ if is_denied_container(local_name.as_ref()) => {
                 let end = start.to_end().into_owned();
@@ -790,6 +824,9 @@ impl DocumentReader {
                     self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
                     self.queue.push_back(Event::Text { content: text });
                 }
+            }
+            b"fldChar" => {
+                self.handle_fld_char(empty);
             }
             _ => {}
         }
@@ -1188,6 +1225,82 @@ impl DocumentReader {
         }
     }
 
+    fn append_field_instruction_text(&mut self, text: &str) {
+        if let Some(top) = self.field_stack.last_mut() {
+            if top.content_start.is_none() {
+                top.instr.push_str(text);
+            }
+        }
+    }
+
+    fn handle_fld_char(&mut self, tag: &BytesStart<'_>) {
+        match read_attribute(tag, b"w:fldCharType").as_deref() {
+            Some("begin") => self.field_stack.push(FieldContext::default()),
+            Some("separate") => {
+                let queue_len = self.queue.len();
+                if let Some(top) = self.field_stack.last_mut() {
+                    top.content_start = Some(queue_len);
+                    top.parsed = field_codes::parse_hyperlink_instruction(&top.instr);
+                }
+            }
+            Some("end") => {
+                if let Some(field) = self.field_stack.pop() {
+                    self.finalize_field(field);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn finalize_field(&mut self, field: FieldContext) {
+        let Some(content_start) = field.content_start else {
+            return;
+        };
+        let buffered: Vec<Event> = if content_start >= self.queue.len() {
+            Vec::new()
+        } else {
+            self.queue.drain(content_start..).collect()
+        };
+        if buffered.is_empty() {
+            return;
+        }
+
+        let outer_field_emits_link = self.field_stack.iter().any(|f| {
+            f.parsed
+                .as_ref()
+                .and_then(field_codes::resolve_field_href)
+                .is_some()
+        });
+
+        let resolved_href = if outer_field_emits_link {
+            None
+        } else {
+            field
+                .parsed
+                .as_ref()
+                .and_then(field_codes::resolve_field_href)
+        };
+
+        if let Some(href) = resolved_href {
+            let title = field.parsed.and_then(|args| args.tooltip);
+            self.queue.push_back(Event::StartLink {
+                href,
+                id: None,
+                title,
+            });
+            self.queue.extend(buffered);
+            self.queue.push_back(Event::EndLink);
+        } else {
+            self.queue.extend(buffered);
+        }
+    }
+
+    fn flush_pending_fields(&mut self) {
+        while let Some(field) = self.field_stack.pop() {
+            self.finalize_field(field);
+        }
+    }
+
     fn parse_hyperlink(
         &mut self,
         start: &BytesStart<'_>,
@@ -1348,6 +1461,7 @@ impl DocumentReader {
 
     fn finish_paragraph_parse(&mut self, state: &mut ParagraphParseState) {
         self.ensure_local_paragraph_started(state);
+        self.flush_pending_fields();
         self.close_paragraph_block(&state.block_kind);
     }
 

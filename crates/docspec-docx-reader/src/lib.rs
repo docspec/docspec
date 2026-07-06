@@ -15,6 +15,10 @@
 //! `<w:tc>`), lists (`<w:p>` with `<w:numPr>` — ordered and unordered),
 //! hyperlinks (`<w:hyperlink>` — resolved via `word/_rels/document.xml.rels`
 //! and emitted as `StartLink`/`EndLink` events around inline content),
+//! field-code hyperlinks (`<w:fldChar>` + `<w:instrText>HYPERLINK ...`,
+//! per OOXML §17.16.5.25 — the legacy complex-field form emitted by some
+//! toolchains; parsed and emitted as `StartLink`/`EndLink` events, with
+//! non-`HYPERLINK` fields passing their display content through unwrapped),
 //! structured document tags (`<w:sdt>` — content emitted normally;
 //! `<w:sdtPr>`/`<w:sdtEndPr>` dropped), tracked insertions and moves
 //! (`<w:ins>`, `<w:moveTo>` — accept-changes semantics), `DrawingML` images
@@ -58,9 +62,6 @@
 //! - Document metadata
 //! - Tracked deletions (`<w:del>`, `<w:moveFrom>`) — accept-changes semantics
 //! - Structured document tag properties (`<w:sdtPr>`, `<w:sdtEndPr>`)
-//! - Field-code hyperlinks (`<w:fldChar>` + `<w:instrText>HYPERLINK ...`):
-//!   legacy form not currently supported; only the modern `<w:hyperlink>`
-//!   element is recognized.
 //!
 //! # Lists
 //!
@@ -97,6 +98,7 @@ extern crate alloc;
 mod asset_provider;
 mod content_types;
 mod document;
+mod field_codes;
 mod numbering;
 mod package;
 mod properties;

@@ -6,10 +6,12 @@ ReaderFixtureSnapshot {
   events: [
     StartDocument { id: None, language: None, metadata: None },
     StartParagraph { alignment: None, id: None },
+    StartLink { href: "#_APPENDIX_5:_FINANCIAL", id: None, title: None },
     Text { content: "A" },
     Text { content: " link to " },
     Text { content: "the" },
     Text { content: " bookmark" },
+    EndLink,
     EndParagraph,
     StartParagraph { alignment: Some(Justify), id: None },
     StartTextStyle { kind: Bold, id: None },
