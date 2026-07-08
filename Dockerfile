@@ -10,7 +10,7 @@ WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 
-RUN cargo build -p docspec-cli --release --no-default-features --features http && \
+RUN cargo build -p docspec-cli --release && \
   mkdir -p /out && \
   cp target/release/docspec /out/docspec
 
