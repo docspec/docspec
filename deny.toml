@@ -1,0 +1,57 @@
+# cargo-deny configuration for the docspec workspace.
+# See https://embarkstudios.github.io/cargo-deny/
+
+[advisories]
+# Deny all security advisories by default
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "deny"
+
+# RUSTSEC-2024-0436: paste crate is unmaintained; no safe upgrade available.
+# paste v1 is a proc-macro reached only via `docspec-blocknote-writer`'s
+# dev-dependencies (verify with `cargo tree -i paste -e normal --workspace`,
+# which reports "nothing to print"). No shipped binary embeds paste-generated
+# code, so risk is limited to proc-macro expansion at compile time in test
+# builds.
+[[advisories.ignore]]
+id = "RUSTSEC-2024-0436"
+reason = "paste is a transitive dev-dependency of docspec-blocknote-writer only; no safe upgrade available; risk is limited to proc-macro expansion in test builds"
+
+[licenses]
+# Require all licenses to be in the allow list below.
+# All licenses listed are OSI-approved or FSF-recognized open-source licenses.
+# GPL-2.0-only and LGPL-2.1-or-later are not listed because every crate that
+# uses them also offers OR alternatives (Apache-2.0 / MIT) which are listed here.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "ISC",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "Unicode-3.0",
+  "Unicode-DFS-2016",
+  "Zlib",
+  "0BSD",
+  "Unlicense",
+  "MIT-0",
+  "CC0-1.0",
+  "OpenSSL",
+  "MPL-2.0",
+  "BSL-1.0",
+  "CDLA-Permissive-2.0",
+  # bzip2-1.0.6: bzip2/libbzip2 license — BSD-like, OSI-compatible permissive license
+  # used by libbz2-rs-sys → bzip2 → zip (transitive via docspec-docx-reader)
+  "bzip2-1.0.6",
+]
+
+[bans]
+# No banned crates — multiple versions are allowed (workspace uses several
+# duplicate transitive deps which are tracked as warnings, not errors)
+multiple-versions = "allow"
+
+[sources]
+# Only allow crates from crates.io and the local workspace
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
