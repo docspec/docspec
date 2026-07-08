@@ -13,6 +13,11 @@ categories = ["network-programming", "web-programming"]
 [package.metadata.dist]
 dist = false
 
+[features]
+default = ["sentry"]
+sentry = ["dep:sentry"]
+posthog = ["dep:posthog-rs", "dep:uuid"]
+
 [dependencies]
 axum = "0.8"
 clap = { version = "4", features = ["derive"] }
@@ -35,7 +40,7 @@ mime = "0.3"
 metrics = "0.24"
 metrics-exporter-prometheus = { version = "0.18", default-features = false }
 thiserror = "2"
-sentry = { version = "0.48", default-features = false, features = [
+sentry = { version = "0.48", optional = true, default-features = false, features = [
   "backtrace",
   "contexts",
   "panic",
@@ -45,6 +50,11 @@ sentry = { version = "0.48", default-features = false, features = [
   "reqwest",
   "rustls",
 ] }
+posthog-rs = { version = "0.15.1", optional = true, default-features = false, features = [
+  "async-client",
+  "error-tracking",
+] }
+uuid = { version = "1", features = ["v4"], optional = true }
 docspec-core = { workspace = true }
 docspec-json = { workspace = true }
 docspec = { workspace = true, features = ["full"] }
@@ -55,6 +65,7 @@ serde_json = "1"
 reqwest = { version = "0.13", features = ["blocking", "json"] }
 uuid = "1"
 docspec-test-utils = { workspace = true }
+wiremock = "0.6"
 sentry = { version = "0.48", default-features = false, features = [
   "backtrace",
   "contexts",
