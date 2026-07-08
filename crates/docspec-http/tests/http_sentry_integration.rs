@@ -19,12 +19,16 @@ fn lock_env() -> std::sync::MutexGuard<'static, ()> {
     }
 }
 
+fn dummy_error() -> std::io::Error {
+    std::io::Error::other("dummy internal error")
+}
+
 #[test]
 fn internal_error_captured_with_request_id_tag() {
     let _env_guard = lock_env();
     let events = sentry::test::with_captured_events(|| {
         use axum::response::IntoResponse as _;
-        drop(docspec_http::error::HttpError::Internal.into_response());
+        drop(docspec_http::error::HttpError::internal(dummy_error()).into_response());
     });
     assert_eq!(
         events.len(),
@@ -123,7 +127,7 @@ fn body_not_in_extras_or_contexts() {
     let _env_guard = lock_env();
     let events = sentry::test::with_captured_events(|| {
         use axum::response::IntoResponse as _;
-        drop(docspec_http::error::HttpError::Internal.into_response());
+        drop(docspec_http::error::HttpError::internal(dummy_error()).into_response());
     });
     assert_eq!(events.len(), 1);
     let event = events.first().expect("expected event");

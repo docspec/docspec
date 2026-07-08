@@ -312,14 +312,16 @@ async fn do_conversion(
         }
 
         sink.finish().map_err(|error| {
-            tracing::debug!(error = %error, "conversion sink finish failed");
-            HttpError::Internal
+            tracing::warn!(error = ?error, "conversion sink finish failed");
+            HttpError::internal(error)
         })?;
 
         // Capture byte count before output_buffer is consumed by Body::from.
         // u64::try_from is lossless on 64-bit targets (usize ≤ u64::MAX).
-        let output_bytes =
-            u64::try_from(output_buffer.len()).map_err(|_conversion_error| HttpError::Internal)?;
+        let output_bytes = u64::try_from(output_buffer.len()).map_err(|conversion_error| {
+            tracing::warn!(error = ?conversion_error, "output size exceeded u64 range");
+            HttpError::internal(conversion_error)
+        })?;
         Ok((output_buffer, output_bytes))
     })
     .await;
@@ -343,13 +345,13 @@ async fn do_conversion(
             .body(Body::from(output))
             .map(|response| (response, output_bytes, output_format))
             .map_err(|error| {
-                tracing::error!(error = %error, "failed to build conversion response");
-                HttpError::Internal
+                tracing::warn!(error = ?error, "failed to build conversion response");
+                HttpError::internal(error)
             }),
         Ok(Err(http_error)) => Err(http_error),
         Err(join_error) => {
-            tracing::error!(error = %join_error, "spawn_blocking join failed");
-            Err(HttpError::Internal)
+            tracing::warn!(error = ?join_error, "spawn_blocking join failed");
+            Err(HttpError::internal(join_error))
         }
     }
 }

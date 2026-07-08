@@ -30,7 +30,7 @@ pub fn router() -> Router {
     use axum::routing::{get, post};
     use tower::ServiceBuilder;
     use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
-    use tower_http::trace::TraceLayer;
+    use tower_http::trace::{DefaultOnFailure, TraceLayer};
 
     use crate::cache::cache_control_layer;
     use crate::handlers::{
@@ -110,7 +110,10 @@ pub fn router() -> Router {
         .layer(option_layer(telemetry::tower_new_layer()))
         .layer(option_layer(telemetry::tower_http_layer()))
         .layer(middleware::from_fn(attach_sentry_tags))
-        .layer(TraceLayer::new_for_http())
+        .layer(
+            TraceLayer::new_for_http()
+                .on_failure(DefaultOnFailure::new().level(tracing::Level::DEBUG)),
+        )
         .layer(middleware::from_fn(record_http_metrics))
         .layer(PropagateRequestIdLayer::new(x_request_id))
         .layer(PropagateRequestIdLayer::new(x_trace_id))
@@ -129,7 +132,10 @@ pub fn router() -> Router {
             MakeRequestUuid,
         ))
         .layer(SetRequestIdLayer::new(x_trace_id.clone(), EchoOnly))
-        .layer(TraceLayer::new_for_http())
+        .layer(
+            TraceLayer::new_for_http()
+                .on_failure(DefaultOnFailure::new().level(tracing::Level::DEBUG)),
+        )
         .layer(middleware::from_fn(record_http_metrics))
         .layer(PropagateRequestIdLayer::new(x_request_id))
         .layer(PropagateRequestIdLayer::new(x_trace_id))

@@ -27,6 +27,10 @@ fn lock_env() -> std::sync::MutexGuard<'static, ()> {
     }
 }
 
+fn dummy_error() -> std::io::Error {
+    std::io::Error::other("dummy internal error")
+}
+
 /// Helper to initialize a `PostHog` client pointing at the wiremock server.
 async fn init_test_posthog_client(
     mock_server: &wiremock::MockServer,
@@ -88,7 +92,7 @@ async fn internal_error_dual_fire_includes_sentry_event_id() {
     mount_posthog_stub(&mock_server).await;
     let client = init_test_posthog_client(&mock_server).await;
 
-    drop(docspec_http::error::HttpError::Internal.into_response());
+    drop(docspec_http::error::HttpError::internal(dummy_error()).into_response());
 
     flush_and_clear_slot(client).await;
 
@@ -115,7 +119,7 @@ async fn internal_error_posthog_only_no_sentry_id() {
     mount_posthog_stub(&mock_server).await;
     let client = init_test_posthog_client(&mock_server).await;
 
-    drop(docspec_http::error::HttpError::Internal.into_response());
+    drop(docspec_http::error::HttpError::internal(dummy_error()).into_response());
 
     flush_and_clear_slot(client).await;
 
@@ -260,7 +264,7 @@ async fn zero_sample_rate_sends_no_events() {
         .expect("client should init even with sample rate 0");
     install_posthog_client(std::sync::Arc::clone(&client));
 
-    drop(docspec_http::error::HttpError::Internal.into_response());
+    drop(docspec_http::error::HttpError::internal(dummy_error()).into_response());
 
     client.shutdown().await;
     clear_posthog_client();
@@ -289,7 +293,7 @@ async fn flush_on_shutdown_delivers_all_events_before_returning() {
         .expect("client should init");
     install_posthog_client(client);
 
-    drop(docspec_http::error::HttpError::Internal.into_response());
+    drop(docspec_http::error::HttpError::internal(dummy_error()).into_response());
 
     docspec_http::telemetry::shutdown().await;
     clear_posthog_client();
