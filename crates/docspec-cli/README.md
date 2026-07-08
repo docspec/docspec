@@ -49,7 +49,11 @@ Starts the HTTP API server. Listens on `127.0.0.1:3000` by default.
 
 ### Feature flags
 
-`docspec-cli` ships with `http` enabled by default. For a slim install without the HTTP server stack:
+`docspec-cli` ships with `http` and `posthog` enabled by default. Sentry compiles in via
+`docspec-http`'s defaults. The telemetry integrations are runtime no-ops until their respective env vars are set —
+see the [`docspec-http` README](https://docs.rs/docspec-http) for the full list.
+
+For a slim install without the HTTP server stack (and therefore no telemetry):
 
 ```bash
 cargo install docspec-cli --no-default-features

@@ -22,7 +22,7 @@ docspec-http = { workspace = true, optional = true }
 thiserror = "2"
 
 [features]
-default = ["http"]
+default = ["http", "posthog"]
 http = ["dep:docspec-http"]
 posthog = ["http", "docspec-http/posthog"]
 

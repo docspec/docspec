@@ -14,7 +14,7 @@ categories = ["network-programming", "web-programming"]
 dist = false
 
 [features]
-default = ["sentry"]
+default = ["sentry", "posthog"]
 sentry = ["dep:sentry"]
 posthog = ["dep:posthog-rs", "dep:uuid"]
 

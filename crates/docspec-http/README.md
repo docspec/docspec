@@ -171,23 +171,15 @@ Each captured event is tagged with `request_id` (UUID v4) and `trace_id`
 ### PostHog
 
 `docspec-http` integrates with [PostHog](https://posthog.com/) for product analytics and error reporting.
-Activation is fully opt-in via Cargo feature and environment variables — the binary has zero PostHog
-overhead when the `posthog` feature is disabled or no API key is configured.
+Activation is fully opt-in via environment variables — the binary has zero PostHog
+overhead when no API key is configured.
 
 #### Activation
 
-Enable the `posthog` Cargo feature and set ONE of the following:
+The `posthog` Cargo feature is on by default. Set ONE of the following to send events:
 
 - `DOCSPEC_POSTHOG_API_KEY` — docspec-specific override (preferred)
 - `POSTHOG_API_KEY` — PostHog's standard convention (fallback)
-
-**For `docspec-cli` users:** the power-user path is:
-
-```bash
-cargo install docspec-cli --features posthog
-```
-
-This enables PostHog analytics in the HTTP server without needing to specify the nested feature.
 
 If both are set, `DOCSPEC_POSTHOG_API_KEY` wins. An empty string is treated as "not set" — the server
 starts normally without PostHog.
@@ -253,27 +245,27 @@ The server handles SIGINT and SIGTERM. In-flight requests complete before the pr
 | Feature | Default | Description |
 | --- | --- | --- |
 | `sentry` | **on** (part of `default`) | Enables Sentry error reporting integration |
-| `posthog` | off | Enables PostHog product analytics integration |
+| `posthog` | **on** (part of `default`) | Enables PostHog product analytics integration |
 
-Default:
+Default (both integrations compiled in):
 
 ```toml
 [dependencies]
 docspec-http = "1"
 ```
 
-Opt into PostHog:
+Sentry only:
 
 ```toml
 [dependencies]
-docspec-http = { version = "1", features = ["posthog"] }
+docspec-http = { version = "1", default-features = false, features = ["sentry"] }
 ```
 
-Both backends:
+PostHog only:
 
 ```toml
 [dependencies]
-docspec-http = { version = "1", features = ["sentry", "posthog"] }
+docspec-http = { version = "1", default-features = false, features = ["posthog"] }
 ```
 
 No telemetry:
@@ -283,9 +275,11 @@ No telemetry:
 docspec-http = { version = "1", default-features = false }
 ```
 
-> **Migration note:** if you depend on `docspec-http` with `default-features = false`, you will
-> lose the Sentry integration after this release. Add `features = ["sentry"]` to preserve the
-> previous behavior.
+> **Migration note:** starting with this release, `posthog` joins `sentry` in the default feature
+> set. Upgrading `docspec-http` without Cargo changes will additionally compile the PostHog
+> integration into your binary — at runtime it stays a no-op unless `DOCSPEC_POSTHOG_API_KEY` (or
+> `POSTHOG_API_KEY`) is set. To exclude either integration, use `default-features = false` and
+> opt into just what you need.
 
 ## Metrics
 
