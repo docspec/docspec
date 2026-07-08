@@ -96,8 +96,17 @@ pub enum HttpError {
     EmptyBody,
     /// An unexpected internal error occurred during conversion.
     ///
+    /// The `source` error is captured for observability (sent to Sentry via
+    /// [`sentry::capture_error`], logged at `warn!` in stderr) and drives the
+    /// error chain visible to operators. It is **never** exposed to the HTTP
+    /// client — the RFC 7807 response detail is always the generic
+    /// "An unexpected error occurred during conversion" string.
+    ///
     /// → HTTP 500 Internal Server Error.
-    Internal,
+    Internal {
+        /// The underlying error that caused this internal failure.
+        source: Box<dyn core::error::Error + Send + Sync + 'static>,
+    },
     /// The HTTP method is not supported on this endpoint.
     ///
     /// → HTTP 405 Method Not Allowed (response includes an `Allow` header).
@@ -152,18 +161,37 @@ fn build_posthog_error_event(detail: &str, sentry_event_id: Option<String>) -> p
     event
 }
 
+#[cfg(feature = "sentry")]
+#[inline]
+fn capture_sentry(
+    detail: &str,
+    source: Option<&(dyn core::error::Error + Send + Sync + 'static)>,
+) -> sentry::types::Uuid {
+    source.map_or_else(
+        || sentry::capture_message(detail, sentry::Level::Error),
+        sentry::capture_error,
+    )
+}
+
 #[cfg(any(feature = "sentry", feature = "posthog"))]
-fn capture_error_telemetry(status: StatusCode, detail: &str) {
+fn capture_error_telemetry(
+    status: StatusCode,
+    detail: &str,
+    source: Option<&(dyn core::error::Error + Send + Sync + 'static)>,
+) {
     if status != StatusCode::INTERNAL_SERVER_ERROR && status != StatusCode::UNPROCESSABLE_ENTITY {
         return;
     }
+
+    #[cfg(not(feature = "sentry"))]
+    let _ = source;
+
     #[cfg(all(feature = "sentry", not(feature = "posthog")))]
     {
-        let _ = sentry::capture_message(detail, sentry::Level::Error);
+        let _ = capture_sentry(detail, source);
     }
     #[cfg(all(feature = "sentry", feature = "posthog"))]
-    let sentry_id_string: Option<String> =
-        Some(sentry::capture_message(detail, sentry::Level::Error).to_string());
+    let sentry_id_string: Option<String> = Some(capture_sentry(detail, source).to_string());
     #[cfg(all(not(feature = "sentry"), feature = "posthog"))]
     let sentry_id_string: Option<String> = None;
     #[cfg(feature = "posthog")]
@@ -191,6 +219,9 @@ impl IntoResponse for HttpError {
     /// [`HttpError::MethodNotAllowed`] additionally sets the `Allow` response header.
     #[inline]
     fn into_response(self) -> Response {
+        #[cfg(any(feature = "sentry", feature = "posthog"))]
+        self.capture_to_telemetry();
+
         let (status, title, detail, allow): (
             StatusCode,
             &'static str,
@@ -253,16 +284,13 @@ impl IntoResponse for HttpError {
                 Cow::Owned(detail),
                 None,
             ),
-            Self::Internal => (
+            Self::Internal { .. } => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal Server Error",
                 Cow::Borrowed("An unexpected error occurred during conversion"),
                 None,
             ),
         };
-
-        #[cfg(any(feature = "sentry", feature = "posthog"))]
-        capture_error_telemetry(status, detail.as_ref());
 
         let body = ProblemJson {
             detail,
@@ -295,7 +323,7 @@ impl HttpError {
         match self {
             Self::BodyNotUtf8 => "body_not_utf8",
             Self::EmptyBody => "empty_body",
-            Self::Internal => "internal",
+            Self::Internal { .. } => "internal",
             Self::MethodNotAllowed { .. } => "method_not_allowed",
             Self::NotAcceptable => "not_acceptable",
             Self::NotFound { .. } => "not_found",
@@ -317,7 +345,47 @@ impl HttpError {
             | Self::NotFound { .. }
             | Self::Unprocessable { .. }
             | Self::UnsupportedMediaType { .. } => RESULT_CLIENT_ERROR,
-            Self::Internal => RESULT_SERVER_ERROR,
+            Self::Internal { .. } => RESULT_SERVER_ERROR,
+        }
+    }
+
+    /// Wrap an unexpected internal error as [`HttpError::Internal`].
+    ///
+    /// The source is preserved end-to-end for observability — it flows to
+    /// Sentry via [`sentry::capture_error`] (walking the [`core::error::Error::source`]
+    /// chain) and is logged at `warn!` level via [`core::fmt::Debug`] formatting.
+    #[inline]
+    #[must_use]
+    pub fn internal<E>(source: E) -> Self
+    where
+        E: core::error::Error + Send + Sync + 'static,
+    {
+        Self::Internal {
+            source: Box::new(source),
+        }
+    }
+
+    /// Capture this error to configured telemetry backends (Sentry, `PostHog`)
+    /// when the variant is a 500 or 422.
+    #[cfg(any(feature = "sentry", feature = "posthog"))]
+    pub(crate) fn capture_to_telemetry(&self) {
+        match self {
+            Self::Internal { source } => {
+                capture_error_telemetry(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "An unexpected error occurred during conversion",
+                    Some(source.as_ref()),
+                );
+            }
+            Self::Unprocessable { detail } => {
+                capture_error_telemetry(StatusCode::UNPROCESSABLE_ENTITY, detail.as_str(), None);
+            }
+            Self::BodyNotUtf8
+            | Self::EmptyBody
+            | Self::MethodNotAllowed { .. }
+            | Self::NotAcceptable
+            | Self::NotFound { .. }
+            | Self::UnsupportedMediaType { .. } => {}
         }
     }
 }
@@ -343,6 +411,10 @@ mod tests {
             .await
             .unwrap()
             .to_vec()
+    }
+
+    fn dummy_error() -> std::io::Error {
+        std::io::Error::other("dummy internal error")
     }
 
     #[test]
@@ -389,7 +461,7 @@ mod tests {
             StatusCode::UNPROCESSABLE_ENTITY
         );
         assert_eq!(
-            HttpError::Internal.into_response().status(),
+            HttpError::internal(dummy_error()).into_response().status(),
             StatusCode::INTERNAL_SERVER_ERROR
         );
     }
@@ -403,28 +475,38 @@ mod tests {
 
     #[test]
     fn content_type_is_problem_json() {
-        let response = HttpError::Internal.into_response();
+        let response = HttpError::internal(dummy_error()).into_response();
         let content_type = response.headers().get(CONTENT_TYPE).unwrap();
         assert_eq!(content_type, "application/problem+json; charset=utf-8");
     }
 
     #[test]
     fn no_allow_header_on_non_405_variants() {
-        let response = HttpError::Internal.into_response();
+        let response = HttpError::internal(dummy_error()).into_response();
         assert!(response.headers().get(ALLOW).is_none());
     }
 
     #[cfg(feature = "sentry")]
     #[test]
-    fn internal_error_is_captured_by_sentry() {
+    fn internal_error_is_captured_by_sentry_with_source_chain() {
         let events = sentry::test::with_captured_events(|| {
-            let _response = HttpError::Internal.into_response();
+            let _response = HttpError::internal(dummy_error()).into_response();
         });
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].level, sentry::Level::Error);
+        assert!(
+            events[0].message.is_none(),
+            "capture_error must not populate top-level message"
+        );
+        let first_exception = events[0]
+            .exception
+            .values
+            .first()
+            .expect("exception chain must be populated by capture_error");
         assert_eq!(
-            events[0].message.as_deref(),
-            Some("An unexpected error occurred during conversion")
+            first_exception.value.as_deref(),
+            Some("dummy internal error"),
+            "exception value must equal the Display of the source error"
         );
     }
 
@@ -464,7 +546,7 @@ mod tests {
 
     #[tokio::test]
     async fn serializes_with_four_fields() {
-        let bytes = body_bytes(HttpError::Internal).await;
+        let bytes = body_bytes(HttpError::internal(dummy_error())).await;
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(
             json,
@@ -508,7 +590,7 @@ mod tests {
 
     #[tokio::test]
     async fn internal_detail_is_fixed() {
-        let bytes = body_bytes(HttpError::Internal).await;
+        let bytes = body_bytes(HttpError::internal(dummy_error())).await;
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(
             json["detail"].as_str().unwrap(),
@@ -577,7 +659,7 @@ mod tests {
 
     #[test]
     fn internal_error_class_returns_internal() {
-        assert_eq!(HttpError::Internal.error_class(), "internal");
+        assert_eq!(HttpError::internal(dummy_error()).error_class(), "internal");
     }
 
     #[test]
@@ -636,7 +718,10 @@ mod tests {
 
     #[test]
     fn internal_result_class_returns_server_error() {
-        assert_eq!(HttpError::Internal.result_class(), "server_error");
+        assert_eq!(
+            HttpError::internal(dummy_error()).result_class(),
+            "server_error"
+        );
     }
 
     #[test]
@@ -687,12 +772,13 @@ mod tests {
     mod posthog_tests {
         #![allow(clippy::expect_used, clippy::unwrap_used)]
         use super::super::HttpError;
+        use super::dummy_error;
         use axum::response::IntoResponse as _;
 
         #[cfg(all(feature = "sentry", feature = "posthog"))]
         #[test]
         fn internal_error_into_response_does_not_panic_with_both_features() {
-            let response = HttpError::Internal.into_response();
+            let response = HttpError::internal(dummy_error()).into_response();
             assert_eq!(
                 response.status(),
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR
@@ -702,7 +788,7 @@ mod tests {
         #[cfg(all(feature = "posthog", not(feature = "sentry")))]
         #[test]
         fn internal_error_into_response_does_not_panic_with_posthog_only() {
-            let response = HttpError::Internal.into_response();
+            let response = HttpError::internal(dummy_error()).into_response();
             assert_eq!(
                 response.status(),
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR
@@ -721,7 +807,7 @@ mod tests {
 
         #[test]
         fn into_response_outside_tokio_runtime_does_not_panic() {
-            let response = HttpError::Internal.into_response();
+            let response = HttpError::internal(dummy_error()).into_response();
             assert_eq!(
                 response.status(),
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR

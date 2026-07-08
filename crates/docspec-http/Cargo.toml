@@ -43,6 +43,7 @@ thiserror = "2"
 sentry = { version = "0.48", optional = true, default-features = false, features = [
   "backtrace",
   "contexts",
+  "debug-images",
   "panic",
   "tower",
   "tower-http",
@@ -69,6 +70,7 @@ wiremock = "0.6"
 sentry = { version = "0.48", default-features = false, features = [
   "backtrace",
   "contexts",
+  "debug-images",
   "panic",
   "tower",
   "tower-http",

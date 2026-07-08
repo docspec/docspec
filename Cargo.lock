@@ -2804,6 +2804,7 @@ dependencies = [
  "sentry-backtrace",
  "sentry-contexts",
  "sentry-core",
+ "sentry-debug-images",
  "sentry-panic",
  "sentry-tower",
  "sentry-tracing",
@@ -2847,6 +2848,16 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
+]
+
+[[package]]
+name = "sentry-debug-images"
+version = "0.48.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b603a51b083141062a142d73e36391b14244b4bd0bfe28bcd80e8327bb1d7698"
+dependencies = [
+ "findshlibs",
+ "sentry-core",
 ]
 
 [[package]]
