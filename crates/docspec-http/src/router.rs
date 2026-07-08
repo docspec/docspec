@@ -24,12 +24,10 @@ impl MakeRequestId for EchoOnly {
 /// Build the HTTP API router with all routes and middleware.
 #[inline]
 pub fn router() -> Router {
-    use axum::body::Body;
     use axum::extract::DefaultBodyLimit;
     use axum::http::header::HeaderName;
-    use axum::middleware::{self, Next};
+    use axum::middleware;
     use axum::routing::{get, post};
-    use tower::util::option_layer;
     use tower::ServiceBuilder;
     use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
     use tower_http::trace::TraceLayer;
@@ -40,8 +38,31 @@ pub fn router() -> Router {
         fallback::{conversion_method_not_allowed, health_method_not_allowed, not_found},
         health::{get_health, head_health, options_health},
     };
-    use crate::telemetry;
 
+    // Sentry-only imports — Body and Next are only used in the attach_sentry_tags
+    // closure; option_layer and telemetry are only used in the sentry middleware stack.
+    #[cfg(feature = "sentry")]
+    use crate::telemetry;
+    #[cfg(feature = "sentry")]
+    use axum::body::Body;
+    #[cfg(feature = "sentry")]
+    use axum::middleware::Next;
+    #[cfg(feature = "sentry")]
+    use tower::util::option_layer;
+
+    let x_request_id = HeaderName::from_static("x-request-id");
+    let x_trace_id = HeaderName::from_static("x-trace-id");
+
+    let conversion_route = post(post_conversion)
+        .options(options_conversion)
+        .fallback(conversion_method_not_allowed);
+
+    let health_route = get(get_health)
+        .head(head_health)
+        .options(options_health)
+        .fallback(health_method_not_allowed);
+
+    #[cfg(feature = "sentry")]
     let attach_sentry_tags = |request: Request<Body>, next: Next| async move {
         if sentry::Hub::current().client().is_some() {
             let request_id = request
@@ -68,44 +89,57 @@ pub fn router() -> Router {
         next.run(request).await
     };
 
-    let x_request_id = HeaderName::from_static("x-request-id");
-    let x_trace_id = HeaderName::from_static("x-trace-id");
+    // Two cfg-exclusive service stacks — one that includes the sentry
+    // hub-binding / HTTP layers and the tag middleware, one without.
+    // Using two `let middleware_stack` bindings (mutually exclusive via cfg)
+    // is the idiomatic Rust approach when each branch produces a different
+    // ServiceBuilder type due to different layer counts.
+    #[cfg(feature = "sentry")]
+    let middleware_stack = ServiceBuilder::new()
+        // Reason: axum's `Bytes`/`String`/`Json` extractors silently
+        // cap request bodies at 2 MiB by default. The README pledges
+        // `Body size: No limit ... DoS risk is accepted.`, so we
+        // disable the cap globally. Without this layer the
+        // `/conversion` handler would 413 on bodies >2 MiB.
+        .layer(DefaultBodyLimit::disable())
+        .layer(SetRequestIdLayer::new(
+            x_request_id.clone(),
+            MakeRequestUuid,
+        ))
+        .layer(SetRequestIdLayer::new(x_trace_id.clone(), EchoOnly))
+        .layer(option_layer(telemetry::tower_new_layer()))
+        .layer(option_layer(telemetry::tower_http_layer()))
+        .layer(middleware::from_fn(attach_sentry_tags))
+        .layer(TraceLayer::new_for_http())
+        .layer(middleware::from_fn(record_http_metrics))
+        .layer(PropagateRequestIdLayer::new(x_request_id))
+        .layer(PropagateRequestIdLayer::new(x_trace_id))
+        .layer(cache_control_layer());
 
-    let conversion_route = post(post_conversion)
-        .options(options_conversion)
-        .fallback(conversion_method_not_allowed);
-
-    let health_route = get(get_health)
-        .head(head_health)
-        .options(options_health)
-        .fallback(health_method_not_allowed);
+    #[cfg(not(feature = "sentry"))]
+    let middleware_stack = ServiceBuilder::new()
+        // Reason: axum's `Bytes`/`String`/`Json` extractors silently
+        // cap request bodies at 2 MiB by default. The README pledges
+        // `Body size: No limit ... DoS risk is accepted.`, so we
+        // disable the cap globally. Without this layer the
+        // `/conversion` handler would 413 on bodies >2 MiB.
+        .layer(DefaultBodyLimit::disable())
+        .layer(SetRequestIdLayer::new(
+            x_request_id.clone(),
+            MakeRequestUuid,
+        ))
+        .layer(SetRequestIdLayer::new(x_trace_id.clone(), EchoOnly))
+        .layer(TraceLayer::new_for_http())
+        .layer(middleware::from_fn(record_http_metrics))
+        .layer(PropagateRequestIdLayer::new(x_request_id))
+        .layer(PropagateRequestIdLayer::new(x_trace_id))
+        .layer(cache_control_layer());
 
     Router::new()
         .route("/conversion", conversion_route)
         .route("/health", health_route)
         .fallback(not_found)
-        .layer(
-            ServiceBuilder::new()
-                // Reason: axum's `Bytes`/`String`/`Json` extractors silently
-                // cap request bodies at 2 MiB by default. The README pledges
-                // `Body size: No limit ... DoS risk is accepted.`, so we
-                // disable the cap globally. Without this layer the
-                // `/conversion` handler would 413 on bodies >2 MiB.
-                .layer(DefaultBodyLimit::disable())
-                .layer(SetRequestIdLayer::new(
-                    x_request_id.clone(),
-                    MakeRequestUuid,
-                ))
-                .layer(SetRequestIdLayer::new(x_trace_id.clone(), EchoOnly))
-                .layer(option_layer(telemetry::tower_new_layer()))
-                .layer(option_layer(telemetry::tower_http_layer()))
-                .layer(middleware::from_fn(attach_sentry_tags))
-                .layer(TraceLayer::new_for_http())
-                .layer(middleware::from_fn(record_http_metrics))
-                .layer(PropagateRequestIdLayer::new(x_request_id))
-                .layer(PropagateRequestIdLayer::new(x_trace_id))
-                .layer(cache_control_layer()),
-        )
+        .layer(middleware_stack)
 }
 
 /// Builds the public router and additionally registers `GET /metrics`

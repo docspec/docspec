@@ -36,25 +36,11 @@ fn env_environment() -> std::borrow::Cow<'static, str> {
 }
 
 fn env_sample_rate() -> f32 {
-    env_rate("SENTRY_SAMPLE_RATE", 1.0)
+    super::env_rate("SENTRY_SAMPLE_RATE", 1.0)
 }
 
 fn env_traces_sample_rate() -> f32 {
-    env_rate("SENTRY_TRACES_SAMPLE_RATE", 0.0)
-}
-
-fn env_rate(name: &str, default: f32) -> f32 {
-    std::env::var(name).map_or(default, |value| {
-        value.parse::<f32>().map_or_else(
-            |_| {
-                eprintln!(
-                    "warning: {name} invalid or out-of-range; clamped to default {default:.1}"
-                );
-                default
-            },
-            |rate| rate.clamp(0.0, 1.0),
-        )
-    })
+    super::env_rate("SENTRY_TRACES_SAMPLE_RATE", 0.0)
 }
 
 fn before_send(
