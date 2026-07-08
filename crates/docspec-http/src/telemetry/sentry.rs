@@ -23,6 +23,7 @@ fn client_options(parsed_data_source_name: sentry::types::Dsn) -> sentry::Client
         sample_rate: env_sample_rate(),
         traces_sample_rate: env_traces_sample_rate(),
         send_default_pii: false,
+        attach_stacktrace: true,
         before_send: Some(std::sync::Arc::new(before_send)),
         ..Default::default()
     }
@@ -184,5 +185,17 @@ mod tests {
     #[test]
     fn init_sentry_returns_none_on_invalid_dsn() {
         assert!(super::init_sentry("not-a-dsn").is_none());
+    }
+
+    #[test]
+    fn client_options_enables_attach_stacktrace() -> Result<(), Box<dyn core::error::Error>> {
+        let _env_guard = lock_env();
+        let dsn: sentry::types::Dsn = "https://public@example.com/1".parse()?;
+        let opts = super::client_options(dsn);
+        if opts.attach_stacktrace {
+            Ok(())
+        } else {
+            Err("attach_stacktrace should be true".into())
+        }
     }
 }

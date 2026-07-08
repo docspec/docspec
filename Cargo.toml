@@ -178,6 +178,12 @@ unnecessary_wraps = "allow"
 # Reason: AnyReader enum variants (HtmlReader, MarkdownReader) are large but must be stack-allocated for zero heap allocation and zero virtual-dispatch overhead per MANIFESTO.md. Boxing would violate the design constraint.
 large_enum_variant = "allow"
 
+[profile.release]
+# Reason: Preserve line-table debug info so Sentry stacktraces (captured
+# via attach_stacktrace) resolve to file:line pairs. Adds ~5% binary size;
+# drops symbol names — Sentry symbolication only needs file:line.
+debug = "line-tables-only"
+
 [workspace.metadata.cargo-semver-checks.lints]
 feature_not_enabled_by_default = { required-update = "minor" }
 enum_variant_added = { required-update = "minor" }
