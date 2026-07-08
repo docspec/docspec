@@ -12,6 +12,21 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.21.0](https://github.com/docspec/docspec/compare/v1.20.1...v1.21.0) - 2026-07-08
+
+### Added
+
+- *(docspec-http)* add optional posthog analytics integration
+- *(docspec-http)* propagate internal error source to Sentry
+
+### Fixed
+
+- *(deps)* update rust crate posthog-rs to 0.17.0
+
+### Other
+
+- add posthog feature flags and cargo-deny config
+
 ## [1.20.1](https://github.com/docspec/docspec/compare/v1.20.0...v1.20.1) - 2026-07-03
 
 ### Fixed
