@@ -124,6 +124,7 @@ pub enum CliOutputFormat {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::infallible_destructuring_match)]
     use super::*;
 
     #[test]

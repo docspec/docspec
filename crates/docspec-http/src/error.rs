@@ -134,6 +134,55 @@ pub enum HttpError {
     },
 }
 
+/// Constructs a `PostHog` `$exception` event for an HTTP error.
+///
+/// The `sentry_event_id` property correlates this event with the corresponding
+/// Sentry event when both backends are active. Each call uses a fresh `distinct_id`
+/// (per-event UUID with `$is_anonymous = true`) because the sync `IntoResponse`
+/// context does not have access to the request ID.
+#[cfg(feature = "posthog")]
+fn build_posthog_error_event(detail: &str, sentry_event_id: Option<String>) -> posthog_rs::Event {
+    let distinct_id = uuid::Uuid::new_v4().to_string();
+    let mut event = posthog_rs::Event::new("$exception", &distinct_id);
+    drop(event.insert_prop("$exception_message", detail));
+    drop(event.insert_prop("$is_anonymous", true));
+    if let Some(sentry_id) = sentry_event_id {
+        drop(event.insert_prop("sentry_event_id", sentry_id));
+    }
+    event
+}
+
+#[cfg(any(feature = "sentry", feature = "posthog"))]
+fn capture_error_telemetry(status: StatusCode, detail: &str) {
+    if status != StatusCode::INTERNAL_SERVER_ERROR && status != StatusCode::UNPROCESSABLE_ENTITY {
+        return;
+    }
+    #[cfg(all(feature = "sentry", not(feature = "posthog")))]
+    {
+        let _ = sentry::capture_message(detail, sentry::Level::Error);
+    }
+    #[cfg(all(feature = "sentry", feature = "posthog"))]
+    let sentry_id_string: Option<String> =
+        Some(sentry::capture_message(detail, sentry::Level::Error).to_string());
+    #[cfg(all(not(feature = "sentry"), feature = "posthog"))]
+    let sentry_id_string: Option<String> = None;
+    #[cfg(feature = "posthog")]
+    {
+        let client_arc: Option<std::sync::Arc<posthog_rs::Client>> =
+            match crate::telemetry::posthog_client_slot().read() {
+                Ok(guard) => guard.as_ref().map(std::sync::Arc::clone),
+                Err(_poisoned) => {
+                    tracing::warn!("posthog slot poisoned; skipping error capture");
+                    None
+                }
+            };
+        if let Some(client) = client_arc {
+            let event = build_posthog_error_event(detail, sentry_id_string);
+            client.capture(event);
+        }
+    }
+}
+
 impl IntoResponse for HttpError {
     /// Convert this error into an HTTP response with an RFC 7807 Problem JSON body.
     ///
@@ -212,10 +261,8 @@ impl IntoResponse for HttpError {
             ),
         };
 
-        if status == StatusCode::INTERNAL_SERVER_ERROR || status == StatusCode::UNPROCESSABLE_ENTITY
-        {
-            sentry::capture_message(detail.as_ref(), sentry::Level::Error);
-        }
+        #[cfg(any(feature = "sentry", feature = "posthog"))]
+        capture_error_telemetry(status, detail.as_ref());
 
         let body = ProblemJson {
             detail,
@@ -367,6 +414,7 @@ mod tests {
         assert!(response.headers().get(ALLOW).is_none());
     }
 
+    #[cfg(feature = "sentry")]
     #[test]
     fn internal_error_is_captured_by_sentry() {
         let events = sentry::test::with_captured_events(|| {
@@ -380,6 +428,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "sentry")]
     #[test]
     fn unprocessable_error_is_captured_by_sentry() {
         let events = sentry::test::with_captured_events(|| {
@@ -393,6 +442,7 @@ mod tests {
         assert_eq!(events[0].message.as_deref(), Some("bad input"));
     }
 
+    #[cfg(feature = "sentry")]
     #[test]
     fn client_errors_are_not_captured_by_sentry() {
         let events = sentry::test::with_captured_events(|| {
@@ -631,5 +681,51 @@ mod tests {
             HttpError::UnsupportedMediaType { received: None }.result_class(),
             "client_error"
         );
+    }
+
+    #[cfg(feature = "posthog")]
+    mod posthog_tests {
+        #![allow(clippy::expect_used, clippy::unwrap_used)]
+        use super::super::HttpError;
+        use axum::response::IntoResponse as _;
+
+        #[cfg(all(feature = "sentry", feature = "posthog"))]
+        #[test]
+        fn internal_error_into_response_does_not_panic_with_both_features() {
+            let response = HttpError::Internal.into_response();
+            assert_eq!(
+                response.status(),
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR
+            );
+        }
+
+        #[cfg(all(feature = "posthog", not(feature = "sentry")))]
+        #[test]
+        fn internal_error_into_response_does_not_panic_with_posthog_only() {
+            let response = HttpError::Internal.into_response();
+            assert_eq!(
+                response.status(),
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR
+            );
+        }
+
+        #[test]
+        fn client_error_returns_correct_status_and_posthog_block_is_bypassed() {
+            let response = HttpError::NotFound {
+                method: "GET".to_owned(),
+                path: "/foo".to_owned(),
+            }
+            .into_response();
+            assert_eq!(response.status(), axum::http::StatusCode::NOT_FOUND);
+        }
+
+        #[test]
+        fn into_response_outside_tokio_runtime_does_not_panic() {
+            let response = HttpError::Internal.into_response();
+            assert_eq!(
+                response.status(),
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR
+            );
+        }
     }
 }

@@ -1,5 +1,5 @@
 //! In-process integration tests for Sentry capture behavior.
-
+#![cfg(feature = "sentry")]
 // Reason: integration tests use standard test patterns with expect/unwrap/indexing.
 #![allow(
     clippy::tests_outside_test_module,

@@ -142,16 +142,17 @@ These follow Sentry's standard conventions:
 
 ### What is captured
 
-| Signal                                                  | Captured?                               |
-| ------------------------------------------------------- | --------------------------------------- |
-| `500 Internal Server Error` (`HttpError::Internal`)     | yes (event)                             |
-| `422 Unprocessable Entity` (`HttpError::Unprocessable`) | yes (event)                             |
-| Other 4xx responses                                     | no                                      |
-| Panics                                                  | yes (event)                             |
-| `tracing::error!` calls                                 | yes (event)                             |
-| `tracing::warn!` calls                                  | yes (breadcrumb)                        |
-| `tracing::info!`/`debug!` calls                         | yes (breadcrumb)                        |
-| Performance transactions                                | only if `SENTRY_TRACES_SAMPLE_RATE > 0` |
+| Signal                                                  | Sentry?                                 | PostHog?                  |
+| ------------------------------------------------------- | --------------------------------------- | ------------------------- |
+| `500 Internal Server Error` (`HttpError::Internal`)     | yes (event)                             | yes (`$exception`)        |
+| `422 Unprocessable Entity` (`HttpError::Unprocessable`) | yes (event)                             | yes (`$exception`)        |
+| Other 4xx responses                                     | no                                      | no                        |
+| Panics                                                  | yes (event)                             | no (no panic hook)        |
+| `tracing::error!` calls                                 | yes (event)                             | no                        |
+| `tracing::warn!` calls                                  | yes (breadcrumb)                        | no                        |
+| `tracing::info!`/`debug!` calls                         | yes (breadcrumb)                        | no                        |
+| Performance transactions                                | only if `SENTRY_TRACES_SAMPLE_RATE > 0` | no                        |
+| `POST /conversion`                                      | no                                      | yes (`conversion_completed`) |
 
 ### Privacy
 
@@ -167,6 +168,76 @@ Sentry's default header redaction (Authorization, Cookie, etc.) is preserved.
 Each captured event is tagged with `request_id` (UUID v4) and `trace_id`
 (`X-Trace-ID` header value, if present) for correlation with logs.
 
+### PostHog
+
+`docspec-http` integrates with [PostHog](https://posthog.com/) for product analytics and error reporting.
+Activation is fully opt-in via Cargo feature and environment variables — the binary has zero PostHog
+overhead when the `posthog` feature is disabled or no API key is configured.
+
+#### Activation
+
+Enable the `posthog` Cargo feature and set ONE of the following:
+
+- `DOCSPEC_POSTHOG_API_KEY` — docspec-specific override (preferred)
+- `POSTHOG_API_KEY` — PostHog's standard convention (fallback)
+
+**For `docspec-cli` users:** the power-user path is:
+
+```bash
+cargo install docspec-cli --features posthog
+```
+
+This enables PostHog analytics in the HTTP server without needing to specify the nested feature.
+
+If both are set, `DOCSPEC_POSTHOG_API_KEY` wins. An empty string is treated as "not set" — the server
+starts normally without PostHog.
+
+#### Configuration (all optional)
+
+- `DOCSPEC_POSTHOG_HOST` — preferred ingest host override
+- `POSTHOG_HOST` — fallback ingest host (default: `https://us.i.posthog.com`)
+- `POSTHOG_SAMPLE_RATE` — capture sample rate `[0.0, 1.0]` (default: `1.0`); set to `0.0` to disable all captures
+
+#### What is captured
+
+| Signal | Captured? | Event name |
+| --- | --- | --- |
+| `500 Internal Server Error` (`HttpError::Internal`) | yes | `$exception` |
+| `422 Unprocessable Entity` (`HttpError::Unprocessable`) | yes | `$exception` |
+| Other 4xx responses | no | — |
+| Panics | no (no panic hook) | — |
+| `POST /conversion` success or failure | yes | `conversion_completed` |
+
+The `conversion_completed` event carries 10 properties: `result`, `error_class`, `input_mime_type`,
+`output_mime_type`, `input_bytes`, `output_bytes`, `duration_ms`, `$app_version`, and optionally
+`trace_id` and `$is_anonymous`.
+
+#### Privacy
+
+`docspec-http` does NOT send the following to PostHog:
+
+- Request bodies (markdown, HTML, or DOCX documents)
+- Response bodies (BlockNote JSON, HTML, oxa.dev JSON, or Pandoc native)
+- PII
+- Any property key containing "body" (stripped by `BeforeSendHook`)
+
+Each error event uses a per-event anonymous UUID as `distinct_id` (with `$is_anonymous = true`).
+Conversion events use the `X-Request-ID` header value when present, else a per-event UUID.
+
+### PostHog + Sentry coexistence
+
+When both `DOCSPEC_SENTRY_DSN` and `DOCSPEC_POSTHOG_API_KEY` are set (and both features are compiled
+in), EVERY 500 and 422 response is reported to BOTH backends by design. This is the intentional
+coexistence mode.
+
+**Double-billing warning:** each error is counted as one event in Sentry and one event in PostHog.
+To avoid double-billing, unset one of the two env vars OR compile without the corresponding feature
+(see [Feature Flags](#feature-flags) below).
+
+**Cross-tool correlation:** each PostHog error event carries a `sentry_event_id` property equal to
+the Sentry `Uuid` for the same request, enabling one-click navigation from a PostHog funnel to the
+corresponding Sentry issue.
+
 ## Wire Contract
 
 Mirrors `github.com/docspecio/api` v3.0.2 where feasible: same endpoint path, RFC 7807 errors, `X-Request-ID`/`X-Trace-ID` header handling. Diverges in supported conversions.
@@ -174,6 +245,47 @@ Mirrors `github.com/docspecio/api` v3.0.2 where feasible: same endpoint path, RF
 ## Graceful Shutdown
 
 The server handles SIGINT and SIGTERM. In-flight requests complete before the process exits.
+
+## Feature Flags
+
+`docspec-http` exposes two optional Cargo features:
+
+| Feature | Default | Description |
+| --- | --- | --- |
+| `sentry` | **on** (part of `default`) | Enables Sentry error reporting integration |
+| `posthog` | off | Enables PostHog product analytics integration |
+
+Default:
+
+```toml
+[dependencies]
+docspec-http = "1"
+```
+
+Opt into PostHog:
+
+```toml
+[dependencies]
+docspec-http = { version = "1", features = ["posthog"] }
+```
+
+Both backends:
+
+```toml
+[dependencies]
+docspec-http = { version = "1", features = ["sentry", "posthog"] }
+```
+
+No telemetry:
+
+```toml
+[dependencies]
+docspec-http = { version = "1", default-features = false }
+```
+
+> **Migration note:** if you depend on `docspec-http` with `default-features = false`, you will
+> lose the Sentry integration after this release. Add `features = ["sentry"]` to preserve the
+> previous behavior.
 
 ## Metrics
 

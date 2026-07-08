@@ -82,15 +82,11 @@ pub async fn serve(config: ServerConfig) -> Result<(), ServerError> {
     let bound_addr = listener.local_addr()?;
 
     let handle = crate::metrics::install_global().map_err(ServerError::MetricsInit)?;
-    let upkeep_handle = handle.clone();
-    let upkeep_task = tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(5));
-        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        loop {
-            interval.tick().await;
-            upkeep_handle.run_upkeep();
-        }
-    });
+
+    #[cfg(feature = "posthog")]
+    init_posthog().await;
+
+    let upkeep_task = spawn_upkeep(handle.clone());
 
     tracing::info!(addr = %bound_addr, "docspec-http listening");
 
@@ -98,15 +94,57 @@ pub async fn serve(config: ServerConfig) -> Result<(), ServerError> {
         .with_graceful_shutdown(shutdown_signal())
         .await;
 
-    upkeep_task.abort();
-    match upkeep_task.await {
+    crate::telemetry::shutdown().await;
+    #[cfg(feature = "posthog")]
+    tracing::info!("posthog flush complete");
+
+    teardown_upkeep(upkeep_task).await;
+    server_result?;
+
+    Ok(())
+}
+
+/// Spawns the Prometheus upkeep task.
+#[allow(clippy::single_call_fn)]
+#[inline]
+fn spawn_upkeep(
+    handle: metrics_exporter_prometheus::PrometheusHandle,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            handle.run_upkeep();
+        }
+    })
+}
+
+/// Aborts the upkeep task and awaits its completion.
+#[allow(clippy::single_call_fn)]
+#[inline]
+async fn teardown_upkeep(task: tokio::task::JoinHandle<()>) {
+    task.abort();
+    match task.await {
         Err(error) if error.is_cancelled() => {}
         Err(error) => tracing::error!(%error, "metrics upkeep task failed during shutdown"),
         Ok(()) => {}
     }
-    server_result?;
+}
 
-    Ok(())
+/// Initialises the `PostHog` client from environment variables and installs
+/// it — or clears any stale predecessor — in the shared slot so capture
+/// sites can reach it.
+///
+/// Always calls [`crate::telemetry::install_posthog_client`], even when the
+/// factory returns `None`, so that a client left in the slot by a previous
+/// run in the same process cannot linger into this run.
+#[cfg(feature = "posthog")]
+#[allow(clippy::single_call_fn)]
+#[inline]
+async fn init_posthog() {
+    let client = crate::telemetry::init_posthog_client_from_env().await;
+    crate::telemetry::install_posthog_client(client);
 }
 
 /// Resolves when SIGINT (Ctrl+C) or SIGTERM is received.

@@ -137,7 +137,7 @@ const _: for<'a> fn(&'a rels::ImageRel) -> (&'a str, bool) = _image_rel_fields;
 ///
 /// # Errors
 ///
-/// Returns [`Error::Io`] for I/O failures and [`Error::Parse`] for malformed
+/// Returns [`docspec_core::Error::Io`] for I/O failures and [`docspec_core::Error::Parse`] for malformed
 /// archives or XML.
 #[derive(Debug)]
 pub struct DocxReader {
@@ -152,7 +152,7 @@ impl DocxReader {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Io`] if the file cannot be opened. See [`from_reader`](Self::from_reader)
+    /// Returns [`docspec_core::Error::Io`] if the file cannot be opened. See [`from_reader`](Self::from_reader)
     /// for additional error conditions.
     #[inline]
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
@@ -185,9 +185,9 @@ impl DocxReader {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Parse`] if the input is not a valid ZIP archive, if
+    /// Returns [`docspec_core::Error::Parse`] if the input is not a valid ZIP archive, if
     /// `_rels/.rels` is missing or malformed, or if the document target entry
-    /// cannot be opened. Returns [`Error::Io`] for I/O failures.
+    /// cannot be opened. Returns [`docspec_core::Error::Io`] for I/O failures.
     #[inline]
     pub fn from_reader<R: Read + Seek + Send + 'static>(reader: R) -> Result<Self> {
         let (style_list, numbering, hyperlink_map, image_map, content_types, archive, stream) =
