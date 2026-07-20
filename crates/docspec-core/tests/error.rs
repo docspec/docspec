@@ -7,7 +7,11 @@ mod tests {
 
     #[test]
     fn error_is_send_sync_static() {
-        fn assert_send_sync_static<T: Send + Sync + 'static>() {}
+        fn assert_send_sync_static<T>()
+        where
+            T: Send + Sync + 'static,
+        {
+        }
         assert_send_sync_static::<Error>();
     }
 

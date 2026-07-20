@@ -113,8 +113,14 @@ shadow_reuse = "allow"
 # Reason: Too noisy; numeric types clear from context
 default_numeric_fallback = "allow"
 # Reason: Targeting embedded — prefer core/alloc over std where possible
-std_instead_of_core = "warn"
+# std_instead_of_core is unactionable on stable for the std::io items we depend on
+# (Cursor is unstable in core::io; Read/Seek/Write/Take/Error/ErrorKind do not exist in core at all).
+# Keep alloc_instead_of_core enforced.
+std_instead_of_core = "allow"
 alloc_instead_of_core = "warn"
+# Reason: `#[cfg(test)] mod tests { ... }` is idiomatic Rust for co-locating unit tests
+# with their target module; splitting each into a separate file adds churn without value.
+inline_modules = "allow"
 # Reason: std crates should use std paths where clearer than alloc aliases
 std_instead_of_alloc = "allow"
 # Reason: Public docs enforced by missing_docs = "deny"; private doc requirement too noisy

@@ -132,7 +132,7 @@ mod tests {
         let result = b.finish();
         assert!(result.is_ok());
         let bytes = result.unwrap_or_default();
-        assert!(bytes == b"[]");
+        assert_eq!(bytes, b"[]");
     }
 
     #[test]
@@ -147,7 +147,7 @@ mod tests {
         let result = b.finish();
         assert!(result.is_ok());
         let bytes = result.unwrap_or_default();
-        assert!(bytes == br#"[1,true,null,"x"]"#);
+        assert_eq!(bytes, br#"[1,true,null,"x"]"#);
     }
 
     #[test]
@@ -158,7 +158,7 @@ mod tests {
         let result = b.finish();
         assert!(result.is_ok());
         let bytes = result.unwrap_or_default();
-        assert!(bytes == b"{}");
+        assert_eq!(bytes, b"{}");
     }
 
     #[test]
@@ -177,7 +177,7 @@ mod tests {
         let result = b.finish();
         assert!(result.is_ok());
         let bytes = result.unwrap_or_default();
-        assert!(bytes == br#"{"a":[1,{"b":true}]}"#);
+        assert_eq!(bytes, br#"{"a":[1,{"b":true}]}"#);
     }
 
     #[test]
@@ -190,7 +190,7 @@ mod tests {
         let result = b.finish();
         assert!(result.is_ok());
         let bytes = result.unwrap_or_default();
-        assert!(bytes == br#"{"k":"v"}"#);
+        assert_eq!(bytes, br#"{"k":"v"}"#);
     }
 
     #[test]
@@ -200,7 +200,7 @@ mod tests {
         let result = b.finish();
         assert!(result.is_ok());
         let bytes = result.unwrap_or_default();
-        assert!(bytes == br#""hello""#);
+        assert_eq!(bytes, br#""hello""#);
     }
 
     #[test]
@@ -212,7 +212,7 @@ mod tests {
         let result = b.finish();
         assert!(result.is_ok());
         let bytes = result.unwrap_or_default();
-        assert!(bytes == br#""data:image/png;base64,iVBORw==""#);
+        assert_eq!(bytes, br#""data:image/png;base64,iVBORw==""#);
     }
 
     #[test]
@@ -224,7 +224,7 @@ mod tests {
         let result = b.finish();
         assert!(result.is_ok());
         let bytes = result.unwrap_or_default();
-        assert!(bytes == br#""\"quoted\"""#);
+        assert_eq!(bytes, br#""\"quoted\"""#);
     }
 
     #[test]
@@ -242,7 +242,7 @@ mod tests {
         let result = b.finish();
         assert!(result.is_ok());
         let bytes = result.unwrap_or_default();
-        assert!(bytes == br#""one-two-three""#);
+        assert_eq!(bytes, br#""one-two-three""#);
     }
 
     #[test]
@@ -265,7 +265,7 @@ mod tests {
         let finish_result = b.finish();
         assert!(finish_result.is_ok());
         let bytes = finish_result.unwrap_or_default();
-        assert!(bytes == br#"{"failed":"","after":"ok"}"#);
+        assert_eq!(bytes, br#"{"failed":"","after":"ok"}"#);
     }
 
     /// Tracks each write call to the inner writer.

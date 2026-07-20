@@ -343,7 +343,7 @@ mod tests {
         let result = b.finish();
         assert!(result.is_ok());
         let tokens = result.unwrap_or_default();
-        assert!(tokens == vec![Token::BeginObject, Token::EndObject]);
+        assert_eq!(tokens, vec![Token::BeginObject, Token::EndObject]);
     }
 
     #[test]

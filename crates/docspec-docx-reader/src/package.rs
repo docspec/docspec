@@ -33,7 +33,10 @@ type PackageContents = (
 /// relationships, locates `document.xml`, reads `[Content_Types].xml`, and returns
 /// a [`PackageContents`] tuple with all parsed data and a streaming reader for the
 /// main document part.
-pub fn open_package<R: Read + Seek + Send + 'static>(reader: R) -> Result<PackageContents> {
+pub fn open_package<R>(reader: R) -> Result<PackageContents>
+where
+    R: Read + Seek + Send + 'static,
+{
     let boxed: Box<dyn ReadSeek + 'static> = Box::new(reader);
     let mut archive = ZipArchive::new(boxed).map_err(map_zip_open_error)?;
 
@@ -110,7 +113,10 @@ fn map_zip_open_error(err: ZipError) -> Error {
     }
 }
 
-fn read_root_rels_bytes<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<Vec<u8>> {
+fn read_root_rels_bytes<R>(archive: &mut ZipArchive<R>) -> Result<Vec<u8>>
+where
+    R: Read + Seek,
+{
     let mut rels_entry = archive.by_name("_rels/.rels").map_err(|err| {
         if matches!(err, ZipError::FileNotFound) {
             Error::Parse {
@@ -126,7 +132,7 @@ fn read_root_rels_bytes<R: Read + Seek>(archive: &mut ZipArchive<R>) -> Result<V
     Ok(bytes)
 }
 
-fn load_small_package_parts<R: Read + Seek>(
+fn load_small_package_parts<R>(
     archive: &mut ZipArchive<R>,
     document_path: &str,
 ) -> Result<(
@@ -135,7 +141,10 @@ fn load_small_package_parts<R: Read + Seek>(
     HyperlinkMap,
     ImageMap,
     ContentTypes,
-)> {
+)>
+where
+    R: Read + Seek,
+{
     let (style_list, hyperlink_map, image_map) =
         load_style_list_and_hyperlink_map(archive, document_path)?;
     let numbering = load_numbering(archive, document_path)?;
@@ -152,10 +161,13 @@ fn load_small_package_parts<R: Read + Seek>(
     ))
 }
 
-fn load_style_list_and_hyperlink_map<R: Read + Seek>(
+fn load_style_list_and_hyperlink_map<R>(
     archive: &mut ZipArchive<R>,
     document_path: &str,
-) -> Result<(StyleList, HyperlinkMap, ImageMap)> {
+) -> Result<(StyleList, HyperlinkMap, ImageMap)>
+where
+    R: Read + Seek,
+{
     let doc_rels_path = rels::derive_part_rels_path(document_path);
     let maybe_doc_rels_bytes = if doc_rels_path == "word/_rels/document.xml.rels" {
         match archive.by_name("word/_rels/document.xml.rels") {
@@ -203,10 +215,10 @@ fn load_style_list_and_hyperlink_map<R: Read + Seek>(
     Ok((style_list, hyperlink_map, image_map))
 }
 
-fn read_optional_entry<R: Read + Seek>(
-    archive: &mut ZipArchive<R>,
-    path: &str,
-) -> Result<Option<Vec<u8>>> {
+fn read_optional_entry<R>(archive: &mut ZipArchive<R>, path: &str) -> Result<Option<Vec<u8>>>
+where
+    R: Read + Seek,
+{
     match archive.by_name(path) {
         Ok(mut entry) => {
             let mut bytes = Vec::new();
@@ -218,10 +230,13 @@ fn read_optional_entry<R: Read + Seek>(
     }
 }
 
-fn load_numbering<R: Read + Seek>(
+fn load_numbering<R>(
     archive: &mut ZipArchive<R>,
     document_path: &str,
-) -> Result<crate::numbering::MinimalNumbering> {
+) -> Result<crate::numbering::MinimalNumbering>
+where
+    R: Read + Seek,
+{
     let doc_rels_path = rels::derive_part_rels_path(document_path);
     let doc_rels_bytes = match archive.by_name(&doc_rels_path) {
         Ok(mut entry) => {

@@ -72,7 +72,10 @@ fn classify_name(name: &str, kind: StyleType) -> Option<StyleClassification> {
 }
 
 impl StyleList {
-    pub fn parse<R: Read>(reader: R) -> Result<Self> {
+    pub fn parse<R>(reader: R) -> Result<Self>
+    where
+        R: Read,
+    {
         let mut xml_reader = quick_xml::Reader::from_reader(std::io::BufReader::new(reader));
         let mut buf = Vec::new();
         let mut styles: Vec<Style> = Vec::new();
@@ -127,12 +130,15 @@ impl StyleList {
     }
 }
 
-fn parse_style_body<R: std::io::BufRead>(
+fn parse_style_body<R>(
     xml_reader: &mut quick_xml::Reader<R>,
     buf: &mut Vec<u8>,
     id: String,
     kind: StyleType,
-) -> Result<Style> {
+) -> Result<Style>
+where
+    R: std::io::BufRead,
+{
     let mut name: Option<String> = None;
     let mut based_on: Option<String> = None;
 

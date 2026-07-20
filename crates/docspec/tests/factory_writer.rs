@@ -87,7 +87,11 @@ mod tests {
     #[cfg(feature = "blocknote-writer")]
     #[test]
     fn assert_is_event_sink() {
-        fn check<K: EventSink>(_: K) {}
+        fn check<K>(_: K)
+        where
+            K: EventSink,
+        {
+        }
         let output = Vec::new();
         check(AnyWriter::new(OutputFormat::Blocknote, output));
     }
@@ -145,7 +149,11 @@ mod tests {
     #[cfg(feature = "oxa-writer")]
     #[test]
     fn oxa_assert_is_event_sink() {
-        fn check<K: EventSink>(_: K) {}
+        fn check<K>(_: K)
+        where
+            K: EventSink,
+        {
+        }
         let output = Vec::new();
         check(AnyWriter::new(OutputFormat::Oxa, output));
     }
@@ -197,7 +205,11 @@ mod tests {
     #[cfg(feature = "pandoc-native-writer")]
     #[test]
     fn pandoc_native_assert_is_event_sink() {
-        fn check<K: EventSink>(_: K) {}
+        fn check<K>(_: K)
+        where
+            K: EventSink,
+        {
+        }
         let output = Vec::new();
         check(AnyWriter::new(OutputFormat::PandocNative, output));
     }
@@ -277,7 +289,11 @@ mod tests {
     #[cfg(feature = "html-writer")]
     #[test]
     fn html_dispatch_is_event_sink() {
-        fn check<K: EventSink>(_: K) {}
+        fn check<K>(_: K)
+        where
+            K: EventSink,
+        {
+        }
         let output = Vec::new();
         check(AnyWriter::new(OutputFormat::Html, output));
     }

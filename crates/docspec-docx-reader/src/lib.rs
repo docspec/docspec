@@ -155,7 +155,10 @@ impl DocxReader {
     /// Returns [`docspec_core::Error::Io`] if the file cannot be opened. See [`from_reader`](Self::from_reader)
     /// for additional error conditions.
     #[inline]
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn from_path<P>(path: P) -> Result<Self>
+    where
+        P: AsRef<Path>,
+    {
         let (style_list, numbering, hyperlink_map, image_map, content_types, archive, stream) =
             package::open_package_from_path(path.as_ref())?;
         let xml = quick_xml::Reader::from_reader(BufReader::new(stream));
@@ -189,7 +192,10 @@ impl DocxReader {
     /// `_rels/.rels` is missing or malformed, or if the document target entry
     /// cannot be opened. Returns [`docspec_core::Error::Io`] for I/O failures.
     #[inline]
-    pub fn from_reader<R: Read + Seek + Send + 'static>(reader: R) -> Result<Self> {
+    pub fn from_reader<R>(reader: R) -> Result<Self>
+    where
+        R: Read + Seek + Send + 'static,
+    {
         let (style_list, numbering, hyperlink_map, image_map, content_types, archive, stream) =
             package::open_package(reader)?;
         let xml = quick_xml::Reader::from_reader(BufReader::new(stream));
@@ -225,7 +231,11 @@ mod tests {
 
     #[test]
     fn docx_reader_is_send_static() {
-        fn assert_send_static<T: Send + 'static>() {}
+        fn assert_send_static<T>()
+        where
+            T: Send + 'static,
+        {
+        }
         assert_send_static::<DocxReader>();
     }
 

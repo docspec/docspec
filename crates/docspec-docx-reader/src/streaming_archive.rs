@@ -95,7 +95,11 @@ impl Read for StreamingArchive {
 const _: fn(&Path, &str) -> Result<StreamingArchive> = StreamingArchive::open;
 
 const _: fn() = || {
-    fn assert_send<T: Send + 'static>() {}
+    fn assert_send<T>()
+    where
+        T: Send + 'static,
+    {
+    }
     assert_send::<StreamingArchive>();
 };
 

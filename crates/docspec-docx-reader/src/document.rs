@@ -1151,10 +1151,9 @@ impl DocumentReader {
 
         let href = if let Some(rid_val) = rid {
             self.hyperlink_map.get(&rid_val).cloned()?
-        } else if let Some(anchor_val) = anchor.filter(|a| !a.is_empty()) {
-            format!("#{anchor_val}")
         } else {
-            return None;
+            let anchor_val = anchor.filter(|a| !a.is_empty())?;
+            format!("#{anchor_val}")
         };
 
         let title = tooltip.and_then(|t| {

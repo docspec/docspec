@@ -219,7 +219,10 @@ mod tests {
         }
     }
 
-    fn drain<S: EventSource>(mut src: S) -> alloc::vec::Vec<Event> {
+    fn drain<S>(mut src: S) -> alloc::vec::Vec<Event>
+    where
+        S: EventSource,
+    {
         let mut out = alloc::vec::Vec::new();
         while let Some(e) = src.next_event().expect("unexpected error") {
             out.push(e);
@@ -431,7 +434,11 @@ mod tests {
 
     #[test]
     fn send_sync_compile_assertion() {
-        fn assert_send_sync<T: Send + Sync>() {}
+        fn assert_send_sync<T>()
+        where
+            T: Send + Sync,
+        {
+        }
         assert_send_sync::<SkipEmptyBlocks<Replay>>();
     }
 

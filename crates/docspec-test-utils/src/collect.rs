@@ -15,7 +15,10 @@ use docspec_core::{Event, EventSource, Result};
 /// Panics with the underlying error if [`EventSource::next_event`] ever
 /// returns `Err`.
 #[inline]
-pub fn collect_events<R: EventSource>(reader: &mut R) -> Vec<Event> {
+pub fn collect_events<R>(reader: &mut R) -> Vec<Event>
+where
+    R: EventSource,
+{
     try_collect_events(reader).expect("event source returned an error")
 }
 
@@ -26,7 +29,10 @@ pub fn collect_events<R: EventSource>(reader: &mut R) -> Vec<Event> {
 ///
 /// Returns the first error produced by [`EventSource::next_event`].
 #[inline]
-pub fn try_collect_events<R: EventSource>(reader: &mut R) -> Result<Vec<Event>> {
+pub fn try_collect_events<R>(reader: &mut R) -> Result<Vec<Event>>
+where
+    R: EventSource,
+{
     let mut events = Vec::new();
     while let Some(event) = reader.next_event()? {
         events.push(event);
