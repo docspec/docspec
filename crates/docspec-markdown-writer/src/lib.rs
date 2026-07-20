@@ -79,7 +79,10 @@ impl<W: Write> MarkdownWriter<W> {
     }
 }
 
-fn write_atx_prefix<W: Write>(writer: &mut W, level: u8) -> Result<()> {
+fn write_atx_prefix<W>(writer: &mut W, level: u8) -> Result<()>
+where
+    W: Write,
+{
     let prefix: &[u8] = match level {
         1 => b"# ",
         2 => b"## ",

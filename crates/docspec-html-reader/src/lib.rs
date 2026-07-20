@@ -112,7 +112,10 @@ impl HtmlReader {
     /// This constructor does not read from the source eagerly and therefore
     /// currently cannot fail.
     #[inline]
-    pub fn from_reader<R: Read + Seek + Send + 'static>(reader: R) -> Result<Self> {
+    pub fn from_reader<R>(reader: R) -> Result<Self>
+    where
+        R: Read + Seek + Send + 'static,
+    {
         let boxed: Box<dyn Read + Send> = Box::new(reader);
         Ok(Self::from_boxed_reader(boxed))
     }
@@ -247,7 +250,11 @@ impl EventSource for HtmlReader {
 
 #[cfg(test)]
 mod send_static_assertions {
-    fn assert_send_static<T: Send + 'static>() {}
+    fn assert_send_static<T>()
+    where
+        T: Send + 'static,
+    {
+    }
 
     #[test]
     fn html_reader_is_send_static() {

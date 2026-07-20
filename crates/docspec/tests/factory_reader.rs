@@ -74,14 +74,22 @@ mod tests {
     #[cfg(feature = "markdown")]
     #[test]
     fn assert_is_event_source() {
-        fn check<S: EventSource>(_: S) {}
+        fn check<S>(_: S)
+        where
+            S: EventSource,
+        {
+        }
         check(AnyReader::from_str(InputFormat::Markdown, "").unwrap());
     }
 
     #[cfg(feature = "html")]
     #[test]
     fn html_assert_is_event_source() {
-        fn check<S: EventSource>(_: S) {}
+        fn check<S>(_: S)
+        where
+            S: EventSource,
+        {
+        }
         check(AnyReader::from_str(InputFormat::Html, "").unwrap());
     }
 

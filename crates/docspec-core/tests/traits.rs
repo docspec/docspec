@@ -152,7 +152,11 @@ mod tests {
 
     #[test]
     fn asset_handle_is_dyn_compatible_send_sync() {
-        fn assert_send_sync_static<T: Send + Sync + 'static>() {}
+        fn assert_send_sync_static<T>()
+        where
+            T: Send + Sync + 'static,
+        {
+        }
         assert_send_sync_static::<std::sync::Arc<dyn docspec_core::AssetHandle>>();
     }
 }

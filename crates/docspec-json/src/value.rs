@@ -14,40 +14,57 @@ pub trait WriteVal {
     /// # Errors
     ///
     /// Returns any error produced while writing the value.
-    fn write_to<B: JsonBackend>(self, backend: &mut B) -> Result<()>;
+    fn write_to<B>(self, backend: &mut B) -> Result<()>
+    where
+        B: JsonBackend;
 }
 
 impl WriteVal for &str {
     #[inline]
-    fn write_to<B: JsonBackend>(self, backend: &mut B) -> Result<()> {
+    fn write_to<B>(self, backend: &mut B) -> Result<()>
+    where
+        B: JsonBackend,
+    {
         backend.write_string(self)
     }
 }
 
 impl WriteVal for bool {
     #[inline]
-    fn write_to<B: JsonBackend>(self, backend: &mut B) -> Result<()> {
+    fn write_to<B>(self, backend: &mut B) -> Result<()>
+    where
+        B: JsonBackend,
+    {
         backend.write_bool(self)
     }
 }
 
 impl WriteVal for u8 {
     #[inline]
-    fn write_to<B: JsonBackend>(self, backend: &mut B) -> Result<()> {
+    fn write_to<B>(self, backend: &mut B) -> Result<()>
+    where
+        B: JsonBackend,
+    {
         backend.write_number(u32::from(self))
     }
 }
 
 impl WriteVal for u32 {
     #[inline]
-    fn write_to<B: JsonBackend>(self, backend: &mut B) -> Result<()> {
+    fn write_to<B>(self, backend: &mut B) -> Result<()>
+    where
+        B: JsonBackend,
+    {
         backend.write_number(self)
     }
 }
 
 impl WriteVal for Null {
     #[inline]
-    fn write_to<B: JsonBackend>(self, backend: &mut B) -> Result<()> {
+    fn write_to<B>(self, backend: &mut B) -> Result<()>
+    where
+        B: JsonBackend,
+    {
         backend.write_null()
     }
 }

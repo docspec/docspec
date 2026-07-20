@@ -144,7 +144,10 @@ impl fmt::Debug for MinimalNumbering {
 ///
 /// Returns an error for I/O failures and malformed XML structure.
 #[inline]
-pub fn parse_numbering<R: Read>(reader: R) -> docspec_core::Result<MinimalNumbering> {
+pub fn parse_numbering<R>(reader: R) -> docspec_core::Result<MinimalNumbering>
+where
+    R: Read,
+{
     let mut xml_reader = quick_xml::Reader::from_reader(std::io::BufReader::new(reader));
     let mut buf = Vec::new();
     let mut element_depth: usize = 0;
@@ -258,11 +261,14 @@ fn finish_level(
     *current_level_outcome = None;
 }
 
-fn attr_u32<R: Read>(
+fn attr_u32<R>(
     reader: &quick_xml::Reader<R>,
     element: &quick_xml::events::BytesStart<'_>,
     name: &[u8],
-) -> docspec_core::Result<Option<u32>> {
+) -> docspec_core::Result<Option<u32>>
+where
+    R: Read,
+{
     let Some(value) = attr_string(reader, element, name)? else {
         return Ok(None);
     };
@@ -270,11 +276,14 @@ fn attr_u32<R: Read>(
     Ok(value.parse::<u32>().ok())
 }
 
-fn attr_string<R: Read>(
+fn attr_string<R>(
     reader: &quick_xml::Reader<R>,
     element: &quick_xml::events::BytesStart<'_>,
     name: &[u8],
-) -> docspec_core::Result<Option<String>> {
+) -> docspec_core::Result<Option<String>>
+where
+    R: Read,
+{
     for attribute_result in element.attributes() {
         let attribute = attribute_result
             .map_err(|err| parse_error(format!("malformed numbering.xml attribute: {err}")))?;

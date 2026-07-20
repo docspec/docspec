@@ -59,7 +59,10 @@ impl AnyReader {
     /// # }
     /// ```
     #[inline]
-    pub fn from_path<P: AsRef<std::path::Path>>(format: InputFormat, path: P) -> Result<Self> {
+    pub fn from_path<P>(format: InputFormat, path: P) -> Result<Self>
+    where
+        P: AsRef<std::path::Path>,
+    {
         let file = std::fs::File::open(path.as_ref())
             .map_err(|source| docspec_core::Error::Io { source })?;
         Self::from_reader(format, file)
@@ -90,10 +93,10 @@ impl AnyReader {
     /// # }
     /// ```
     #[inline]
-    pub fn from_reader<R: Read + Seek + Send + 'static>(
-        format: InputFormat,
-        reader: R,
-    ) -> Result<Self> {
+    pub fn from_reader<R>(format: InputFormat, reader: R) -> Result<Self>
+    where
+        R: Read + Seek + Send + 'static,
+    {
         #[cfg(not(any(feature = "markdown", feature = "html", feature = "docx")))]
         {
             let _ = reader;
@@ -190,7 +193,11 @@ impl EventSource for AnyReader {
 
 #[cfg(test)]
 mod send_static_assertions {
-    fn assert_send_static<T: Send + 'static>() {}
+    fn assert_send_static<T>()
+    where
+        T: Send + 'static,
+    {
+    }
     #[test]
     fn any_reader_is_send_static() {
         #[cfg(any(feature = "markdown", feature = "html", feature = "docx"))]

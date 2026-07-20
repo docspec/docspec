@@ -67,7 +67,10 @@ impl<R: Read + Seek> Seek for BomStrippingReader<R> {
 /// Returns the number of bytes actually read (0, 1, 2, or 3). Unlike
 /// `read_exact`, this never returns `UnexpectedEof` for inputs shorter than
 /// 3 bytes — those are valid text (e.g. empty input, one character).
-fn read_up_to_3<R: Read>(reader: &mut R, buf: &mut [u8; 3]) -> std::io::Result<usize> {
+fn read_up_to_3<R>(reader: &mut R, buf: &mut [u8; 3]) -> std::io::Result<usize>
+where
+    R: Read,
+{
     let mut filled = usize::default();
     while filled < 3 {
         let remaining = buf.get_mut(filled..).ok_or_else(|| {

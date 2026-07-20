@@ -56,6 +56,9 @@ default_numeric_fallback = "allow"
 std_instead_of_core = "warn"
 alloc_instead_of_core = "warn"
 std_instead_of_alloc = "warn"
+# Reason: `#[cfg(test)] mod tests { ... }` is idiomatic Rust for co-locating unit tests
+# with their target module; splitting each into a separate file adds churn without value.
+inline_modules = "allow"
 missing_docs_in_private_items = "allow"
 partial_pub_fields = "allow"
 let_underscore_untyped = "allow"

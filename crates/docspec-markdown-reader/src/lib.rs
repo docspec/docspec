@@ -387,7 +387,10 @@ impl MarkdownReader {
     ///
     /// Returns [`Error::Io`](docspec_core::Error::Io) if reading fails.
     #[inline]
-    pub fn from_reader<R: Read + Seek + Send + 'static>(mut reader: R) -> Result<Self> {
+    pub fn from_reader<R>(mut reader: R) -> Result<Self>
+    where
+        R: Read + Seek + Send + 'static,
+    {
         let mut source = String::new();
         reader.read_to_string(&mut source)?;
         Ok(Self::from_owned_string(source))
@@ -987,7 +990,11 @@ mod tests {
 
 #[cfg(test)]
 mod send_static_assertions {
-    fn assert_send_static<T: Send + 'static>() {}
+    fn assert_send_static<T>()
+    where
+        T: Send + 'static,
+    {
+    }
 
     #[test]
     fn markdown_reader_is_send_static() {

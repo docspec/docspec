@@ -24,7 +24,10 @@ pub(crate) struct ImageRel {
 /// whose Type ends with "/image".
 pub(crate) type ImageMap = HashMap<String, ImageRel>;
 
-pub fn find_document_target<R: Read>(reader: R) -> docspec_core::Result<String> {
+pub fn find_document_target<R>(reader: R) -> docspec_core::Result<String>
+where
+    R: Read,
+{
     let mut xml_reader = quick_xml::Reader::from_reader(std::io::BufReader::new(reader));
     let mut buf = Vec::new();
     let mut element_depth: usize = 0;
@@ -75,7 +78,10 @@ pub fn find_document_target<R: Read>(reader: R) -> docspec_core::Result<String> 
 /// Returns `Ok(None)` if no `/styles` relationship is present (legal per ECMA-376 §11.3.12).
 /// Returns `Err` if the target contains a path-traversal (`..`) segment.
 /// Ignores relationships with `TargetMode="External"`.
-pub fn find_styles_target<R: Read>(reader: R) -> docspec_core::Result<Option<String>> {
+pub fn find_styles_target<R>(reader: R) -> docspec_core::Result<Option<String>>
+where
+    R: Read,
+{
     let mut xml_reader = quick_xml::Reader::from_reader(std::io::BufReader::new(reader));
     let mut buf = Vec::new();
     let mut element_depth: usize = 0;
@@ -118,7 +124,10 @@ pub fn find_styles_target<R: Read>(reader: R) -> docspec_core::Result<Option<Str
     }
 }
 
-pub(crate) fn collect_hyperlink_map<R: Read>(reader: R) -> Result<HyperlinkMap, Error> {
+pub(crate) fn collect_hyperlink_map<R>(reader: R) -> Result<HyperlinkMap, Error>
+where
+    R: Read,
+{
     let mut xml_reader = quick_xml::Reader::from_reader(std::io::BufReader::new(reader));
     let mut buf = Vec::new();
     let mut element_depth: usize = 0;
@@ -214,7 +223,10 @@ pub(crate) fn collect_image_map(rels_xml: &[u8], document_path: &str) -> Result<
 /// Returns `Ok(None)` if no `/numbering` relationship is present (legal per ECMA-376 §17.9).
 /// Returns `Err` if the target contains a path-traversal (`..`) segment.
 /// Ignores relationships with `TargetMode="External"`.
-pub fn find_numbering_target<R: Read>(reader: R) -> docspec_core::Result<Option<String>> {
+pub fn find_numbering_target<R>(reader: R) -> docspec_core::Result<Option<String>>
+where
+    R: Read,
+{
     let mut xml_reader = quick_xml::Reader::from_reader(std::io::BufReader::new(reader));
     let mut buf = Vec::new();
     let mut element_depth: usize = 0;
@@ -276,10 +288,13 @@ fn validate_document_path(document_path: &str) -> docspec_core::Result<String> {
     Ok(document_path.to_string())
 }
 
-fn office_document_target<R: Read>(
+fn office_document_target<R>(
     reader: &quick_xml::Reader<R>,
     element: &quick_xml::events::BytesStart<'_>,
-) -> docspec_core::Result<Option<String>> {
+) -> docspec_core::Result<Option<String>>
+where
+    R: Read,
+{
     let mut rel_type = None;
     let mut target = None;
 
@@ -311,10 +326,13 @@ fn office_document_target<R: Read>(
     })
 }
 
-fn styles_target<R: Read>(
+fn styles_target<R>(
     reader: &quick_xml::Reader<R>,
     element: &quick_xml::events::BytesStart<'_>,
-) -> docspec_core::Result<Option<String>> {
+) -> docspec_core::Result<Option<String>>
+where
+    R: Read,
+{
     let mut rel_type = None;
     let mut target = None;
     let mut target_mode = None;
@@ -353,10 +371,13 @@ fn styles_target<R: Read>(
     })
 }
 
-fn hyperlink_entry<R: Read>(
+fn hyperlink_entry<R>(
     reader: &quick_xml::Reader<R>,
     element: &quick_xml::events::BytesStart<'_>,
-) -> Result<Option<(String, String)>, Error> {
+) -> Result<Option<(String, String)>, Error>
+where
+    R: Read,
+{
     let mut id = None;
     let mut rel_type = None;
     let mut target = None;
@@ -392,11 +413,14 @@ fn hyperlink_entry<R: Read>(
     })
 }
 
-fn image_entry<R: Read>(
+fn image_entry<R>(
     reader: &quick_xml::Reader<R>,
     element: &quick_xml::events::BytesStart<'_>,
     document_path: &str,
-) -> Result<Option<(String, ImageRel)>, Error> {
+) -> Result<Option<(String, ImageRel)>, Error>
+where
+    R: Read,
+{
     let mut id = None;
     let mut rel_type = None;
     let mut target = None;
@@ -452,10 +476,13 @@ fn image_entry<R: Read>(
     }
 }
 
-fn numbering_target<R: Read>(
+fn numbering_target<R>(
     reader: &quick_xml::Reader<R>,
     element: &quick_xml::events::BytesStart<'_>,
-) -> docspec_core::Result<Option<String>> {
+) -> docspec_core::Result<Option<String>>
+where
+    R: Read,
+{
     let mut rel_type = None;
     let mut target = None;
     let mut target_mode = None;

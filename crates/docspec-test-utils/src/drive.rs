@@ -17,7 +17,11 @@ use docspec_core::{Event, EventSink, Result};
 /// Panics with the underlying error if [`EventSink::handle_event`] or
 /// [`EventSink::finish`] ever returns `Err`.
 #[inline]
-pub fn drive<W: EventSink, I: IntoIterator<Item = Event>>(sink: W, events: I) {
+pub fn drive<W, I>(sink: W, events: I)
+where
+    W: EventSink,
+    I: IntoIterator<Item = Event>,
+{
     try_drive(sink, events).expect("event sink returned an error");
 }
 
@@ -29,10 +33,11 @@ pub fn drive<W: EventSink, I: IntoIterator<Item = Event>>(sink: W, events: I) {
 /// Returns the first error produced by [`EventSink::handle_event`] or
 /// [`EventSink::finish`].
 #[inline]
-pub fn try_drive<W: EventSink, I: IntoIterator<Item = Event>>(
-    mut sink: W,
-    events: I,
-) -> Result<()> {
+pub fn try_drive<W, I>(mut sink: W, events: I) -> Result<()>
+where
+    W: EventSink,
+    I: IntoIterator<Item = Event>,
+{
     for event in events {
         sink.handle_event(event)?;
     }

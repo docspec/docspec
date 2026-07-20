@@ -9,16 +9,18 @@ use crate::args::ConvertArgs;
 use crate::error::{CliError, Result};
 use crate::format;
 
-fn run_pipeline<W: Write>(
-    reader: AnyReader,
-    output_format: docspec::OutputFormat,
-    output: W,
-) -> Result<()> {
+fn run_pipeline<W>(reader: AnyReader, output_format: docspec::OutputFormat, output: W) -> Result<()>
+where
+    W: Write,
+{
     let sink = AnyWriter::new(output_format, output);
     docspec_core::pipe(docspec_core::SkipEmptyBlocks::new(reader), sink).map_err(Into::into)
 }
 
-fn write_cli_terminating_newline<W: Write>(output: &mut W) -> Result<()> {
+fn write_cli_terminating_newline<W>(output: &mut W) -> Result<()>
+where
+    W: Write,
+{
     output.write_all(b"\n").map_err(Into::into)
 }
 

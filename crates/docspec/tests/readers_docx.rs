@@ -18,7 +18,11 @@ mod tests {
 
     #[test]
     fn docx_reader_implements_event_source() {
-        fn assert_event_source<S: EventSource>() {}
+        fn assert_event_source<S>()
+        where
+            S: EventSource,
+        {
+        }
         assert_event_source::<DocxReader>();
     }
 

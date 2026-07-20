@@ -155,7 +155,10 @@ impl<B: JsonBackend> JsonEmitter<B> {
     ///
     /// Returns `Err` if a value is not allowed here, or if the backend errors.
     #[inline]
-    pub fn value<V: WriteVal>(&mut self, v: V) -> Result<()> {
+    pub fn value<V>(&mut self, v: V) -> Result<()>
+    where
+        V: WriteVal,
+    {
         self.stack.expect_value_allowed()?;
         v.write_to(&mut self.backend)?;
         self.stack.mark_value_written()
@@ -253,7 +256,10 @@ impl<B: JsonBackend> KeyedEmitter<'_, B> {
     ///
     /// Returns `Err` if a key is not allowed here, or if the backend errors.
     #[inline]
-    pub fn value<V: WriteVal>(self, v: V) -> Result<()> {
+    pub fn value<V>(self, v: V) -> Result<()>
+    where
+        V: WriteVal,
+    {
         let emitter = self.emitter;
         let name = self.name;
         emitter.write_key(name)?;

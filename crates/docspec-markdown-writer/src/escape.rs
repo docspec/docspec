@@ -11,7 +11,10 @@ const REPLACEMENT_CHARACTER: &[u8] = "\u{FFFD}".as_bytes();
 ///
 /// Normalizes NUL and line endings before escaping and streams output without
 /// accumulating the whole escaped text.
-pub(crate) fn write_escaped_inline<W: Write>(writer: &mut W, text: &str) -> io::Result<()> {
+pub(crate) fn write_escaped_inline<W>(writer: &mut W, text: &str) -> io::Result<()>
+where
+    W: Write,
+{
     let mut chars = text.chars().peekable();
     while let Some(ch) = next_normalized_char(&mut chars) {
         write_inline_char(writer, ch)?;
@@ -24,7 +27,10 @@ pub(crate) fn write_escaped_inline<W: Write>(writer: &mut W, text: &str) -> io::
 ///
 /// Normalizes NUL and line endings before escaping and streams output without
 /// accumulating the whole escaped text.
-pub(crate) fn write_escaped_block_start<W: Write>(writer: &mut W, text: &str) -> io::Result<()> {
+pub(crate) fn write_escaped_block_start<W>(writer: &mut W, text: &str) -> io::Result<()>
+where
+    W: Write,
+{
     let mut chars = text.chars().peekable();
     let Some(first) = next_normalized_char(&mut chars) else {
         return Ok(());
@@ -48,10 +54,13 @@ pub(crate) fn write_escaped_block_start<W: Write>(writer: &mut W, text: &str) ->
     Ok(())
 }
 
-fn write_ordered_list_marker_tail<W: Write>(
+fn write_ordered_list_marker_tail<W>(
     writer: &mut W,
     chars: &mut Peekable<Chars<'_>>,
-) -> io::Result<()> {
+) -> io::Result<()>
+where
+    W: Write,
+{
     let possible_marker = next_normalized_char(chars);
     let Some(marker @ ('.' | ')')) = possible_marker else {
         if let Some(ch) = possible_marker {
@@ -88,7 +97,10 @@ fn next_normalized_char(chars: &mut Peekable<Chars<'_>>) -> Option<char> {
     }
 }
 
-fn write_inline_char<W: Write>(writer: &mut W, ch: char) -> io::Result<()> {
+fn write_inline_char<W>(writer: &mut W, ch: char) -> io::Result<()>
+where
+    W: Write,
+{
     match ch {
         '\\' => writer.write_all(b"\\\\"),
         '`' => writer.write_all(b"\\`"),
@@ -104,7 +116,10 @@ fn write_inline_char<W: Write>(writer: &mut W, ch: char) -> io::Result<()> {
     }
 }
 
-fn write_raw_char<W: Write>(writer: &mut W, ch: char) -> io::Result<()> {
+fn write_raw_char<W>(writer: &mut W, ch: char) -> io::Result<()>
+where
+    W: Write,
+{
     let mut buf = [0; 4];
     writer.write_all(ch.encode_utf8(&mut buf).as_bytes())
 }

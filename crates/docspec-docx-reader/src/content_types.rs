@@ -108,11 +108,14 @@ impl ContentTypes {
     }
 }
 
-fn process_element<R: Read>(
+fn process_element<R>(
     reader: &quick_xml::Reader<R>,
     element: &quick_xml::events::BytesStart<'_>,
     ct: &mut ContentTypes,
-) -> docspec_core::Result<()> {
+) -> docspec_core::Result<()>
+where
+    R: Read,
+{
     match element.local_name().as_ref() {
         b"Default" => {
             let ext = attr_string(reader, element, b"Extension")?;
@@ -134,11 +137,14 @@ fn process_element<R: Read>(
     Ok(())
 }
 
-fn attr_string<R: Read>(
+fn attr_string<R>(
     reader: &quick_xml::Reader<R>,
     element: &quick_xml::events::BytesStart<'_>,
     name: &[u8],
-) -> docspec_core::Result<Option<String>> {
+) -> docspec_core::Result<Option<String>>
+where
+    R: Read,
+{
     for attribute_result in element.attributes() {
         let attribute = attribute_result
             .map_err(|err| parse_error(format!("malformed [Content_Types].xml: {err}")))?;
