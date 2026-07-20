@@ -1,6 +1,6 @@
 # Security Principles
 
-This document describes the security philosophy and principles that guide how we build DocSpec. It is not a threat model, vulnerability policy, or security audit. It is how we think about security.
+Security in DocSpec is not a separate concern. It flows from our core values: memory safety, fail-fast error handling, defensive parsing, and minimal dependencies. This document explains how those values translate into concrete security properties. It is not a threat model, vulnerability policy, or security audit. It is how we think about security.
 
 ---
 
@@ -115,7 +115,7 @@ Security researchers who report valid vulnerabilities will be acknowledged in ou
 
 ## Summary
 
-Security in DocSpec is not a separate concern. It flows from our core values:
+Security in DocSpec flows from our core values:
 
 - Memory safety through Rust's type system
 - Defensive parsing through fail-fast validation

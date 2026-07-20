@@ -1,14 +1,14 @@
 # Coding Standards
 
-This document explains why we enforce the standards we do. For the exact rules, see the workspace `Cargo.toml`. For the philosophy behind them, see `MANIFESTO.md`.
+We do not suppress warnings. We fix the underlying problems. These standards exist because we have seen what happens when they are not followed: production crashes, silent data corruption, security vulnerabilities, code no one dares touch. The compiler is our first reviewer. It never gets tired. A warning that is ignored will become a bug.
+
+For the exact lint configuration, see the workspace `Cargo.toml`. For the philosophy behind these rules, see [MANIFESTO.md](MANIFESTO.md).
 
 ---
 
 ## 1. The Underlying Philosophy
 
-Code quality is about correctness, safety, and maintainability. We enforce standards that eliminate whole categories of bugs. We do not suppress warnings; we fix the underlying problems.
-
-Every rule exists because we have seen what happens when it is not followed: production crashes, silent data corruption, security vulnerabilities, code no one dares touch. The compiler is our first reviewer. It never gets tired. A warning that is ignored will become a bug.
+Code quality is about correctness, safety, and maintainability. We enforce standards that eliminate whole categories of bugs. Every rule exists because we have seen what happens when it is not followed. The compiler is our ally. We do not bypass it.
 
 ---
 
@@ -142,6 +142,6 @@ Quality is not accidental. It is the result of discipline applied consistently o
 
 ## Further Reading
 
-- **MANIFESTO.md** — The philosophy that drives these standards
-- **ARCHITECTURE.md** — The streaming pipeline design
-- **CONTRIBUTING.md** — The workflow that enforces these standards
+- **[MANIFESTO.md](MANIFESTO.md)** — The philosophy that drives these standards
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — The streaming pipeline design
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — The workflow that enforces these standards

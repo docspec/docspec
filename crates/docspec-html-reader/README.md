@@ -1,29 +1,19 @@
 # docspec-html-reader
 
-Streaming HTML to DocSpec event stream reader.
+**Paragraphs from HTML, one event at a time.**
 
-See the [main DocSpec repository](https://github.com/docspec/docspec) for documentation,
-architecture, and the event protocol.
+Raw HTML arrives; a clean event stream leaves. `docspec-html-reader` parses HTML5 source and emits DocSpec events as it goes, touching only what it understands and dropping the rest without complaint. Streaming, like the rest of DocSpec. (See the [Manifesto](https://github.com/docspec/docspec/blob/main/MANIFESTO.md) for why.)
 
-## Supported Elements
+## Add it
 
-- Paragraphs (`<p>`)
-- Emits exactly: `StartDocument`, `StartParagraph`, `Text`, `EndParagraph`, `EndDocument`
+```toml
+[dependencies]
+docspec-html-reader = "1"
+```
 
-## Out of Scope (silently dropped)
+## Read some HTML
 
-All other HTML elements are silently ignored. Text content inside inline elements
-(e.g., `<strong>`, `<em>`) is preserved as `Text` events, but the formatting
-structure is dropped.
-
-## Streaming Guarantee
-
-`HtmlReader` streams its source via `html5gum::IoReader`'s 16 KB sliding-window
-buffer. Memory usage is constant regardless of document size — the document need
-not fit in memory. Both `from_str` and `from_reader` use this streaming path
-internally.
-
-## Quick Start
+`HtmlReader` is an `EventSource`: call `next_event()` and events arrive one at a time. From a string:
 
 ```rust
 use docspec_html_reader::{HtmlReader, EventSource};
@@ -49,8 +39,15 @@ while let Some(event) = reader.next_event()? {
 # Ok::<(), docspec_core::Error>(())
 ```
 
-## See Also
+In a real pipeline, connect it to any `EventSink` with `docspec_core::pipe(reader, writer)`.
 
-- [MANIFESTO.md](../../MANIFESTO.md) — philosophy and values
-- [ARCHITECTURE.md](../../ARCHITECTURE.md) — pipeline design, event model decisions, and pointers to the in-code event reference
-- [`docspec_core` on docs.rs](https://docs.rs/docspec-core) — every event variant, field, and well-formedness rule
+## What it handles today
+
+We emit exactly five event kinds: `StartDocument`, `StartParagraph`, `Text`, `EndParagraph`, `EndDocument`. That means `<p>` elements and the text inside them. Text content inside inline elements like `<strong>` or `<em>` is preserved as `Text` events, but the formatting structure is dropped. Everything else — headings, lists, tables, images, every other HTML element — is silently ignored. No half-formed events, no silent guesses.
+
+Memory stays constant regardless of document size. Both `from_str` and `from_reader` stream through `html5gum::IoReader`'s 16 KB sliding-window buffer; the document never needs to fit in memory.
+
+## Related
+
+- [Architecture](https://github.com/docspec/docspec/blob/main/ARCHITECTURE.md) — the streaming pipeline and event model
+- [`docspec-html-reader` on docs.rs](https://docs.rs/docspec-html-reader)

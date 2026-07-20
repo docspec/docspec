@@ -1,30 +1,19 @@
-# `docspec-markdown-writer`
+# docspec-markdown-writer
 
-Streaming Markdown (CommonMark) writer for DocSpec events — paragraphs and headings only.
+**Paragraphs and headings, written as CommonMark.**
 
-Converts a DocSpec event stream into CommonMark-compliant Markdown output. Implements the `EventSink` trait and emits output directly to any `Write` target as events arrive — no intermediate document representation, constant memory regardless of file size.
+Events arrive; Markdown leaves. `docspec-markdown-writer` turns a DocSpec event stream into CommonMark-compliant Markdown, writing directly to any `Write` target as each event passes through. Nothing accumulates. Streaming, like the rest of DocSpec. (See the [Manifesto](https://github.com/docspec/docspec/blob/main/MANIFESTO.md) for why.)
 
-## Supported Events
+## Add it
 
-| DocSpec Event | Markdown output |
-| --- | --- |
-| `StartDocument` / `EndDocument` | (no output — Markdown has no document framing) |
-| `StartParagraph` / `EndParagraph` | paragraph text + `\n\n` (empty paragraphs produce zero bytes) |
-| `StartHeading { level, id }` / `EndHeading` | ATX heading `# ` ... `###### ` + `\n\n` (level clamped to 1–6; `id` dropped) |
-| `Text` | CommonMark-escaped text |
+```toml
+[dependencies]
+docspec-markdown-writer = "1"
+```
 
-## Not Supported
+## Write some Markdown
 
-The following DocSpec events are silently ignored:
-
-- Text styles — `StartTextStyle` / `EndTextStyle`
-- Line breaks — `LineBreak`, `SoftBreak`
-- Thematic breaks — `ThematicBreak`
-- Block quotes, lists, tables, links, images, footnotes, definition lists, captions, preformatted blocks
-- Heading IDs (`{#id}` syntax not emitted)
-- Inline formatting markers (`**bold**`, `*italic*`, `` `code` ``, `~~strike~~`)
-
-## Usage
+`MarkdownWriter` is an `EventSink`: hand it events and it writes CommonMark as they arrive. We escape text as it passes and close each paragraph with a double newline:
 
 ```rust
 use docspec_markdown_writer::MarkdownWriter;
@@ -47,14 +36,20 @@ assert_eq!(output, "Hello, world\n\n");
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-## Limitations
+## What it handles today
 
-- **ATX headings only**: no setext `===` / `---` underlines.
-- **No inline style markers**: bold, italic, code, and strikethrough are not emitted.
-- **No GFM extensions**: tables, task lists, and footnotes are not supported.
-- **LF line endings only**: no CRLF, no BOM, no trailing spaces.
-- **Heading IDs dropped silently**: `{#id}` syntax is never emitted.
+| DocSpec event | Markdown output |
+| --- | --- |
+| `StartDocument` / `EndDocument` | (no output — Markdown has no document framing) |
+| `StartParagraph` / `EndParagraph` | paragraph text + `\n\n` (empty paragraphs produce zero bytes) |
+| `StartHeading { level, id }` / `EndHeading` | ATX heading — prefixes from `#` through `######`, each followed by a space, then the heading text and `\n\n` (level clamped to 1–6; `id` dropped) |
+| `Text` | CommonMark-escaped text |
 
-## License
+Everything else is silently ignored: text styles (`StartTextStyle` / `EndTextStyle`), line breaks (`LineBreak`, `SoftBreak`), thematic breaks, block quotes, lists, tables, links, images, footnotes, definition lists, captions, and preformatted blocks. Heading IDs are dropped — we never emit `{#id}` syntax. Inline formatting markers (`**bold**`, `*italic*`, `` `code` ``, `~~strike~~`) are not emitted either.
 
-See the [repository LICENSE](../../LICENSE).
+A few more hard edges: ATX headings only, no setext `===` / `---` underlines. LF line endings only — no CRLF, no BOM, no trailing spaces. No GFM extensions: tables, task lists, and footnotes are not supported.
+
+## Related
+
+- [Architecture](https://github.com/docspec/docspec/blob/main/ARCHITECTURE.md) — the streaming pipeline and event model
+- [`docspec-markdown-writer` on docs.rs](https://docs.rs/docspec-markdown-writer)

@@ -1,10 +1,24 @@
-# `docspec-cli`
+# docspec-cli
 
-Command-line interface for DocSpec document conversion.
+**Convert documents from the command line.**
 
-See the [main DocSpec repository](https://github.com/docspec/docspec) for documentation.
+One binary, every format DocSpec speaks. `docspec-cli` wraps the full DocSpec conversion pipeline behind two subcommands: `convert` turns a file (or stdin) from one format into another, and `http` starts the HTTP API server. Streaming, like the rest of DocSpec. (See the [Manifesto](https://github.com/docspec/docspec/blob/main/MANIFESTO.md) for why.)
 
-## Usage
+## Install it
+
+```bash
+cargo install docspec-cli
+```
+
+For a slim install without the HTTP server stack (and therefore no telemetry):
+
+```bash
+cargo install docspec-cli --no-default-features
+```
+
+The resulting binary supports only `docspec convert`; running `docspec http` will print "unknown subcommand".
+
+## Convert a document
 
 ```bash
 docspec <COMMAND> [OPTIONS]
@@ -53,15 +67,7 @@ Starts the HTTP API server. Listens on `127.0.0.1:3000` by default.
 `docspec-http`'s defaults. The telemetry integrations are runtime no-ops until their respective env vars are set —
 see the [`docspec-http` README](https://docs.rs/docspec-http) for the full list.
 
-For a slim install without the HTTP server stack (and therefore no telemetry):
-
-```bash
-cargo install docspec-cli --no-default-features
-```
-
-The resulting binary will only support `docspec convert`; running `docspec http` will print "unknown subcommand".
-
-## Supported Input Formats
+## Supported input formats
 
 - `markdown` — Full Markdown support including headings, lists, tables, and inline formatting
 - `html` — HTML input (see note below)
@@ -91,7 +97,7 @@ docspec convert --from html --to blocknote input.html --output output.json
 Convert a DOCX file to BlockNote JSON (preserves paragraphs, tables, lists, hyperlinks, images, and run styles):
 
 ```bash
-docspec --from docx --to blocknote input.docx --output output.json
+docspec convert --from docx --to blocknote input.docx --output output.json
 ```
 
 Convert Markdown from stdin to BlockNote JSON on stdout:
@@ -129,3 +135,8 @@ extension is ambiguous, so `--to oxa` must be explicit. HTML output is selected 
 or auto-detected from `.html` and `.htm` output paths. Pandoc native output is selected by
 `--to pandoc-native` or auto-detected from `.native` output paths. Markdown output is selected
 by `--to markdown` or auto-detected from `.md` output paths.
+
+## Related
+
+- [Architecture](https://github.com/docspec/docspec/blob/main/ARCHITECTURE.md) — the streaming pipeline and event model
+- [DocSpec repository](https://github.com/docspec/docspec)

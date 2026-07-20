@@ -1,6 +1,6 @@
 # Testing Philosophy
 
-Testing is not a step that happens after development. It is development. Every feature, every bug fix, every refactor comes with tests that prove it works. Untested code is incomplete code.
+We are uncompromising about testing. We do not ship code we have not verified. Testing is not a step that happens after development — it is development. Every feature, every bug fix, every refactor comes with tests that prove it works. Untested code is incomplete code.
 
 We target 98% test coverage for new and changed executable Rust lines in crates covered by the standard coverage job. Not as an aspirational goal. As a floor. The 2% tolerance exists for genuinely untestable code: platform-specific initialization, embedded hardware interaction, code that interfaces with external systems beyond our control, and WASM/CLI entry points that require integration testing. If your code does not have tests, it is not done.
 
@@ -68,7 +68,7 @@ Snapshots also serve as regression tests. When a bug is fixed, we add a snapshot
 
 Snapshot files live in `tests/snapshots/docx/pandoc/` and are committed alongside the fixtures they cover. Run `cargo insta review` to interactively inspect pending snapshots: press `a` to accept a change as correct, `r` to reject it and keep the existing snapshot. Accept snapshots only when you have verified the new output is correct — not merely different.
 
-To generate snapshots for the first time (or for fixtures added since the last run), use `INSTA_UPDATE=unseen cargo test --test pandoc_corpus -p docspec-docx-reader`. This writes only the missing snapshots and leaves existing ones untouched. In CI (`CI=true`, `INSTA_UPDATE` unset), any missing or mismatched snapshot causes the test to fail immediately — do not set `INSTA_UPDATE=always` in any committed script or workflow.
+To generate snapshots for the first time (or for fixtures added since the last run), use `INSTA_UPDATE=unseen cargo test --test snapshots -p docspec-docx-reader`. This writes only the missing snapshots and leaves existing ones untouched. In CI (`CI=true`, `INSTA_UPDATE` unset), any missing or mismatched snapshot causes the test to fail immediately — do not set `INSTA_UPDATE=always` in any committed script or workflow.
 
 ### Fuzz Tests
 
@@ -99,6 +99,87 @@ A good fixture is minimal but complete. It contains the minimum structure needed
 We do not generate fixtures programmatically unless the generation itself is under test. Real files from real sources are preferred. They contain the complexity that synthetic data misses.
 
 Fixtures are documentation too. They show what kinds of documents we handle and demonstrate the complexity we support.
+
+## How We Test a Conversion
+
+The sections above describe the kinds of tests; this one is the concrete machinery. Every conversion test is built from a small shared harness and asserts an *exact* value — an event stream, an output string, or a committed snapshot.
+
+### The shared harness: `docspec-test-utils`
+
+One internal, unpublished crate — [`docspec-test-utils`](crates/docspec-test-utils) — supplies the pieces every conversion test reuses. It is a dev-dependency of every reader and writer, the facade, the CLI, and the HTTP crate:
+
+- `collect_events(reader)` / `try_collect_events(reader)` — drive a reader to completion and return the `Vec<Event>` it emitted.
+- `drive(sink, events)` / `try_drive(sink, events)` — push a sequence of events into a writer and call `finish()`.
+- `capture(path, open)` — open a fixture with a reader and drain it into a `ReaderFixtureSnapshot`: the event stream plus how it terminated (`Ok` or `Err`), with image assets captured stably by content hash.
+- `FailingWriter` — an `io::Write` that fails after N bytes, for exercising error propagation.
+- `synth_docx(...)` and friends — build minimal in-memory DOCX archives, so DOCX tests don't all need a binary fixture on disk.
+
+### Readers assert the exact event stream
+
+A reader test feeds input, collects the events, and compares the *entire* vector — every field pinned, nothing approximate:
+
+```rust
+let mut reader = HtmlReader::from_str("<p>hello</p>");
+let events = collect_events(&mut reader);
+assert_eq!(events, vec![
+    Event::StartDocument { id: None, language: None, metadata: None },
+    Event::StartParagraph { alignment: None, id: None },
+    Event::Text { content: "hello".to_string() },
+    Event::EndParagraph,
+    Event::EndDocument,
+]);
+```
+
+Wrong event, wrong order, or an unexpected field, and the equality fails. No `contains`, no "is an array", no shape check — the [exact-value rule](#exact-value-assertions) applies to event streams too.
+
+### Writers assert the exact output
+
+The mirror image: drive a known event sequence into the writer, then compare the output byte for byte. The `events` slice below is illustrative — a real test builds the exact `Vec<Event>` for the input:
+
+```rust
+let mut buf = Vec::new();
+let mut writer = HtmlWriter::new(&mut buf);
+for event in events {          // StartDocument … Text("hello world") … EndDocument
+    writer.handle_event(event).unwrap();
+}
+writer.finish().unwrap();
+assert_eq!(String::from_utf8(buf).unwrap(), "<html><body><p>Hello, world</p></body></html>");
+```
+
+### End to end: a reader wired to a writer
+
+The facade's integration tests connect a reader straight to a writer — the real pipeline — and compare the result against a committed fixture. JSON outputs are compared as parsed values, so key ordering and whitespace can't cause false failures while the structure stays pinned exactly. The snippet below is a sketch — `run_pipeline` and `assert_json_eq` are per-test helpers, and the `.../tests/fixtures/…` paths are placeholders for the concrete relative paths each test uses:
+
+```rust
+// crates/docspec/tests/blocknote_markdown_pipeline.rs
+let markdown = include_str!(".../tests/fixtures/markdown/empty.md");
+let expected = include_str!(".../tests/fixtures/blocknote/empty.json");
+assert_json_eq(&run_pipeline(markdown), expected);
+```
+
+Inputs and expected outputs live under `tests/fixtures/<format>/`, paired by name (`empty.md` ↔ `empty.json`), so every conversion is pinned to a real, reviewable before/after pair.
+
+### The DOCX corpus: real files, snapshotted
+
+DOCX input is the messiest, so it gets the heaviest machinery: a corpus of **real** `.docx` files, each pinned by a snapshot of the events it produces.
+
+- **Fixtures** live under `tests/fixtures/docx/<corpus>/`, tracked via Git LFS (`*.docx filter=lfs`). Three corpora, each with its own license recorded in [`tests/fixtures/ATTRIBUTION.md`](tests/fixtures/ATTRIBUTION.md): **pandoc** (80 files), **apache-tika** (55 files), and **docspec** (our own curated regressions).
+- **Tests are generated, not hand-written.** [`crates/docspec-docx-reader/build.rs`](crates/docspec-docx-reader/build.rs) walks each corpus directory and emits one `#[test]` per fixture; [`tests/snapshots.rs`](crates/docspec-docx-reader/tests/snapshots.rs) includes them. Drop a fixture in, and its test exists on the next build.
+- **Each test checks two things.** It opens the fixture both by bytes (`from_reader`) and by path (`from_path`) and asserts the two event streams are identical — the streaming and path-based entry points must never diverge — then snapshots the stream against the committed `.snap` under `tests/snapshots/docx/<corpus>/`.
+
+Run the corpus:
+
+```bash
+cargo test --test snapshots -p docspec-docx-reader
+```
+
+In CI, `INSTA_UPDATE` is unset, so a new or changed snapshot fails the build — output drift is never silent. To add a regression: drop the `.docx` into the corpus, record it in `ATTRIBUTION.md`, generate its snapshot with `INSTA_UPDATE=unseen cargo test --test snapshots -p docspec-docx-reader`, and review it as described in [Snapshot Review](#snapshot-review) before committing the fixture and snapshot together.
+
+### Where the tests live
+
+- **Per-crate** `crates/<crate>/tests/` — `reader.rs` (event-stream assertions), `writer.rs` (output assertions), and `snapshots.rs` for the DOCX reader.
+- **Cross-crate** `crates/docspec/tests/` — reader-to-writer pipelines and reader/writer factory dispatch.
+- **Shared** corpora and snapshots at the workspace root: `tests/fixtures/` and `tests/snapshots/`.
 
 ## The Fail-Fast Test Principle
 

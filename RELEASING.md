@@ -1,14 +1,12 @@
 # Releasing DocSpec
 
-This document is the maintainer runbook for releasing DocSpec. It covers the full release lifecycle: from conventional commit on `main` to published crates, signed binaries, and Docker images.
+This is the maintainer runbook for releasing DocSpec. It covers the full release lifecycle: from conventional commit on `main` to published crates, signed binaries, and Docker images. The process is designed to be boring. Most releases require a maintainer to review and merge a single PR. The automation handles the rest.
 
 ## Overview
 
 DocSpec uses a unified ecosystem version across all 12 crates. Every release is tagged `vX.Y.Z` at the workspace level, and all publishable crates carry that same version. [release-plz](https://release-plz.dev) is the canonical release driver: it reads Conventional Commits, opens a release PR, and on merge handles tagging and publishing.
 
 Crates publish to crates.io via Trusted Publishing (OIDC). No long-lived API tokens are stored in repository secrets. Binaries for `docspec-cli` are built and distributed by [cargo-dist](https://opensource.axo.dev/cargo-dist/). Docker images are built and pushed from release-plz's native release outputs via the reusable `docker.yml` workflow. All artifacts carry SLSA L2 build provenance attestations and cosign keyless signatures.
-
-The release process is designed to be boring. Most releases require a maintainer to review and merge a single PR. The automation handles the rest.
 
 ## Versioning Policy
 

@@ -1,6 +1,6 @@
 # Contributing to DocSpec
 
-Thank you for considering a contribution. DocSpec is a memory-conscious streaming document conversion library with strict quality standards.
+We are not relaxed. We are not permissive. We have standards, and we enforce them — not as gatekeeping, but as stewardship. Read the [Manifesto](MANIFESTO.md) before diving into code. It explains what we stand for: memory efficiency, streaming design, and strict quality above convenience. Then come back here for the workflow.
 
 ## Getting Started
 
@@ -11,6 +11,7 @@ Thank you for considering a contribution. DocSpec is a memory-conscious streamin
 - [Git LFS](https://git-lfs.com/) for large binary test fixtures — run `git lfs install` once per machine after installing; run `git lfs pull` after clone to fetch the `.docx` test fixtures
 - [pre-commit](https://pre-commit.com/) for running pre-commit hooks
 - [taplo](https://taplo.tamasfe.dev/) for TOML formatting (`cargo install taplo-cli`)
+- [`just`](https://github.com/casey/just) for the build and test commands below (`cargo install just`)
 
 Clone the repository:
 ```bash
@@ -21,8 +22,6 @@ pre-commit install --hook-type commit-msg
 pre-commit install --hook-type pre-push
 ```
 
-The pre-commit hooks enforce formatting, linting, and conventional commit message format; the pre-push hooks verify the full build, test suite, and documentation. Before diving into code, read the [Manifesto](MANIFESTO.md) to understand our philosophy: memory efficiency, streaming design, and strict quality above convenience.
-
 The pre-commit stage (runs on every commit) enforces formatting, linting, and hygiene checks. The pre-push stage (runs before push) runs the full build, test suite, and documentation build.
 
 ### Hook Bypass Policy
@@ -32,6 +31,74 @@ Use `git commit --no-verify` or `git push --no-verify` only when:
 - Work-in-progress commits on a personal branch that will be squashed before PR
 
 Never bypass hooks on commits intended for pull request review. CI will catch what hooks miss, but hooks exist to give you fast local feedback.
+
+## Building and Running Locally
+
+The `justfile` is the front door. Running `just` with no arguments runs the whole local gate — format, lint, test, doc, build — the same checks the hooks and CI enforce:
+
+```bash
+just              # fmt · clippy · test · doc · build
+```
+
+Reach for a single recipe when you want one step:
+
+```bash
+just build        # cargo build --workspace
+just test         # cargo test --workspace
+just clippy       # cargo clippy --workspace --all-targets -- -D warnings
+just fmt          # cargo fmt --all
+just doc          # cargo doc --workspace --no-deps, warnings denied
+just coverage     # llvm-cov across covered crates → lcov.info
+```
+
+Every recipe is a thin wrapper over the Cargo command shown beside it, so raw `cargo` works just as well. `just --list` prints the full set.
+
+### Running the CLI from source
+
+The binary is `docspec`. Run it through Cargo without installing anything:
+
+```bash
+cargo run -p docspec-cli -- convert report.docx report.md
+cargo run -p docspec-cli -- convert --from markdown --to blocknote input.md
+cargo run -p docspec-cli -- --help
+```
+
+### Running the HTTP server from source
+
+```bash
+cargo run -p docspec-cli -- http                          # binds 127.0.0.1:3000
+cargo run -p docspec-cli -- http --host 0.0.0.0 --port 8080
+```
+
+`GET /health` reports liveness, `POST /conversion` streams a conversion, and `GET /metrics` exposes Prometheus metrics. Sentry and PostHog are compiled in but stay dormant unless `DOCSPEC_SENTRY_DSN` or `DOCSPEC_POSTHOG_API_KEY` is set — nothing leaves your machine by default.
+
+### Feature flags
+
+`just build` and `just test` run `cargo build/test --workspace`, which builds each crate with its own default feature set — so every reader and writer *crate* is compiled and tested (each has meaningful defaults), but non-default facade feature combinations are only checked when you enable them explicitly. Flags matter when you depend on the [`docspec`](crates/docspec) facade and want a smaller footprint:
+
+- Facade defaults are `markdown`, `blocknote`, and `pandoc-native`.
+- DOCX reading is opt-in — enable the `docx` feature, or `full` for everything.
+- The CLI bundles the HTTP server by default; `cargo install docspec-cli --no-default-features` builds a convert-only binary.
+
+### WebAssembly
+
+`docspec-wasm` builds with [`wasm-pack`](https://rustwasm.github.io/wasm-pack/) (`cargo install wasm-pack`) against the `wasm32-unknown-unknown` target:
+
+```bash
+just wasm          # wasm-pack build --dev --target web crates/docspec-wasm
+just wasm-release  # the optimized build
+```
+
+The output bundle lands in `crates/docspec-wasm/pkg/`.
+
+### Docker
+
+The `Dockerfile` at the repo root is the image published as `ghcr.io/docspec/api` — a static `docspec` binary running `http` on port 3000:
+
+```bash
+docker build -t docspec-api .
+docker run --rm -p 3000:3000 docspec-api
+```
 
 ## Branching Strategy
 
@@ -209,14 +276,10 @@ Better: `fix(docx): prevent panic on documents with missing content types`
 
 ## Questions and Support
 
-- Open an issue for bug reports or feature requests
+- Open an issue for bug reports or feature requests — see [Bug Triage & Reporting](TRIAGE.md) for what makes a report actionable and how we triage
 - Use discussions for questions about usage or architecture
 - Read existing documentation before asking
 
 ## Attribution
 
 Contributions are attributed in the git history. Your commits are your contribution record. By contributing, you agree that your contributions will be licensed under the same license as the project.
-
----
-
-Thank you for helping make DocSpec better.

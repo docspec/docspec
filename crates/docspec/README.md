@@ -1,20 +1,30 @@
-# `docspec`
+# docspec
 
-Streaming document conversion. Convenience facade re-exporting the DocSpec readers,
-writers, and core event types.
+**One import, every reader and writer.**
 
-Use this crate when you want a single entry point. For the smallest possible dependency
-footprint, depend directly on the individual sub-crates (`docspec-core`,
-`docspec-markdown-reader`, etc.) instead.
+`docspec` is the convenience facade over the DocSpec workspace. It re-exports the core
+event types and traits, and — behind feature flags — the format readers and writers you
+opt into. Reach for it when you want a single entry point; drop to the individual crates
+(`docspec-core`, `docspec-markdown-reader`, …) when you want the smallest possible
+dependency footprint. Streaming, like the rest of DocSpec. (See the [Manifesto](https://github.com/docspec/docspec/blob/main/MANIFESTO.md) for why.)
 
-## Usage
+## Add it
+
+Pick the formats you need through features:
 
 ```toml
 [dependencies]
-docspec = { version = "1.5", features = ["markdown", "blocknote"] }
+docspec = { version = "1", features = ["markdown", "blocknote"] }
 ```
 
-```rust
+Default features are `markdown`, `blocknote`, and `pandoc-native`; disable them when you
+want to opt in explicitly.
+
+## Convert a document
+
+Wire a reader to a writer and let the events flow — here, Markdown into BlockNote JSON:
+
+```rust,no_run
 use docspec::readers::MarkdownReader;
 use docspec::writers::BlockNoteWriter;
 use docspec::{EventSink, EventSource, StackTrackingSink};
@@ -28,46 +38,35 @@ while let Some(event) = reader.next_event()? {
     writer.handle_event(event)?;
 }
 writer.finish()?;
+# Ok::<(), docspec_core::Error>(())
 ```
 
-## Feature Flags
+Opening a file by format instead? `AnyReader::from_path(InputFormat::Docx, "document.docx")`
+picks the right reader for you.
+
+## Feature flags
 
 ### Readers
 
-| Feature    | Format                                           | Crate                     |
-| ---------- | ------------------------------------------------ | ------------------------- |
-| `markdown` | Markdown (CommonMark + GFM tables/strikethrough) | `docspec-markdown-reader` |
-| `html`     | HTML (paragraphs only)                           | `docspec-html-reader`     |
-| `docx`     | DOCX (paragraphs, tables, lists, hyperlinks, embedded images, run styles, color/highlight) | `docspec-docx-reader`   |
+| Feature    | Format                                                                                      | Crate                     |
+| ---------- | ------------------------------------------------------------------------------------------- | ------------------------- |
+| `markdown` | Markdown (CommonMark + GFM tables/strikethrough)                                            | `docspec-markdown-reader` |
+| `html`     | HTML (paragraphs only)                                                                       | `docspec-html-reader`     |
+| `docx`     | DOCX (paragraphs, headings, tables, lists, hyperlinks, images, run styles, color/highlight) | `docspec-docx-reader`     |
 
-`DocxReader` covers paragraphs, line breaks, tabs, tables, ordered/unordered lists,
-hyperlinks, embedded images (streamed via `AssetHandle`), and run styles (bold, italic,
-underline, strikethrough, sub/superscript) with text color, highlight, and shading.
-See [`docspec-docx-reader`](https://docs.rs/docspec-docx-reader) for the authoritative
-list of supported and out-of-scope OOXML elements.
-
-`DocxReader` is dispatched through `AnyReader::from_reader` and `AnyReader::from_path`.
-Use `AnyReader::from_path(InputFormat::Docx, path)` to open a DOCX file, or
-`AnyReader::from_reader(InputFormat::Docx, cursor)` to read from an in-memory buffer.
-
-```rust
-use docspec::{AnyReader, InputFormat};
-
-# fn main() -> docspec::Result<()> {
-let reader = AnyReader::from_path(InputFormat::Docx, "document.docx")?;
-# Ok(())
-# }
-```
+`DocxReader` is dispatched through `AnyReader::from_reader` and `AnyReader::from_path`. See
+[`docspec-docx-reader`](https://docs.rs/docspec-docx-reader) for the authoritative list of supported and
+out-of-scope OOXML elements.
 
 ### Writers
 
-| Feature            | Format                 | Crate                      |
-| ------------------ | ---------------------- | -------------------------- |
-| `blocknote-writer` | BlockNote JSON         | `docspec-blocknote-writer` |
-| `oxa-writer`       | oxa.dev JSON           | `docspec-oxa-writer`       |
-| `html-writer`      | HTML (paragraphs only) | `docspec-html-writer`      |
-| `pandoc-native-writer` | Pandoc native block list | `docspec-pandoc-native-writer` |
-| `markdown-writer` | Markdown (paragraphs and headings only) | `docspec-markdown-writer` |
+| Feature                | Format                                  | Crate                          |
+| ---------------------- | --------------------------------------- | ------------------------------ |
+| `blocknote-writer`     | BlockNote JSON                          | `docspec-blocknote-writer`     |
+| `oxa-writer`           | oxa.dev JSON                            | `docspec-oxa-writer`           |
+| `html-writer`          | HTML (paragraphs only)                  | `docspec-html-writer`          |
+| `pandoc-native-writer` | Pandoc native block list                | `docspec-pandoc-native-writer` |
+| `markdown-writer`      | Markdown (paragraphs and headings only) | `docspec-markdown-writer`      |
 
 ### Primitives
 
@@ -77,21 +76,20 @@ let reader = AnyReader::from_path(InputFormat::Docx, "document.docx")?;
 
 ### Convenience
 
-| Feature       | Enables                                                       |
-| ------------- | ------------------------------------------------------------- |
-| `blocknote`   | BlockNote in both directions (writer only until reader lands) |
-| `oxa`         | oxa.dev in both directions (writer only until reader lands)   |
-| `pandoc-native` | Pandoc native in both directions (writer only until reader lands) |
-| `all-readers` | All reader features                                           |
-| `all-writers` | All writer features                                           |
-| `all-libs`    | All primitive/library features (currently `json`)             |
-| `full`        | Everything (`all-readers` + `all-writers` + `all-libs`)       |
+| Feature         | Enables                                            |
+| --------------- | -------------------------------------------------- |
+| `blocknote`     | BlockNote (writer only until the reader lands)     |
+| `oxa`           | oxa.dev (writer only until the reader lands)       |
+| `pandoc-native` | Pandoc native (writer only until the reader lands) |
+| `all-readers`   | Every reader feature                               |
+| `all-writers`   | Every writer feature                               |
+| `all-libs`      | Every primitive feature (currently `json`)         |
+| `full`          | Everything                                         |
 
-There is no `markdown` convenience feature for the writer. The name `markdown` is already taken by the reader feature, so `markdown-writer` must be enabled explicitly — there is no shorthand that enables both directions at once.
+There is no `markdown` convenience feature for the writer — `markdown` is already the
+reader feature, so enable `markdown-writer` explicitly.
 
-Default features are `markdown`, `blocknote`, and `pandoc-native`; disable default features when you need the smallest possible dependency footprint.
+## Related
 
-## Documentation
-
-See the [main DocSpec repository](https://github.com/docspec/docspec) for the full
-project documentation, architecture, and event protocol.
+- [Architecture](https://github.com/docspec/docspec/blob/main/ARCHITECTURE.md) — the streaming pipeline and event model
+- [`docspec` on docs.rs](https://docs.rs/docspec) — the full API and feature reference

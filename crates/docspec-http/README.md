@@ -1,22 +1,24 @@
-# `docspec-http`
+# docspec-http
 
-Library providing an Axum-based HTTP server that wraps a DocSpec conversion pipeline. Designed for embedding in custom binaries or running via the unified `docspec http` subcommand.
+**An Axum HTTP server that wraps a DocSpec conversion pipeline.**
+
+Send a document, receive a converted one. `docspec-http` is an Axum-based library that wraps the full DocSpec conversion pipeline behind a small HTTP surface — designed for embedding in custom binaries or running via the unified `docspec http` subcommand. Streaming, like the rest of DocSpec. (See the [Manifesto](https://github.com/docspec/docspec/blob/main/MANIFESTO.md) for why.)
 
 Send markdown (`Content-Type: text/markdown`), HTML (`Content-Type: text/html`), or DOCX (`Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document`), receive BlockNote JSON (default), HTML (`Accept: text/html`), oxa.dev JSON (`Accept: application/vnd.oxa+json`), or Pandoc native (`Accept: application/vnd.pandoc.native`). The underlying DocSpec pipeline is streaming, but this v1 HTTP wrapper **buffers the request body and the conversion output in memory** before responding. End-to-end streaming over HTTP is planned for a future version. For now, request size scales with available memory.
 
-> **HTML is paragraph-only.** The HTML reader currently parses `<p>` elements only, and the HTML writer currently emits only paragraph events. Other HTML input elements and non-paragraph output events (headings, lists, tables, formatting, etc.) are silently dropped. See [docspec-html-reader](../docspec-html-reader/README.md) and [docspec-html-writer](../docspec-html-writer/README.md).
+> **HTML is paragraph-only.** The HTML reader currently parses `<p>` elements only, and the HTML writer currently emits only paragraph events. Other HTML input elements and non-paragraph output events (headings, lists, tables, formatting, etc.) are silently dropped. See [docspec-html-reader](https://docs.rs/docspec-html-reader) and [docspec-html-writer](https://docs.rs/docspec-html-writer).
 
-## When to Use This Crate
+## When to use this crate
 
 Use `docspec-http` directly when you're embedding the HTTP server into your own binary or need programmatic control over server startup, configuration, or telemetry initialization.
 
 For end users who want a running HTTP server without writing Rust code, install `docspec-cli` and run `docspec http`.
 
-## Quick Start
+## Add it
 
 ```toml
 [dependencies]
-docspec-http = "1.5"
+docspec-http = "1"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -376,3 +378,8 @@ sum by (input_mime_type) (rate(docspec_conversions_total{result="success"}[5m]))
 ### Security
 
 `/metrics` has no authentication. It's intended for internal scraping only. Deploy behind a private overlay network or a Kubernetes `NetworkPolicy` that restricts access to your Prometheus pods.
+
+## Related
+
+- [Architecture](https://github.com/docspec/docspec/blob/main/ARCHITECTURE.md) — the streaming pipeline and event model
+- [`docspec-http` on docs.rs](https://docs.rs/docspec-http)
