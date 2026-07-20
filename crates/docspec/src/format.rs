@@ -15,7 +15,8 @@ pub enum InputFormat {
     /// Markdown (`CommonMark` + GFM). Available when the `markdown` feature is enabled.
     #[cfg(feature = "markdown")]
     Markdown,
-    /// DOCX format (paragraphs and text only). Available when the `docx` feature is enabled.
+    /// DOCX format (paragraphs, headings, tables, lists, hyperlinks, images, and run styles).
+    /// Available when the `docx` feature is enabled.
     #[cfg(feature = "docx")]
     Docx,
 }

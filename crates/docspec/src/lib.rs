@@ -16,7 +16,7 @@
 //! |----------------|-----------------------------------------------------|-----------------------------|
 //! | `markdown`     | Markdown (`CommonMark` + GFM tables/strikethrough)  | [`readers::MarkdownReader`] |
 //! | `html`         | HTML (paragraphs only)                              | `readers::HtmlReader`       |
-//! | `docx`         | DOCX (paragraphs, text, color, highlight, shading)  | `readers::DocxReader`       |
+//! | `docx`         | DOCX (paragraphs, headings, tables, lists, hyperlinks, images, run styles)  | `readers::DocxReader`       |
 //!
 //! [`readers::DocxReader`] is dispatched through [`AnyReader::from_reader`] and
 //! [`AnyReader::from_path`]. Use `AnyReader::from_path(InputFormat::Docx, path)` to
@@ -119,10 +119,14 @@ pub mod readers {
 
     /// Streaming DOCX reader. Available when the `docx` feature is enabled.
     /// Dispatched through [`crate::AnyReader::from_reader`] and
-    /// [`crate::AnyReader::from_path`]. Emits paragraphs, text, and inline
-    /// formatting including text color, highlight color, and run/text shading
-    /// (via `TextColor` and `Mark` events). Tables, lists, images,
-    /// headers/footers, metadata, and tracked changes are silently dropped.
+    /// [`crate::AnyReader::from_path`]. Emits paragraphs, headings, block quotes,
+    /// preformatted blocks, tables, ordered/unordered lists, hyperlinks, images
+    /// (`DrawingML` and VML, streamed via `AssetHandle`), and inline run styles —
+    /// bold, italic, underline, strikethrough, sub/superscript, plus text color,
+    /// highlight, and shading. Comments, footnotes, headers/footers, document
+    /// metadata, and tracked deletions are silently dropped; see
+    /// [`docspec-docx-reader`](https://docs.rs/docspec-docx-reader) for the
+    /// authoritative supported and out-of-scope list.
     #[cfg(feature = "docx")]
     #[cfg_attr(docsrs, doc(cfg(feature = "docx")))]
     pub use docspec_docx_reader::DocxReader;

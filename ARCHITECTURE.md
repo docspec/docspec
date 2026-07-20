@@ -1,6 +1,6 @@
 # DocSpec Architecture
 
-This document explains how DocSpec works architecturally. For the philosophy behind our design decisions, see the companion [Manifesto](MANIFESTO.md).
+Documents are rivers, not lakes. This document explains how that conviction becomes code. For the philosophy behind these decisions, see the [Manifesto](MANIFESTO.md).
 
 ---
 
@@ -18,7 +18,7 @@ DocSpec rejects all of this. Documents are streams of content, not static struct
 
 ## 2. The Event-Based Pipeline
 
-DocSpec treats every document as a stream of events. Instead of building a tree, we emit events as we parse. A heading becomes StartHeading and EndHeading events. A paragraph becomes StartParagraph, Text events, then EndParagraph. A table becomes StartTable, StartTableRow, StartTableCell, cell content, EndTableCell, EndTableRow, EndTable.
+DocSpec treats every document as a stream of events. Instead of building a tree, we emit events as we parse. A heading becomes `StartHeading` and `EndHeading` events. A paragraph becomes `StartParagraph`, `Text` events, then `EndParagraph`. A table becomes `StartTable`, `StartTableRow`, `StartTableCell`, cell content, `EndTableCell`, `EndTableRow`, `EndTable`.
 
 Events flow in strict document order. Nothing accumulates. Nothing buffers. The document enters as bytes and exits as bytes. In between, it is a stream of events flowing through a pipeline.
 
@@ -34,7 +34,7 @@ The pipeline is transparent and inspectable. You can insert adapters between sou
 
 The event model is universal across all formats. A document is a sequence of structural elements: headings, paragraphs, lists, tables, text runs with styling, links, images. By separating structure from encoding, we achieve true interoperability.
 
-The event flow is predictable. StartDocument begins the stream. EndDocument terminates it. Between these, events arrive in document order. Block-level elements use paired Start and End events. Inline content uses flat events with styling. This consistency makes reasoning about event sequences straightforward.
+The event flow is predictable. `StartDocument` begins the stream. `EndDocument` terminates it. Between these, events arrive in document order. Block-level elements use paired Start and End events. Inline content uses flat events with styling. This consistency makes reasoning about event sequences straightforward.
 
 ---
 
@@ -42,7 +42,7 @@ The event flow is predictable. StartDocument begins the stream. EndDocument term
 
 The dominant alternative to streaming is building an abstract syntax tree. Parse the whole document, construct a tree in memory, walk the tree recursively, emit output. These advantages come at a steep cost that grows with document size.
 
-Memory usage in a tree-based system is O(document size) at best, often worse. A 100 MB document typically needs 100 MB for content storage, plus overhead for tree node structures: pointers, sibling links, type tags, metadata. A 100 MB document can easily become 200-300 MB in memory.
+Memory usage in a tree-based system is O(document size) at best, often worse. A 100 MB document typically needs 100 MB for content storage, plus overhead for tree node structures: pointers, sibling links, type tags, metadata. A 100 MB document can easily become 200–300 MB in memory.
 
 Streaming uses O(1) memory regardless of document size. Events flow through and are immediately consumed. Only a small, fixed-size buffer is needed for the current event. A 1 KB document and a 1 GB document use essentially the same amount of memory.
 
@@ -64,7 +64,7 @@ The streaming model enables processing of documents larger than available memory
 
 Images are where the memory abuse of traditional approaches is most visible. Traditional converters load the full image bytes before deciding what to do with them. A document containing a 50 MB embedded image requires the entire 50 MB in heap memory. A document with twenty such images requires 1 GB of image data in memory simultaneously.
 
-DocSpec never does this. Images are represented as references in the event stream, not as data payloads. When the source encounters an image, it emits an Image event containing a reference. The event itself is tiny, just a few dozen bytes.
+DocSpec never does this. Images are represented as references in the event stream, not as data payloads. When the source encounters an image, it emits an `Image` event containing a reference. The event itself is tiny, just a few dozen bytes.
 
 When the sink needs the actual image bytes, it requests them through an asset provider. The asset provider is an abstraction that can serve bytes on demand. The sink asks for the image by its reference, and the provider streams it piece by piece. The sink writes each chunk directly to its output buffer without ever holding the complete image.
 
@@ -115,7 +115,7 @@ Common adapter patterns include:
 - **Filtering adapters** remove events matching certain criteria. Strip all images to create a text-only version. Remove hidden text. Skip metadata sections.
 - **Remapping adapters** change event types to transform document structure. Convert all headings down by one level. Turn block quotations into indented paragraphs.
 - **Counting adapters** track statistics without modifying the event stream. Count words, paragraphs, images, tables.
-- **Validating adapters** check invariants and fail fast if violated. Ensure every StartParagraph has a corresponding EndParagraph. Verify heading levels are within valid ranges.
+- **Validating adapters** check invariants and fail fast if violated. Ensure every `StartParagraph` has a corresponding `EndParagraph`. Verify heading levels are within valid ranges.
 
 The trait interfaces are intentionally minimal. A source has one main method: return the next event when requested. A sink has two methods: receive an event, and finish. This minimal surface area makes implementations straightforward.
 

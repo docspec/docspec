@@ -1,11 +1,13 @@
 # docspec-docx-reader
 
-Streaming DOCX to DocSpec event stream reader.
+**DOCX in, a stream of events out.**
 
-See the [main DocSpec repository](https://github.com/docspec/docspec) for documentation,
-architecture, and the event protocol.
+Word documents, unwrapped as they flow. `docspec-docx-reader` parses a `.docx` archive with
+`quick-xml` and `zip` and emits DocSpec events one at a time — and from `from_path`, in
+constant memory, whatever the file's size. Streaming, like the rest of DocSpec. (See the
+[Manifesto](https://github.com/docspec/docspec/blob/main/MANIFESTO.md) for why.)
 
-## Supported
+## What it handles today
 
 - Paragraphs (`<w:p>`) and direct text (`<w:t>` inside `<w:r>`)
 - Line breaks (`<w:br>`, including `w:type="page"` and `w:type="column"` — all emit `LineBreak`)
@@ -41,12 +43,17 @@ When both `<w:highlight>` and `<w:shd w:fill>` appear in the same `<w:rPr>`, `<w
 
 Adjacent runs with the same color emit separate `StartTextStyle`/`EndTextStyle` pairs. The reader maintains per-run discipline and does not merge consecutive runs, even when their style properties are identical.
 
-## Out of Scope (subtree silently dropped)
+### Style references (resolved, not on the denylist)
+
+Two elements look like they should belong to the denylist below, but are actually resolved through the styles table — the surrounding content is emitted normally:
+
+- `<w:rStyle>` (run-level style references) — resolved via `apply_resolved_rpr_style`. Style values that classify as `Code` promote the run to `TextStyleKind::Code`; other values contribute no style metadata, but the run's text is still emitted.
+- `<w:pStyle>` values other than the heading, block-quote, and code-style names listed in "What it handles today" — the paragraph emits as `StartParagraph` with no style metadata, and its content is emitted normally.
+
+## Out of scope (subtree silently dropped)
 
 The XML elements listed below are the reader's denylist — their entire subtree is silently dropped during parsing. Any element NOT listed (whether a known structural tag like `<w:p>` or an unknown extension) is processed normally; the reader just continues into its children.
 
-- `<w:rStyle>` (run-level style references) — silently dropped
-- `<w:pStyle>` values other than the heading, block-quote, and code-style names listed in "Supported" — silently dropped; the paragraph emits as `StartParagraph` with no style metadata
 - Run formatting not listed above: `<w:sz>`, `<w:szCs>`, `<w:caps>`, `<w:smallCaps>`, `<w:position>`, `<w:spacing>`, `<w:kern>`, `<w:lang>`, `<w:noProof>`
 - `<w:rFonts>` (general font tracking is not exposed as events, *except for symbol font resolution (Wingdings, Wingdings 2, Wingdings 3, Webdings, Symbol) which is used internally to normalize codepoints to Unicode*)
 - `themeColor` / `themeTint` / `themeShade` attributes on `<w:color>` and `<w:shd>` — silently dropped. The reader does not parse `styles.xml` or `theme1.xml`, so theme-referenced colors cannot be resolved. Future work.
@@ -127,7 +134,7 @@ In both cases, `_rels/.rels` and `word/_rels/document.xml.rels` are fully read i
 memory at package-open time (typical combined size < 10 KB even for large documents).
 The internal event queue remains bounded regardless of document size or hyperlink count.
 
-## Quick Start
+## Read a DOCX
 
 ```rust,no_run
 use docspec_docx_reader::{DocxReader, EventSource};
@@ -139,8 +146,7 @@ while let Some(event) = reader.next_event()? {
 # Ok::<(), docspec_core::Error>(())
 ```
 
-## See Also
+## Related
 
-- [MANIFESTO.md](../../MANIFESTO.md) — philosophy and values
-- [ARCHITECTURE.md](../../ARCHITECTURE.md) — pipeline design, event model decisions, and pointers to the in-code event reference
-- [`docspec_core` on docs.rs](https://docs.rs/docspec-core) — every event variant, field, and well-formedness rule
+- [Architecture](https://github.com/docspec/docspec/blob/main/ARCHITECTURE.md) — pipeline design, event model decisions, and pointers to the in-code event reference
+- [`docspec-core` on docs.rs](https://docs.rs/docspec-core) — every event variant, field, and well-formedness rule

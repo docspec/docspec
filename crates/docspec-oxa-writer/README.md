@@ -1,31 +1,21 @@
-# `docspec-oxa-writer`
+# docspec-oxa-writer
 
-Converts a DocSpec event stream into [oxa.dev](https://oxa.dev/) JSON. Implements the `EventSink` trait and emits JSON tokens directly to any `Write` target as events arrive — no intermediate document representation, constant memory regardless of file size.
+**Paragraphs into oxa.dev JSON, token by token.**
 
-## Supported Features
+Events arrive; oxa.dev JSON leaves. `docspec-oxa-writer` turns a DocSpec event stream into the [oxa.dev](https://oxa.dev/) JSON format, writing tokens directly to any `Write` target as each event passes through. Nothing accumulates. Streaming, like the rest of DocSpec. (See the [Manifesto](https://github.com/docspec/docspec/blob/main/MANIFESTO.md) for why.)
 
-| Block type | oxa.dev type |
-| --- | --- |
-| Paragraph | `Paragraph` |
-| Text | `Text` |
+Built on [`docspec-json`](https://docs.rs/docspec-json), which guarantees the output is structurally valid JSON before a single byte reaches the backend.
 
-## Not Supported
+## Add it
 
-The following DocSpec events are not yet supported and will be silently ignored:
+```toml
+[dependencies]
+docspec-oxa-writer = "1"
+```
 
-- Headings — `StartHeading` / `EndHeading`
-- Block quotes — `StartBlockQuote` / `EndBlockQuote`
-- Preformatted / code blocks — `StartPreformatted` / `EndPreformatted`
-- Images — `Image`
-- Tables — `StartTable` / `EndTable` and related events
-- Thematic breaks — `ThematicBreak`
-- List items — `StartOrderedListItem` / `StartUnorderedListItem` and related events
-- Inline links — `StartLink` / `EndLink`
-- Footnotes — `StartFootnote` / `EndFootnote` / `FootnoteRef`
-- Definition lists — `StartDefinitionList` / `StartDefinitionTerm` / `StartDefinitionDetail`
-- Captions — `StartCaption` / `EndCaption`
+## Emit some oxa.dev JSON
 
-## Usage
+`OxaWriter` is an `EventSink`: hand it events and it writes oxa.dev JSON as they arrive. We open a `Document` object, emit a `Paragraph` for each paragraph, and nest `Text` nodes inside:
 
 ```rust
 use docspec_oxa_writer::OxaWriter;
@@ -38,7 +28,6 @@ writer.handle_event(Event::StartDocument { id: None, language: None, metadata: N
 writer.handle_event(Event::StartParagraph { alignment: None, id: None })?;
 writer.handle_event(Event::Text {
     content: "Hello, world".to_string(),
-    style: Default::default(),
 })?;
 writer.handle_event(Event::EndParagraph)?;
 writer.handle_event(Event::EndDocument)?;
@@ -48,10 +37,17 @@ let json = String::from_utf8(buf)?;
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-## Limitations
+The output for that sequence is:
 
-This is a minimal scaffold. Full implementation will follow in subsequent tasks.
+```json
+{"type":"Document","children":[{"type":"Paragraph","children":[{"type":"Text","value":"Hello, world"}]}]}
+```
 
-## License
+## What it handles today
 
-See the [repository LICENSE](../../LICENSE).
+Paragraphs and the text inside them. `Text` style information is dropped — we emit the content string only. Everything else is silently ignored: headings, block quotes, preformatted blocks, images, tables, thematic breaks, lists, links, footnotes, definition lists, and captions. No half-formed JSON, no silent guesses.
+
+## Related
+
+- [Architecture](https://github.com/docspec/docspec/blob/main/ARCHITECTURE.md) — the streaming pipeline and event model
+- [`docspec-oxa-writer` on docs.rs](https://docs.rs/docspec-oxa-writer)
