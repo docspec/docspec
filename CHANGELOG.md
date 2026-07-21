@@ -12,6 +12,12 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.21.4](https://github.com/docspec/docspec/compare/v1.21.3...v1.21.4) - 2026-07-21
+
+### Other
+
+- improve documentation
+
 ## [1.21.3](https://github.com/docspec/docspec/compare/v1.21.2...v1.21.3) - 2026-07-21
 
 ### Fixed
