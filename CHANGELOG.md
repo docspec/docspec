@@ -12,6 +12,17 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.21.3](https://github.com/docspec/docspec/compare/v1.21.2...v1.21.3) - 2026-07-21
+
+### Fixed
+
+- *(deps)* update rust crate posthog-rs to 0.21.0
+- *(deps)* update rust crate posthog-rs to 0.20.0
+
+### Other
+
+- fix clippy warnings
+
 ## [1.21.2](https://github.com/docspec/docspec/compare/v1.21.1...v1.21.2) - 2026-07-08
 
 ### Fixed
