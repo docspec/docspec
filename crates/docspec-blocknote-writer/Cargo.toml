@@ -10,7 +10,7 @@ keywords = ["document", "conversion", "streaming"]
 categories = ["encoding"]
 
 [dependencies]
-base64 = "0.22"
+base64 = "0.23"
 docspec-core = { workspace = true }
 docspec-json = { workspace = true }
 
