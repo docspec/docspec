@@ -102,7 +102,7 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@v4.1.2
         with:
-          cosign-release: "v2.6.4"
+          cosign-release: "v3.1.2"
 
       - name: Sign binaries with cosign (keyless)
         run: |
@@ -184,7 +184,7 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@v4.1.2
         with:
-          cosign-release: "v2.6.4"
+          cosign-release: "v3.1.2"
 
       - name: Sign Docker image with cosign (keyless)
         env:
