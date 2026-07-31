@@ -1764,7 +1764,7 @@ mod events {
 
         assert_eq!(
             format!("{reader:?}"),
-            "DocxReader { inner: DocumentReader { buf: [], pending_preformatted_close: false, open_styles: [], phase: \"<phase>\", queue: [], data: \"<DocxData>\", hyperlink_map: {}, list_stack: [], list_counters: {}, xml: \"<quick_xml::Reader>\", archive: \"<Arc<Mutex<ZipArchive>>>\", content_types: \"<Arc<ContentTypes>>\" } }"
+            "DocxReader { inner: DocumentReader { buf: [], pending_preformatted_close: false, open_styles: [], phase: \"<phase>\", queue: [], data: \"<DocxData>\", hyperlink_map: {}, field_stack: [], list_stack: [], list_counters: {}, xml: \"<quick_xml::Reader>\", archive: \"<Arc<Mutex<ZipArchive>>>\", content_types: \"<Arc<ContentTypes>>\" } }"
         );
     }
 
@@ -7387,6 +7387,735 @@ mod cross_feature_lists {
                 Event::EndParagraph,
                 start_paragraph(),
                 text("Signatures"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+}
+
+mod field_code_hyperlinks {
+    use std::io::Cursor;
+
+    use docspec_core::{Event, TextStyleKind};
+    use docspec_docx_reader::DocxReader;
+    use docspec_test_utils::builders::{start_document, start_paragraph, text};
+
+    use crate::fixture;
+
+    fn root_rels() -> &'static str {
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"#
+    }
+
+    fn body_to_events(body_xml: &str) -> Vec<Event> {
+        let document_xml = format!(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>{body_xml}</w:body></w:document>"#
+        );
+        let bytes = fixture::synth_docx(root_rels(), &document_xml);
+        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+        docspec_test_utils::collect_events(&mut reader)
+    }
+
+    fn start_link(href: &str, title: Option<&str>) -> Event {
+        Event::StartLink {
+            href: href.to_string(),
+            id: None,
+            title: title.map(str::to_string),
+        }
+    }
+
+    fn run_field_begin() -> &'static str {
+        r#"<w:r><w:fldChar w:fldCharType="begin"/></w:r>"#
+    }
+
+    fn run_field_separate() -> &'static str {
+        r#"<w:r><w:fldChar w:fldCharType="separate"/></w:r>"#
+    }
+
+    fn run_field_end() -> &'static str {
+        r#"<w:r><w:fldChar w:fldCharType="end"/></w:r>"#
+    }
+
+    fn run_instr_text(instr: &str) -> String {
+        format!(r#"<w:r><w:instrText xml:space="preserve">{instr}</w:instrText></w:r>"#)
+    }
+
+    fn run_text(content: &str) -> String {
+        format!(r#"<w:r><w:t xml:space="preserve">{content}</w:t></w:r>"#)
+    }
+
+    #[test]
+    fn hyperlink_field_with_url_wraps_display_text_in_start_link_end_link() {
+        let body = format!(
+            "<w:p>{begin}{instr}{sep}{display}{end}</w:p>",
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK "https://example.com" "#),
+            sep = run_field_separate(),
+            display = run_text("click here"),
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://example.com", None),
+                text("click here"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_field_with_tooltip_populates_start_link_title() {
+        let body = format!(
+            "<w:p>{begin}{instr}{sep}{display}{end}</w:p>",
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK "https://example.com" \o "Click for details" "#),
+            sep = run_field_separate(),
+            display = run_text("here"),
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://example.com", Some("Click for details")),
+                text("here"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_field_with_anchor_only_emits_fragment_href() {
+        let body = format!(
+            "<w:p>{begin}{instr}{sep}{display}{end}</w:p>",
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK \l "section_1" "#),
+            sep = run_field_separate(),
+            display = run_text("see above"),
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("#section_1", None),
+                text("see above"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_field_with_url_and_anchor_uses_url_drops_anchor() {
+        let body = format!(
+            "<w:p>{begin}{instr}{sep}{display}{end}</w:p>",
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK "https://example.com" \l "ignored" "#),
+            sep = run_field_separate(),
+            display = run_text("x"),
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://example.com", None),
+                text("x"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn instr_text_split_across_multiple_runs_is_concatenated() {
+        let body = format!(
+            "<w:p>{begin}{instr1}{instr2}{instr3}{sep}{display}{end}</w:p>",
+            begin = run_field_begin(),
+            instr1 = run_instr_text(r#" HYPERLINK "https://exa"#),
+            instr2 = run_instr_text("mple.com/pa"),
+            instr3 = run_instr_text(r#"ge" "#),
+            sep = run_field_separate(),
+            display = run_text("link"),
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://example.com/page", None),
+                text("link"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn field_with_no_separate_emits_no_link_and_no_display_events() {
+        let body = format!(
+            "<w:p>{prefix}{begin}{instr}{end}{suffix}</w:p>",
+            prefix = run_text("before "),
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK "https://example.com" "#),
+            end = run_field_end(),
+            suffix = run_text(" after"),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("before "),
+                text(" after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn non_hyperlink_field_passes_display_text_through_unwrapped() {
+        let body = format!(
+            "<w:p>{begin}{instr}{sep}{display}{end}</w:p>",
+            begin = run_field_begin(),
+            instr = run_instr_text(r" PAGE \* MERGEFORMAT "),
+            sep = run_field_separate(),
+            display = run_text("42"),
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("42"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn ref_field_passes_display_text_through_unwrapped() {
+        let body = format!(
+            "<w:p>{begin}{instr}{sep}{display}{end}</w:p>",
+            begin = run_field_begin(),
+            instr = run_instr_text(r" REF _Ref71265628 \h "),
+            sep = run_field_separate(),
+            display = run_text("Table 1"),
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("Table 1"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn multiple_hyperlink_fields_in_one_paragraph_each_wrap_independently() {
+        let first = format!(
+            "{begin}{instr}{sep}{display}{end}",
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK "https://a.example" "#),
+            sep = run_field_separate(),
+            display = run_text("A"),
+            end = run_field_end(),
+        );
+        let second = format!(
+            "{begin}{instr}{sep}{display}{end}",
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK "https://b.example" "#),
+            sep = run_field_separate(),
+            display = run_text("B"),
+            end = run_field_end(),
+        );
+        let body = format!(
+            "<w:p>{first}{between}{second}</w:p>",
+            between = run_text(" / "),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://a.example", None),
+                text("A"),
+                Event::EndLink,
+                text(" / "),
+                start_link("https://b.example", None),
+                text("B"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_field_wraps_styled_display_text_with_style_inside_link() {
+        let body = format!(
+            "<w:p>{begin}{instr}{sep}{display}{end}</w:p>",
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK "https://example.com" "#),
+            sep = run_field_separate(),
+            display = "<w:r><w:rPr><w:b/></w:rPr><w:t>bold link</w:t></w:r>",
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://example.com", None),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                text("bold link"),
+                Event::EndTextStyle,
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_field_inside_table_cell_wraps_cell_text() {
+        let body = format!(
+            "<w:tbl><w:tr><w:tc><w:p>{begin}{instr}{sep}{display}{end}</w:p></w:tc></w:tr></w:tbl>",
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK "https://example.com" "#),
+            sep = run_field_separate(),
+            display = run_text("cell link"),
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                Event::StartTable { id: None },
+                Event::StartTableRow { id: None },
+                Event::StartTableCell {
+                    colspan: None,
+                    id: None,
+                    rowspan: None,
+                },
+                start_paragraph(),
+                start_link("https://example.com", None),
+                text("cell link"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn unclosed_hyperlink_field_at_paragraph_end_still_emits_wrapped_content() {
+        let body = format!(
+            "<w:p>{begin}{instr}{sep}{display}</w:p>",
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK "https://example.com" "#),
+            sep = run_field_separate(),
+            display = run_text("dangling"),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://example.com", None),
+                text("dangling"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn nested_hyperlink_field_only_emits_outer_link_wrapper() {
+        let inner = format!(
+            "{begin}{instr}{sep}{display}{end}",
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK "https://inner.example" "#),
+            sep = run_field_separate(),
+            display = run_text("inner"),
+            end = run_field_end(),
+        );
+        let body = format!(
+            "<w:p>{outer_begin}{outer_instr}{outer_sep}{prefix}{inner}{suffix}{outer_end}</w:p>",
+            outer_begin = run_field_begin(),
+            outer_instr = run_instr_text(r#" HYPERLINK "https://outer.example" "#),
+            outer_sep = run_field_separate(),
+            prefix = run_text("before "),
+            suffix = run_text(" after"),
+            outer_end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://outer.example", None),
+                text("before "),
+                text("inner"),
+                text(" after"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_field_inside_non_hyperlink_outer_field_still_wraps_inner() {
+        let inner = format!(
+            "{begin}{instr}{sep}{display}{end}",
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK "https://example.com" "#),
+            sep = run_field_separate(),
+            display = run_text("inner"),
+            end = run_field_end(),
+        );
+        let body = format!(
+            "<w:p>{outer_begin}{outer_instr}{outer_sep}{inner}{outer_end}</w:p>",
+            outer_begin = run_field_begin(),
+            outer_instr = run_instr_text(r" PAGE  \* MERGEFORMAT "),
+            outer_sep = run_field_separate(),
+            outer_end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://example.com", None),
+                text("inner"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn instr_text_decodes_xml_entities_in_url() {
+        let body = format!(
+            "<w:p>{begin}{instr}{sep}{display}{end}</w:p>",
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK "https://example.com/?a=1&amp;b=2" "#),
+            sep = run_field_separate(),
+            display = run_text("link"),
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://example.com/?a=1&b=2", None),
+                text("link"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn complete_field_with_no_display_runs_emits_nothing_around_neighbors() {
+        let body = format!(
+            "<w:p>{before}{begin}{instr}{sep}{end}{after}</w:p>",
+            before = run_text("A "),
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK "https://example.com" "#),
+            sep = run_field_separate(),
+            end = run_field_end(),
+            after = run_text(" Z"),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("A "),
+                text(" Z"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_field_with_target_frame_switch_drops_frame_argument() {
+        let body = format!(
+            "<w:p>{begin}{instr}{sep}{display}{end}</w:p>",
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK "https://example.com" \t "_blank" "#),
+            sep = run_field_separate(),
+            display = run_text("link"),
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://example.com", None),
+                text("link"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_field_with_flag_only_switches_keeps_url_and_emits_link() {
+        let body = format!(
+            "<w:p>{begin}{instr}{sep}{display}{end}</w:p>",
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" HYPERLINK "https://example.com" \m \n \x "#),
+            sep = run_field_separate(),
+            display = run_text("link"),
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://example.com", None),
+                text("link"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_field_with_extra_positional_after_url_ignores_extra() {
+        let body = format!(
+            "<w:p>{begin}{instr}{sep}{display}{end}</w:p>",
+            begin = run_field_begin(),
+            instr = run_instr_text(
+                r#" HYPERLINK "https://primary.example" "https://secondary.example" "#
+            ),
+            sep = run_field_separate(),
+            display = run_text("link"),
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://primary.example", None),
+                text("link"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn empty_instruction_text_passes_display_through_unwrapped() {
+        let body = format!(
+            "<w:p>{begin}{instr}{sep}{display}{end}</w:p>",
+            begin = run_field_begin(),
+            instr = run_instr_text("   "),
+            sep = run_field_separate(),
+            display = run_text("plain"),
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("plain"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_field_with_lowercase_command_name_still_emits_link() {
+        let body = format!(
+            "<w:p>{begin}{instr}{sep}{display}{end}</w:p>",
+            begin = run_field_begin(),
+            instr = run_instr_text(r#" hyperlink "https://example.com" "#),
+            sep = run_field_separate(),
+            display = run_text("link"),
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://example.com", None),
+                text("link"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn fld_char_with_unknown_type_attribute_is_ignored() {
+        let body = format!(
+            "<w:p>{stray}{display}</w:p>",
+            stray = r#"<w:r><w:fldChar w:fldCharType="bogus"/></w:r>"#,
+            display = run_text("plain"),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("plain"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn fld_char_without_type_attribute_is_ignored() {
+        let body = format!(
+            "<w:p>{stray}{display}</w:p>",
+            stray = "<w:r><w:fldChar/></w:r>",
+            display = run_text("plain"),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("plain"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn instr_text_outside_of_field_context_is_dropped() {
+        let body = format!(
+            "<w:p>{before}{stray_instr}{after}</w:p>",
+            before = run_text("A "),
+            stray_instr = run_instr_text(r#" HYPERLINK "https://example.com" "#),
+            after = run_text(" Z"),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("A "),
+                text(" Z"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn fld_char_end_without_matching_begin_is_ignored() {
+        let body = format!(
+            "<w:p>{before}{stray_end}{after}</w:p>",
+            before = run_text("A "),
+            stray_end = run_field_end(),
+            after = run_text(" Z"),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("A "),
+                text(" Z"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn fld_char_separate_without_matching_begin_is_ignored() {
+        let body = format!(
+            "<w:p>{before}{stray_sep}{after}</w:p>",
+            before = run_text("A "),
+            stray_sep = run_field_separate(),
+            after = run_text(" Z"),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("A "),
+                text(" Z"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn instr_text_after_separate_in_open_field_is_silently_dropped() {
+        let body = format!(
+            "<w:p>{begin}{instr1}{sep}{display}{stray_instr}{end}</w:p>",
+            begin = run_field_begin(),
+            instr1 = run_instr_text(r#" HYPERLINK "https://example.com" "#),
+            sep = run_field_separate(),
+            display = run_text("visible"),
+            stray_instr = run_instr_text(" DATE "),
+            end = run_field_end(),
+        );
+        assert_eq!(
+            body_to_events(&body),
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://example.com", None),
+                text("visible"),
+                Event::EndLink,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]

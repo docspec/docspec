@@ -26,6 +26,7 @@ constant memory, whatever the file's size. Streaming, like the rest of DocSpec. 
 - Empty `<w:rPr/>` and `<w:pPr/>` are treated as no properties (default style / alignment None)
 - A `<w:rPr>` or `<w:pPr>` that appears after content in the same parent is silently ignored (per the OOXML spec, both must be the first child element)
 - Hyperlinks (`<w:hyperlink>`): resolved via `word/_rels/document.xml.rels` and emitted as `StartLink`/`EndLink` events around inline content. Supports external URL targets (both Strict and Transitional OOXML relationship Type URIs), anchor-only links (`w:anchor` without `r:id` emits `#fragment`), and tooltips (`w:tooltip` → `StartLink.title`, XML-decoded). When the relationship cannot be resolved, the link wrapper is dropped and content passes through as plain runs.
+- Field-code hyperlinks (`<w:fldChar>` + `<w:instrText>HYPERLINK ...`, OOXML §17.16.5.25): the legacy complex-field form emitted by some toolchains (e.g., Pandoc, older Word). The instruction is parsed for the positional URL and the `\l "anchor"`, `\o "tooltip"`, `\t "frame"`, `\m`, and `\n` switches. The display content (events between `<w:fldChar w:fldCharType="separate"/>` and `<w:fldChar w:fldCharType="end"/>`) is wrapped in `StartLink`/`EndLink` events using the same href resolution as `<w:hyperlink>` — URL alone when present, `#anchor` when only an anchor is given. Tooltips populate `StartLink.title`. Non-`HYPERLINK` field instructions (`PAGE`, `REF`, `TOC`, `ADDIN ...`, citations, etc.) pass their display content through unwrapped. Nested fields are supported, but if any outer field would emit a link wrapper, inner-field link wrappers are suppressed to keep the `StartLink`/`EndLink` pair non-nested (per Event well-formedness rule 4). A field that ends without a matching `separate` or before the enclosing paragraph closes emits its display content unwrapped.
 - Structured Document Tags (`<w:sdt>`) — the content of an SDT is emitted normally. The property containers `<w:sdtPr>` and `<w:sdtEndPr>` are dropped.
 - Tracked insertions and moves (`<w:ins>`, `<w:moveTo>`) — the inserted/moved-in content is emitted (accept-changes semantics).
 - DrawingML images (`<w:drawing>`) — emitted as `Event::Image`. See [Image Support](#image-support) below.
@@ -71,7 +72,6 @@ The XML elements listed below are the reader's denylist — their entire subtree
 - Document metadata
 - Tracked deletions and moves-from (`<w:del>`, `<w:moveFrom>`) — silently dropped (accept-changes semantics). Their text content uses `<w:delText>` which is not part of the reader's text-matching set.
 - Structured document tag properties (`<w:sdtPr>`, `<w:sdtEndPr>`) — metadata containers; subtree dropped.
-- Field-code hyperlinks (`<w:fldChar>` + `<w:instrText>HYPERLINK ...`): legacy form not currently supported; only the modern `<w:hyperlink>` element is recognized.
 
 ### Lists (V1 cuts)
 
