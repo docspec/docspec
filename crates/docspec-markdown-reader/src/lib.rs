@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! Markdown to `DocSpec` event stream reader.
 //!
 //! This crate provides a [`MarkdownReader`] that implements [`EventSource`] to convert
