@@ -38,9 +38,15 @@ pub enum AnyReader {
 }
 
 impl AnyReader {
-    /// Construct a reader by opening a file at `path`. The file is opened with
-    /// `File::open` and passed to [`from_reader`](Self::from_reader). Works for
-    /// all formats including DOCX.
+    /// Construct a reader by opening a file at `path`.
+    ///
+    /// DOCX dispatches to [`DocxReader::from_path`], which streams
+    /// `word/document.xml` in constant memory regardless of document size. Text
+    /// formats open the file and delegate to [`from_reader`](Self::from_reader).
+    ///
+    /// Prefer this over [`from_reader`](Self::from_reader) when the input is a
+    /// file on disk: `from_reader` must buffer the whole DOCX main part, because
+    /// an arbitrary `Read + Seek` source cannot be re-opened for streaming.
     ///
     /// # Errors
     ///
@@ -63,9 +69,28 @@ impl AnyReader {
     where
         P: AsRef<std::path::Path>,
     {
-        let file = std::fs::File::open(path.as_ref())
-            .map_err(|source| docspec_core::Error::Io { source })?;
-        Self::from_reader(format, file)
+        #[cfg(not(any(feature = "markdown", feature = "html", feature = "docx")))]
+        {
+            let _ = path;
+            match format {}
+        }
+        #[cfg(any(feature = "markdown", feature = "html", feature = "docx"))]
+        match format {
+            #[cfg(feature = "docx")]
+            InputFormat::Docx => Ok(Self::Docx(DocxReader::from_path(path.as_ref())?)),
+            #[cfg(feature = "html")]
+            InputFormat::Html => {
+                let file = std::fs::File::open(path.as_ref())
+                    .map_err(|source| docspec_core::Error::Io { source })?;
+                Self::from_reader(format, file)
+            }
+            #[cfg(feature = "markdown")]
+            InputFormat::Markdown => {
+                let file = std::fs::File::open(path.as_ref())
+                    .map_err(|source| docspec_core::Error::Io { source })?;
+                Self::from_reader(format, file)
+            }
+        }
     }
 
     /// Construct a reader for the given format from any `Read + Seek` source.
