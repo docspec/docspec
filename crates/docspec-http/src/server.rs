@@ -105,7 +105,6 @@ pub async fn serve(config: ServerConfig) -> Result<(), ServerError> {
 }
 
 /// Spawns the Prometheus upkeep task.
-#[allow(clippy::single_call_fn)]
 #[inline]
 fn spawn_upkeep(
     handle: metrics_exporter_prometheus::PrometheusHandle,
@@ -121,7 +120,6 @@ fn spawn_upkeep(
 }
 
 /// Aborts the upkeep task and awaits its completion.
-#[allow(clippy::single_call_fn)]
 #[inline]
 async fn teardown_upkeep(task: tokio::task::JoinHandle<()>) {
     task.abort();
@@ -140,7 +138,6 @@ async fn teardown_upkeep(task: tokio::task::JoinHandle<()>) {
 /// factory returns `None`, so that a client left in the slot by a previous
 /// run in the same process cannot linger into this run.
 #[cfg(feature = "posthog")]
-#[allow(clippy::single_call_fn)]
 #[inline]
 async fn init_posthog() {
     let client = crate::telemetry::init_posthog_client_from_env().await;
@@ -148,9 +145,6 @@ async fn init_posthog() {
 }
 
 /// Resolves when SIGINT (Ctrl+C) or SIGTERM is received.
-// Reason: graceful shutdown is intentionally factored out to match Axum's
-// documented server lifecycle pattern and keep `serve` focused on binding.
-#[allow(clippy::single_call_fn)]
 #[inline]
 async fn shutdown_signal() {
     use core::future;

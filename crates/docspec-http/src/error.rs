@@ -1,9 +1,5 @@
 //! Error types for the HTTP server.
 
-// Reason: docspec-http is an HTTP server unconditionally requiring std;
-// alloc is not in the extern prelude for std crates without `extern crate alloc`.
-#![allow(clippy::std_instead_of_alloc)]
-
 use std::borrow::Cow;
 
 use axum::{

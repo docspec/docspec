@@ -32,9 +32,6 @@ pub fn init() {
 ///
 /// Returns [`Err`] if a global subscriber has already been installed.
 #[inline]
-#[allow(clippy::std_instead_of_core)]
-// Reason: `std::error::Error` is not available in `core`; the `tracing_subscriber`
-// crate's `try_init` error type requires `std::error::Error + Send + Sync`.
 pub fn try_init() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let fmt = tracing_subscriber::fmt::layer()
         .with_writer(std::io::stderr)
