@@ -4,7 +4,12 @@
 //! of `document.xml` size. They are marked `#[ignore]` because they are slow and
 //! should not run in normal CI.
 //!
-//! Run with: `cargo test -p docspec-docx-reader --test memory -- --ignored --nocapture`.
+//! The tests spawn a prebuilt release example, so build it first:
+//!
+//! ```text
+//! cargo build --release --example memtest_child -p docspec-docx-reader
+//! cargo test -p docspec-docx-reader --test memory -- --ignored --nocapture
+//! ```
 #![allow(
     clippy::arithmetic_side_effects,
     clippy::expect_used,
@@ -56,11 +61,22 @@ mod linux_only {
         ])
     }
 
+    /// Cargo's target directory, always absolute.
+    ///
+    /// `CARGO_TARGET_TMPDIR` is set at compile time for integration tests to
+    /// `<target-dir>/tmp`, already resolved by Cargo. Reading `CARGO_TARGET_DIR`
+    /// at runtime instead would break on relative values: Cargo resolves those
+    /// against its invocation directory, while the test process runs from the
+    /// package root.
+    fn target_dir() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
+            .parent()
+            .expect("CARGO_TARGET_TMPDIR is <target-dir>/tmp and always has a parent")
+            .to_path_buf()
+    }
+
     fn child_bin_path() -> std::path::PathBuf {
-        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
-            .expect("CARGO_MANIFEST_DIR must be set (run via cargo test)");
-        let workspace_root = std::path::Path::new(&manifest_dir).join("../..");
-        workspace_root.join("target/release/examples/memtest_child")
+        target_dir().join("release/examples/memtest_child")
     }
 
     fn run_child_and_get_peak_rss(docx_path: &std::path::Path) -> u64 {

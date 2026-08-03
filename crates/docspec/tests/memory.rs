@@ -50,17 +50,26 @@ mod linux_only {
         docspec_test_utils::synth_docx(rels_xml, &doc_xml)
     }
 
+    /// Cargo's target directory, always absolute.
+    ///
+    /// `CARGO_TARGET_TMPDIR` is set at compile time for integration tests to
+    /// `<target-dir>/tmp`, already resolved by Cargo. Reading `CARGO_TARGET_DIR`
+    /// at runtime instead would break on relative values: Cargo resolves those
+    /// against its invocation directory, while the test process runs from the
+    /// package root.
     fn target_dir() -> std::path::PathBuf {
-        if let Ok(dir) = std::env::var("CARGO_TARGET_DIR") {
-            return std::path::PathBuf::from(dir);
-        }
-        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
-            .expect("CARGO_MANIFEST_DIR must be set (run via cargo test)");
-        std::path::Path::new(&manifest_dir).join("../../target")
+        std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
+            .parent()
+            .expect("CARGO_TARGET_TMPDIR is <target-dir>/tmp and always has a parent")
+            .to_path_buf()
+    }
+
+    fn child_bin_path() -> std::path::PathBuf {
+        target_dir().join("release/examples/memtest_facade_child")
     }
 
     fn run_child_and_get_peak_rss(docx_path: &std::path::Path) -> u64 {
-        let bin = target_dir().join("release/examples/memtest_facade_child");
+        let bin = child_bin_path();
 
         assert!(
             bin.exists(),
