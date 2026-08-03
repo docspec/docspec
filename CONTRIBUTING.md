@@ -58,7 +58,7 @@ Every recipe is a thin wrapper over the Cargo command shown beside it, so raw `c
 The binary is `docspec`. Run it through Cargo without installing anything:
 
 ```bash
-cargo run -p docspec-cli -- convert report.docx report.md
+cargo run -p docspec-cli -- convert report.docx --output report.md
 cargo run -p docspec-cli -- convert --from markdown --to blocknote input.md
 cargo run -p docspec-cli -- --help
 ```
@@ -277,7 +277,7 @@ Better: `fix(docx): prevent panic on documents with missing content types`
 ## Questions and Support
 
 - Open an issue for bug reports or feature requests — see [Bug Triage & Reporting](TRIAGE.md) for what makes a report actionable and how we triage
-- Use discussions for questions about usage or architecture
+- Open an issue for usage or architecture questions too — GitHub Discussions is not currently enabled for this repository
 - Read existing documentation before asking
 
 ## Attribution

@@ -1,6 +1,6 @@
 # docspec-cli
 
-**Convert documents from the command line.**
+**Command-line interface for DocSpec document conversion**
 
 One binary, every format DocSpec speaks. `docspec-cli` wraps the full DocSpec conversion pipeline behind two subcommands: `convert` turns a file (or stdin) from one format into another, and `http` starts the HTTP API server. Streaming, like the rest of DocSpec. (See the [Manifesto](https://github.com/docspec/docspec/blob/main/MANIFESTO.md) for why.)
 
@@ -21,8 +21,12 @@ The resulting binary supports only `docspec convert`; running `docspec http` wil
 ## Convert a document
 
 ```bash
-docspec <COMMAND> [OPTIONS]
+docspec [OPTIONS] <COMMAND>
 ```
+
+Top-level options:
+- `-h, --help` — Print help
+- `-V, --version` — Print version
 
 Commands:
 - `convert` — Convert documents between formats
@@ -45,7 +49,6 @@ docspec convert [OPTIONS] [INPUT]
 - `-t, --to <FORMAT>` — Output format (auto-detected from extension if omitted). Valid values: `blocknote`, `html`, `markdown`, `oxa`, `pandoc-native`
 - `--color <WHEN>` — When to use colors: `auto`, `always`, `never` (default: `auto`)
 - `-h, --help` — Print help
-- `-V, --version` — Print version
 
 ### `http` subcommand
 
@@ -73,12 +76,14 @@ see the [`docspec-http` README](https://docs.rs/docspec-http) for the full list.
 - `html` — HTML input (see note below)
 - `docx` — DOCX input including paragraphs, tables, ordered/unordered lists, hyperlinks, embedded images, line breaks, tabs, and run styles (bold, italic, underline, strikethrough, sub/superscript, color, highlight). Embedded images stream as base64 data URLs in BlockNote output. See [`docspec-docx-reader`](https://docs.rs/docspec-docx-reader) for the authoritative list of supported and out-of-scope OOXML elements.
 
-> **Note:** HTML input is paragraph-only — the HTML reader currently parses `<p>` elements only,
-> and other HTML elements are silently dropped. DOCX input is considerably richer (see above);
-> known DOCX elements outside scope (headings via `<w:pStyle>`, vertical cell merges, VML images,
-> comments, footnotes, headers/footers, document metadata) are silently dropped per the
-> [DOCX reader denylist](https://docs.rs/docspec-docx-reader). For HTML, use Markdown input or
-> DOCX input with BlockNote JSON output for fuller feature coverage.
+> **HTML note:** HTML input is paragraph-only. The reader recognizes `<p>` elements,
+> preserves text inside inline elements within those paragraphs, and silently drops all
+> other structure.
+>
+> **DOCX note:** DOCX input supports paragraphs, style-derived headings, block quotes,
+> preformatted blocks, tables, lists, hyperlinks, DrawingML and VML images, and run styles.
+> Known losses include vertical cell merges, comments, footnotes, headers and footers,
+> document metadata, tracked deletions, and field-code hyperlinks.
 
 ## Examples
 
@@ -135,6 +140,12 @@ extension is ambiguous, so `--to oxa` must be explicit. HTML output is selected 
 or auto-detected from `.html` and `.htm` output paths. Pandoc native output is selected by
 `--to pandoc-native` or auto-detected from `.native` output paths. Markdown output is selected
 by `--to markdown` or auto-detected from `.md` output paths.
+
+## Exit status
+
+- `0` — command completed successfully
+- `1` — conversion, I/O, or server runtime failure
+- `2` — command-line usage or argument parsing error
 
 ## Related
 

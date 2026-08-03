@@ -1,6 +1,6 @@
 # docspec-json
 
-**A JSON emitter that can't emit invalid JSON.**
+**JSON writing primitives for docspec writers**
 
 `docspec-json` is the toolkit the JSON-shaped DocSpec writers are built on. Its
 `JsonEmitter` drives a pluggable `JsonBackend` through valid JSON shapes only — write a
@@ -36,7 +36,7 @@ emitter.object(|doc| {
 let json: Vec<u8> = emitter.finish()?;
 
 assert_eq!(json, br#"{"type":"heading","level":1,"content":["Hello"]}"#);
-# Ok::<(), docspec_core::Error>(())
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 Prefer to open and close frames yourself? The streaming form — `open_object`,

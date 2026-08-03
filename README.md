@@ -37,10 +37,10 @@ Install with Cargo:
 cargo install docspec-cli
 ```
 
-Convert a document — the formats are inferred from the file extensions:
+Convert a document — the formats are inferred from the input and output file extensions:
 
 ```sh
-docspec convert report.docx report.md
+docspec convert report.docx --output report.md
 ```
 
 Or pipe through stdin and name the formats explicitly:
@@ -158,7 +158,7 @@ DocSpec is built in the open, and contributions are welcome — a new reader or 
 A few good entry points:
 
 - **Found a bug?** [Bug Triage & Reporting](TRIAGE.md) shows what makes a report we can fix today. Security issues go [privately](SECURITY.md) — never a public issue.
-- **Have an idea, or a design to talk through?** Open a [Discussion](https://github.com/orgs/docspec/discussions).
+- **Have an idea, or a design to talk through?** Open an [issue](https://github.com/docspec/docspec/issues/new) and tag it as a proposal.
 - **Ready to write code?** [Building and Running Locally](CONTRIBUTING.md#building-and-running-locally) gets you set up in a few commands.
 
 Every contribution is attributed in the git history, and we treat review as collaboration, not gatekeeping.

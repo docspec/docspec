@@ -1,11 +1,19 @@
 # docspec-docx-reader
 
-**DOCX in, a stream of events out.**
+**DOCX to DocSpec event stream reader**
 
 Word documents, unwrapped as they flow. `docspec-docx-reader` parses a `.docx` archive with
 `quick-xml` and `zip` and emits DocSpec events one at a time — and from `from_path`, in
 constant memory, whatever the file's size. Streaming, like the rest of DocSpec. (See the
 [Manifesto](https://github.com/docspec/docspec/blob/main/MANIFESTO.md) for why.)
+
+## Add it
+
+```toml
+[dependencies]
+docspec-docx-reader = "1"
+docspec-core = "1"
+```
 
 ## What it handles today
 
@@ -56,7 +64,7 @@ The XML elements listed below are the reader's denylist — their entire subtree
 
 - Run formatting not listed above: `<w:sz>`, `<w:szCs>`, `<w:caps>`, `<w:smallCaps>`, `<w:position>`, `<w:spacing>`, `<w:kern>`, `<w:lang>`, `<w:noProof>`
 - `<w:rFonts>` (general font tracking is not exposed as events, *except for symbol font resolution (Wingdings, Wingdings 2, Wingdings 3, Webdings, Symbol) which is used internally to normalize codepoints to Unicode*)
-- `themeColor` / `themeTint` / `themeShade` attributes on `<w:color>` and `<w:shd>` — silently dropped. The reader does not parse `styles.xml` or `theme1.xml`, so theme-referenced colors cannot be resolved. Future work.
+- `themeColor` / `themeTint` / `themeShade` attributes on `<w:color>` and `<w:shd>` are silently dropped. The reader parses `styles.xml` for style classification, but does not load or resolve theme colors from `theme1.xml`.
 - Revision tracking (`<w:rPrChange>`, `<w:pPrChange>`)
 - Advanced paragraph layout beyond alignment: `<w:ind>`, `<w:tabs>`, `<w:framePr>`, `<w:sectPr>`
 - `<w:rPr>` nested inside `<w:pPr>` (paragraph mark / pilcrow run properties)

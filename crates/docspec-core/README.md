@@ -1,6 +1,6 @@
 # docspec-core
 
-**The events every reader and writer agree on.**
+**Core event types and traits for DocSpec streaming document conversion**
 
 `docspec-core` is the foundation of DocSpec: the `Event` type that documents stream as,
 the `EventSource` and `EventSink` traits that decouple readers from writers, and the
