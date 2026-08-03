@@ -20,6 +20,8 @@
 
 use std::io::Cursor;
 
+use serde_json::json;
+
 use docspec::writers::BlockNoteWriter;
 use docspec::{AnyReader, EventSink as _, EventSource as _, InputFormat, StackTrackingSink};
 use docspec_test_utils::synth_docx;
@@ -67,33 +69,24 @@ fn docx_color_highlight_shading_round_trip_to_blocknote() {
         .expect("first block must have a content array");
 
     // Run 1: D9730D (RGB 217,115,13) → text palette "orange" → textColor key
-    let expected_run1: serde_json::Value = serde_json::from_str(
-        r#"{"type":"text","text":"orange-text","styles":{"textColor":"orange"}}"#,
-    )
-    .unwrap();
     assert_eq!(
-        content[0], expected_run1,
+        content[0],
+        json!({"type": "text", "text": "orange-text", "styles": {"textColor": "orange"}}),
         "run 1: D9730D text color must snap to palette \"orange\""
     );
 
     // Run 2: yellow highlight (255,255,0) → background palette "orange" (counterintuitive!)
     // Squared-Euclidean distance: bg-orange=47654 < bg-yellow=48121
-    let expected_run2: serde_json::Value = serde_json::from_str(
-        r#"{"type":"text","text":"highlighted","styles":{"backgroundColor":"orange"}}"#,
-    )
-    .unwrap();
     assert_eq!(
-        content[1], expected_run2,
+        content[1],
+        json!({"type": "text", "text": "highlighted", "styles": {"backgroundColor": "orange"}}),
         "run 2: yellow highlight (255,255,0) must snap to background palette \"orange\", not \"yellow\""
     );
 
     // Run 3: black text filtered (no textColor) + shading DDEDEA (221,237,234) → bg palette "green"
-    let expected_run3: serde_json::Value = serde_json::from_str(
-        r#"{"type":"text","text":"green-bg","styles":{"backgroundColor":"green"}}"#,
-    )
-    .unwrap();
     assert_eq!(
-        content[2], expected_run3,
+        content[2],
+        json!({"type": "text", "text": "green-bg", "styles": {"backgroundColor": "green"}}),
         "run 3: DDEDEA shading must snap to background palette \"green\", black text must be filtered (no textColor key)"
     );
 }

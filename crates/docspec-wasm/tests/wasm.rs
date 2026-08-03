@@ -2,15 +2,29 @@
 
 #[cfg(test)]
 mod tests {
+    use docspec_test_utils::assert_json_eq;
     use docspec_wasm::convert_markdown_to_blocknote;
+    use serde_json::json;
 
     #[test]
     fn heading_and_paragraph() {
         let result = convert_markdown_to_blocknote("# Hello\n\nWorld");
         assert!(result.is_ok(), "conversion failed: {result:?}");
-        assert_eq!(
-            result.unwrap_or_default(),
-            r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"World","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &result.unwrap_or_default(),
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 1},
+                    "content": [{"type": "text", "text": "Hello", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "World", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -18,16 +32,22 @@ mod tests {
     fn empty_input() {
         let result = convert_markdown_to_blocknote("");
         assert!(result.is_ok(), "empty input should succeed: {result:?}");
-        assert_eq!(result.unwrap_or_default(), "[]");
+        assert_json_eq(&result.unwrap_or_default(), json!([]));
     }
 
     #[test]
     fn plain_paragraph() {
         let result = convert_markdown_to_blocknote("Just a paragraph");
         assert!(result.is_ok(), "conversion failed: {result:?}");
-        assert_eq!(
-            result.unwrap_or_default(),
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"Just a paragraph","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &result.unwrap_or_default(),
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Just a paragraph", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -35,9 +55,19 @@ mod tests {
     fn bold_and_italic_formatting() {
         let result = convert_markdown_to_blocknote("**bold** and *italic*");
         assert!(result.is_ok(), "conversion failed: {result:?}");
-        assert_eq!(
-            result.unwrap_or_default(),
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"bold","styles":{"bold":true}},{"type":"text","text":" and ","styles":{}},{"type":"text","text":"italic","styles":{"italic":true}}],"children":[]}]"#
+        assert_json_eq(
+            &result.unwrap_or_default(),
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "bold", "styles": {"bold": true}},
+                        {"type": "text", "text": " and ", "styles": {}},
+                        {"type": "text", "text": "italic", "styles": {"italic": true}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 }

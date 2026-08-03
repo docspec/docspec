@@ -1,10 +1,14 @@
 //! Integration tests for `BlockNoteWriter`.
 
+// Reason: `too_many_lines` fires on tests whose expected BlockNote document is
+// written out as a readable `json!` literal; the length is expectation data,
+// not logic.
 #![allow(
     clippy::expect_used,
     clippy::redundant_test_prefix,
     clippy::items_after_statements,
-    clippy::indexing_slicing
+    clippy::indexing_slicing,
+    clippy::too_many_lines
 )]
 
 #[cfg(test)]
@@ -18,7 +22,8 @@ mod tests {
         TextStyleKind,
     };
     use docspec_test_utils::builders::text;
-    use docspec_test_utils::FailingWriter;
+    use docspec_test_utils::{assert_json_eq, FailingWriter};
+    use serde_json::json;
 
     #[derive(Debug)]
     struct MockAssetHandle {
@@ -170,7 +175,7 @@ mod tests {
     #[test]
     fn empty_document() {
         let json = run_events(&[start_document(), Event::EndDocument]);
-        assert_eq!(json, "[]");
+        assert_json_eq(&json, json!([]));
     }
 
     #[test]
@@ -182,9 +187,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Hello", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -197,9 +208,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Hello", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -212,9 +229,16 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","props":{"textAlignment":"center"},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "props": {"textAlignment": "center"},
+                    "content": [{"type": "text", "text": "Hello", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -227,9 +251,16 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","props":{"textAlignment":"right"},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "props": {"textAlignment": "right"},
+                    "content": [{"type": "text", "text": "Hello", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -242,9 +273,16 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","props":{"textAlignment":"justify"},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "props": {"textAlignment": "justify"},
+                    "content": [{"type": "text", "text": "Hello", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -259,9 +297,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"Bold","styles":{"bold":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Bold", "styles": {"bold": true}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -276,9 +320,19 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"Line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Line two","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "Line one", "styles": {}},
+                        {"type": "text", "text": "\n", "styles": {}},
+                        {"type": "text", "text": "Line two", "styles": {}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -293,9 +347,20 @@ mod tests {
             Event::EndHeading,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"Title one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Title two","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 2},
+                    "content": [
+                        {"type": "text", "text": "Title one", "styles": {}},
+                        {"type": "text", "text": "\n", "styles": {}},
+                        {"type": "text", "text": "Title two", "styles": {}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -314,9 +379,32 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Cell line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Cell line two","styles":{}}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [
+                                            {"type": "text", "text": "Cell line one", "styles": {}},
+                                            {"type": "text", "text": "\n", "styles": {}},
+                                            {"type": "text", "text": "Cell line two", "styles": {}}
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -335,9 +423,19 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Bullet line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Bullet line two","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [
+                        {"type": "text", "text": "Bullet line one", "styles": {}},
+                        {"type": "text", "text": "\n", "styles": {}},
+                        {"type": "text", "text": "Bullet line two", "styles": {}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -358,9 +456,25 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"Click line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"click line two","styles":{}}]}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "link",
+                            "href": "https://example.com",
+                            "content": [
+                                {"type": "text", "text": "Click line one", "styles": {}},
+                                {"type": "text", "text": "\n", "styles": {}},
+                                {"type": "text", "text": "click line two", "styles": {}}
+                            ]
+                        }
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -377,9 +491,19 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"Quote line one","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"Quote line two","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [
+                        {"type": "text", "text": "Quote line one", "styles": {}},
+                        {"type": "text", "text": "\n", "styles": {}},
+                        {"type": "text", "text": "Quote line two", "styles": {}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -398,9 +522,19 @@ mod tests {
         ]);
         // Three text nodes: bold "Bold line one", bold "\n", bold "Bold line two" because
         // SoftBreak reads the currently open style stack just like any other text event.
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"Bold line one","styles":{"bold":true}},{"type":"text","text":"\n","styles":{"bold":true}},{"type":"text","text":"Bold line two","styles":{"bold":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "Bold line one", "styles": {"bold": true}},
+                        {"type": "text", "text": "\n", "styles": {"bold": true}},
+                        {"type": "text", "text": "Bold line two", "styles": {"bold": true}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -415,9 +549,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"Italic","styles":{"italic":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Italic", "styles": {"italic": true}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -434,9 +574,17 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"Both","styles":{"bold":true,"italic":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "Both", "styles": {"bold": true, "italic": true}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -449,9 +597,16 @@ mod tests {
             Event::EndHeading,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Title","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 1},
+                    "content": [{"type": "text", "text": "Title", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -464,9 +619,16 @@ mod tests {
             Event::EndHeading,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"Subtitle","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 2},
+                    "content": [{"type": "text", "text": "Subtitle", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -482,9 +644,20 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"First","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Second","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "First", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Second", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -503,9 +676,16 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"image","props":{"url":"https://example.com/img.png","caption":"Alt text"},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/img.png", "caption": "Alt text"},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -524,9 +704,16 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"image","props":{"url":"https://example.com/img.png","caption":""},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/img.png", "caption": ""},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -551,9 +738,27 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Title","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Body","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/img.png","caption":""},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 1},
+                    "content": [{"type": "text", "text": "Title", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Body", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/img.png", "caption": ""},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -567,9 +772,9 @@ mod tests {
             Event::ThematicBreak { id: None },
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[],"children":[]},{"type":"divider"}]"#
+        assert_json_eq(
+            &json,
+            json!([{"type": "quote", "content": [], "children": []}, {"type": "divider"}]),
         );
     }
 
@@ -584,9 +789,15 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"test","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [{"type": "text", "text": "test", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -603,9 +814,15 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"bold quote","styles":{"bold":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [{"type": "text", "text": "bold quote", "styles": {"bold": true}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -623,9 +840,20 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"quoted","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"normal","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [{"type": "text", "text": "quoted", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "normal", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -644,9 +872,21 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"line1","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"line2","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"line3","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [
+                        {"type": "text", "text": "line1", "styles": {}},
+                        {"type": "text", "text": "\n", "styles": {}},
+                        {"type": "text", "text": "line2", "styles": {}},
+                        {"type": "text", "text": "\n", "styles": {}},
+                        {"type": "text", "text": "line3", "styles": {}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -665,9 +905,26 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Title","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Body","styles":{}}],"children":[]},{"type":"quote","content":[{"type":"text","text":"Quote","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 1},
+                    "content": [{"type": "text", "text": "Title", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Body", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "quote",
+                    "content": [{"type": "text", "text": "Quote", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -682,9 +939,15 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"Quoted text","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [{"type": "text", "text": "Quoted text", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -703,9 +966,26 @@ mod tests {
             Event::EndHeading,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"Para","styles":{}}],"children":[]},{"type":"quote","content":[{"type":"text","text":"Quote","styles":{}}],"children":[]},{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"Head","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Para", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "quote",
+                    "content": [{"type": "text", "text": "Quote", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "heading",
+                    "props": {"level": 2},
+                    "content": [{"type": "text", "text": "Head", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -722,9 +1002,15 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "Item", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -743,9 +1029,15 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "Item", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -764,9 +1056,16 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","props":{"textAlignment":"center"},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "props": {"textAlignment": "center"},
+                    "content": [{"type": "text", "text": "Item", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -786,9 +1085,16 @@ mod tests {
             Event::EndOrderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"numberedListItem","props":{"textAlignment":"right","start":3},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "numberedListItem",
+                    "props": {"textAlignment": "right", "start": 3},
+                    "content": [{"type": "text", "text": "Item", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -805,9 +1111,15 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"First bullet","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "First bullet", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -825,9 +1137,16 @@ mod tests {
             Event::EndOrderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"numberedListItem","props":{"start":1},"content":[{"type":"text","text":"First item","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "numberedListItem",
+                    "props": {"start": 1},
+                    "content": [{"type": "text", "text": "First item", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -851,9 +1170,20 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"First","styles":{}}],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"Second","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "First", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "Second", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -869,9 +1199,15 @@ mod tests {
             text("x"),
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"x","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "x", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -888,9 +1224,15 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"x","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "x", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -912,9 +1254,20 @@ mod tests {
             text("b"),
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "a", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "b", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -946,9 +1299,26 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Bullet one","styles":{}}],"children":[]},{"type":"numberedListItem","props":{"start":1},"content":[{"type":"text","text":"Number one","styles":{}}],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"Bullet two","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "Bullet one", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "numberedListItem",
+                    "props": {"start": 1},
+                    "content": [{"type": "text", "text": "Number one", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "Bullet two", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -967,9 +1337,15 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Bold bullet","styles":{"bold":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "Bold bullet", "styles": {"bold": true}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -993,9 +1369,21 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "a", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "b", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -1026,9 +1414,27 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "a", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "b", "styles": {}}],
+                            "children": [
+                                {
+                                    "type": "bulletListItem",
+                                    "content": [{"type": "text", "text": "c", "styles": {}}],
+                                    "children": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -1053,9 +1459,22 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"bullet","styles":{}}],"children":[{"type":"numberedListItem","props":{"start":1},"content":[{"type":"text","text":"one","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "bullet", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "numberedListItem",
+                            "props": {"start": 1},
+                            "content": [{"type": "text", "text": "one", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -1086,9 +1505,26 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "a", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "b", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "c", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -1105,7 +1541,7 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         assert!(writer.finish().is_ok());
         let output = String::from_utf8_lossy(&buf);
-        assert_eq!(output, "[]");
+        assert_json_eq(&output, json!([]));
     }
 
     #[test]
@@ -1121,15 +1557,21 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         assert!(writer.finish().is_ok());
         let output = String::from_utf8_lossy(&buf);
-        assert_eq!(output, "[]");
+        assert_json_eq(&output, json!([]));
     }
 
     #[test]
     fn text_outside_block_auto_opens_paragraph() {
         let json = run_events(&[start_document(), text("Orphan"), Event::EndDocument]);
-        assert_eq!(
-            json,
-            "[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"Orphan\",\"styles\":{}}],\"children\":[]}]"
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Orphan", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1145,9 +1587,18 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"Hello ","styles":{}},{"type":"text","text":"World","styles":{"bold":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "Hello ", "styles": {}},
+                        {"type": "text", "text": "World", "styles": {"bold": true}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1163,9 +1614,20 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"First","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Second","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "First", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Second", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1178,9 +1640,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"He said \"hello\"","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "He said \"hello\"", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1193,9 +1661,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"path\\to\\file","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "path\\to\\file", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1208,9 +1682,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"line1\nline2","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "line1\nline2", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1223,9 +1703,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"col1\tcol2","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "col1\tcol2", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1237,7 +1723,10 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(json, r#"[{"type":"paragraph","content":[],"children":[]}]"#);
+        assert_json_eq(
+            &json,
+            json!([{"type": "paragraph", "content": [], "children": []}]),
+        );
     }
 
     #[test]
@@ -1248,9 +1737,9 @@ mod tests {
             Event::EndHeading,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"heading","props":{"level":1},"content":[],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([{"type": "heading", "props": {"level": 1}, "content": [], "children": []}]),
         );
     }
 
@@ -1272,9 +1761,21 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"Before","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/img.png","caption":""},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Before", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/img.png", "caption": ""},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1290,9 +1791,21 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Title","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Body","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 1},
+                    "content": [{"type": "text", "text": "Title", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Body", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1305,9 +1818,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"line1\rline2","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "line1\rline2", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1326,9 +1845,16 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"image","props":{"url":"https://example.com/img?a=1&b=\"test\"","caption":""},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/img?a=1&b=\"test\"", "caption": ""},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1349,9 +1875,17 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[],"children":[]},{"type":"image","props":{"url":"https://example.com/img.png","caption":""},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {"type": "paragraph", "content": [], "children": []},
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/img.png", "caption": ""},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1443,9 +1977,16 @@ mod tests {
         let finish_result = writer.finish();
         assert!(finish_result.is_ok(), "finish should succeed");
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"image","props":{"url":"data:image/png;base64,iVBORw==","caption":"Test image"},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "image",
+                    "props": {"url": "data:image/png;base64,iVBORw==", "caption": "Test image"},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1541,9 +2082,16 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"image","props":{"url":"data:image/jpeg;base64,/9j/","caption":""},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "image",
+                    "props": {"url": "data:image/jpeg;base64,/9j/", "caption": ""},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1564,9 +2112,16 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"image","props":{"url":"data:image/png;base64,","caption":""},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "image",
+                    "props": {"url": "data:image/png;base64,", "caption": ""},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1596,9 +2151,22 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"image","props":{"url":"data:image/png;base64,iVBORw==","caption":""},"content":null,"children":[]},{"type":"image","props":{"url":"https://example.com/img.png","caption":""},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "image",
+                    "props": {"url": "data:image/png;base64,iVBORw==", "caption": ""},
+                    "content": null,
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/img.png", "caption": ""},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1627,9 +2195,22 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"image","props":{"url":"data:image/png;base64,iVBORw==","caption":""},"content":null,"children":[]},{"type":"image","props":{"url":"data:image/png;base64,iVBORw==","caption":""},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "image",
+                    "props": {"url": "data:image/png;base64,iVBORw==", "caption": ""},
+                    "content": null,
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "data:image/png;base64,iVBORw==", "caption": ""},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1653,9 +2234,21 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"Before","styles":{}}],"children":[]},{"type":"image","props":{"url":"data:image/png;base64,iVBORw==","caption":""},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Before", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "data:image/png;base64,iVBORw==", "caption": ""},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1700,9 +2293,17 @@ mod tests {
             Event::EndHeading,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"heading","id":"custom-id","props":{"level":1},"content":[{"type":"text","text":"Title","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "heading",
+                    "id": "custom-id",
+                    "props": {"level": 1},
+                    "content": [{"type": "text", "text": "Title", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1715,9 +2316,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"Body","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Body", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1730,9 +2337,16 @@ mod tests {
             Event::EndPreformatted,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"codeBlock","props":{"language":"rust"},"content":[{"type":"text","text":"fn main() {}","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "codeBlock",
+                    "props": {"language": "rust"},
+                    "content": [{"type": "text", "text": "fn main() {}", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1745,9 +2359,15 @@ mod tests {
             Event::EndPreformatted,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"codeBlock","content":[{"type":"text","text":"plain code","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "codeBlock",
+                    "content": [{"type": "text", "text": "plain code", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1759,9 +2379,9 @@ mod tests {
             Event::EndPreformatted,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"codeBlock","props":{"language":"python"},"content":[],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([{"type": "codeBlock", "props": {"language": "python"}, "content": [], "children": []}]),
         );
     }
 
@@ -1776,9 +2396,9 @@ mod tests {
             Event::EndPreformatted,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"codeBlock","id":"cb-1","content":[],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([{"type": "codeBlock", "id": "cb-1", "content": [], "children": []}]),
         );
     }
 
@@ -1806,9 +2426,22 @@ mod tests {
         assert!(writer.finish().is_ok());
 
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[],"children":[{"type":"image","props":{"url":"https://example.com/logo.png","caption":"logo"},"content":null,"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "image",
+                            "props": {"url": "https://example.com/logo.png", "caption": "logo"},
+                            "content": null,
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -1833,9 +2466,21 @@ mod tests {
         assert!(writer.finish().is_ok());
 
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"outer","styles":{}}],"children":[{"type":"quote","content":[{"type":"text","text":"inner","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [{"type": "text", "text": "outer", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "quote",
+                            "content": [{"type": "text", "text": "inner", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -1859,9 +2504,22 @@ mod tests {
         assert!(writer.finish().is_ok());
 
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"inline","styles":{}}],"children":[{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"block","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [{"type": "text", "text": "inline", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "heading",
+                            "props": {"level": 2},
+                            "content": [{"type": "text", "text": "block", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -1882,9 +2540,27 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"inline","styles":{}}],"children":[{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"heading","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [{"type": "text", "text": "inline", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "heading",
+                            "props": {"level": 2},
+                            "content": [{"type": "text", "text": "heading", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "after", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -1904,9 +2580,22 @@ mod tests {
         assert!(writer.finish().is_ok());
 
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Title","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "heading",
+                            "props": {"level": 1},
+                            "content": [{"type": "text", "text": "Title", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -1928,9 +2617,22 @@ mod tests {
         assert!(writer.finish().is_ok());
 
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[],"children":[{"type":"codeBlock","props":{"language":"rust"},"content":[{"type":"text","text":"fn main() {}","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "codeBlock",
+                            "props": {"language": "rust"},
+                            "content": [{"type": "text", "text": "fn main() {}", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -1957,9 +2659,17 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         assert!(writer.finish().is_ok());
 
-        assert_eq!(
-            String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8"),
-            r#"[{"type":"heading","props":{"level":1},"content":[],"children":[]},{"type":"image","props":{"url":"https://example.com/logo.png","caption":"logo"},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8"),
+            json!([
+                {"type": "heading", "props": {"level": 1}, "content": [], "children": []},
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/logo.png", "caption": "logo"},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -1979,9 +2689,9 @@ mod tests {
         assert!(writer.finish().is_ok());
 
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[],"children":[{"type":"divider"}]}]"#
+        assert_json_eq(
+            &json,
+            json!([{"type": "quote", "content": [], "children": [{"type": "divider"}]}]),
         );
     }
 
@@ -2000,9 +2710,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"code","styles":{"code":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "code", "styles": {"code": true}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2017,9 +2733,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"struck","styles":{"strike":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "struck", "styles": {"strike": true}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2034,9 +2756,17 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"underlined","styles":{"underline":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "underlined", "styles": {"underline": true}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2055,9 +2785,21 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"combined","styles":{"bold":true,"code":true,"strike":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "combined",
+                            "styles": {"bold": true, "code": true, "strike": true}
+                        }
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2072,9 +2814,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{"bold":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "hello", "styles": {"bold": true}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2089,9 +2837,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{"italic":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "hello", "styles": {"italic": true}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2106,9 +2860,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{"code":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "hello", "styles": {"code": true}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2123,9 +2883,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{"strike":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "hello", "styles": {"strike": true}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2140,9 +2906,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{"underline":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "hello", "styles": {"underline": true}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2157,9 +2929,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "x", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2174,9 +2952,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "x", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2195,9 +2979,17 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{"backgroundColor":"yellow"}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "x", "styles": {"backgroundColor": "yellow"}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2216,9 +3008,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{"textColor":"orange"}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "x", "styles": {"textColor": "orange"}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2237,9 +3035,17 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{"backgroundColor":"orange"}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "x", "styles": {"backgroundColor": "orange"}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2254,9 +3060,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "x", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2271,9 +3083,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "x", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2294,9 +3112,17 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{"bold":true,"textColor":"red"}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "x", "styles": {"bold": true, "textColor": "red"}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2321,9 +3147,21 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{"textColor":"red","backgroundColor":"yellow"}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "x",
+                            "styles": {"textColor": "red", "backgroundColor": "yellow"}
+                        }
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2342,9 +3180,15 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{"textColor":"gray"}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "x", "styles": {"textColor": "gray"}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2361,9 +3205,17 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"x","styles":{"bold":true,"italic":true}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "x", "styles": {"bold": true, "italic": true}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2392,9 +3244,15 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {"type": "tableContent", "columnWidths": [], "rows": []},
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2414,9 +3272,32 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Cell1","styles":{}}]},{"type":"tableCell","content":[{"type":"text","text":"Cell2","styles":{}}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [{"type": "text", "text": "Cell1", "styles": {}}]
+                                    },
+                                    {
+                                        "type": "tableCell",
+                                        "content": [{"type": "text", "text": "Cell2", "styles": {}}]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2448,9 +3329,32 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"H1","styles":{}}]},{"type":"tableCell","content":[{"type":"text","text":"H2","styles":{}}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [{"type": "text", "text": "H1", "styles": {}}]
+                                    },
+                                    {
+                                        "type": "tableCell",
+                                        "content": [{"type": "text", "text": "H2", "styles": {}}]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2469,9 +3373,34 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"bold","styles":{"bold":true}}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [
+                                            {
+                                                "type": "text",
+                                                "text": "bold",
+                                                "styles": {"bold": true}
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2492,9 +3421,31 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"colspan":3},"content":[{"type":"text","text":"merged","styles":{}}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "props": {"colspan": 3},
+                                        "content": [
+                                            {"type": "text", "text": "merged", "styles": {}}
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2515,9 +3466,31 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"rowspan":2},"content":[{"type":"text","text":"merged","styles":{}}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "props": {"rowspan": 2},
+                                        "content": [
+                                            {"type": "text", "text": "merged", "styles": {}}
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2538,9 +3511,31 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"colspan":3,"rowspan":2},"content":[{"type":"text","text":"merged","styles":{}}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "props": {"colspan": 3, "rowspan": 2},
+                                        "content": [
+                                            {"type": "text", "text": "merged", "styles": {}}
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2563,9 +3558,29 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"colspan":2},"content":[{"type":"text","text":"H","styles":{}}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "props": {"colspan": 2},
+                                        "content": [{"type": "text", "text": "H", "styles": {}}]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2580,9 +3595,20 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"before","styles":{}}],"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "before", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "table",
+                    "content": {"type": "tableContent", "columnWidths": [], "rows": []},
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2597,9 +3623,20 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[]},"children":[]},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {"type": "tableContent", "columnWidths": [], "rows": []},
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "after", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2617,7 +3654,7 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         assert!(writer.finish().is_ok());
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
-        assert_eq!(json, "[]");
+        assert_json_eq(&json, json!([]));
     }
 
     #[test]
@@ -2642,9 +3679,46 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         assert!(writer.finish().is_ok());
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"outer","styles":{}}]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"inner","styles":{}}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [{"type": "text", "text": "outer", "styles": {}}]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [{"type": "text", "text": "inner", "styles": {}}]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2673,9 +3747,46 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"c","styles":{}}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [{"type": "text", "text": "c", "styles": {}}]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2705,9 +3816,55 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"b1","styles":{}}]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"b2","styles":{}}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [{"type": "text", "text": "b1", "styles": {}}]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [{"type": "text", "text": "b2", "styles": {}}]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2732,9 +3889,49 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"before","styles":{}},{"type":"text","text":"after","styles":{}}]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"inner","styles":{}}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [
+                                            {"type": "text", "text": "before", "styles": {}},
+                                            {"type": "text", "text": "after", "styles": {}}
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [{"type": "text", "text": "inner", "styles": {}}]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2763,9 +3960,39 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"nested","styles":{}}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [
+                                            {"type": "text", "text": "nested", "styles": {}}
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2790,9 +4017,39 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"b","styles":{"bold":true}}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [
+                                            {"type": "text", "text": "b", "styles": {"bold": true}}
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -2823,9 +4080,64 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"bullet","styles":{}}],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"dropped","styles":{}}]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"also dropped","styles":{}}]}]}]},"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "bullet", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "table",
+                            "content": {
+                                "type": "tableContent",
+                                "columnWidths": [],
+                                "rows": [
+                                    {
+                                        "cells": [
+                                            {
+                                                "type": "tableCell",
+                                                "content": [
+                                                    {
+                                                        "type": "text",
+                                                        "text": "dropped",
+                                                        "styles": {}
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            "children": []
+                        },
+                        {
+                            "type": "table",
+                            "content": {
+                                "type": "tableContent",
+                                "columnWidths": [],
+                                "rows": [
+                                    {
+                                        "cells": [
+                                            {
+                                                "type": "tableCell",
+                                                "content": [
+                                                    {
+                                                        "type": "text",
+                                                        "text": "also dropped",
+                                                        "styles": {}
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -2854,9 +4166,30 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"lifted","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "table",
+                            "content": {
+                                "type": "tableContent",
+                                "columnWidths": [],
+                                "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                            },
+                            "children": []
+                        },
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "lifted", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -2889,9 +4222,35 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"outer","styles":{}}],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"lifted","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "outer", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "table",
+                            "content": {
+                                "type": "tableContent",
+                                "columnWidths": [],
+                                "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                            },
+                            "children": []
+                        },
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "lifted", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "after", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -2943,9 +4302,63 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"level 0","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"level 1","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"level 2","styles":{}}],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"numberedListItem","props":{"start":4},"content":[{"type":"text","text":"lifted 0","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"lifted 1","styles":{}}],"children":[]}]}]}]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "level 0", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "level 1", "styles": {}}],
+                            "children": [
+                                {
+                                    "type": "bulletListItem",
+                                    "content": [{"type": "text", "text": "level 2", "styles": {}}],
+                                    "children": [
+                                        {
+                                            "type": "table",
+                                            "content": {
+                                                "type": "tableContent",
+                                                "columnWidths": [],
+                                                "rows": [
+                                                    {
+                                                        "cells": [
+                                                            {"type": "tableCell", "content": []}
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            "children": []
+                                        },
+                                        {
+                                            "type": "numberedListItem",
+                                            "props": {"start": 4},
+                                            "content": [
+                                                {"type": "text", "text": "lifted 0", "styles": {}}
+                                            ],
+                                            "children": [
+                                                {
+                                                    "type": "bulletListItem",
+                                                    "content": [
+                                                        {
+                                                            "type": "text",
+                                                            "text": "lifted 1",
+                                                            "styles": {}
+                                                        }
+                                                    ],
+                                                    "children": []
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -2977,9 +4390,38 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"outer","styles":{}}],"children":[{"type":"quote","content":[],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"quoted lifted","styles":{}}],"children":[]}]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "outer", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "quote",
+                            "content": [],
+                            "children": [
+                                {
+                                    "type": "table",
+                                    "content": {
+                                        "type": "tableContent",
+                                        "columnWidths": [],
+                                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                                    },
+                                    "children": []
+                                },
+                                {
+                                    "type": "bulletListItem",
+                                    "content": [
+                                        {"type": "text", "text": "quoted lifted", "styles": {}}
+                                    ],
+                                    "children": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -3000,9 +4442,31 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"lifted heading","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "table",
+                            "content": {
+                                "type": "tableContent",
+                                "columnWidths": [],
+                                "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                            },
+                            "children": []
+                        },
+                        {
+                            "type": "heading",
+                            "props": {"level": 2},
+                            "content": [{"type": "text", "text": "lifted heading", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -3035,9 +4499,40 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"quote","content":[],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/in-quote.png","caption":"in quote"},"content":null,"children":[]}]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "quote",
+                            "content": [],
+                            "children": [
+                                {
+                                    "type": "table",
+                                    "content": {
+                                        "type": "tableContent",
+                                        "columnWidths": [],
+                                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                                    },
+                                    "children": []
+                                },
+                                {
+                                    "type": "image",
+                                    "props": {
+                                        "url": "https://example.com/in-quote.png",
+                                        "caption": "in quote"
+                                    },
+                                    "content": null,
+                                    "children": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -3070,9 +4565,40 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[],"children":[{"type":"bulletListItem","content":[],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/in-list.png","caption":"in list"},"content":null,"children":[]}]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [],
+                            "children": [
+                                {
+                                    "type": "table",
+                                    "content": {
+                                        "type": "tableContent",
+                                        "columnWidths": [],
+                                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                                    },
+                                    "children": []
+                                },
+                                {
+                                    "type": "image",
+                                    "props": {
+                                        "url": "https://example.com/in-list.png",
+                                        "caption": "in list"
+                                    },
+                                    "content": null,
+                                    "children": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -3097,9 +4623,30 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"quote","content":[{"type":"text","text":"lifted quote","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "table",
+                            "content": {
+                                "type": "tableContent",
+                                "columnWidths": [],
+                                "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                            },
+                            "children": []
+                        },
+                        {
+                            "type": "quote",
+                            "content": [{"type": "text", "text": "lifted quote", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -3112,7 +4659,7 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert_eq!(json, r#"[{"type":"divider","id":"hr-1"}]"#);
+        assert_json_eq(&json, json!([{"type": "divider", "id": "hr-1"}]));
     }
 
     #[test]
@@ -3130,9 +4677,17 @@ mod tests {
             },
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"id":"img-1","type":"image","props":{"url":"https://example.com/img.png","caption":""},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "id": "img-1",
+                    "type": "image",
+                    "props": {"url": "https://example.com/img.png", "caption": ""},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3153,7 +4708,7 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         assert!(writer.finish().is_ok());
         let json = String::from_utf8(buf).expect("output should be valid UTF-8");
-        assert_eq!(json, "[]");
+        assert_json_eq(&json, json!([]));
     }
 
     #[test]
@@ -3177,9 +4732,25 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/img.png","caption":"in cell"},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/img.png", "caption": "in cell"},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3213,9 +4784,31 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/a.png","caption":"A"},"content":null,"children":[]},{"type":"image","props":{"url":"https://example.com/b.png","caption":"B"},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/a.png", "caption": "A"},
+                    "content": null,
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/b.png", "caption": "B"},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3251,9 +4844,38 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]},{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/cell1.png","caption":"cell1"},"content":null,"children":[]},{"type":"image","props":{"url":"https://example.com/cell2.png","caption":"cell2"},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {"type": "tableCell", "content": []},
+                                    {"type": "tableCell", "content": []}
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/cell1.png", "caption": "cell1"},
+                    "content": null,
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/cell2.png", "caption": "cell2"},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3280,9 +4902,37 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"before","styles":{}},{"type":"text","text":"after","styles":{}}]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/img.png","caption":"middle"},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [
+                                            {"type": "text", "text": "before", "styles": {}},
+                                            {"type": "text", "text": "after", "styles": {}}
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/img.png", "caption": "middle"},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3310,9 +4960,25 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"data:image/png;base64,iVBORw==","caption":"png"},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "data:image/png;base64,iVBORw==", "caption": "png"},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3337,9 +5003,26 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"id":"img-99","type":"image","props":{"url":"https://example.com/img.png","caption":""},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "id": "img-99",
+                    "type": "image",
+                    "props": {"url": "https://example.com/img.png", "caption": ""},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3370,9 +5053,34 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/nested.png","caption":"nested"},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/nested.png", "caption": "nested"},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3412,9 +5120,40 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/outer.png","caption":"outer"},"content":null,"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/nested.png","caption":"nested"},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/outer.png", "caption": "outer"},
+                    "content": null,
+                    "children": []
+                },
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/nested.png", "caption": "nested"},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3445,9 +5184,25 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/header.png","caption":"header"},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/header.png", "caption": "header"},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3487,9 +5242,40 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/t1.png","caption":"t1"},"content":null,"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/t2.png","caption":"t2"},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/t1.png", "caption": "t1"},
+                    "content": null,
+                    "children": []
+                },
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/t2.png", "caption": "t2"},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3516,9 +5302,25 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"image","props":{"url":"https://example.com/wrapped.png","caption":"wrapped"},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/wrapped.png", "caption": "wrapped"},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3536,9 +5338,16 @@ mod tests {
             Event::EndOrderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"numberedListItem","props":{"start":5},"content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "numberedListItem",
+                    "props": {"start": 5},
+                    "content": [{"type": "text", "text": "Item", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3556,9 +5365,15 @@ mod tests {
             Event::EndOrderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"numberedListItem","content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "numberedListItem",
+                    "content": [{"type": "text", "text": "Item", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3575,9 +5390,15 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "Item", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3594,9 +5415,15 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "Item", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3613,9 +5440,15 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Item","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "Item", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3638,9 +5471,24 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"dropped","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "dropped", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3659,9 +5507,21 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"quoted bullet","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "quoted bullet", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -3686,9 +5546,26 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "first", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "second", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -3718,9 +5595,42 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"outer","styles":{}}]}]}]},"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"inner dropped","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [{"type": "text", "text": "outer", "styles": {}}]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "inner dropped", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3759,9 +5669,32 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]}]},{"type":"bulletListItem","content":[{"type":"text","text":"d","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "a", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "b", "styles": {}}],
+                            "children": [
+                                {
+                                    "type": "bulletListItem",
+                                    "content": [{"type": "text", "text": "c", "styles": {}}],
+                                    "children": []
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "d", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3796,9 +5729,32 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]},{"type":"bulletListItem","content":[{"type":"text","text":"d","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "a", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "b", "styles": {}}],
+                            "children": [
+                                {
+                                    "type": "bulletListItem",
+                                    "content": [{"type": "text", "text": "c", "styles": {}}],
+                                    "children": []
+                                }
+                            ]
+                        },
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "d", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -3821,9 +5777,21 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "a", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "b", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -3852,9 +5820,26 @@ mod tests {
             text("c"),
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[]}]},{"type":"bulletListItem","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "a", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "b", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                },
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "c", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3882,9 +5867,27 @@ mod tests {
             text("c"),
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "a", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "b", "styles": {}}],
+                            "children": [
+                                {
+                                    "type": "bulletListItem",
+                                    "content": [{"type": "text", "text": "c", "styles": {}}],
+                                    "children": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -3905,9 +5908,15 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "Hello", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -3927,9 +5936,21 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Para one","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"Para two","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "Para one", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Para two", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -3956,9 +5977,27 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b1","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"b2","styles":{}}],"children":[]}]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "a", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "b1", "styles": {}}],
+                            "children": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": "b2", "styles": {}}],
+                                    "children": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -3981,9 +6020,26 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"Para one","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"Para two","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Para three","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "Para one", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Para two", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Para three", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4003,9 +6059,20 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"Quote","styles":{}}],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"after quote","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [{"type": "text", "text": "Quote", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "after quote", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -4025,9 +6092,27 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"h","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"item","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "heading",
+                            "props": {"level": 1},
+                            "content": [{"type": "text", "text": "h", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "item", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4052,9 +6137,22 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"image","props":{"url":"https://example.com/img.png","caption":""},"content":null,"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "image",
+                            "props": {"url": "https://example.com/img.png", "caption": ""},
+                            "content": null,
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4073,9 +6171,21 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"codeBlock","content":[{"type":"text","text":"code","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "codeBlock",
+                            "content": [{"type": "text", "text": "code", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4094,9 +6204,21 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"quote","content":[{"type":"text","text":"q","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "quote",
+                            "content": [{"type": "text", "text": "q", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4113,9 +6235,9 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"divider"}]}]"#
+        assert_json_eq(
+            &json,
+            json!([{"type": "bulletListItem", "content": [], "children": [{"type": "divider"}]}]),
         );
     }
 
@@ -4138,9 +6260,36 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"cell","styles":{}}]}]}]},"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "table",
+                            "content": {
+                                "type": "tableContent",
+                                "columnWidths": [],
+                                "rows": [
+                                    {
+                                        "cells": [
+                                            {
+                                                "type": "tableCell",
+                                                "content": [
+                                                    {"type": "text", "text": "cell", "styles": {}}
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4161,9 +6310,27 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"before","styles":{}}],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"dropped","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "before", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "heading",
+                            "props": {"level": 1},
+                            "content": [{"type": "text", "text": "dropped", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "after", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4186,9 +6353,25 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"h","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "heading",
+                    "props": {"level": 1},
+                    "content": [{"type": "text", "text": "h", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -4207,9 +6390,24 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"quote","content":[{"type":"text","text":"q","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "quote",
+                    "content": [{"type": "text", "text": "q", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -4228,9 +6426,24 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"codeBlock","content":[{"type":"text","text":"code","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "codeBlock",
+                    "content": [{"type": "text", "text": "code", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -4252,9 +6465,31 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"head","styles":{}},{"type":"text","text":"\n","styles":{}},{"type":"text","text":"more","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"item","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "heading",
+                            "props": {"level": 1},
+                            "content": [
+                                {"type": "text", "text": "head", "styles": {}},
+                                {"type": "text", "text": "\n", "styles": {}},
+                                {"type": "text", "text": "more", "styles": {}}
+                            ],
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "item", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4299,9 +6534,16 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {"type": "bulletListItem", "content": [], "children": []},
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "after", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -4319,9 +6561,19 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"first","styles":{}},{"type":"text","text":"\n\n","styles":{}},{"type":"text","text":"second","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [
+                        {"type": "text", "text": "first", "styles": {}},
+                        {"type": "text", "text": "\n\n", "styles": {}},
+                        {"type": "text", "text": "second", "styles": {}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -4342,7 +6594,7 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         assert!(writer.finish().is_ok());
         let json = String::from_utf8(buf).expect("output must be valid UTF-8");
-        assert_eq!(json, "[]");
+        assert_json_eq(&json, json!([]));
     }
 
     #[test]
@@ -4368,9 +6620,26 @@ mod tests {
             text("after"),
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"before","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/img.png","caption":""},"content":null,"children":[]},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "before", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/img.png", "caption": ""},
+                    "content": null,
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "after", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -4420,9 +6689,16 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"Heading text","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 2},
+                    "content": [{"type": "text", "text": "Heading text", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -4440,9 +6716,16 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"codeBlock","props":{"language":"rust"},"content":[{"type":"text","text":"let x = 1;","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "codeBlock",
+                    "props": {"language": "rust"},
+                    "content": [{"type": "text", "text": "let x = 1;", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -4459,9 +6742,20 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"divider"}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {"type": "divider"}
+            ]),
         );
     }
 
@@ -4491,9 +6785,36 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"H","styles":{}}],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"item","styles":{}}],"children":[]},{"type":"quote","content":[{"type":"text","text":"Q","styles":{}}],"children":[]},{"type":"divider"}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "heading",
+                    "props": {"level": 1},
+                    "content": [{"type": "text", "text": "H", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "item", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "quote",
+                    "content": [{"type": "text", "text": "Q", "styles": {}}],
+                    "children": []
+                },
+                {"type": "divider"}
+            ]),
         );
     }
 
@@ -4512,9 +6833,25 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"title","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "heading",
+                    "props": {"level": 2},
+                    "content": [{"type": "text", "text": "title", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -4533,9 +6870,25 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"Inner","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [{"cells": [{"type": "tableCell", "content": []}]}]
+                    },
+                    "children": []
+                },
+                {
+                    "type": "heading",
+                    "props": {"level": 2},
+                    "content": [{"type": "text", "text": "Inner", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -4552,9 +6905,15 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"plain text","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "plain text", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -4590,9 +6949,32 @@ mod tests {
             text("d"),
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"a","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"b","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]},{"type":"bulletListItem","content":[{"type":"text","text":"d","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "a", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "b", "styles": {}}],
+                            "children": [
+                                {
+                                    "type": "bulletListItem",
+                                    "content": [{"type": "text", "text": "c", "styles": {}}],
+                                    "children": []
+                                }
+                            ]
+                        },
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "d", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4619,9 +7001,21 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "first", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "second", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4651,9 +7045,21 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"parent","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"child","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "parent", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "child", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4676,9 +7082,16 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"numberedListItem","props":{"start":42},"content":[{"type":"text","text":"item 42","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "numberedListItem",
+                    "props": {"start": 42},
+                    "content": [{"type": "text", "text": "item 42", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -4702,9 +7115,17 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"id":"img-1","type":"image","props":{"url":"https://example.com/photo.jpg","caption":"alt text"},"content":null,"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "id": "img-1",
+                    "type": "image",
+                    "props": {"url": "https://example.com/photo.jpg", "caption": "alt text"},
+                    "content": null,
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -4728,9 +7149,16 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"numberedListItem","props":{"start":5},"content":[{"type":"text","text":"five","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "numberedListItem",
+                    "props": {"start": 5},
+                    "content": [{"type": "text", "text": "five", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -4790,9 +7218,38 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"before","styles":{}}],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"heading","styles":{}}],"children":[]},{"type":"codeBlock","content":[{"type":"text","text":"code","styles":{}}],"children":[]},{"type":"quote","content":[{"type":"text","text":"quote","styles":{}}],"children":[]},{"type":"divider"},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "before", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "heading",
+                            "props": {"level": 1},
+                            "content": [{"type": "text", "text": "heading", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "codeBlock",
+                            "content": [{"type": "text", "text": "code", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "quote",
+                            "content": [{"type": "text", "text": "quote", "styles": {}}],
+                            "children": []
+                        },
+                        {"type": "divider"},
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "after", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4828,9 +7285,27 @@ mod tests {
             decorative: false,
             id: None,
         }]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/leaked.png","caption":"leaked"},"content":null,"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "first", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "second", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "image",
+                            "props": {"url": "https://example.com/leaked.png", "caption": "leaked"},
+                            "content": null,
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4859,9 +7334,41 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"before (","styles":{}}],"children":[{"type":"image","props":{"url":"https://example.com/first.png","caption":""},"content":null,"children":[]},{"type":"paragraph","content":[{"type":"text","text":"):","styles":{}},{"type":"text","text":"\n","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/second.png","caption":""},"content":null,"children":[]},{"type":"paragraph","content":[{"type":"text","text":" after.","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "before (", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "image",
+                            "props": {"url": "https://example.com/first.png", "caption": ""},
+                            "content": null,
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [
+                                {"type": "text", "text": "):", "styles": {}},
+                                {"type": "text", "text": "\n", "styles": {}}
+                            ],
+                            "children": []
+                        },
+                        {
+                            "type": "image",
+                            "props": {"url": "https://example.com/second.png", "caption": ""},
+                            "content": null,
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": " after.", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4887,9 +7394,41 @@ mod tests {
             Event::EndOrderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"numberedListItem","content":[{"type":"text","text":"before (","styles":{}}],"children":[{"type":"image","props":{"url":"https://example.com/first.png","caption":""},"content":null,"children":[]},{"type":"paragraph","content":[{"type":"text","text":"):","styles":{}},{"type":"text","text":"\n","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/second.png","caption":""},"content":null,"children":[]},{"type":"paragraph","content":[{"type":"text","text":" after.","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "numberedListItem",
+                    "content": [{"type": "text", "text": "before (", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "image",
+                            "props": {"url": "https://example.com/first.png", "caption": ""},
+                            "content": null,
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [
+                                {"type": "text", "text": "):", "styles": {}},
+                                {"type": "text", "text": "\n", "styles": {}}
+                            ],
+                            "children": []
+                        },
+                        {
+                            "type": "image",
+                            "props": {"url": "https://example.com/second.png", "caption": ""},
+                            "content": null,
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": " after.", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4913,18 +7452,58 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[{"type":"text","text":"before (","styles":{}}],"children":[{"type":"image","props":{"url":"https://example.com/first.png","caption":""},"content":null,"children":[]},{"type":"paragraph","content":[{"type":"text","text":"):","styles":{}},{"type":"text","text":"\n","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/second.png","caption":""},"content":null,"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [{"type": "text", "text": "before (", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "image",
+                            "props": {"url": "https://example.com/first.png", "caption": ""},
+                            "content": null,
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [
+                                {"type": "text", "text": "):", "styles": {}},
+                                {"type": "text", "text": "\n", "styles": {}}
+                            ],
+                            "children": []
+                        },
+                        {
+                            "type": "image",
+                            "props": {"url": "https://example.com/second.png", "caption": ""},
+                            "content": null,
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
     #[test]
     fn thematic_break_after_children_transition_inside_list_item_emits_as_child() {
         let json = list_item_with_children_transition_then(vec![Event::ThematicBreak { id: None }]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]},{"type":"divider"}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "first", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "second", "styles": {}}],
+                            "children": []
+                        },
+                        {"type": "divider"}
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4935,9 +7514,27 @@ mod tests {
             text("leaked-heading"),
             Event::EndHeading,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]},{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"leaked-heading","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "first", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "second", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "heading",
+                            "props": {"level": 2},
+                            "content": [{"type": "text", "text": "leaked-heading", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4948,9 +7545,26 @@ mod tests {
             text("leaked-quote"),
             Event::EndBlockQuote,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]},{"type":"quote","content":[{"type":"text","text":"leaked-quote","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "first", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "second", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "quote",
+                            "content": [{"type": "text", "text": "leaked-quote", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4961,9 +7575,26 @@ mod tests {
             text("leaked-code"),
             Event::EndPreformatted,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]},{"type":"codeBlock","content":[{"type":"text","text":"leaked-code","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "first", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "second", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "codeBlock",
+                            "content": [{"type": "text", "text": "leaked-code", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -4978,9 +7609,45 @@ mod tests {
             Event::EndTableRow,
             Event::EndTable,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]},{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"text","text":"leaked-cell","styles":{}}]}]}]},"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "first", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "second", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "table",
+                            "content": {
+                                "type": "tableContent",
+                                "columnWidths": [],
+                                "rows": [
+                                    {
+                                        "cells": [
+                                            {
+                                                "type": "tableCell",
+                                                "content": [
+                                                    {
+                                                        "type": "text",
+                                                        "text": "leaked-cell",
+                                                        "styles": {}
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -5007,9 +7674,32 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"a","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"b","styles":{}}],"children":[]},{"type":"quote","content":[{"type":"text","text":"c","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "heading",
+                            "props": {"level": 2},
+                            "content": [{"type": "text", "text": "a", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "b", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "quote",
+                            "content": [{"type": "text", "text": "c", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -5028,9 +7718,16 @@ mod tests {
             Event::EndOrderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"numberedListItem","props":{"start":3},"content":[{"type":"text","text":"item","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "numberedListItem",
+                    "props": {"start": 3},
+                    "content": [{"type": "text", "text": "item", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -5059,9 +7756,21 @@ mod tests {
         assert!(writer.handle_event(Event::EndDocument).is_ok());
         writer.finish().expect("writer should finish fixture");
         let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "first", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "second", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -5088,9 +7797,22 @@ mod tests {
             Event::ThematicBreak { id: None },
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"item","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/foo.png","caption":"Foo"},"content":null,"children":[]},{"type":"divider"}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "item", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "image",
+                    "props": {"url": "https://example.com/foo.png", "caption": "Foo"},
+                    "content": null,
+                    "children": []
+                },
+                {"type": "divider"}
+            ]),
         );
     }
 
@@ -5110,9 +7832,21 @@ mod tests {
             Event::EndHeading,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"item","styles":{}}],"children":[]},{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"After list","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "item", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "heading",
+                    "props": {"level": 2},
+                    "content": [{"type": "text", "text": "After list", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -5138,9 +7872,27 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"outer","styles":{}}],"children":[{"type":"quote","content":[],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"inner","styles":{}}],"children":[]}]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "outer", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "quote",
+                            "content": [],
+                            "children": [
+                                {
+                                    "type": "bulletListItem",
+                                    "content": [{"type": "text", "text": "inner", "styles": {}}],
+                                    "children": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -5164,9 +7916,26 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"quote","content":[{"type":"text","text":"quoted","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"real","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "quote",
+                            "content": [{"type": "text", "text": "quoted", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "real", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -5197,9 +7966,26 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"outer","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"nested","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"continuation","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [{"type": "text", "text": "outer", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "nested", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "continuation", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -5225,9 +8011,26 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"nested","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"after","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "bulletListItem",
+                            "content": [{"type": "text", "text": "nested", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "after", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -5249,9 +8052,28 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"dropped","styles":{}}],"children":[]},{"type":"paragraph","props":{"textAlignment":"center"},"content":[{"type":"text","text":"real","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "heading",
+                            "props": {"level": 1},
+                            "content": [{"type": "text", "text": "dropped", "styles": {}}],
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "props": {"textAlignment": "center"},
+                            "content": [{"type": "text", "text": "real", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -5279,9 +8101,34 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"link","href":"https://dropped.example","content":[{"type":"text","text":"dropped","styles":{}}]}],"children":[]},{"type":"paragraph","props":{"textAlignment":"right"},"content":[{"type":"text","text":"real","styles":{}}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "heading",
+                            "props": {"level": 1},
+                            "content": [
+                                {
+                                    "type": "link",
+                                    "href": "https://dropped.example",
+                                    "content": [{"type": "text", "text": "dropped", "styles": {}}]
+                                }
+                            ],
+                            "children": []
+                        },
+                        {
+                            "type": "paragraph",
+                            "props": {"textAlignment": "right"},
+                            "content": [{"type": "text", "text": "real", "styles": {}}],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -5304,9 +8151,21 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"text","styles":{}}]}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "link",
+                            "href": "https://example.com",
+                            "content": [{"type": "text", "text": "text", "styles": {}}]
+                        }
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -5330,9 +8189,21 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"link","href":"https://a.example","content":[{"type":"text","text":"inner","styles":{}}]}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "link",
+                            "href": "https://a.example",
+                            "content": [{"type": "text", "text": "inner", "styles": {}}]
+                        }
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -5350,9 +8221,21 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"link","href":"https://x.example","content":[{"type":"text","text":"label","styles":{}}]}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "link",
+                            "href": "https://x.example",
+                            "content": [{"type": "text", "text": "label", "styles": {}}]
+                        }
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -5374,9 +8257,36 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"link","href":"https://cell.example","content":[{"type":"text","text":"cell","styles":{}}]}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [
+                                            {
+                                                "type": "link",
+                                                "href": "https://cell.example",
+                                                "content": [
+                                                    {"type": "text", "text": "cell", "styles": {}}
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -5394,9 +8304,21 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"","styles":{}}]}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "link",
+                            "href": "https://example.com",
+                            "content": [{"type": "text", "text": "", "styles": {}}]
+                        }
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -5415,9 +8337,21 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"text","styles":{}}]}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "link",
+                            "href": "https://example.com",
+                            "content": [{"type": "text", "text": "text", "styles": {}}]
+                        }
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -5442,9 +8376,25 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"bold","styles":{"bold":true}},{"type":"text","text":"italic","styles":{"italic":true}},{"type":"text","text":"plain","styles":{}}]}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "link",
+                            "href": "https://example.com",
+                            "content": [
+                                {"type": "text", "text": "bold", "styles": {"bold": true}},
+                                {"type": "text", "text": "italic", "styles": {"italic": true}},
+                                {"type": "text", "text": "plain", "styles": {}}
+                            ]
+                        }
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -5465,9 +8415,23 @@ mod tests {
             Event::EndParagraph,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"before ","styles":{}},{"type":"link","href":"https://example.com","content":[{"type":"text","text":"link","styles":{}}]},{"type":"text","text":" after","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "before ", "styles": {}},
+                        {
+                            "type": "link",
+                            "href": "https://example.com",
+                            "content": [{"type": "text", "text": "link", "styles": {}}]
+                        },
+                        {"type": "text", "text": " after", "styles": {}}
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -5486,9 +8450,22 @@ mod tests {
             Event::EndHeading,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"heading","props":{"level":1},"content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"title link","styles":{}}]}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 1},
+                    "content": [
+                        {
+                            "type": "link",
+                            "href": "https://example.com",
+                            "content": [{"type": "text", "text": "title link", "styles": {}}]
+                        }
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -5511,9 +8488,21 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"link","styles":{}}]}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [
+                        {
+                            "type": "link",
+                            "href": "https://example.com",
+                            "content": [{"type": "text", "text": "link", "styles": {}}]
+                        }
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -5534,9 +8523,21 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"link","styles":{}}]}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [
+                        {
+                            "type": "link",
+                            "href": "https://example.com",
+                            "content": [{"type": "text", "text": "link", "styles": {}}]
+                        }
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -5556,9 +8557,21 @@ mod tests {
             Event::EndBlockQuote,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"quote","content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"","styles":{}}]}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "quote",
+                    "content": [
+                        {
+                            "type": "link",
+                            "href": "https://example.com",
+                            "content": [{"type": "text", "text": "", "styles": {}}]
+                        }
+                    ],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -5581,9 +8594,36 @@ mod tests {
             Event::EndTable,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","content":[{"type":"link","href":"https://example.com","content":[{"type":"text","text":"link","styles":{}}]}]}]}]},"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "table",
+                    "content": {
+                        "type": "tableContent",
+                        "columnWidths": [],
+                        "rows": [
+                            {
+                                "cells": [
+                                    {
+                                        "type": "tableCell",
+                                        "content": [
+                                            {
+                                                "type": "link",
+                                                "href": "https://example.com",
+                                                "content": [
+                                                    {"type": "text", "text": "link", "styles": {}}
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -5608,9 +8648,28 @@ mod tests {
             Event::EndUnorderedListItem,
             Event::EndDocument,
         ]);
-        assert_eq!(
-            json,
-            r#"[{"type":"bulletListItem","content":[],"children":[{"type":"heading","props":{"level":1},"content":[{"type":"link","href":"https://x","content":[{"type":"text","text":"hidden","styles":{}}]}],"children":[]}]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "bulletListItem",
+                    "content": [],
+                    "children": [
+                        {
+                            "type": "heading",
+                            "props": {"level": 1},
+                            "content": [
+                                {
+                                    "type": "link",
+                                    "href": "https://x",
+                                    "content": [{"type": "text", "text": "hidden", "styles": {}}]
+                                }
+                            ],
+                            "children": []
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
@@ -5692,8 +8751,10 @@ mod tests {
         let sink = StackTrackingSink::new(writer);
         docspec_core::pipe(reader, sink).expect("pipe");
         let actual_json = String::from_utf8(buf).expect("valid utf-8");
-        const EXPECTED_JSON: &str = r#"[{"type":"table","content":{"type":"tableContent","columnWidths":[],"rows":[{"cells":[{"type":"tableCell","props":{"colspan":2},"content":[{"type":"text","text":"Project properties","styles":{"bold":true}},{"type":"text","text":" ","styles":{"bold":true}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Title","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"Mapping hybrid governance ","styles":{}},{"type":"text","text":"for sustainable global value chains","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Group","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"PAP","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Project type","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"Master thesis ","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Credits","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"18-24","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Supervisor(s)","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"Dr.","styles":{}},{"type":"text","text":" Otto. Hospes","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Examiner(s)","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"Prof.","styles":{}},{"type":"text","text":" Katrien Termeer and ","styles":{}},{"type":"text","text":"Dr.","styles":{}},{"type":"text","text":" Otto Hospes","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Contact info","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"Dr.","styles":{}},{"type":"text","text":" Otto Hospes","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Begin date","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"asap","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"End date","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"November 2016","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Description","styles":{"bold":true}}]},{"type":"tableCell","content":[{"type":"text","text":"This master thesis project is part of a larger (PhD) project that examines the potential for developing synergies between public and private governance for sustainable global value chains (GVCs). A central aim of the PhD project is to develop innovative governance arrangements with public authorities in both producing/exporting and importing countries.  ","styles":{}},{"type":"text","text":"Private governance initiatives are considered more effective than state-led initiatives in addressing environmental and social problems in global value chains. However, these private initiatives are increasingly criticised for their limitations in addressing land conflicts and smallholder concerns, their bias towards a single-commodity approach and their lack of area-based governance. These criticisms are paralleled by an increasing role of public actors in developing public sustainability schemes or quasi-accreditation policies for private standards. While currently these public and private initiatives often exist next to each other or even compete, there is great potential for synergies because public and private actors can complement each other’s roles in GVCs. ","styles":{}},{"type":"text","text":"The first objective of the master thesis project is to map different forms of h","styles":{}},{"type":"text","text":"ybrid governance of global value chains. ","styles":{}},{"type":"text","text":"For this purpose the following preliminary classification can be tested and adjusted: a) private certification programmes with government involvement through official recognition of the standard; b) social-private partnerships (roundtables) for specific commodities with limited government involvement through subsidies; c) public-private partnerships with direct involvement of public authorities; d) public-private value chain initiatives with explicit linkages with area-based public policies in the producing country. The second objective is to ","styles":{}},{"type":"text","text":"make an inventory and classification of ","styles":{}},{"type":"text","text":"different scientific concepts that are used ","styles":{}},{"type":"text","text":"by scholars ","styles":{}},{"type":"text","text":"to understand and analyse hybrid governance forms, arrangements and interactions  involving public and private actors.","styles":{}},{"type":"text","text":" ","styles":{}},{"type":"text","text":"The third objective is to conduct a quick scan of the underlying motives and perceived challenges and obstacles for organizing synergies between private and public forms of governance. ","styles":{}},{"type":"text","text":"Data collection and methods consists of three steps: ","styles":{}},{"type":"text","text":"1. ","styles":{}},{"type":"text","text":"systematic literature review","styles":{}},{"type":"text","text":"; 2. ","styles":{}},{"type":"text","text":"analysis of  professional reports of public and private actors involved in certification programmes, social-private partnerships or public-private partnerships; ","styles":{}},{"type":"text","text":"3. ","styles":{}},{"type":"text","text":"interviews with stakeholders that are involved in the larger (PhD) project. ","styles":{}}]}]},{"cells":[{"type":"tableCell","content":[{"type":"text","text":"Requirements","styles":{"bold":true}},{"type":"text","text":" and skills","styles":{"bold":true}}]},{"type":"tableCell","content":[]}]}]},"children":[]},{"type":"bulletListItem","props":{"textAlignment":"justify"},"content":[{"type":"text","text":"Bachelor BIN or BEB; enrolled in master program MID or MME ","styles":{}}],"children":[]},{"type":"bulletListItem","content":[{"type":"text","text":"Ambition to develop a master thesis that can serve as a basis for ","styles":{}},{"type":"text","text":"writing and publishing ","styles":{}},{"type":"text","text":"a scientific article","styles":{}}],"children":[]},{"type":"bulletListItem","props":{"textAlignment":"justify"},"content":[{"type":"text","text":"Skills: 1. Good English writing; 2. Experience with organizing Endnote libraries 3. ","styles":{}},{"type":"text","text":"Experience with organizing search queries through Scopus, google advanced search, and other search machines. ","styles":{}}],"children":[]},{"type":"paragraph","content":[],"children":[]},{"type":"paragraph","content":[],"children":[]},{"type":"paragraph","content":[],"children":[]},{"type":"paragraph","content":[],"children":[]}]"#;
-        assert_eq!(actual_json, EXPECTED_JSON);
+        let expected: serde_json::Value =
+            serde_json::from_str(include_str!("fixtures/sample_docx.blocknote.json"))
+                .expect("golden fixture must be valid JSON");
+        assert_json_eq(&actual_json, expected);
     }
 
     #[test]

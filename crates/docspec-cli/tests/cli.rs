@@ -13,7 +13,9 @@ use predicates::prelude::PredicateBooleanExt as _;
 use predicates::str::contains;
 use tempfile::NamedTempFile;
 
-use docspec_test_utils::{synth_docx, synth_docx_with_image_png};
+use serde_json::json;
+
+use docspec_test_utils::{assert_json_eq, synth_docx, synth_docx_with_image_png};
 
 fn docspec_cmd() -> Command {
     let result = Command::cargo_bin("docspec");
@@ -96,12 +98,16 @@ mod tests {
             .assert()
             .success();
 
-        assert_eq!(
-            read_output(&output_path),
-            concat!(
-                r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Auto Detected","styles":{}}],"children":[]}]"#,
-                "\n"
-            )
+        assert_json_eq(
+            &read_output(&output_path),
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 1},
+                    "content": [{"type": "text", "text": "Auto Detected", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -150,39 +156,64 @@ mod tests {
             .assert()
             .success();
 
-        assert_eq!(
-            read_output(&output_path),
-            concat!(
-                r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Hello World","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Some paragraph text.","styles":{}}],"children":[]}]"#,
-                "\n"
-            )
+        assert_json_eq(
+            &read_output(&output_path),
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 1},
+                    "content": [{"type": "text", "text": "Hello World", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Some paragraph text.", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
     #[test]
     fn convert_stdin_to_stdout() {
-        docspec_cmd()
+        let assert = docspec_cmd()
             .args(["convert", "--from", "markdown", "--to", "blocknote"])
             .write_stdin("# Hello\n")
             .assert()
-            .success()
-            .stdout(concat!(
-                r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#,
-                "\n"
-            ));
+            .success();
+
+        assert_json_eq(
+            &String::from_utf8_lossy(&assert.get_output().stdout),
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 1},
+                    "content": [{"type": "text", "text": "Hello", "styles": {}}],
+                    "children": []
+                }
+            ]),
+        );
     }
 
     #[test]
     fn dash_means_stdin() {
-        docspec_cmd()
+        let assert = docspec_cmd()
             .args(["convert", "-", "--from", "markdown", "--to", "blocknote"])
             .write_stdin("# Dash Input\n")
             .assert()
-            .success()
-            .stdout(concat!(
-                r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Dash Input","styles":{}}],"children":[]}]"#,
-                "\n"
-            ));
+            .success();
+
+        assert_json_eq(
+            &String::from_utf8_lossy(&assert.get_output().stdout),
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 1},
+                    "content": [{"type": "text", "text": "Dash Input", "styles": {}}],
+                    "children": []
+                }
+            ]),
+        );
     }
 
     #[test]
@@ -221,12 +252,16 @@ mod tests {
             .assert()
             .success();
 
-        assert_eq!(
-            read_output(&output_path),
-            concat!(
-                r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Explicit","styles":{}}],"children":[]}]"#,
-                "\n"
-            )
+        assert_json_eq(
+            &read_output(&output_path),
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 1},
+                    "content": [{"type": "text", "text": "Explicit", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -237,14 +272,52 @@ mod tests {
             "/../../tests/fixtures/markdown/heading_levels.md"
         );
 
-        docspec_cmd()
+        let assert = docspec_cmd()
             .args(["convert", fixture, "--to", "blocknote"])
             .assert()
-            .success()
-            .stdout(concat!(
-                r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Heading Level 1","styles":{}}],"children":[]},{"type":"heading","props":{"level":2},"content":[{"type":"text","text":"Heading Level 2","styles":{}}],"children":[]},{"type":"heading","props":{"level":3},"content":[{"type":"text","text":"Heading Level 3","styles":{}}],"children":[]},{"type":"heading","props":{"level":4},"content":[{"type":"text","text":"Heading Level 4","styles":{}}],"children":[]},{"type":"heading","props":{"level":5},"content":[{"type":"text","text":"Heading Level 5","styles":{}}],"children":[]},{"type":"heading","props":{"level":6},"content":[{"type":"text","text":"Heading Level 6","styles":{}}],"children":[]}]"#,
-                "\n"
-            ));
+            .success();
+
+        assert_json_eq(
+            &String::from_utf8_lossy(&assert.get_output().stdout),
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 1},
+                    "content": [{"type": "text", "text": "Heading Level 1", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "heading",
+                    "props": {"level": 2},
+                    "content": [{"type": "text", "text": "Heading Level 2", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "heading",
+                    "props": {"level": 3},
+                    "content": [{"type": "text", "text": "Heading Level 3", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "heading",
+                    "props": {"level": 4},
+                    "content": [{"type": "text", "text": "Heading Level 4", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "heading",
+                    "props": {"level": 5},
+                    "content": [{"type": "text", "text": "Heading Level 5", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "heading",
+                    "props": {"level": 6},
+                    "content": [{"type": "text", "text": "Heading Level 6", "styles": {}}],
+                    "children": []
+                }
+            ]),
+        );
     }
 
     #[test]
@@ -313,14 +386,65 @@ mod tests {
             "/../../tests/fixtures/markdown/paragraphs.md"
         );
 
-        docspec_cmd()
+        let assert = docspec_cmd()
             .args(["convert", fixture, "--to", "blocknote"])
             .assert()
-            .success()
-            .stdout(concat!(
-                r#"[{"type":"paragraph","content":[{"type":"text","text":"Single paragraph with plain text.","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Multiple paragraphs. This is the second paragraph.","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"bold text","styles":{"bold":true}},{"type":"text","text":" in the middle.","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"italic text","styles":{"italic":true}},{"type":"text","text":" in the middle.","styles":{}}],"children":[]},{"type":"paragraph","content":[{"type":"text","text":"Paragraph with ","styles":{}},{"type":"text","text":"bold and italic text","styles":{"bold":true,"italic":true}},{"type":"text","text":" combined.","styles":{}}],"children":[]}]"#,
-                "\n"
-            ));
+            .success();
+
+        assert_json_eq(
+            &String::from_utf8_lossy(&assert.get_output().stdout),
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "Single paragraph with plain text.", "styles": {}}
+                    ],
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Multiple paragraphs. This is the second paragraph.",
+                            "styles": {}
+                        }
+                    ],
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "Paragraph with ", "styles": {}},
+                        {"type": "text", "text": "bold text", "styles": {"bold": true}},
+                        {"type": "text", "text": " in the middle.", "styles": {}}
+                    ],
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "Paragraph with ", "styles": {}},
+                        {"type": "text", "text": "italic text", "styles": {"italic": true}},
+                        {"type": "text", "text": " in the middle.", "styles": {}}
+                    ],
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {"type": "text", "text": "Paragraph with ", "styles": {}},
+                        {
+                            "type": "text",
+                            "text": "bold and italic text",
+                            "styles": {"bold": true, "italic": true}
+                        },
+                        {"type": "text", "text": " combined.", "styles": {}}
+                    ],
+                    "children": []
+                }
+            ]),
+        );
     }
 
     #[test]
@@ -420,15 +544,22 @@ mod tests {
 
     #[test]
     fn html_explicit_from_flag_via_stdin() {
-        docspec_cmd()
+        let assert = docspec_cmd()
             .args(["convert", "--from", "html", "--to", "blocknote", "-"])
             .write_stdin("<p>hello world</p>")
             .assert()
-            .success()
-            .stdout(concat!(
-                r#"[{"type":"paragraph","content":[{"type":"text","text":"hello world","styles":{}}],"children":[]}]"#,
-                "\n"
-            ));
+            .success();
+
+        assert_json_eq(
+            &String::from_utf8_lossy(&assert.get_output().stdout),
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "hello world", "styles": {}}],
+                    "children": []
+                }
+            ]),
+        );
     }
 
     #[test]
@@ -514,15 +645,21 @@ mod tests {
 
     #[test]
     fn convert_markdown_stdin_to_oxa_stdout() {
-        docspec_cmd()
+        let assert = docspec_cmd()
             .args(["convert", "--from", "markdown", "--to", "oxa"])
             .write_stdin("Hello world")
             .assert()
-            .success()
-            .stdout(concat!(
-                r#"{"type":"Document","children":[{"type":"Paragraph","children":[{"type":"Text","value":"Hello world"}]}]}"#,
-                "\n"
-            ));
+            .success();
+
+        assert_json_eq(
+            &String::from_utf8_lossy(&assert.get_output().stdout),
+            json!({
+                "type": "Document",
+                "children": [
+                    {"type": "Paragraph", "children": [{"type": "Text", "value": "Hello world"}]}
+                ]
+            }),
+        );
     }
 
     #[test]
@@ -549,12 +686,15 @@ mod tests {
             .assert()
             .success();
 
-        assert_eq!(
-            read_output(&output_path),
-            concat!(
-                r#"[{"type":"paragraph","content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#,
-                "\n"
-            )
+        assert_json_eq(
+            &read_output(&output_path),
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Hello", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
     #[test]

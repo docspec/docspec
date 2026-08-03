@@ -111,6 +111,7 @@ One internal, unpublished crate — [`docspec-test-utils`](crates/docspec-test-u
 - `collect_events(reader)` / `try_collect_events(reader)` — drive a reader to completion and return the `Vec<Event>` it emitted.
 - `drive(sink, events)` / `try_drive(sink, events)` — push a sequence of events into a writer and call `finish()`.
 - `capture(path, open)` — open a fixture with a reader and drain it into a `ReaderFixtureSnapshot`: the event stream plus how it terminated (`Ok` or `Err`), with image assets captured stably by content hash.
+- `assert_json_eq(output, json!(…))` / `assert_json_text_eq(output, fixture_text)` — compare a writer's JSON output against a `json!` literal or a fixture, as parsed documents.
 - `FailingWriter` — an `io::Write` that fails after N bytes, for exercising error propagation.
 - `synth_docx(...)` and friends — build minimal in-memory DOCX archives, so DOCX tests don't all need a binary fixture on disk.
 
@@ -146,15 +147,31 @@ writer.finish().unwrap();
 assert_eq!(String::from_utf8(buf).unwrap(), "<html><body><p>Hello, world</p></body></html>");
 ```
 
+JSON writers are the one exception to byte-for-byte comparison: their expected document is written as a `json!` literal and compared through `assert_json_eq`, so the assertion reads as the document it pins rather than as an escaped one-line string. Every field is still pinned exactly — only key ordering and whitespace stop mattering.
+
+```rust
+let json = run_events(&events);   // StartDocument … Text("Hello") … EndDocument
+assert_json_eq(
+    &json,
+    json!([
+        {
+            "type": "paragraph",
+            "content": [{"type": "text", "text": "Hello", "styles": {}}],
+            "children": []
+        }
+    ]),
+);
+```
+
 ### End to end: a reader wired to a writer
 
-The facade's integration tests connect a reader straight to a writer — the real pipeline — and compare the result against a committed fixture. JSON outputs are compared as parsed values, so key ordering and whitespace can't cause false failures while the structure stays pinned exactly. The snippet below is a sketch — `run_pipeline` and `assert_json_eq` are per-test helpers, and the `.../tests/fixtures/…` paths are placeholders for the concrete relative paths each test uses:
+The facade's integration tests connect a reader straight to a writer — the real pipeline — and compare the result against a committed fixture. JSON outputs are compared as parsed values, so key ordering and whitespace can't cause false failures while the structure stays pinned exactly. The snippet below is a sketch — `run_pipeline` is a per-test helper, `assert_json_text_eq` comes from the shared harness, and the `.../tests/fixtures/…` paths are placeholders for the concrete relative paths each test uses:
 
 ```rust
 // crates/docspec/tests/blocknote_markdown_pipeline.rs
 let markdown = include_str!(".../tests/fixtures/markdown/empty.md");
 let expected = include_str!(".../tests/fixtures/blocknote/empty.json");
-assert_json_eq(&run_pipeline(markdown), expected);
+assert_json_text_eq(&run_pipeline(markdown), expected);
 ```
 
 Inputs and expected outputs live under `tests/fixtures/<format>/`, paired by name (`empty.md` ↔ `empty.json`), so every conversion is pinned to a real, reviewable before/after pair.

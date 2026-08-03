@@ -28,6 +28,9 @@ pub use drive::{drive, try_drive};
 mod failing_writer;
 pub use failing_writer::FailingWriter;
 
+mod json;
+pub use json::{assert_json_eq, assert_json_text_eq};
+
 pub mod snapshot;
 pub use snapshot::{
     capture, is_lfs_pointer, AssetDescriptor, EventSnapshot, ReaderFixtureSnapshot, Terminal,
