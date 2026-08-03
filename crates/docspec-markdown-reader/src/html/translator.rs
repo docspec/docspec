@@ -24,18 +24,6 @@ pub(crate) fn tokenize_fragment(
     Tokenizer::new(input)
 }
 
-/// Classifies an HTML start-tag byte slice into its semantic intent.
-///
-/// Delegates to [`tag_intent`] and returns `None` for
-/// [`TagIntent::Ignored`] tags. Later tasks extend this function into a
-/// full event-emitting translator.
-pub(crate) fn classify_start_tag(name: &[u8]) -> Option<TagIntent> {
-    match tag_intent(name) {
-        TagIntent::Ignored => None,
-        intent => Some(intent),
-    }
-}
-
 /// State for accumulating a multi-line HTML heading whose tags and content
 /// arrive as separate `Event::Html` payloads inside a single `HtmlBlock`.
 ///
