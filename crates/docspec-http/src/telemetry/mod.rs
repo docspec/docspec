@@ -187,23 +187,23 @@ pub fn shutdown() -> core::future::Ready<()> {
 }
 
 /// Parses a float rate from the named environment variable, returning the
-/// default if the variable is absent, empty, or unparseable, and clamping
-/// the result to `[0.0, 1.0]`.
+/// default if the variable is absent, empty, unparseable, or not finite, and
+/// clamping the result to `[0.0, 1.0]`.
 ///
 /// Shared by the Sentry and `PostHog` backends.
 #[cfg(any(feature = "sentry", feature = "posthog"))]
 pub(in crate::telemetry) fn env_rate(name: &str, default: f32) -> f32 {
-    std::env::var(name).map_or(default, |value| {
-        value.parse::<f32>().map_or_else(
-            |_| {
-                eprintln!(
-                    "warning: {name} invalid or out-of-range; clamped to default {default:.1}"
-                );
-                default
-            },
-            |rate| rate.clamp(0.0, 1.0),
-        )
-    })
+    let Ok(value) = std::env::var(name) else {
+        return default;
+    };
+
+    match value.parse::<f32>() {
+        Ok(rate) if rate.is_finite() => rate.clamp(0.0, 1.0),
+        _ => {
+            eprintln!("warning: {name} invalid or out-of-range; clamped to default {default:.1}");
+            default
+        }
+    }
 }
 
 #[cfg(test)]

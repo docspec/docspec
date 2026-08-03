@@ -16,17 +16,25 @@ pub(in crate::telemetry) fn init_sentry(
 }
 
 fn client_options(parsed_data_source_name: sentry::types::Dsn) -> sentry::ClientOptions {
-    sentry::ClientOptions {
-        dsn: Some(parsed_data_source_name),
-        release: sentry::release_name!(),
-        environment: Some(env_environment()),
-        sample_rate: env_sample_rate(),
-        traces_sample_rate: env_traces_sample_rate(),
-        send_default_pii: false,
-        attach_stacktrace: true,
-        before_send: Some(std::sync::Arc::new(before_send)),
-        ..Default::default()
+    let mut options = sentry::ClientOptions::new()
+        .maybe_release(sentry::release_name!())
+        .environment(env_environment())
+        .sample_rate(env_sample_rate())
+        .send_default_pii(false)
+        .attach_stacktrace(true)
+        .before_send(before_send);
+
+    // Zero must stay `Disabled`, not `FixedRate(0.0)`: the latter still honours
+    // an inherited sampling decision from an incoming trace.
+    let traces_sample_rate = env_traces_sample_rate();
+    if traces_sample_rate > 0.0 {
+        options = options.traces_sample_rate(traces_sample_rate);
     }
+
+    // Assigned directly because the builder's `dsn` takes a `&str` and panics on
+    // parse failure; this DSN is already parsed.
+    options.dsn = Some(parsed_data_source_name);
+    options
 }
 
 fn env_environment() -> std::borrow::Cow<'static, str> {
@@ -87,6 +95,10 @@ pub(in crate::telemetry) fn tower_http_layer() -> sentry::integrations::tower::S
 
 #[cfg(test)]
 mod tests {
+    // Reason: tests that parse a DSN with `?` still assert with `assert!`;
+    // the lint only makes sense for production code.
+    #![allow(clippy::panic_in_result_fn)]
+
     use std::sync::Mutex;
 
     static ENV_MUTEX: Mutex<()> = Mutex::new(());
@@ -188,6 +200,16 @@ mod tests {
     }
 
     #[test]
+    fn env_traces_sample_rate_ignores_non_finite() {
+        let _env_guard = lock_env();
+        std::env::set_var("SENTRY_TRACES_SAMPLE_RATE", "NaN");
+
+        assert_eq!(super::env_traces_sample_rate().to_bits(), f32::to_bits(0.0));
+
+        std::env::remove_var("SENTRY_TRACES_SAMPLE_RATE");
+    }
+
+    #[test]
     fn client_options_enables_attach_stacktrace() -> Result<(), Box<dyn core::error::Error>> {
         let _env_guard = lock_env();
         let dsn: sentry::types::Dsn = "https://public@example.com/1".parse()?;
@@ -197,5 +219,66 @@ mod tests {
         } else {
             Err("attach_stacktrace should be true".into())
         }
+    }
+
+    #[test]
+    fn client_options_sets_dsn_release_environment_and_sample_rate(
+    ) -> Result<(), Box<dyn core::error::Error>> {
+        let _env_guard = lock_env();
+        std::env::set_var("SENTRY_ENVIRONMENT", "staging");
+        std::env::set_var("SENTRY_SAMPLE_RATE", "0.25");
+        let dsn: sentry::types::Dsn = "https://public@example.com/1".parse()?;
+
+        let opts = super::client_options(dsn.clone());
+
+        std::env::remove_var("SENTRY_ENVIRONMENT");
+        std::env::remove_var("SENTRY_SAMPLE_RATE");
+
+        assert_eq!(opts.dsn, Some(dsn));
+        assert_eq!(opts.release, sentry::release_name!());
+        assert_eq!(
+            opts.environment,
+            Some(std::borrow::Cow::Borrowed("staging"))
+        );
+        assert!(!opts.send_default_pii);
+        assert!(opts.before_send.is_some());
+        assert!(matches!(
+            opts.event_sampling_strategy,
+            sentry::EventSamplingStrategy::FixedRate(rate) if rate.to_bits() == f32::to_bits(0.25)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn client_options_leaves_traces_disabled_at_zero() -> Result<(), Box<dyn core::error::Error>> {
+        let _env_guard = lock_env();
+        std::env::remove_var("SENTRY_TRACES_SAMPLE_RATE");
+        let dsn: sentry::types::Dsn = "https://public@example.com/1".parse()?;
+
+        let opts = super::client_options(dsn);
+
+        assert!(matches!(
+            opts.traces_sampling_strategy,
+            sentry::TracesSamplingStrategy::Disabled
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn client_options_sets_fixed_traces_rate_above_zero() -> Result<(), Box<dyn core::error::Error>>
+    {
+        let _env_guard = lock_env();
+        std::env::set_var("SENTRY_TRACES_SAMPLE_RATE", "0.5");
+        let dsn: sentry::types::Dsn = "https://public@example.com/1".parse()?;
+
+        let opts = super::client_options(dsn);
+
+        std::env::remove_var("SENTRY_TRACES_SAMPLE_RATE");
+
+        assert!(matches!(
+            opts.traces_sampling_strategy,
+            sentry::TracesSamplingStrategy::FixedRate(rate) if rate.to_bits() == f32::to_bits(0.5)
+        ));
+        Ok(())
     }
 }
