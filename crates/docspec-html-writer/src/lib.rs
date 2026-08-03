@@ -1,6 +1,12 @@
 #![forbid(unsafe_code)]
 
 //! Streaming HTML5 writer for `DocSpec` events.
+//!
+//! **Experimental.** This writer emits paragraphs and their text, and nothing else.
+//! Headings, lists, tables, links, images, text styles, block quotes, preformatted
+//! blocks and breaks are all silently dropped, as is any `Text` event that arrives
+//! outside a paragraph. A heading therefore produces no output at all — not even its
+//! text. Do not rely on this writer where fidelity matters.
 
 use docspec_core::{Event, EventSink, Result};
 use html5ever::serialize::{HtmlSerializer, SerializeOpts, Serializer as _};

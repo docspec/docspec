@@ -4,6 +4,10 @@
 //! This crate provides a streaming [`OxaWriter`] that implements [`EventSink`] to convert
 //! `DocSpec` event streams into `oxa.dev` JSON format.
 //!
+//! **Experimental.** This writer emits paragraphs and their text, and nothing else.
+//! Headings, lists, tables, links, images and text styles are silently dropped. Do not
+//! rely on it where fidelity matters.
+//!
 //! # Design
 //!
 //! The writer emits JSON tokens directly to the underlying `Write` as events arrive using

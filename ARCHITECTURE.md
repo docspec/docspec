@@ -30,6 +30,8 @@ A sink takes events and produces a document in some format. It receives events o
 
 This decoupling is the key architectural insight. Sources and sinks are fully independent. They communicate only through the event protocol. Any source can connect to any sink. A system with four readers and four writers needs only eight implementations instead of sixteen. Complexity grows linearly, not quadratically.
 
+"Any source can connect to any sink" is a statement about **protocol compatibility**, not about fidelity. Every pairing runs, but the result is only as faithful as its least-capable endpoint: a sink silently drops events it cannot represent. See the [format matrix](README.md#what-it-reads-and-writes) for which readers and writers are production-ready and which are experimental.
+
 The pipeline is transparent and inspectable. You can insert adapters between source and sink without either knowing the adapter exists. An adapter is a sink that consumes events and a source that emits events. This composability enables powerful transformation chains: filter events, remap event types, validate events, count events.
 
 The event model is universal across all formats. A document is a sequence of structural elements: headings, paragraphs, lists, tables, text runs with styling, links, images. By separating structure from encoding, we achieve true interoperability.
@@ -78,7 +80,9 @@ This approach also enables lazy loading and conditional processing. If a sink do
 
 Events flow until they cannot. When a reader encounters a malformed byte sequence, corrupted structure, or unsupported feature, it surfaces an error immediately. There is no attempt to recover and continue. There is no partial output. There is no "best effort" conversion that produces garbage.
 
-Fail fast means the caller receives one of exactly two outcomes: a complete, correct conversion that processed the entire document successfully, or a clear error describing precisely what went wrong and where. Never a partial conversion. Never truncated output. Never corrupted output that propagates downstream.
+Fail fast means the caller receives one of exactly two outcomes: a conversion that processed the entire input successfully, or a clear error describing precisely what went wrong and where. Never a partial conversion. Never truncated output. Never corrupted output that propagates downstream.
+
+This guarantee is about **input integrity**, not **semantic coverage**. A successful conversion means every byte of the source was read and understood; it does not mean every event survived into the output. A sink that has no representation for an event drops it and keeps going — so a writer marked *Experimental* in the [format matrix](README.md#what-it-reads-and-writes) can return success while omitting headings, lists, or tables entirely. That is a documented coverage gap, not a failure, and it is deliberately not surfaced as an error today.
 
 Error information is structured, typed, and contextual. Each error carries relevant context: what operation was being performed, where in the document the problem occurred, what values were expected and what was actually found.
 
