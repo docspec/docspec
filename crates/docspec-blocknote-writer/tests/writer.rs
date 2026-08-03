@@ -155,6 +155,18 @@ mod tests {
         }
     }
 
+    fn uri_image(uri: &str) -> Event {
+        Event::Image {
+            source: ImageSource::Uri {
+                uri: uri.to_string(),
+            },
+            alt: None,
+            title: None,
+            decorative: false,
+            id: None,
+        }
+    }
+
     #[test]
     fn empty_document() {
         let json = run_events(&[start_document(), Event::EndDocument]);
@@ -4819,6 +4831,91 @@ mod tests {
         assert_eq!(
             json,
             r#"[{"type":"bulletListItem","content":[{"type":"text","text":"first","styles":{}}],"children":[{"type":"paragraph","content":[{"type":"text","text":"second","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/leaked.png","caption":"leaked"},"content":null,"children":[]}]}]"#
+        );
+    }
+
+    /// Regression for #345: a DOCX bullet with inline images separated by soft breaks.
+    /// The first image moves emission into `children[]` and the following text auto-opens
+    /// a child paragraph there; the second image must close that paragraph and land as its
+    /// sibling. Inside `paragraph.content[]` (`InlineContent[]`) it makes a real
+    /// `BlockNote` editor throw `RangeError: Invalid content for node paragraph`.
+    #[test]
+    fn image_after_line_break_in_open_child_paragraph_emits_as_bullet_item_sibling() {
+        let json = run_events(&[
+            start_document(),
+            Event::StartUnorderedListItem {
+                id: None,
+                level: 0,
+                style_type: docspec_core::ListStyleType::Disc,
+            },
+            start_paragraph(),
+            text("before ("),
+            uri_image("https://example.com/first.png"),
+            text("):"),
+            Event::LineBreak,
+            uri_image("https://example.com/second.png"),
+            text(" after."),
+            Event::EndParagraph,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"bulletListItem","content":[{"type":"text","text":"before (","styles":{}}],"children":[{"type":"image","props":{"url":"https://example.com/first.png","caption":""},"content":null,"children":[]},{"type":"paragraph","content":[{"type":"text","text":"):","styles":{}},{"type":"text","text":"\n","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/second.png","caption":""},"content":null,"children":[]},{"type":"paragraph","content":[{"type":"text","text":" after.","styles":{}}],"children":[]}]}]"#
+        );
+    }
+
+    /// Regression for #345 — same shape as the bullet case, on an ordered list item.
+    #[test]
+    fn image_after_line_break_in_open_child_paragraph_emits_as_ordered_item_sibling() {
+        let json = run_events(&[
+            start_document(),
+            Event::StartOrderedListItem {
+                id: None,
+                level: 0,
+                start: None,
+                style_type: docspec_core::ListStyleType::Decimal,
+            },
+            start_paragraph(),
+            text("before ("),
+            uri_image("https://example.com/first.png"),
+            text("):"),
+            Event::LineBreak,
+            uri_image("https://example.com/second.png"),
+            text(" after."),
+            Event::EndParagraph,
+            Event::EndOrderedListItem,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"numberedListItem","content":[{"type":"text","text":"before (","styles":{}}],"children":[{"type":"image","props":{"url":"https://example.com/first.png","caption":""},"content":null,"children":[]},{"type":"paragraph","content":[{"type":"text","text":"):","styles":{}},{"type":"text","text":"\n","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/second.png","caption":""},"content":null,"children":[]},{"type":"paragraph","content":[{"type":"text","text":" after.","styles":{}}],"children":[]}]}]"#
+        );
+    }
+
+    /// Regression for #345 — `prepare_blockquote_children` has the same no-op hole as
+    /// `open_current_list_item_children`: once the quote is in children-only mode, a
+    /// child paragraph opened there stays open and swallows the next block.
+    #[test]
+    fn image_after_line_break_in_open_child_paragraph_emits_as_blockquote_sibling() {
+        let json = run_events(&[
+            start_document(),
+            start_blockquote(),
+            start_paragraph(),
+            text("before ("),
+            uri_image("https://example.com/first.png"),
+            Event::EndParagraph,
+            start_paragraph(),
+            text("):"),
+            Event::LineBreak,
+            uri_image("https://example.com/second.png"),
+            Event::EndParagraph,
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
+        assert_eq!(
+            json,
+            r#"[{"type":"quote","content":[{"type":"text","text":"before (","styles":{}}],"children":[{"type":"image","props":{"url":"https://example.com/first.png","caption":""},"content":null,"children":[]},{"type":"paragraph","content":[{"type":"text","text":"):","styles":{}},{"type":"text","text":"\n","styles":{}}],"children":[]},{"type":"image","props":{"url":"https://example.com/second.png","caption":""},"content":null,"children":[]}]}]"#
         );
     }
 

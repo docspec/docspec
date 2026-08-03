@@ -393,6 +393,22 @@ impl<W: Write> BlockNoteWriter<W> {
         Ok(())
     }
 
+    /// Terminate a child block still holding an open `content[]` array inside an
+    /// already-open `children[]`.
+    ///
+    /// `children[]` holds `Block[]`, but a child paragraph (auto-opened for text that
+    /// follows an inline image) or code block keeps its `content[]` — an
+    /// `InlineContent[]` array — open until its matching end event. Emitting a sibling
+    /// block while that array is open would nest a block inside `InlineContent[]`, which
+    /// no `BlockNote` schema accepts and which makes an editor throw at document
+    /// construction.
+    fn close_open_child_text_block(&mut self) -> Result<()> {
+        if self.context.in_text_block {
+            return close_text_block!(self);
+        }
+        Ok(())
+    }
+
     fn close_open_list_items(&mut self) -> Result<()> {
         while !self.list_stack.is_empty() {
             self.close_current_list_item_object()?;
@@ -442,7 +458,8 @@ impl<W: Write> BlockNoteWriter<W> {
                     *state = BlockquoteContentState::InChildren;
                 }
             }
-            Some(BlockquoteContentState::InChildren) | None => {}
+            Some(BlockquoteContentState::InChildren) => self.close_open_child_text_block()?,
+            None => {}
         }
         Ok(())
     }
@@ -1192,7 +1209,8 @@ impl<W: Write> BlockNoteWriter<W> {
                 entry.children_array_open = true;
             }
         }
-        Ok(())
+
+        self.close_open_child_text_block()
     }
 
     fn prepare_list_item_children(&mut self) -> Result<()> {
