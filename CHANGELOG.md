@@ -12,6 +12,19 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.21.5](https://github.com/docspec/docspec/compare/v1.21.4...v1.21.5) - 2026-08-03
+
+### Fixed
+
+- *(docspec)* stream DOCX in AnyReader::from_path instead of buffering
+- *(http)* avoid panic when serializing error responses
+
+### Other
+
+- correct invalid commands, nonexistent APIs, and false capability claims
+- *(markdown-reader)* drop dead_code allow and unused classify_start_tag
+- *(http)* remove redundant inline allows already set workspace-wide
+
 ## [1.21.4](https://github.com/docspec/docspec/compare/v1.21.3...v1.21.4) - 2026-07-31
 
 ### Fixed

@@ -19,24 +19,24 @@ members = [
 ]
 
 [workspace.package]
-version = "1.21.4"
+version = "1.21.5"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/docspec/docspec"
 
 [workspace.dependencies]
-docspec = { path = "crates/docspec", version = "1.21.4" }
-docspec-core = { path = "crates/docspec-core", version = "1.21.4" }
-docspec-json = { path = "crates/docspec-json", version = "1.21.4" }
-docspec-markdown-reader = { path = "crates/docspec-markdown-reader", version = "1.21.4" }
-docspec-html-reader = { path = "crates/docspec-html-reader", version = "1.21.4" }
-docspec-docx-reader = { path = "crates/docspec-docx-reader", version = "1.21.4" }
-docspec-blocknote-writer = { path = "crates/docspec-blocknote-writer", version = "1.21.4" }
-docspec-html-writer = { path = "crates/docspec-html-writer", version = "1.21.4" }
-docspec-http = { path = "crates/docspec-http", version = "1.21.4" }
-docspec-oxa-writer = { path = "crates/docspec-oxa-writer", version = "1.21.4" }
-docspec-pandoc-native-writer = { path = "crates/docspec-pandoc-native-writer", version = "1.21.4" }
-docspec-markdown-writer = { path = "crates/docspec-markdown-writer", version = "1.21.4" }
+docspec = { path = "crates/docspec", version = "1.21.5" }
+docspec-core = { path = "crates/docspec-core", version = "1.21.5" }
+docspec-json = { path = "crates/docspec-json", version = "1.21.5" }
+docspec-markdown-reader = { path = "crates/docspec-markdown-reader", version = "1.21.5" }
+docspec-html-reader = { path = "crates/docspec-html-reader", version = "1.21.5" }
+docspec-docx-reader = { path = "crates/docspec-docx-reader", version = "1.21.5" }
+docspec-blocknote-writer = { path = "crates/docspec-blocknote-writer", version = "1.21.5" }
+docspec-html-writer = { path = "crates/docspec-html-writer", version = "1.21.5" }
+docspec-http = { path = "crates/docspec-http", version = "1.21.5" }
+docspec-oxa-writer = { path = "crates/docspec-oxa-writer", version = "1.21.5" }
+docspec-pandoc-native-writer = { path = "crates/docspec-pandoc-native-writer", version = "1.21.5" }
+docspec-markdown-writer = { path = "crates/docspec-markdown-writer", version = "1.21.5" }
 docspec-test-utils = { path = "crates/docspec-test-utils" }
 self_cell = "1.2"
 
