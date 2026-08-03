@@ -85,6 +85,25 @@ see the [`docspec-http` README](https://docs.rs/docspec-http) for the full list.
 > Known losses include vertical cell merges, comments, footnotes, headers and footers,
 > document metadata, tracked deletions, and field-code hyperlinks.
 
+## Supported output formats
+
+Only `blocknote` is production-ready. **Every other output format is experimental and will
+silently drop structure it cannot express** — the conversion succeeds and exits `0`, but
+content is missing from the output.
+
+- `blocknote` — **Supported.** Headings, lists, tables, links, images, styles, block quotes, code
+- `pandoc-native` — *Experimental.* Paragraphs, headings, text styles and code blocks; lists, tables, links and images are dropped
+- `markdown` — *Experimental.* Paragraphs and headings only, text only
+- `html` — *Experimental.* Paragraphs and text only; headings, lists, tables, links and images are dropped
+- `oxa` — *Experimental.* Paragraphs and text only; headings, lists, tables, links and images are dropped
+
+> **Worked example.** `echo '# Foo' | docspec convert --from markdown --to html` prints
+> `<html><body></body></html>` — the heading is dropped, and its text with it, because the
+> HTML writer only emits text inside a paragraph.
+
+See the [format matrix](https://github.com/docspec/docspec/blob/main/README.md#what-it-reads-and-writes)
+for the canonical status of every format.
+
 ## Examples
 
 Convert a Markdown file to BlockNote JSON:
@@ -111,7 +130,7 @@ Convert Markdown from stdin to BlockNote JSON on stdout:
 echo "# Hello" | docspec convert --from markdown --to blocknote
 ```
 
-Convert Markdown to HTML:
+Convert Markdown to HTML (experimental — paragraphs and text only):
 
 ```bash
 echo "Hello" | docspec convert --from markdown --to html

@@ -6,7 +6,15 @@ Send a document, receive a converted one. `docspec-http` is an Axum-based librar
 
 Send markdown (`Content-Type: text/markdown`), HTML (`Content-Type: text/html`), or DOCX (`Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document`), receive BlockNote JSON (default), HTML (`Accept: text/html`), oxa.dev JSON (`Accept: application/vnd.oxa+json`), or Pandoc native (`Accept: application/vnd.pandoc.native`). The underlying DocSpec pipeline is streaming, but this v1 HTTP wrapper **buffers the request body and the conversion output in memory** before responding. End-to-end streaming over HTTP is planned for a future version. For now, request size scales with available memory.
 
-> **HTML is paragraph-only.** The HTML reader currently parses `<p>` elements only, and the HTML writer currently emits only paragraph events. Other HTML input elements and non-paragraph output events (headings, lists, tables, formatting, etc.) are silently dropped. See [docspec-html-reader](https://docs.rs/docspec-html-reader) and [docspec-html-writer](https://docs.rs/docspec-html-writer).
+> **Only BlockNote output is production-ready.** `text/html`, `application/vnd.oxa+json` and `application/vnd.pandoc.native` are **experimental**: the server returns `200` while silently dropping structure those writers cannot express.
+>
+> - `text/html` — paragraphs and text only; headings, lists, tables, links and images are dropped
+> - `application/vnd.oxa+json` — paragraphs and text only; same omissions
+> - `application/vnd.pandoc.native` — paragraphs, headings, styles and code; lists, tables, links and images are dropped
+>
+> HTML **input** is likewise paragraph-only: the reader parses `<p>` elements and their text, and drops all other structure.
+>
+> See the [format matrix](https://github.com/docspec/docspec/blob/main/README.md#what-it-reads-and-writes) for canonical status, and [docspec-html-reader](https://docs.rs/docspec-html-reader) / [docspec-html-writer](https://docs.rs/docspec-html-writer) for exact event coverage.
 
 ## When to use this crate
 

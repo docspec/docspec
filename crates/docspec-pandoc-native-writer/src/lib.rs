@@ -1,6 +1,10 @@
 #![forbid(unsafe_code)]
 
 //! Streaming Pandoc native (block-list) writer for `DocSpec` events.
+//!
+//! **Experimental.** This writer covers paragraphs, headings, text styles, code blocks
+//! and breaks. Lists, tables, links and images are silently dropped. Do not rely on it
+//! where fidelity matters.
 
 mod escape;
 

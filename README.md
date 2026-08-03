@@ -76,12 +76,30 @@ curl -X POST http://localhost:3000/conversion \
 ## What it reads and writes
 
 Readers and writers are fully decoupled: any reader can feed any writer, because the
-event stream is the only contract between them.
+event stream is the only contract between them. That decoupling is *mechanical* — every
+pairing runs, but a conversion is only as faithful as its least-capable endpoint.
 
-| Direction  | Formats                                                     |
-| ---------- | ----------------------------------------------------------- |
-| **Reads**  | DOCX, HTML, Markdown                                         |
-| **Writes** | HTML, Markdown, BlockNote JSON, oxa.dev JSON, Pandoc native  |
+Formats carry one of two statuses:
+
+- **Supported** — intended for production use within its documented mapping. Common
+  document structure is covered, and the known limitations are part of the maintained
+  contract. This does not mean lossless interchange.
+- **Experimental** — coverage is deliberately incomplete. Common structures may be
+  **silently omitted from the output**. Don't rely on it where fidelity matters.
+
+| Direction  | Format           | Status           | Coverage today                                                    |
+| ---------- | ---------------- | ---------------- | ----------------------------------------------------------------- |
+| **Reads**  | DOCX             | **Supported**    | Headings, tables, lists, hyperlinks, images, run styles, colors    |
+| **Reads**  | Markdown         | **Supported**    | CommonMark + GFM tables and strikethrough                          |
+| **Reads**  | HTML             | *Experimental*   | `<p>` elements and their text only — every other tag is dropped    |
+| **Writes** | BlockNote JSON   | **Supported**    | Headings, lists, tables, links, images, styles, quotes, code       |
+| **Writes** | Pandoc native    | *Experimental*   | Paragraphs, headings, styles, code; no lists, tables, links, images |
+| **Writes** | Markdown         | *Experimental*   | Paragraphs and headings, text only                                 |
+| **Writes** | HTML             | *Experimental*   | Paragraphs and text only                                           |
+| **Writes** | oxa.dev JSON     | *Experimental*   | Paragraphs and text only                                           |
+
+This table is the canonical statement of format maturity. Each crate's README remains the
+authoritative reference for exactly which events it handles and drops.
 
 ## Why DocSpec?
 

@@ -90,13 +90,13 @@ pub enum ColorChoice {
 #[derive(Clone, Copy, Debug, ValueEnum)]
 #[non_exhaustive]
 pub enum CliInputFormat {
-    /// DOCX format (paragraphs and text only).
+    /// DOCX — supported: headings, tables, lists, hyperlinks, images, run styles.
     #[value(name = "docx")]
     Docx,
-    /// HTML format (paragraph-only; `<p>` elements and text within them only).
+    /// HTML — EXPERIMENTAL: `<p>` and its text only; all other tags are dropped.
     #[value(name = "html")]
     Html,
-    /// Markdown format.
+    /// Markdown — supported: `CommonMark` plus GFM tables and strikethrough.
     #[value(name = "markdown")]
     Markdown,
 }
@@ -105,19 +105,22 @@ pub enum CliInputFormat {
 #[derive(Clone, Copy, Debug, ValueEnum)]
 #[non_exhaustive]
 pub enum CliOutputFormat {
-    /// `BlockNote` JSON format.
+    /// `BlockNote` JSON — supported: headings, lists, tables, links, images, styles.
     #[value(name = "blocknote")]
     Blocknote,
-    /// HTML5 format.
+    /// HTML5 — EXPERIMENTAL: paragraphs and text only; headings, lists, tables,
+    /// links and images are silently dropped.
     #[value(name = "html")]
     Html,
-    /// `oxa.dev` JSON format.
+    /// `oxa.dev` JSON — EXPERIMENTAL: paragraphs and text only; headings, lists,
+    /// tables, links and images are silently dropped.
     #[value(name = "oxa")]
     Oxa,
-    /// Pandoc native block-list syntax.
+    /// Pandoc native — EXPERIMENTAL: paragraphs, headings, styles and code only;
+    /// no lists, tables, links or images.
     #[value(name = "pandoc-native")]
     PandocNative,
-    /// Markdown format (paragraphs and headings only).
+    /// Markdown — EXPERIMENTAL: paragraphs and headings only, text only.
     #[value(name = "markdown")]
     Markdown,
 }
