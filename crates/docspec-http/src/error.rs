@@ -35,7 +35,25 @@ pub struct ProblemJson {
     pub type_uri: &'static str,
 }
 
+/// Pre-encoded RFC 7807 body used when serializing a `ProblemJson` fails.
+///
+/// Written out verbatim so the fallback never re-enters the JSON emitter that
+/// just failed.
+const SERIALIZATION_FALLBACK_JSON: &[u8] = br#"{"type":"about:blank","title":"Internal Server Error","status":500,"detail":"Error response serialization failed"}"#;
+
 impl ProblemJson {
+    fn try_to_json_bytes(&self) -> docspec_core::Result<Vec<u8>> {
+        let mut emitter = JsonEmitter::new(StrusonBackend::new(Vec::new()));
+        emitter.object(|builder| {
+            builder.key("type").value(self.type_uri)?;
+            builder.key("title").value(self.title)?;
+            builder.key("status").value(u32::from(self.status))?;
+            builder.key("detail").value(self.detail.as_ref())?;
+            Ok(())
+        })?;
+        emitter.finish()
+    }
+
     /// Serialize this problem detail as a JSON-encoded byte vector.
     ///
     /// Emits exactly four fields in document order:
@@ -43,36 +61,65 @@ impl ProblemJson {
     /// JSON-escaped (RFC 8259 §7) by the underlying writer; the status is
     /// an unquoted integer.
     ///
-    /// Uses [`JsonEmitter`] backed by `struson` for serialization.
-    ///
-    /// # Panics
-    ///
-    /// Does not panic for any well-formed `ProblemJson` instance. The
-    /// internal `.expect()` calls would only trigger on a bug in
-    /// `docspec-json` (the key/value sequence is statically valid JSON and
-    /// the `Vec<u8>` writer is infallible).
+    /// Uses [`JsonEmitter`] backed by `struson` for serialization. If
+    /// serialization fails, returns a static RFC 7807 `500` body rather than
+    /// panicking, so constructing an error response can never itself abort the
+    /// request.
     #[inline]
     #[must_use]
     pub fn to_json_bytes(&self) -> Vec<u8> {
-        // Reason: emission of a fixed 4-field object into Vec<u8> cannot fail
-        // in practice — Vec writes are infallible and the key/value sequence
-        // is statically valid JSON. Any error here would indicate a bug in
-        // docspec-json itself, not runtime input.
-        #[allow(clippy::expect_used)]
-        {
-            let mut emitter = JsonEmitter::new(StrusonBackend::new(Vec::new()));
-            emitter
-                .object(|builder| {
-                    builder.key("type").value(self.type_uri)?;
-                    builder.key("title").value(self.title)?;
-                    builder.key("status").value(u32::from(self.status))?;
-                    builder.key("detail").value(self.detail.as_ref())?;
-                    Ok(())
-                })
-                .expect("ProblemJson object emission is infallible");
-            emitter.finish().expect("ProblemJson finish is infallible")
-        }
+        Self::bytes_or_fallback(self.try_to_json_bytes())
     }
+
+    /// Unwraps a serialization result, degrading to the static fallback body.
+    fn bytes_or_fallback(serialized: docspec_core::Result<Vec<u8>>) -> Vec<u8> {
+        serialized.unwrap_or_else(|_| SERIALIZATION_FALLBACK_JSON.to_vec())
+    }
+}
+
+/// Builds the RFC 7807 response, degrading to a static body if serialization fails.
+fn problem_response(
+    problem: &ProblemJson,
+    status: StatusCode,
+    allow: Option<&'static str>,
+) -> Response {
+    problem_response_from(problem.try_to_json_bytes(), status, allow)
+}
+
+/// Builds the RFC 7807 response from an already-attempted serialization.
+///
+/// Split from [`problem_response`] so the degraded path can be exercised
+/// directly: with a `Vec<u8>` sink the emitter never fails in practice, so the
+/// `Err` arm is otherwise unreachable from a test.
+fn problem_response_from(
+    serialized: docspec_core::Result<Vec<u8>>,
+    status: StatusCode,
+    allow: Option<&'static str>,
+) -> Response {
+    let mut response = match serialized {
+        Ok(body) => {
+            let mut ok_response = (status, body).into_response();
+            if let Some(allowed) = allow {
+                ok_response
+                    .headers_mut()
+                    .insert(ALLOW, HeaderValue::from_static(allowed));
+            }
+            ok_response
+        }
+        Err(error) => {
+            tracing::error!(%error, "problem JSON serialization failed; sending static fallback");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                SERIALIZATION_FALLBACK_JSON,
+            )
+                .into_response()
+        }
+    };
+    response.headers_mut().insert(
+        CONTENT_TYPE,
+        HeaderValue::from_static("application/problem+json; charset=utf-8"),
+    );
+    response
 }
 
 /// HTTP-layer errors returned by the conversion API.
@@ -288,25 +335,13 @@ impl IntoResponse for HttpError {
             ),
         };
 
-        let body = ProblemJson {
+        let problem = ProblemJson {
             detail,
             status: status.as_u16(),
             title,
             type_uri: "about:blank",
-        }
-        .to_json_bytes();
-
-        let mut response = (status, body).into_response();
-        response.headers_mut().insert(
-            CONTENT_TYPE,
-            HeaderValue::from_static("application/problem+json; charset=utf-8"),
-        );
-        if let Some(allowed) = allow {
-            response
-                .headers_mut()
-                .insert(ALLOW, HeaderValue::from_static(allowed));
-        }
-        response
+        };
+        problem_response(&problem, status, allow)
     }
 }
 
@@ -411,6 +446,61 @@ mod tests {
 
     fn dummy_error() -> std::io::Error {
         std::io::Error::other("dummy internal error")
+    }
+
+    fn serialization_error() -> docspec_core::Error {
+        docspec_core::Error::Other {
+            message: "forced serialization failure".to_string(),
+        }
+    }
+
+    #[test]
+    fn bytes_or_fallback_returns_static_body_when_serialization_fails() {
+        assert_eq!(
+            ProblemJson::bytes_or_fallback(Err(serialization_error())),
+            br#"{"type":"about:blank","title":"Internal Server Error","status":500,"detail":"Error response serialization failed"}"#
+                .to_vec()
+        );
+    }
+
+    #[test]
+    fn bytes_or_fallback_passes_through_successful_serialization() {
+        assert_eq!(
+            ProblemJson::bytes_or_fallback(Ok(b"{\"ok\":true}".to_vec())),
+            b"{\"ok\":true}".to_vec()
+        );
+    }
+
+    #[tokio::test]
+    async fn problem_response_degrades_to_500_fallback_when_serialization_fails() {
+        let response =
+            problem_response_from(Err(serialization_error()), StatusCode::BAD_REQUEST, None);
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(
+            response.headers().get(CONTENT_TYPE).unwrap(),
+            "application/problem+json; charset=utf-8"
+        );
+        assert_eq!(
+            axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap()
+                .to_vec(),
+            br#"{"type":"about:blank","title":"Internal Server Error","status":500,"detail":"Error response serialization failed"}"#
+                .to_vec()
+        );
+    }
+
+    #[tokio::test]
+    async fn problem_response_drops_allow_header_on_serialization_failure() {
+        let response = problem_response_from(
+            Err(serialization_error()),
+            StatusCode::METHOD_NOT_ALLOWED,
+            Some("POST, OPTIONS"),
+        );
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(response.headers().get(ALLOW), None);
     }
 
     #[test]
