@@ -1,6 +1,6 @@
 # docspec-html-writer
 
-**Streaming HTML5, one event at a time.**
+**Streaming HTML5 writer for DocSpec events**
 
 HTML, written as it flows. `docspec-html-writer` turns a stream of DocSpec events into
 HTML5 without ever assembling the document in memory. Paragraphs become `<p>`, text is
@@ -12,6 +12,7 @@ escaped as it passes, and nothing accumulates — streaming, like the rest of Do
 ```toml
 [dependencies]
 docspec-html-writer = "1"
+docspec-core = "1"
 ```
 
 ## Write some HTML
@@ -46,10 +47,16 @@ rather than hand-writing events.
 
 ## What it handles today
 
-Paragraphs and their text, escaped for safety (`&`, `<`, `>`). It emits nothing for
-headings, lists, tables, images, thematic breaks, or inline text styles — no half-formed
-HTML, no silent guesses. Text outside a paragraph is ignored, and an open paragraph is
-closed for you when the document ends.
+Handled: `StartDocument`, `EndDocument`, `StartParagraph`, `EndParagraph`, and `Text`
+while a paragraph is open. Text is escaped for `&`, `<`, and `>`.
+
+Silently ignored: `StartBlockQuote`/`EndBlockQuote`, `StartCaption`/`EndCaption`, every
+definition-list event, `StartFootnote`/`EndFootnote`/`FootnoteRef`,
+`StartHeading`/`EndHeading`, `StartLink`/`EndLink`, both list-item pairs,
+`StartPreformatted`/`EndPreformatted`, every table event,
+`StartTextStyle`/`EndTextStyle`, `Image`, `LineBreak`, `SoftBreak`, and
+`ThematicBreak`. `Text` outside a paragraph is also ignored. An open paragraph is closed
+automatically on `EndDocument`.
 
 ## Related
 

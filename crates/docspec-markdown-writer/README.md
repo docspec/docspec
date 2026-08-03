@@ -1,6 +1,6 @@
 # docspec-markdown-writer
 
-**Paragraphs and headings, written as CommonMark.**
+**Streaming Markdown (CommonMark) writer for DocSpec events — paragraphs and headings only**
 
 Events arrive; Markdown leaves. `docspec-markdown-writer` turns a DocSpec event stream into CommonMark-compliant Markdown, writing directly to any `Write` target as each event passes through. Nothing accumulates. Streaming, like the rest of DocSpec. (See the [Manifesto](https://github.com/docspec/docspec/blob/main/MANIFESTO.md) for why.)
 
@@ -9,6 +9,7 @@ Events arrive; Markdown leaves. `docspec-markdown-writer` turns a DocSpec event 
 ```toml
 [dependencies]
 docspec-markdown-writer = "1"
+docspec-core = "1"
 ```
 
 ## Write some Markdown

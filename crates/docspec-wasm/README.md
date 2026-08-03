@@ -1,6 +1,6 @@
 # docspec-wasm
 
-**DocSpec in the browser, still streaming.**
+**WebAssembly bindings for the DocSpec document conversion library.**
 
 WebAssembly bindings for DocSpec, built with `wasm-bindgen`. Today they expose one entry
 point — Markdown to BlockNote JSON — so a browser can run the same streaming conversion

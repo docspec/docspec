@@ -1,6 +1,6 @@
 # docspec-html-reader
 
-**Paragraphs from HTML, one event at a time.**
+**HTML to DocSpec event stream reader**
 
 Raw HTML arrives; a clean event stream leaves. `docspec-html-reader` parses HTML5 source and emits DocSpec events as it goes, touching only what it understands and dropping the rest without complaint. Streaming, like the rest of DocSpec. (See the [Manifesto](https://github.com/docspec/docspec/blob/main/MANIFESTO.md) for why.)
 
@@ -22,7 +22,7 @@ let mut reader = HtmlReader::from_str("<p>Hello world</p>");
 while let Some(event) = reader.next_event()? {
     println!("{event:?}");
 }
-# Ok::<(), docspec_core::Error>(())
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 From a file or any `Read + Seek` source:
@@ -36,7 +36,7 @@ let mut reader = HtmlReader::from_reader(file)?;
 while let Some(event) = reader.next_event()? {
     println!("{event:?}");
 }
-# Ok::<(), docspec_core::Error>(())
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 In a real pipeline, connect it to any `EventSink` with `docspec_core::pipe(reader, writer)`.

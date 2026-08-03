@@ -40,7 +40,7 @@ The event flow is predictable. `StartDocument` begins the stream. `EndDocument` 
 
 ## 3. Why Streaming Beats Trees
 
-The dominant alternative to streaming is building an abstract syntax tree. Parse the whole document, construct a tree in memory, walk the tree recursively, emit output. These advantages come at a steep cost that grows with document size.
+The dominant alternative to streaming is building an abstract syntax tree: parse the whole document, construct a tree in memory, walk it recursively, then emit output. That buys random access, look-ahead, and whole-document transforms. Those advantages come at a steep cost that grows with document size.
 
 Memory usage in a tree-based system is O(document size) at best, often worse. A 100 MB document typically needs 100 MB for content storage, plus overhead for tree node structures: pointers, sibling links, type tags, metadata. A 100 MB document can easily become 200–300 MB in memory.
 
@@ -64,13 +64,13 @@ The streaming model enables processing of documents larger than available memory
 
 Images are where the memory abuse of traditional approaches is most visible. Traditional converters load the full image bytes before deciding what to do with them. A document containing a 50 MB embedded image requires the entire 50 MB in heap memory. A document with twenty such images requires 1 GB of image data in memory simultaneously.
 
-DocSpec never does this. Images are represented as references in the event stream, not as data payloads. When the source encounters an image, it emits an `Image` event containing a reference. The event itself is tiny, just a few dozen bytes.
+DocSpec never does this. Images are represented as references in the event stream, not as data payloads. When the source encounters an image, it emits an `Image` event carrying an `ImageSource` — either an external `Uri` or an `Asset(Arc<dyn AssetHandle>)` handle. The event itself is tiny, just a few dozen bytes.
 
-When the sink needs the actual image bytes, it requests them through an asset provider. The asset provider is an abstraction that can serve bytes on demand. The sink asks for the image by its reference, and the provider streams it piece by piece. The sink writes each chunk directly to its output buffer without ever holding the complete image.
+When the sink needs the actual image bytes, it calls `AssetHandle::stream_to`, handing the handle its own output writer. The handle is self-contained: it carries everything needed to resolve the content type and stream the bytes, with no external provider lookup. The DOCX reader streams straight out of the ZIP entry; the BlockNote writer base64-encodes into its output as the bytes arrive.
 
-A 50 MB image flows through DocSpec using a 32 KB buffer. The image size is completely irrelevant to memory usage. Whether the image is 1 MB or 500 MB, the memory footprint stays constant at the buffer size.
+Memory on this path is bounded by the I/O buffers of the copy rather than by the size of the image.
 
-This approach also enables lazy loading and conditional processing. If a sink does not need the image bytes, the image data is never fetched. The reference flows through, the sink ignores it, and no memory is allocated.
+This approach also enables lazy loading and conditional processing. If a sink does not need the image bytes, it never calls `stream_to`. The reference flows through, the sink ignores it, and the bytes are never read.
 
 ---
 
@@ -149,7 +149,7 @@ The event protocol is defined in the [`docspec-core`](crates/docspec-core/) crat
 
 **Semantic fidelity.** Events capture meaning, not appearance. Visual properties (font, size) are not represented. Color is represented in two places: `TextStyleKind::Mark(Color)` for highlight/background, and `TextStyleKind::TextColor(Color)` for foreground text color.
 
-**Lazy asset references.** Images carry references, not bytes. The `Image` event holds a small `ImageSource` (asset id or URI), not pixel data. Writers resolve bytes via `AssetProvider` only when needed. A 50 MB image flows through using a 32 KB buffer.
+**Lazy asset references.** Images carry references, not bytes. The `Image` event holds a small `ImageSource` — `Asset(Arc<dyn AssetHandle>)` or an external `Uri` — not pixel data. Writers pull bytes via `AssetHandle::stream_to` only when needed, streaming them directly into their own output.
 
 **No warnings.** Errors are out-of-band via `Result`. Events carry content only. Readers that cannot continue return `Err`; readers that can recover silently do so without emitting a recovery event.
 
@@ -170,9 +170,8 @@ The event types and their semantics are defined in the [`docspec-core`](crates/d
 **Locally via rustdoc.** Build and open the workspace documentation:
 
 ```sh
-just doc-open    # build with warnings-as-errors and open in browser
-# or
-cargo doc --no-deps --open
+just doc                                  # build with warnings-as-errors
+cargo doc --workspace --no-deps --open    # build and open in a browser
 ```
 
 This produces the same content as docs.rs but reflects your local source tree.
@@ -181,7 +180,7 @@ This produces the same content as docs.rs but reflects your local source tree.
 
 - `crates/docspec-core/src/event.rs` — `Event` enum, `TextStyleKind` enum, and well-formedness rules
 - `crates/docspec-core/src/types.rs` — supporting enums and structs (`TextAlignment`, `ListStyleType`, `Color`, `ImageSource`, `Author`, `DocumentMeta`)
-- `crates/docspec-core/src/traits.rs` — `EventSource`, `EventSink`, `AssetProvider` traits
+- `crates/docspec-core/src/traits.rs` — `EventSource`, `EventSink`, and `AssetHandle` traits
 - `crates/docspec-core/src/stack.rs` — `BlockKind` enum, `StackTrackingSink`, and the `block_kind_for_start` / `block_kind_for_end` / `end_event_for` lookup functions
 
 **Enumerating events programmatically.** The `BlockKind` enum mirrors Start/End pairs. Use the lookup functions to inspect events at runtime:
@@ -200,9 +199,11 @@ This is how `StackTrackingSink` validates well-formedness and how adapters build
 
 The `docspec-http` crate exposes DocSpec's sync conversion pipeline over HTTP using Axum 0.8 + tokio.
 
-**Crate**: `docspec-http`
-**Binary**: `docspec-http`
-**Endpoint**: `POST /conversion` — accepts `text/markdown` , returns `application/vnd.docspec.blocknote+json`
+**Crate**: `docspec-http` — a library, not a binary. The server is launched by the `docspec http` CLI subcommand; there is no standalone `docspec-http` binary target.
+
+**Endpoints**: `POST /conversion`, `GET /health`, `GET /metrics`.
+
+**Negotiation**: `Content-Type` selects the reader — `text/markdown`, `text/html`, or `application/vnd.openxmlformats-officedocument.wordprocessingml.document`. `Accept` selects the writer — `application/vnd.docspec.blocknote+json` (also the default for `*/*`, `application/*`, and a missing `Accept`), `text/html`, `application/vnd.oxa+json`, or `application/vnd.pandoc.native`. When `Accept` lists several types, the first supported bare MIME wins and `q=` weights are ignored. Markdown output is not reachable over HTTP.
 
 **Sync/async bridge**: The conversion pipeline runs synchronously inside `tokio::task::spawn_blocking`, writing into a `Vec<u8>`. At the facade boundary, `docspec::AnyReader` and `docspec::AnyWriter` are the canonical factory types for composing supported reader/writer pairs; internally, events still flow directly through the streaming `EventSource → EventSink` protocol with stack tracking around writers that need it. The handler awaits completion of the blocking task, then either returns the full body as `200 OK` or maps the error to an RFC 7807 problem response (`422` for parse / sink errors, `500` for finalize errors). Errors surface before any response body is sent — no truncated `200 OK` on conversion failure.
 
@@ -210,7 +211,7 @@ The `docspec-http` crate exposes DocSpec's sync conversion pipeline over HTTP us
 
 **Async crate**: `docspec-http` is the only crate in the workspace that uses async Rust. It is explicitly excluded from the `docspec-wasm` dependency graph (adding it would pull in tokio and break the WASM target).
 
-**Wire contract**: Mirrors `github.com/docspecio/api` v3.0.2 where feasible — same endpoint path, RFC 7807 errors, `X-Request-ID`/`X-Trace-ID` header echo. Diverges in input MIME (`text/markdown` vs DOCX) and adds `Cache-Control` on all responses.
+**Correlation headers**: `X-Request-ID` is generated when absent and echoed when supplied; `X-Trace-ID` is echoed only when supplied. Because both are caller-controlled and forwarded to telemetry, callers must keep PII and secrets out of them.
 
 ---
 

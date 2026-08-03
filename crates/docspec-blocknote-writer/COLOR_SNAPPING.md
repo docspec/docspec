@@ -22,6 +22,6 @@ distance((255,255,0) → (246,233,217)) = 9² + 22² + 217² = 47654   ← short
 
 ## Mechanism
 
-Every entry in `BACKGROUND_PALETTE` has all three channels in the range 217-242 (pastel). Many source-palette colors place at least one channel at 0 or 255, far outside that anchor cluster. The squared-distance sum is then dominated by whichever channels are most extreme, and the snap is decided by small differences in the remaining channels. Those small differences do not track perceptual hue or color name, so the "nearest" pastel under this metric is frequently a *neighbouring* color rather than the same color in pastel form.
+Every entry in `BACKGROUND_PALETTE` has all three channels in the range 217-251 (pastel). Many source-palette colors place at least one channel at 0 or 255, far outside that anchor cluster. The squared-distance sum is then dominated by whichever channels are most extreme, and the snap is decided by small differences in the remaining channels. Those small differences do not track perceptual hue or color name, so the "nearest" pastel under this metric is frequently a *neighbouring* color rather than the same color in pastel form.
 
 The same metric applies to text color (`TextColor` → `textColor`) against `TEXT_PALETTE`. The text palette uses richer tones and a different anchor distribution, so the specific divergences differ.

@@ -1,6 +1,6 @@
 # docspec-markdown-reader
 
-**CommonMark and GFM, flowing out as events.**
+**Markdown to DocSpec event stream reader**
 
 Markdown arrives as text; a typed event stream leaves. `docspec-markdown-reader` parses CommonMark and GitHub Flavored Markdown and emits DocSpec events as it goes, including raw HTML tags embedded in the source. Streaming, like the rest of DocSpec. (See the [Manifesto](https://github.com/docspec/docspec/blob/main/MANIFESTO.md) for why.)
 
@@ -22,7 +22,7 @@ let mut reader = MarkdownReader::from_str("# Hello\n\nWorld");
 while let Some(event) = reader.next_event()? {
     println!("{event:?}");
 }
-# Ok::<(), docspec_core::Error>(())
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 From a file or any `Read + Seek` source:
@@ -36,7 +36,7 @@ let mut reader = MarkdownReader::from_reader(file)?;
 while let Some(event) = reader.next_event()? {
     println!("{event:?}");
 }
-# Ok::<(), docspec_core::Error>(())
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 ## What it handles today

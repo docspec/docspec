@@ -1,6 +1,6 @@
 # docspec-pandoc-native-writer
 
-**Pandoc's native block-list syntax, written as events flow.**
+**Streaming Pandoc native (block-list) writer for DocSpec events**
 
 Events arrive; Pandoc native leaves. `docspec-pandoc-native-writer` turns a DocSpec event stream into compact Pandoc native block-list syntax, suitable for Pandoc's `-f native` reader, writing directly to any `Write` target as each event passes through. Nothing accumulates. Streaming, like the rest of DocSpec. (See the [Manifesto](https://github.com/docspec/docspec/blob/main/MANIFESTO.md) for why.)
 
@@ -9,6 +9,7 @@ Events arrive; Pandoc native leaves. `docspec-pandoc-native-writer` turns a DocS
 ```toml
 [dependencies]
 docspec-pandoc-native-writer = "1"
+docspec-core = "1"
 ```
 
 ## Emit Pandoc native

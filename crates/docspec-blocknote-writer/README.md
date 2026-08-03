@@ -1,6 +1,6 @@
 # docspec-blocknote-writer
 
-**DocSpec events, written as BlockNote JSON.**
+**DocSpec event stream to BlockNote JSON writer**
 
 Events arrive; BlockNote JSON leaves. `docspec-blocknote-writer` turns a DocSpec event stream into [BlockNote](https://www.blocknotejs.org/) JSON, writing tokens directly to any `Write` target as events arrive. Nothing accumulates beyond what bounded conversion details require — asset data URI encoding and lifting nested table substreams after their enclosing table closes. Streaming, like the rest of DocSpec. (See the [Manifesto](https://github.com/docspec/docspec/blob/main/MANIFESTO.md) for why.)
 
@@ -9,6 +9,7 @@ Events arrive; BlockNote JSON leaves. `docspec-blocknote-writer` turns a DocSpec
 ```toml
 [dependencies]
 docspec-blocknote-writer = "1"
+docspec-core = "1"
 ```
 
 ## Write some BlockNote JSON
@@ -152,7 +153,10 @@ Headings, lists, code blocks, images, dividers, and nested quotes inside a block
 
 ### Image in links
 
-Images inside a link span are emitted as plain text using the alt-text of the image. This is a BlockNote limitation: BlockNote's inline content cannot contain image nodes.
+If an `Image` event arrives while an inline link is open, the writer closes the link and
+the surrounding inline block as needed, then emits the image as a regular BlockNote image
+block at the nearest valid block destination. Its alt text becomes the image caption; it
+is not emitted as plain link text.
 
 ## Related
 

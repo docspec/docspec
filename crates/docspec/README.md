@@ -1,6 +1,6 @@
 # docspec
 
-**One import, every reader and writer.**
+**Streaming document conversion: convenience facade re-exporting readers, writers, and event types**
 
 `docspec` is the convenience facade over the DocSpec workspace. It re-exports the core
 event types and traits, and — behind feature flags — the format readers and writers you
@@ -38,7 +38,7 @@ while let Some(event) = reader.next_event()? {
     writer.handle_event(event)?;
 }
 writer.finish()?;
-# Ok::<(), docspec_core::Error>(())
+# Ok::<(), docspec::Error>(())
 ```
 
 Opening a file by format instead? `AnyReader::from_path(InputFormat::Docx, "document.docx")`
