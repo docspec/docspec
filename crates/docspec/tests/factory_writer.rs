@@ -34,6 +34,11 @@ mod tests {
     ))]
     use docspec_test_utils::builders::{start_document, start_paragraph, text};
 
+    #[cfg(any(feature = "blocknote-writer", feature = "oxa-writer"))]
+    use docspec_test_utils::assert_json_eq;
+    #[cfg(any(feature = "blocknote-writer", feature = "oxa-writer"))]
+    use serde_json::json;
+
     #[cfg(feature = "blocknote-writer")]
     #[test]
     fn blocknote_dispatch_writes_expected_bytes_simple() {
@@ -56,9 +61,15 @@ mod tests {
             .expect("handle_event failed");
         writer.finish().expect("finish failed");
         let json = String::from_utf8(output).expect("not utf8");
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "hello", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -78,9 +89,15 @@ mod tests {
             .expect("handle_event failed");
         writer.finish().expect("finish failed");
         let json = String::from_utf8(output).expect("not utf8");
-        assert_eq!(
-            json,
-            r#"[{"type":"paragraph","content":[{"type":"text","text":"bare text","styles":{}}],"children":[]}]"#
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "bare text", "styles": {}}],
+                    "children": []
+                }
+            ]),
         );
     }
 
@@ -118,9 +135,14 @@ mod tests {
             .expect("handle_event failed");
         writer.finish().expect("finish failed");
         let json = String::from_utf8(output).expect("not utf8");
-        assert_eq!(
-            json,
-            r#"{"type":"Document","children":[{"type":"Paragraph","children":[{"type":"Text","value":"hello"}]}]}"#
+        assert_json_eq(
+            &json,
+            json!({
+                "type": "Document",
+                "children": [
+                    {"type": "Paragraph", "children": [{"type": "Text", "value": "hello"}]}
+                ]
+            }),
         );
     }
 
@@ -140,9 +162,14 @@ mod tests {
             .expect("handle_event failed");
         writer.finish().expect("finish failed");
         let json = String::from_utf8(output).expect("not utf8");
-        assert_eq!(
-            json,
-            r#"{"type":"Document","children":[{"type":"Paragraph","children":[{"type":"Text","value":"bare text"}]}]}"#
+        assert_json_eq(
+            &json,
+            json!({
+                "type": "Document",
+                "children": [
+                    {"type": "Paragraph", "children": [{"type": "Text", "value": "bare text"}]}
+                ]
+            }),
         );
     }
 

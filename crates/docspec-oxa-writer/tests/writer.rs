@@ -6,6 +6,7 @@
 mod tests {
     use docspec_core::{Error, Event, ImageSource, TextStyleKind};
     use docspec_oxa_writer::OxaWriter;
+    use docspec_test_utils::assert_json_eq;
     use docspec_test_utils::builders::{start_document, start_paragraph, text};
     use serde_json::{json, Value};
 
@@ -197,9 +198,15 @@ mod tests {
             end_para(),
             end_doc(),
         ]);
-        assert_eq!(
-            json,
-            "{\"type\":\"Document\",\"children\":[{\"type\":\"Paragraph\",\"children\":[{\"type\":\"Text\",\"value\":\"a\\nb\\t\\\"c\\\\d\"}]}]}"
+        assert_json_eq(
+            &json,
+            json!({
+                "type": "Document",
+                "children": [{
+                    "type": "Paragraph",
+                    "children": [{"type": "Text", "value": "a\nb\t\"c\\d"}]
+                }]
+            }),
         );
     }
 
@@ -214,9 +221,15 @@ mod tests {
             end_para(),
             end_doc(),
         ]);
-        assert_eq!(
-            json,
-            r#"{"type":"Document","children":[{"type":"Paragraph","children":[{"type":"Text","value":"héllo 🎉 日本語"}]}]}"#
+        assert_json_eq(
+            &json,
+            json!({
+                "type": "Document",
+                "children": [{
+                    "type": "Paragraph",
+                    "children": [{"type": "Text", "value": "héllo 🎉 日本語"}]
+                }]
+            }),
         );
     }
 

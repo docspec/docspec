@@ -15,7 +15,9 @@ use axum::{
     http::{header, StatusCode},
     Router,
 };
-use serde_json::Value;
+use serde_json::{json, Value};
+
+use docspec_test_utils::assert_json_eq;
 use tower::ServiceExt as _;
 
 const CACHE_CONTROL: &str = "max-age=0, private, must-revalidate";
@@ -797,9 +799,14 @@ async fn post_conversion_oxa_happy_path() {
     );
 
     let body_text = response_body_text(response.into_body()).await;
-    assert_eq!(
-        body_text,
-        r#"{"type":"Document","children":[{"type":"Paragraph","children":[{"type":"Text","value":"Hello world"}]}]}"#
+    assert_json_eq(
+        &body_text,
+        json!({
+            "type": "Document",
+            "children": [
+                {"type": "Paragraph", "children": [{"type": "Text", "value": "Hello world"}]}
+            ]
+        }),
     );
 }
 
@@ -930,9 +937,12 @@ async fn post_conversion_html_to_oxa_happy_path() {
     );
 
     let body_text = response_body_text(response.into_body()).await;
-    assert_eq!(
-        body_text,
-        r#"{"type":"Document","children":[{"type":"Paragraph","children":[{"type":"Text","value":"Hello"}]}]}"#
+    assert_json_eq(
+        &body_text,
+        json!({
+            "type": "Document",
+            "children": [{"type": "Paragraph", "children": [{"type": "Text", "value": "Hello"}]}]
+        }),
     );
 }
 

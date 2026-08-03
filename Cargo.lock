@@ -868,6 +868,7 @@ version = "1.21.5"
 dependencies = [
  "docspec-core",
  "docspec-docx-reader",
+ "serde_json",
  "sha2",
  "zip",
 ]
@@ -878,6 +879,8 @@ version = "1.21.5"
 dependencies = [
  "docspec",
  "docspec-core",
+ "docspec-test-utils",
+ "serde_json",
  "wasm-bindgen",
 ]
 

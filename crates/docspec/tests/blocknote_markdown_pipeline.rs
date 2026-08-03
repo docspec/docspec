@@ -23,20 +23,12 @@ fn run_pipeline(markdown: &str) -> String {
     try_run_pipeline(markdown).expect("pipeline failed")
 }
 
-fn assert_json_eq(actual: &str, expected: &str) {
-    let actual_parsed =
-        serde_json::from_str::<serde_json::Value>(actual).expect("actual is valid JSON");
-    let expected_parsed =
-        serde_json::from_str::<serde_json::Value>(expected).expect("fixture is valid JSON");
-    assert_eq!(
-        actual_parsed, expected_parsed,
-        "JSON mismatch\nActual:   {actual}\nExpected: {expected}"
-    );
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{assert_json_eq, run_pipeline};
+    use docspec_test_utils::{assert_json_eq, assert_json_text_eq};
+    use serde_json::json;
+
+    use super::run_pipeline;
 
     fn load_blocknote_fixture(name: &str) -> serde_json::Value {
         let path = format!(
@@ -59,7 +51,7 @@ mod tests {
         let markdown = include_str!("../../../tests/fixtures/markdown/empty.md");
         let expected = include_str!("../../../tests/fixtures/blocknote/empty.json");
         let actual = run_pipeline(markdown);
-        assert_json_eq(&actual, expected);
+        assert_json_text_eq(&actual, expected);
     }
 
     #[test]
@@ -67,7 +59,7 @@ mod tests {
         let markdown = include_str!("../../../tests/fixtures/markdown/heading_levels.md");
         let expected = include_str!("../../../tests/fixtures/blocknote/heading_levels.json");
         let actual = run_pipeline(markdown);
-        assert_json_eq(&actual, expected);
+        assert_json_text_eq(&actual, expected);
     }
 
     #[test]
@@ -75,7 +67,7 @@ mod tests {
         let markdown = include_str!("../../../tests/fixtures/markdown/paragraphs.md");
         let expected = include_str!("../../../tests/fixtures/blocknote/paragraphs.json");
         let actual = run_pipeline(markdown);
-        assert_json_eq(&actual, expected);
+        assert_json_text_eq(&actual, expected);
     }
 
     #[test]
@@ -83,7 +75,7 @@ mod tests {
         let markdown = include_str!("../../../tests/fixtures/markdown/images.md");
         let expected = include_str!("../../../tests/fixtures/blocknote/images.json");
         let actual = run_pipeline(markdown);
-        assert_json_eq(&actual, expected);
+        assert_json_text_eq(&actual, expected);
     }
 
     #[test]
@@ -91,7 +83,7 @@ mod tests {
         let markdown = include_str!("../../../tests/fixtures/markdown/mixed.md");
         let expected = include_str!("../../../tests/fixtures/blocknote/mixed.json");
         let actual = run_pipeline(markdown);
-        assert_json_eq(&actual, expected);
+        assert_json_text_eq(&actual, expected);
     }
 
     #[test]
@@ -99,7 +91,7 @@ mod tests {
         let markdown = include_str!("../../../tests/fixtures/markdown/nested_content.md");
         let expected = include_str!("../../../tests/fixtures/blocknote/nested_content.json");
         let actual = run_pipeline(markdown);
-        assert_json_eq(&actual, expected);
+        assert_json_text_eq(&actual, expected);
     }
 
     #[test]
@@ -107,7 +99,7 @@ mod tests {
         let markdown = include_str!("../../../tests/fixtures/markdown/inline_images.md");
         let expected = include_str!("../../../tests/fixtures/blocknote/inline_images.json");
         let actual = run_pipeline(markdown);
-        assert_json_eq(&actual, expected);
+        assert_json_text_eq(&actual, expected);
     }
 
     #[test]
@@ -115,7 +107,7 @@ mod tests {
         let markdown = include_str!("../../../tests/fixtures/markdown/blockquote.md");
         let expected = include_str!("../../../tests/fixtures/blocknote/blockquote.json");
         let actual = run_pipeline(markdown);
-        assert_json_eq(&actual, expected);
+        assert_json_text_eq(&actual, expected);
     }
 
     #[test]
@@ -123,7 +115,7 @@ mod tests {
         let markdown = include_str!("../../../tests/fixtures/markdown/blockquote_multiline.md");
         let expected = include_str!("../../../tests/fixtures/blocknote/blockquote_multiline.json");
         let actual = run_pipeline(markdown);
-        assert_json_eq(&actual, expected);
+        assert_json_text_eq(&actual, expected);
     }
 
     #[test]
@@ -131,7 +123,7 @@ mod tests {
         let markdown = include_str!("../../../tests/fixtures/markdown/text_formatting.md");
         let expected = include_str!("../../../tests/fixtures/blocknote/text_formatting.json");
         let actual = run_pipeline(markdown);
-        assert_json_eq(&actual, expected);
+        assert_json_text_eq(&actual, expected);
     }
 
     #[test]
@@ -139,7 +131,7 @@ mod tests {
         let markdown = include_str!("../../../tests/fixtures/markdown/tables.md");
         let expected = include_str!("../../../tests/fixtures/blocknote/tables.json");
         let actual = run_pipeline(markdown);
-        assert_json_eq(&actual, expected);
+        assert_json_text_eq(&actual, expected);
     }
 
     #[test]
@@ -147,7 +139,7 @@ mod tests {
         let markdown = include_str!("../../../tests/fixtures/markdown/lists.md");
         let expected = include_str!("../../../tests/fixtures/blocknote/lists.json");
         let actual = run_pipeline(markdown);
-        assert_json_eq(&actual, expected);
+        assert_json_text_eq(&actual, expected);
     }
 
     #[test]
@@ -155,7 +147,7 @@ mod tests {
         let markdown = include_str!("../../../tests/fixtures/markdown/links.md");
         let expected = include_str!("../../../tests/fixtures/blocknote/links.json");
         let actual = run_pipeline(markdown);
-        assert_json_eq(&actual, expected);
+        assert_json_text_eq(&actual, expected);
     }
 
     #[test]
@@ -163,7 +155,7 @@ mod tests {
         let markdown = include_str!("../../../tests/fixtures/markdown/soft_break.md");
         let expected = include_str!("../../../tests/fixtures/blocknote/soft_break.json");
         let actual = run_pipeline(markdown);
-        assert_json_eq(&actual, expected);
+        assert_json_text_eq(&actual, expected);
     }
 
     #[test]
@@ -173,7 +165,30 @@ mod tests {
         let actual = run_pipeline(markdown);
         assert_json_eq(
             &actual,
-            r#"[{"type":"numberedListItem","props":{"start":5},"content":[{"type":"text","text":"I2","styles":{}}],"children":[{"type":"quote","content":[{"type":"text","text":"text","styles":{}}],"children":[{"type":"bulletListItem","content":[{"type":"text","text":"[","styles":{}},{"type":"text","text":"f","styles":{}},{"type":"text","text":"]","styles":{}}],"children":[]}]}]}]"#,
+            json!([
+                {
+                    "type": "numberedListItem",
+                    "props": {"start": 5},
+                    "content": [{"type": "text", "text": "I2", "styles": {}}],
+                    "children": [
+                        {
+                            "type": "quote",
+                            "content": [{"type": "text", "text": "text", "styles": {}}],
+                            "children": [
+                                {
+                                    "type": "bulletListItem",
+                                    "content": [
+                                        {"type": "text", "text": "[", "styles": {}},
+                                        {"type": "text", "text": "f", "styles": {}},
+                                        {"type": "text", "text": "]", "styles": {}}
+                                    ],
+                                    "children": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]),
         );
     }
 
