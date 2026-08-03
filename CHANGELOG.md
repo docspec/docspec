@@ -12,6 +12,20 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.21.6](https://github.com/docspec/docspec/compare/v1.21.5...v1.21.6) - 2026-08-03
+
+### Fixed
+
+- *(blocknote-writer)* close open child paragraph before emitting sibling block
+- *(http)* adapt Sentry client options to 0.49 builder API
+- *(deps)* update rust crate sentry to 0.49
+
+### Other
+
+- assert JSON output as readable documents
+- *(memory)* resolve memtest child binaries via Cargo's target directory
+- distinguish supported from experimental formats
+
 ## [1.21.5](https://github.com/docspec/docspec/compare/v1.21.4...v1.21.5) - 2026-08-03
 
 ### Fixed
