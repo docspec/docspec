@@ -97,3 +97,59 @@ impl HttpError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "sentry")]
+    #[test]
+    fn unsupported_status_skips_error_capture() {
+        let events = sentry::test::with_captured_events(|| {
+            super::capture_error_telemetry(
+                axum::http::StatusCode::BAD_REQUEST,
+                "client error",
+                None,
+            );
+        });
+
+        assert_eq!(events, Vec::new());
+    }
+
+    #[cfg(feature = "posthog")]
+    #[test]
+    fn poisoned_posthog_slot_skips_error_capture_in_an_isolated_process() {
+        let test_binary = std::env::current_exe().unwrap_or_default();
+        assert!(!test_binary.as_os_str().is_empty());
+        assert!(std::process::Command::new(test_binary)
+            .args([
+                "--ignored",
+                "--exact",
+                "error::capture::tests::poisoned_slot_child_probe",
+            ])
+            .status()
+            .is_ok_and(|status| status.success()));
+    }
+
+    #[cfg(feature = "posthog")]
+    #[test]
+    #[ignore = "executed by poisoned_posthog_slot_skips_error_capture_in_an_isolated_process"]
+    fn poisoned_slot_child_probe() {
+        let slot = crate::telemetry::posthog_client_slot();
+        let poison_result = std::thread::spawn(|| {
+            let guard = slot
+                .write()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let _guard = guard;
+            std::panic::resume_unwind(Box::new("intentional test lock poison"));
+        })
+        .join();
+        assert!(poison_result.is_err());
+
+        super::capture_error_telemetry(
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "server error",
+            None,
+        );
+
+        slot.clear_poison();
+    }
+}
