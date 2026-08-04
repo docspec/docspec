@@ -123,6 +123,88 @@ where
     }
 }
 
+#[cfg(all(test, coverage))]
+mod coverage_tests {
+    use super::*;
+
+    fn assert_parse_error(result: docspec_core::Result<ImageMap>, expected_message: &str) {
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(message, expected_message);
+                assert_eq!(position, None);
+            }
+            other => assert_eq!(format!("{other:?}"), "expected relationship parse error"),
+        }
+    }
+
+    #[test]
+    fn collect_image_map_accepts_non_empty_relationship_element() {
+        let rels_xml = r#"<Relationships>
+  <Relationship Id="rId1" Type="http://example.com/image" Target="media/image.png" Extra="ignored"></Relationship>
+</Relationships>"#;
+
+        let result = collect_image_map(rels_xml.as_bytes(), "word/document.xml");
+
+        match result {
+            Ok(map) => assert_eq!(
+                map.get("rId1")
+                    .map(|rel| (rel.target.as_str(), rel.is_external)),
+                Some(("word/media/image.png", false))
+            ),
+            Err(err) => assert_eq!(format!("{err:?}"), "expected image map"),
+        }
+    }
+
+    #[test]
+    fn collect_image_map_rejects_unexpected_closing_element() {
+        let result = collect_image_map("</Relationships>".as_bytes(), "word/document.xml");
+
+        assert_parse_error(result, "malformed _rels/.rels");
+    }
+
+    #[test]
+    fn collect_image_map_rejects_unclosed_relationships_element() {
+        let result = collect_image_map("<Relationships>".as_bytes(), "word/document.xml");
+
+        assert_parse_error(result, "malformed _rels/.rels");
+    }
+
+    #[test]
+    fn collect_image_map_rejects_xml_parser_error() {
+        let result = collect_image_map("<Relationships><".as_bytes(), "word/document.xml");
+
+        assert_parse_error(result, "malformed _rels/.rels");
+    }
+
+    #[test]
+    fn collect_image_map_rejects_malformed_relationship_attribute() {
+        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target=word/document.xml/>
+</Relationships>"#;
+
+        let result = collect_image_map(rels_xml.as_bytes(), "word/document.xml");
+
+        assert_parse_error(
+            result,
+            "malformed _rels/.rels: position 120: attribute value must be enclosed in `\"` or `'`",
+        );
+    }
+
+    #[test]
+    fn collect_image_map_rejects_bad_attribute_entity() {
+        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/&bogus;.xml"/>
+</Relationships>"#;
+
+        let result = collect_image_map(rels_xml.as_bytes(), "word/document.xml");
+
+        assert_parse_error(
+            result,
+            "malformed _rels/.rels: at 6..11: unrecognized entity `bogus`",
+        );
+    }
+}
+
 #[cfg(test)]
 #[cfg(not(coverage))]
 mod tests {

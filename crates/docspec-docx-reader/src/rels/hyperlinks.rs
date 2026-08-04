@@ -94,6 +94,88 @@ where
     })
 }
 
+#[cfg(all(test, coverage))]
+mod coverage_tests {
+    use super::*;
+    use std::io::Cursor;
+
+    fn assert_parse_error(result: docspec_core::Result<HyperlinkMap>, expected_message: &str) {
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(message, expected_message);
+                assert_eq!(position, None);
+            }
+            other => assert_eq!(format!("{other:?}"), "expected relationship parse error"),
+        }
+    }
+
+    #[test]
+    fn collect_hyperlink_map_accepts_non_empty_relationship_element() {
+        let rels_xml = r#"<Relationships>
+  <Relationship Id="rId1" Type="http://example.com/hyperlink" Target="https://example.com"></Relationship>
+</Relationships>"#;
+
+        let result = collect_hyperlink_map(Cursor::new(rels_xml.as_bytes()));
+
+        match result {
+            Ok(map) => assert_eq!(
+                map,
+                HashMap::from([("rId1".to_string(), "https://example.com".to_string())])
+            ),
+            Err(err) => assert_eq!(format!("{err:?}"), "expected hyperlink map"),
+        }
+    }
+
+    #[test]
+    fn collect_hyperlink_map_rejects_unexpected_closing_element() {
+        let result = collect_hyperlink_map(Cursor::new("</Relationships>".as_bytes()));
+
+        assert_parse_error(result, "malformed _rels/.rels");
+    }
+
+    #[test]
+    fn collect_hyperlink_map_rejects_unclosed_relationships_element() {
+        let result = collect_hyperlink_map(Cursor::new("<Relationships>".as_bytes()));
+
+        assert_parse_error(result, "malformed _rels/.rels");
+    }
+
+    #[test]
+    fn collect_hyperlink_map_rejects_xml_parser_error() {
+        let result = collect_hyperlink_map(Cursor::new("<Relationships><".as_bytes()));
+
+        assert_parse_error(result, "malformed _rels/.rels");
+    }
+
+    #[test]
+    fn collect_hyperlink_map_rejects_malformed_relationship_attribute() {
+        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target=word/document.xml/>
+</Relationships>"#;
+
+        let result = collect_hyperlink_map(Cursor::new(rels_xml.as_bytes()));
+
+        assert_parse_error(
+            result,
+            "malformed _rels/.rels: position 120: attribute value must be enclosed in `\"` or `'`",
+        );
+    }
+
+    #[test]
+    fn collect_hyperlink_map_rejects_bad_attribute_entity() {
+        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/&bogus;.xml"/>
+</Relationships>"#;
+
+        let result = collect_hyperlink_map(Cursor::new(rels_xml.as_bytes()));
+
+        assert_parse_error(
+            result,
+            "malformed _rels/.rels: at 6..11: unrecognized entity `bogus`",
+        );
+    }
+}
+
 #[cfg(test)]
 #[cfg(not(coverage))]
 mod tests {
