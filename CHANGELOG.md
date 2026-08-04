@@ -12,6 +12,13 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.21.7](https://github.com/docspec/docspec/compare/v1.21.6...v1.21.7) - 2026-08-04
+
+### Other
+
+- *(docx-reader)* use a where clause for the extend trait bound
+- *(docx-reader)* extract XmlCursor, EmitState, and PackageContext
+
 ## [1.21.6](https://github.com/docspec/docspec/compare/v1.21.5...v1.21.6) - 2026-08-03
 
 ### Fixed
