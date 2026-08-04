@@ -106,6 +106,26 @@ fn document_bigtext_bomb_docx() -> Vec<u8> {
     writer.finish().unwrap().into_inner()
 }
 
+/// A DOCX whose `document.xml` nests `<w:tbl>` far deeper than the depth cap.
+/// The recursion this would trigger overflows the stack without the guard, so
+/// the fixture is kept just over the limit rather than tens of thousands deep.
+fn nested_tables_bomb_docx(levels: usize) -> Vec<u8> {
+    let mut doc: Vec<u8> = br#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>"#.to_vec();
+    for _ in 0..levels {
+        doc.extend_from_slice(b"<w:tbl><w:tr><w:tc>");
+    }
+    doc.extend_from_slice(b"<w:p><w:r><w:t>x</w:t></w:r></w:p>");
+    for _ in 0..levels {
+        doc.extend_from_slice(b"</w:tc></w:tr></w:tbl>");
+    }
+    doc.extend_from_slice(b"</w:body></w:document>");
+
+    let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
+    add_stored(&mut writer, "_rels/.rels", ROOT_RELS);
+    add_stored(&mut writer, "word/document.xml", &doc);
+    writer.finish().unwrap().into_inner()
+}
+
 fn expected_metadata_message(part: &str) -> String {
     format!("package part {part} exceeds the {CAP}-byte limit (possible zip bomb)")
 }
@@ -164,4 +184,30 @@ fn document_single_node_bomb_is_rejected_while_streaming_via_from_path() {
         }
     }
     assert!(saw_node_limit, "streaming never hit the node-size limit");
+}
+
+#[test]
+fn deeply_nested_tables_fail_fast_instead_of_overflowing_the_stack() {
+    // 500 levels is well past the depth cap but far below what would overflow
+    // the stack, so this test fails cleanly (a regression would abort instead).
+    let bomb = nested_tables_bomb_docx(500);
+    let mut reader = DocxReader::from_reader(Cursor::new(bomb)).unwrap();
+    let mut saw_depth_limit = false;
+    loop {
+        match reader.next_event() {
+            Ok(Some(_)) => {}
+            Ok(None) => break,
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "table nesting exceeds the depth limit of 100 (possible zip bomb)"
+                );
+                assert_eq!(position, None);
+                saw_depth_limit = true;
+                break;
+            }
+            other => panic!("expected Parse depth-limit error, got {other:?}"),
+        }
+    }
+    assert!(saw_depth_limit, "nesting never hit the depth limit");
 }

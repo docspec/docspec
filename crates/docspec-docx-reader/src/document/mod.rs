@@ -28,6 +28,16 @@ use text::{collect_text_content, decode_general_ref, normalize_symbol_text, reso
 
 const MAX_LIST_LEVEL: u32 = 8;
 
+/// Maximum `<w:tbl>` nesting depth before parsing fails.
+///
+/// Nested tables are parsed by recursion (`parse_tbl` → `parse_tr` → `parse_tc`
+/// → `parse_tbl`), so an adversarial document of deeply nested tables would
+/// overflow the call stack and abort the process — a tiny file crashing the
+/// server, unreachable by any byte or node cap. Real documents nest tables a
+/// handful of levels at most; 100 is far beyond that while staying well clear of
+/// stack exhaustion.
+const MAX_TABLE_NESTING_DEPTH: u32 = 100;
+
 /// Document processing phase.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Phase {
@@ -105,6 +115,9 @@ pub struct DocumentReader {
     package: PackageContext,
     /// The XML token pump streaming from the document entry.
     input: XmlCursor,
+    /// Current `<w:tbl>` nesting depth, bounded by [`MAX_TABLE_NESTING_DEPTH`]
+    /// to keep the recursive table parser off a stack-overflow path.
+    table_depth: u32,
 }
 
 impl fmt::Debug for DocumentReader {
@@ -138,6 +151,7 @@ impl DocumentReader {
             pending_error: None,
             package: PackageContext::new(data, archive, content_types),
             input: XmlCursor::new(xml),
+            table_depth: 0,
         }
     }
 
@@ -915,7 +929,26 @@ impl DocumentReader {
         }
     }
 
-    fn parse_tbl(&mut self, _start: &BytesStart<'_>, is_outermost: bool) -> Result<()> {
+    /// Parses a `<w:tbl>`, bounding recursion depth so deeply nested tables fail
+    /// fast instead of overflowing the call stack.
+    ///
+    /// The depth counter is incremented for the whole lifetime of the inner
+    /// parse and decremented on every exit path, so sibling tables at the same
+    /// level do not accumulate depth.
+    fn parse_tbl(&mut self, start: &BytesStart<'_>, is_outermost: bool) -> Result<()> {
+        self.table_depth = self.table_depth.saturating_add(1);
+        if self.table_depth > MAX_TABLE_NESTING_DEPTH {
+            self.table_depth = self.table_depth.saturating_sub(1);
+            return Err(parse_error(format!(
+                "table nesting exceeds the depth limit of {MAX_TABLE_NESTING_DEPTH} (possible zip bomb)"
+            )));
+        }
+        let result = self.parse_tbl_inner(start, is_outermost);
+        self.table_depth = self.table_depth.saturating_sub(1);
+        result
+    }
+
+    fn parse_tbl_inner(&mut self, _start: &BytesStart<'_>, is_outermost: bool) -> Result<()> {
         self.emit.flush_list_stack();
         self.emit.flush_pending_preformatted_close();
         self.emit.push(Event::StartTable { id: None });
