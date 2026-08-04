@@ -37,8 +37,7 @@ enum AnyWriterInner<W: Write> {
     PandocNative(PandocNativeWriter<W>),
     #[cfg(feature = "markdown-writer")]
     Markdown(MarkdownWriter<W>),
-    /// Consumes `W` when no writer feature is enabled, where the enum is otherwise
-    /// variant-free and the type parameter would be unused.
+    /// Consumes `W` when no writer feature is enabled and the enum has no other variants.
     #[cfg(not(writer))]
     _Phantom(core::marker::PhantomData<W>),
 }
