@@ -1764,7 +1764,7 @@ mod events {
 
         assert_eq!(
             format!("{reader:?}"),
-            "DocxReader { inner: DocumentReader { buf: [], pending_preformatted_close: false, open_styles: [], phase: \"<phase>\", queue: [], data: \"<DocxData>\", hyperlink_map: {}, list_stack: [], list_counters: {}, xml: \"<quick_xml::Reader>\", archive: \"<Arc<Mutex<ZipArchive>>>\", content_types: \"<Arc<ContentTypes>>\" } }"
+            "DocxReader { inner: DocumentReader { phase: NotStarted, queued: 0, pending_error: None, package: PackageContext { hyperlink_map: {}, .. }, .. } }"
         );
     }
 
