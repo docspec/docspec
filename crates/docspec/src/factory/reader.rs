@@ -216,7 +216,10 @@ impl EventSource for AnyReader {
     }
 }
 
+// Nothing to assert about until a reader is compiled in. Two attributes rather than
+// `all(test, reader)`: clippy's `tests_outside_test_module` wants a literal `#[cfg(test)]`.
 #[cfg(test)]
+#[cfg(reader)]
 mod send_static_assertions {
     fn assert_send_static<T>()
     where
@@ -225,7 +228,6 @@ mod send_static_assertions {
     }
     #[test]
     fn any_reader_is_send_static() {
-        #[cfg(reader)]
         assert_send_static::<crate::AnyReader>();
     }
     #[cfg(feature = "docx")]

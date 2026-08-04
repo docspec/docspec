@@ -7,7 +7,7 @@
 //! - Black `(0,0,0)` text color → filtered (no `"textColor"` key emitted)
 //! - Yellow highlight `(255,255,0)` → `"backgroundColor":"orange"` (counterintuitive palette snap)
 
-#![cfg(feature = "docx")]
+#![cfg(all(feature = "docx", feature = "blocknote-writer"))]
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
