@@ -100,7 +100,7 @@ jobs:
     # are visible. Otherwise the PR job computes the next-version diff against
     # the still-old crates.io baseline and re-includes commits the release job
     # is in the middle of publishing, producing duplicate CHANGELOG entries.
-    needs: [test, clippy, fmt, docker-build, release-plz-release]
+    needs: [test, clippy, fmt, features, docker-build, release-plz-release]
     if: >-
       github.event_name == 'push'
       && github.ref == 'refs/heads/main'
@@ -132,7 +132,7 @@ jobs:
 
   release-plz-release:
     name: Tag and publish crates
-    needs: [test, clippy, fmt, docker-build]
+    needs: [test, clippy, fmt, features, docker-build]
     if: >-
       github.event_name == 'push'
       && github.ref == 'refs/heads/main'
