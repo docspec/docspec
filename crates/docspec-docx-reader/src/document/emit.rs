@@ -78,7 +78,11 @@ impl EmitState {
         self.pending_preformatted_close = false;
     }
 
-    pub(crate) fn extend<I: IntoIterator<Item = Event>>(&mut self, events: I) {
+    /// Queues every event from `events`, in order.
+    pub(crate) fn extend<I>(&mut self, events: I)
+    where
+        I: IntoIterator<Item = Event>,
+    {
         self.queue.extend(events);
     }
 
