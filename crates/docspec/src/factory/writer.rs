@@ -39,7 +39,7 @@ enum AnyWriterInner<W: Write> {
     Markdown(MarkdownWriter<W>),
     /// Consumes `W` when no writer feature is enabled, where the enum is otherwise
     /// variant-free and the type parameter would be unused.
-    #[cfg(not(feature = "_writer"))]
+    #[cfg(not(writer))]
     _Phantom(core::marker::PhantomData<W>),
 }
 
@@ -48,12 +48,12 @@ impl<W: Write> AnyWriter<W> {
     #[inline]
     #[must_use]
     pub fn new(format: OutputFormat, writer: W) -> Self {
-        #[cfg(not(feature = "_writer"))]
+        #[cfg(not(writer))]
         {
             drop(writer);
             match format {}
         }
-        #[cfg(feature = "_writer")]
+        #[cfg(writer)]
         {
             let inner = match format {
                 #[cfg(feature = "blocknote-writer")]
@@ -89,7 +89,7 @@ impl<W: Write> EventSink for AnyWriterInner<W> {
             Self::PandocNative(w) => w.finish(),
             #[cfg(feature = "markdown-writer")]
             Self::Markdown(w) => w.finish(),
-            #[cfg(not(feature = "_writer"))]
+            #[cfg(not(writer))]
             Self::_Phantom(_) => Ok(()),
         }
     }
@@ -106,7 +106,7 @@ impl<W: Write> EventSink for AnyWriterInner<W> {
             Self::PandocNative(w) => w.handle_event(event),
             #[cfg(feature = "markdown-writer")]
             Self::Markdown(w) => w.handle_event(event),
-            #[cfg(not(feature = "_writer"))]
+            #[cfg(not(writer))]
             Self::_Phantom(_) => {
                 let _ = event;
                 Ok(())

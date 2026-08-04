@@ -14,23 +14,21 @@ categories = ["parsing", "encoding"]
 default = ["markdown", "blocknote", "pandoc-native"]
 
 # Format readers (event sources).
-markdown = ["dep:docspec-markdown-reader", "_reader", "_text-reader"]
-html = ["dep:docspec-html-reader", "_reader", "_text-reader"]
-docx = ["dep:docspec-docx-reader", "_reader"]
+markdown = ["dep:docspec-markdown-reader"]
+html = ["dep:docspec-html-reader"]
+docx = ["dep:docspec-docx-reader"]
 
 # Format writers (event sinks).
-blocknote-writer = ["dep:docspec-blocknote-writer", "_writer"]
-oxa-writer = ["dep:docspec-oxa-writer", "_writer"]
-html-writer = ["dep:docspec-html-writer", "_writer"]
-pandoc-native-writer = ["dep:docspec-pandoc-native-writer", "_writer"]
-markdown-writer = ["dep:docspec-markdown-writer", "_writer"]
+blocknote-writer = ["dep:docspec-blocknote-writer"]
+oxa-writer = ["dep:docspec-oxa-writer"]
+html-writer = ["dep:docspec-html-writer"]
+pandoc-native-writer = ["dep:docspec-pandoc-native-writer"]
+markdown-writer = ["dep:docspec-markdown-writer"]
 
-# Internal markers. Never enable these directly: each is set by the features above, so
-# that "is any writer compiled in" is one condition rather than a list repeated at every
-# use. Repeating it by hand is how the conditions drifted apart in the first place.
-_reader = []
-_writer = []
-_text-reader = []
+# "Is any reader / writer compiled in" is a condition the factories need in several places.
+# build.rs derives it from the features above as the `reader`, `text_reader` and `writer`
+# cfgs. Not a marker feature: a feature can be selected on its own, and then claims a
+# reader or writer is compiled in when none is. See build.rs.
 
 # Lower-level primitives for implementing custom writers.
 json = ["dep:docspec-json"]
