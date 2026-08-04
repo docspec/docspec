@@ -25,10 +25,8 @@ html-writer = ["dep:docspec-html-writer"]
 pandoc-native-writer = ["dep:docspec-pandoc-native-writer"]
 markdown-writer = ["dep:docspec-markdown-writer"]
 
-# "Is any reader / writer compiled in" is a condition the factories need in several places.
-# build.rs derives it from the features above as the `reader`, `text_reader` and `writer`
-# cfgs. Not a marker feature: a feature can be selected on its own, and then claims a
-# reader or writer is compiled in when none is. See build.rs.
+# The factories gate on the `reader`, `text_reader` and `writer` cfgs, which build.rs
+# derives from the features above.
 
 # Lower-level primitives for implementing custom writers.
 json = ["dep:docspec-json"]
