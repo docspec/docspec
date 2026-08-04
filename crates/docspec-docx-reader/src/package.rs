@@ -19,6 +19,36 @@ use crate::styles::StyleList;
 pub(crate) trait ReadSeek: Read + Seek + Send {}
 impl<T: Read + Seek + Send> ReadSeek for T {}
 
+/// Maximum decompressed size accepted for a small package part (relationships,
+/// `styles.xml`, `numbering.xml`, `[Content_Types].xml`).
+///
+/// These parts hold document metadata and are kilobytes in real documents. The
+/// cap stops a zip-bomb entry — one that deflates from a few KB to gigabytes —
+/// from being read fully into memory before parsing, which would otherwise
+/// exhaust the process regardless of the streaming main-document path. 64 MiB
+/// is far above any legitimate metadata part while keeping the amplification an
+/// attacker can force bounded and small.
+const MAX_METADATA_PART_BYTES: u64 = 64 * 1024 * 1024;
+
+/// Reads a ZIP entry fully into memory, failing if it decompresses beyond `cap`.
+///
+/// Reads at most `cap + 1` bytes so an over-cap entry is detected without
+/// decompressing the whole (potentially enormous) part. `part_name` is used only
+/// for the error message.
+fn read_entry_capped<R: Read>(entry: &mut R, cap: u64, part_name: &str) -> Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    entry
+        .take(cap.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(Error::from)?;
+    if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > cap {
+        return Err(parse_error(format!(
+            "package part {part_name} exceeds the {cap}-byte limit (possible zip bomb)"
+        )));
+    }
+    Ok(bytes)
+}
+
 type PackageContents = (
     StyleList,
     crate::numbering::MinimalNumbering,
@@ -127,9 +157,7 @@ where
             parse_error(format!("malformed ZIP: {err}"))
         }
     })?;
-    let mut bytes = Vec::new();
-    rels_entry.read_to_end(&mut bytes).map_err(Error::from)?;
-    Ok(bytes)
+    read_entry_capped(&mut rels_entry, MAX_METADATA_PART_BYTES, "_rels/.rels")
 }
 
 fn load_small_package_parts<R>(
@@ -222,11 +250,11 @@ where
     R: Read + Seek,
 {
     match archive.by_name(path) {
-        Ok(mut entry) => {
-            let mut bytes = Vec::new();
-            entry.read_to_end(&mut bytes).map_err(Error::from)?;
-            Ok(Some(bytes))
-        }
+        Ok(mut entry) => Ok(Some(read_entry_capped(
+            &mut entry,
+            MAX_METADATA_PART_BYTES,
+            path,
+        )?)),
         Err(ZipError::FileNotFound) => Ok(None),
         Err(err) => Err(parse_error(format!("malformed ZIP: {err}"))),
     }
@@ -242,13 +270,18 @@ fn parse_error(message: String) -> Error {
 #[cfg(test)]
 #[cfg(not(coverage))]
 mod tests {
-    #![allow(clippy::unwrap_used, clippy::indexing_slicing)]
+    #![allow(
+        clippy::unwrap_used,
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::arithmetic_side_effects
+    )]
     use core::fmt::Write as _;
     use std::collections::HashMap;
     use std::io::{Cursor, Read as _, Write as _};
     use zip::ZipWriter;
 
-    use super::{load_document_parts, open_package};
+    use super::{load_document_parts, open_package, read_entry_capped, MAX_METADATA_PART_BYTES};
     use crate::styles::StyleList;
     use docspec_core::Error;
 
@@ -863,6 +896,83 @@ mod tests {
                 );
             }
             Err(err) => assert_eq!(format!("{err:?}"), "expected content types lookup to work"),
+        }
+    }
+
+    #[test]
+    fn read_entry_capped_accepts_up_to_cap_and_rejects_over_with_exact_message() {
+        // Exactly at the cap: accepted, returned verbatim.
+        let at_cap = vec![b'A'; 8];
+        let mut cursor = Cursor::new(at_cap.clone());
+        assert_eq!(
+            read_entry_capped(&mut cursor, 8, "word/styles.xml").unwrap(),
+            at_cap
+        );
+
+        // One byte over the cap: rejected with the exact zip-bomb error.
+        let over_cap = vec![b'A'; 9];
+        match read_entry_capped(&mut Cursor::new(over_cap), 8, "word/styles.xml") {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "package part word/styles.xml exceeds the 8-byte limit (possible zip bomb)"
+                );
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Parse error, got {other:?}"),
+        }
+    }
+
+    /// Writes a deflated ZIP entry filled with `len` copies of `byte`, streamed in
+    /// chunks so the fixture never materializes the full decompressed payload.
+    fn add_deflated_filled_entry(
+        writer: &mut ZipWriter<Cursor<Vec<u8>>>,
+        name: &str,
+        byte: u8,
+        len: usize,
+    ) {
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+        writer.start_file(name, options).unwrap();
+        let chunk = vec![byte; 1 << 20];
+        let mut remaining = len;
+        while remaining > 0 {
+            let n = remaining.min(chunk.len());
+            writer.write_all(&chunk[..n]).unwrap();
+            remaining -= n;
+        }
+    }
+
+    #[test]
+    fn styles_part_exceeding_cap_is_rejected_before_full_decompression() {
+        // A 2 KB DOCX whose word/styles.xml deflates to just over the cap — the
+        // zip bomb that used to drive peak memory to gigabytes. The reader must
+        // reject it instead of reading the whole part into memory.
+        let over_cap = usize::try_from(MAX_METADATA_PART_BYTES).unwrap() + 1;
+
+        let buf = Cursor::new(Vec::new());
+        let mut writer = ZipWriter::new(buf);
+        add_stored_entry(
+            &mut writer,
+            "word/_rels/document.xml.rels",
+            doc_rels_xml("styles.xml").as_bytes(),
+        );
+        add_deflated_filled_entry(&mut writer, "word/styles.xml", b'A', over_cap);
+        let zip_bytes = writer.finish().unwrap().into_inner();
+
+        let mut reader = Cursor::new(zip_bytes);
+        let mut archive = zip::ZipArchive::new(&mut reader).unwrap();
+        match load_document_parts(&mut archive, "word/document.xml") {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    format!(
+                        "package part word/styles.xml exceeds the {MAX_METADATA_PART_BYTES}-byte limit (possible zip bomb)"
+                    )
+                );
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Parse error for zip-bomb styles.xml, got {other:?}"),
         }
     }
 }
