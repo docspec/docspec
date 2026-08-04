@@ -4,19 +4,27 @@ use core::fmt;
 use std::io::{BufReader, Read};
 use std::sync::{Arc, Mutex};
 
-use docspec_core::{Color, Error, Event, Result, TableHeaderScope, TextAlignment, TextStyleKind};
-use quick_xml::events::{BytesRef, BytesStart};
+use docspec_core::{Error, Event, Result, TableHeaderScope};
+use quick_xml::events::BytesStart;
 
 use crate::properties;
 
 mod context;
 mod emit;
 mod input;
+mod media;
+mod props;
+mod text;
 
 pub use context::DocxData;
 use context::PackageContext;
 use emit::EmitState;
 use input::XmlCursor;
+use props::{
+    parse_ppr, parse_rpr, parse_tcpr, parse_trpr, resolved_run_styles, ResolvedCellProperties,
+    ResolvedParagraphProperties, ResolvedRowProperties, ResolvedRunProperties,
+};
+use text::{collect_text_content, decode_general_ref, normalize_symbol_text, resolve_sym_char};
 
 const MAX_LIST_LEVEL: u32 = 8;
 
@@ -59,39 +67,6 @@ enum ParagraphBlockKind {
     },
 }
 
-#[derive(Default)]
-struct DrawingScanState {
-    pending_alt: Option<String>,
-    current_pic_alt: Option<String>,
-    pic_depth: u32,
-    blip_fill_depth: u32,
-    emitted_for_current_pic: bool,
-}
-
-struct ResolvedRunProperties {
-    kinds: Vec<TextStyleKind>,
-    text_color: Option<Color>,
-    mark: Option<Color>,
-    font: Option<crate::symbol_fonts::SymbolFont>,
-}
-
-#[derive(Debug, Default, PartialEq, Eq)]
-struct ResolvedParagraphProperties {
-    alignment: Option<TextAlignment>,
-    classification: Option<crate::styles::StyleClassification>,
-    list_info: Option<(u32, u32)>,
-}
-
-#[derive(Debug, Default, PartialEq, Eq)]
-struct ResolvedCellProperties {
-    colspan: Option<u32>,
-}
-
-#[derive(Debug, Default, PartialEq, Eq)]
-struct ResolvedRowProperties {
-    is_header: bool,
-}
-
 struct ParagraphParseState {
     props: ResolvedParagraphProperties,
     properties_seen: bool,
@@ -116,32 +91,6 @@ impl Default for ParagraphParseState {
             block_start_emitted: false,
         }
     }
-}
-
-#[derive(Default)]
-struct RunPropertyAccumulator {
-    kinds: Vec<TextStyleKind>,
-    text_color: Option<Color>,
-    mark: Option<Color>,
-    shade: Option<Color>,
-    font: Option<crate::symbol_fonts::SymbolFont>,
-}
-
-impl RunPropertyAccumulator {
-    fn finish(self) -> ResolvedRunProperties {
-        ResolvedRunProperties {
-            kinds: self.kinds,
-            text_color: self.text_color,
-            mark: self.mark.or(self.shade),
-            font: self.font,
-        }
-    }
-}
-
-/// State machine for parsing a `<w:pict>` VML subtree.
-struct VmlScanState {
-    /// Alt text stack for nested `<v:shape alt="...">` scopes.
-    shape_alt_stack: Vec<Option<String>>,
 }
 
 /// Streaming parser for the DOCX main document XML part.
@@ -218,161 +167,6 @@ impl DocumentReader {
 }
 
 impl DocumentReader {
-    fn set_resolved_run_kind(kinds: &mut Vec<TextStyleKind>, kind: TextStyleKind, enabled: bool) {
-        kinds.retain(|current| current != &kind);
-        if enabled {
-            kinds.push(kind);
-        }
-    }
-
-    fn set_resolved_vertical_alignment(
-        kinds: &mut Vec<TextStyleKind>,
-        align: properties::VertAlign,
-    ) {
-        kinds.retain(|kind| {
-            kind != &TextStyleKind::Subscript && kind != &TextStyleKind::Superscript
-        });
-        match align {
-            properties::VertAlign::Subscript => kinds.push(TextStyleKind::Subscript),
-            properties::VertAlign::Superscript => kinds.push(TextStyleKind::Superscript),
-            properties::VertAlign::None => {}
-        }
-    }
-
-    fn apply_resolved_rpr_style(&mut self, tag: &BytesStart<'_>, kinds: &mut Vec<TextStyleKind>) {
-        if let Some(crate::styles::StyleClassification::Code) = read_val_attribute(tag)
-            .filter(|s| !s.is_empty())
-            .and_then(|s| self.package.classify_style(&s))
-        {
-            if !kinds.contains(&TextStyleKind::Code) {
-                kinds.push(TextStyleKind::Code);
-            }
-        }
-    }
-
-    fn apply_resolved_rpr_property(
-        &mut self,
-        local: &[u8],
-        tag: &BytesStart<'_>,
-        acc: &mut RunPropertyAccumulator,
-    ) -> bool {
-        match local {
-            b"b" => {
-                Self::set_resolved_run_kind(
-                    &mut acc.kinds,
-                    TextStyleKind::Bold,
-                    parse_on_off_attribute(tag),
-                );
-            }
-            b"i" => {
-                Self::set_resolved_run_kind(
-                    &mut acc.kinds,
-                    TextStyleKind::Italic,
-                    parse_on_off_attribute(tag),
-                );
-            }
-            // <w:bCs> per ECMA-376 §17.3.2.2 and <w:iCs> per §17.3.2.21 apply only
-            // to complex-script runs. DocSpec runs are not complex-script, so these
-            // properties are silently ignored; §17.3.2.1 governs <w:b> and §17.3.2.20
-            // governs <w:i> for non-complex-script text.
-            b"bCs" | b"iCs" => {}
-            b"strike" | b"dstrike" => {
-                Self::set_resolved_run_kind(
-                    &mut acc.kinds,
-                    TextStyleKind::Strikethrough,
-                    parse_on_off_attribute(tag),
-                );
-            }
-            b"u" => {
-                let val = read_val_attribute(tag);
-                Self::set_resolved_run_kind(
-                    &mut acc.kinds,
-                    TextStyleKind::Underline,
-                    properties::parse_underline_on(val.as_deref()),
-                );
-            }
-            b"vertAlign" => {
-                let val = read_val_attribute(tag);
-                Self::set_resolved_vertical_alignment(
-                    &mut acc.kinds,
-                    properties::parse_vert_align(val.as_deref()),
-                );
-            }
-            b"color" => {
-                let val = read_val_attribute(tag);
-                acc.text_color = properties::parse_color_val(val.as_deref());
-            }
-            b"highlight" => {
-                let val = read_val_attribute(tag);
-                acc.mark = properties::parse_highlight_val(val.as_deref());
-            }
-            b"shd" => {
-                let val = read_attribute(tag, b"w:val");
-                let color = read_attribute(tag, b"w:color");
-                let fill = read_attribute(tag, b"w:fill");
-                acc.shade =
-                    properties::parse_shd(val.as_deref(), color.as_deref(), fill.as_deref());
-            }
-            b"rFonts" => {
-                acc.font = read_rfonts_symbol(tag);
-            }
-            b"rStyle" => self.apply_resolved_rpr_style(tag, &mut acc.kinds),
-            _ => return false,
-        }
-        true
-    }
-
-    fn parse_rpr(&mut self, _start: &BytesStart<'_>) -> Result<ResolvedRunProperties> {
-        let mut acc = RunPropertyAccumulator::default();
-
-        loop {
-            let event = self.input.read_owned()?;
-            match event {
-                quick_xml::events::Event::Start(start) => {
-                    let local_name = start.local_name();
-                    let local = local_name.as_ref();
-                    let _ = self.apply_resolved_rpr_property(local, &start, &mut acc);
-                    self.input.skip_subtree(&start)?;
-                }
-                quick_xml::events::Event::Empty(empty) => {
-                    let local_name = empty.local_name();
-                    let local = local_name.as_ref();
-                    let _ = self.apply_resolved_rpr_property(local, &empty, &mut acc);
-                }
-                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"rPr" => {
-                    return Ok(acc.finish());
-                }
-                quick_xml::events::Event::End(_)
-                | quick_xml::events::Event::Text(_)
-                | quick_xml::events::Event::GeneralRef(_)
-                | quick_xml::events::Event::CData(_)
-                | quick_xml::events::Event::Comment(_)
-                | quick_xml::events::Event::Decl(_)
-                | quick_xml::events::Event::PI(_)
-                | quick_xml::events::Event::DocType(_) => {}
-                quick_xml::events::Event::Eof => {
-                    return Err(parse_error(
-                        "malformed document.xml: unexpected EOF inside <w:rPr>".to_string(),
-                    ));
-                }
-            }
-        }
-    }
-
-    fn resolved_run_styles(props: Option<&ResolvedRunProperties>) -> Vec<TextStyleKind> {
-        let Some(props) = props else {
-            return Vec::new();
-        };
-        let mut styles = props.kinds.clone();
-        if let Some(color) = props.text_color {
-            styles.push(TextStyleKind::TextColor(color));
-        }
-        if let Some(color) = props.mark {
-            styles.push(TextStyleKind::Mark(color));
-        }
-        styles
-    }
-
     fn emit_deferred_styles_if_needed(
         &mut self,
         props: Option<&ResolvedRunProperties>,
@@ -381,101 +175,14 @@ impl DocumentReader {
         if *content_emitted {
             return;
         }
-        for kind in Self::resolved_run_styles(props) {
+        for kind in resolved_run_styles(props) {
             self.emit.emit_style_if_not_open(kind);
         }
         *content_emitted = true;
     }
 
     fn close_run_styles(&mut self, props: Option<&ResolvedRunProperties>) {
-        self.emit.close_styles(Self::resolved_run_styles(props));
-    }
-
-    fn collect_text_content(&mut self) -> Result<String> {
-        let mut content = String::new();
-        loop {
-            let event = self.input.read_owned()?;
-            match event {
-                quick_xml::events::Event::Text(text) => {
-                    let decoded = text
-                        .decode()
-                        .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
-                    let unescaped = quick_xml::escape::unescape(&decoded)
-                        .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
-                    content.push_str(&unescaped);
-                }
-                quick_xml::events::Event::CData(cdata) => {
-                    let bytes = cdata.into_inner();
-                    let text = core::str::from_utf8(&bytes)
-                        .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
-                    content.push_str(text);
-                }
-                quick_xml::events::Event::GeneralRef(reference) => {
-                    content.push_str(&Self::decode_general_ref(&reference)?);
-                }
-                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"t" => {
-                    return Ok(content);
-                }
-                quick_xml::events::Event::Start(start) => {
-                    self.input.skip_subtree(&start)?;
-                }
-                quick_xml::events::Event::Empty(_)
-                | quick_xml::events::Event::End(_)
-                | quick_xml::events::Event::Comment(_)
-                | quick_xml::events::Event::Decl(_)
-                | quick_xml::events::Event::PI(_)
-                | quick_xml::events::Event::DocType(_) => {}
-                quick_xml::events::Event::Eof => return Ok(content),
-            }
-        }
-    }
-
-    fn normalize_symbol_text(props: Option<&ResolvedRunProperties>, text: String) -> String {
-        let Some(font) = props.and_then(|props| props.font) else {
-            return text;
-        };
-
-        let mut out = String::with_capacity(text.len());
-        for ch in text.chars() {
-            let key = match u32::from(ch) {
-                cp @ 0xF020..=0xF0FF => cp
-                    .checked_sub(0xF000)
-                    .and_then(|stripped| u8::try_from(stripped).ok()),
-                cp @ 0x0020..=0x00FF => u8::try_from(cp).ok(),
-                _ => None,
-            };
-            if let Some(k) = key {
-                if let Some(mapped) = font.convert(k) {
-                    out.push(mapped);
-                }
-            }
-        }
-        out
-    }
-
-    fn decode_general_ref(reference: &BytesRef<'_>) -> Result<String> {
-        let decoded = reference
-            .decode()
-            .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
-        let escaped = format!("&{decoded};");
-        let unescaped = quick_xml::escape::unescape(&escaped)
-            .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
-        Ok(unescaped.into_owned())
-    }
-
-    fn resolve_sym_char(
-        props: Option<&ResolvedRunProperties>,
-        tag: &BytesStart<'_>,
-    ) -> Option<String> {
-        let char_hex = read_attribute(tag, b"w:char")?;
-        let key = crate::properties::parse_sym_char(&char_hex)?;
-        let font = read_attribute(tag, b"w:font")
-            .and_then(|name| crate::symbol_fonts::SymbolFont::from_name(&name))
-            .or_else(|| {
-                let props = props?;
-                props.font
-            })?;
-        font.convert(key).map(String::from)
+        self.emit.close_styles(resolved_run_styles(props));
     }
 
     fn handle_run_child_start(
@@ -487,12 +194,12 @@ impl DocumentReader {
         let local_name = start.local_name();
         match local_name.as_ref() {
             b"rPr" if !*content_emitted && props.is_none() => {
-                *props = Some(self.parse_rpr(start)?);
+                *props = Some(parse_rpr(&mut self.input, &self.package)?);
             }
             b"rPr" => self.consume_current_start(start)?,
             b"t" => {
-                let text = self.collect_text_content()?;
-                let text = Self::normalize_symbol_text(props.as_ref(), text);
+                let text = collect_text_content(&mut self.input)?;
+                let text = normalize_symbol_text(props.as_ref().and_then(|p| p.font), text);
                 if !text.is_empty() {
                     self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
                     self.emit.push(Event::Text { content: text });
@@ -556,7 +263,7 @@ impl DocumentReader {
                 self.emit.push(Event::LineBreak);
             }
             b"sym" => {
-                if let Some(text) = Self::resolve_sym_char(props.as_ref(), empty) {
+                if let Some(text) = resolve_sym_char(props.as_ref().and_then(|p| p.font), empty) {
                     self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
                     self.emit.push(Event::Text { content: text });
                 }
@@ -585,7 +292,7 @@ impl DocumentReader {
                     return Ok(());
                 }
                 quick_xml::events::Event::GeneralRef(reference) => {
-                    let text = Self::decode_general_ref(&reference)?;
+                    let text = decode_general_ref(&reference)?;
                     if !text.is_empty() {
                         self.emit_deferred_styles_if_needed(props.as_ref(), &mut content_emitted);
                         self.emit.push(Event::Text { content: text });
@@ -603,99 +310,6 @@ impl DocumentReader {
                         self.close_run_styles(props.as_ref());
                     }
                     return Ok(());
-                }
-            }
-        }
-    }
-
-    fn parse_numpr(&mut self, _start: &BytesStart<'_>) -> Result<Option<(u32, u32)>> {
-        let mut num_id = None;
-        let mut ilvl = None;
-
-        loop {
-            let event = self.input.read_owned()?;
-            match event {
-                quick_xml::events::Event::Empty(empty) => match empty.name().as_ref() {
-                    b"w:numId" => num_id = parse_u32_attr(&empty, b"w:val"),
-                    b"w:ilvl" => ilvl = parse_u32_attr(&empty, b"w:val"),
-                    _ => {}
-                },
-                quick_xml::events::Event::Start(start) => {
-                    self.input.skip_subtree(&start)?;
-                }
-                quick_xml::events::Event::End(end) if end.name().as_ref() == b"w:numPr" => {
-                    return Ok(num_id.map(|num_id| (num_id, ilvl.unwrap_or(0))));
-                }
-                quick_xml::events::Event::End(_)
-                | quick_xml::events::Event::Text(_)
-                | quick_xml::events::Event::GeneralRef(_)
-                | quick_xml::events::Event::CData(_)
-                | quick_xml::events::Event::Comment(_)
-                | quick_xml::events::Event::Decl(_)
-                | quick_xml::events::Event::PI(_)
-                | quick_xml::events::Event::DocType(_) => {}
-                quick_xml::events::Event::Eof => {
-                    return Err(parse_error(
-                        "malformed document.xml: unexpected EOF inside <w:numPr>".to_string(),
-                    ));
-                }
-            }
-        }
-    }
-
-    fn parse_ppr(&mut self, _start: &BytesStart<'_>) -> Result<ResolvedParagraphProperties> {
-        let mut props = ResolvedParagraphProperties::default();
-
-        loop {
-            let event = self.input.read_owned()?;
-            match event {
-                quick_xml::events::Event::Empty(empty) => match empty.local_name().as_ref() {
-                    b"jc" => {
-                        let val = read_val_attribute(&empty);
-                        props.alignment = val.as_deref().and_then(properties::parse_alignment);
-                    }
-                    b"pStyle" => {
-                        props.classification = read_val_attribute(&empty)
-                            .filter(|s| !s.is_empty())
-                            .and_then(|s| self.package.classify_style(&s));
-                    }
-                    _ => {}
-                },
-                quick_xml::events::Event::Start(start) => match start.local_name().as_ref() {
-                    b"jc" => {
-                        let val = read_val_attribute(&start);
-                        props.alignment = val.as_deref().and_then(properties::parse_alignment);
-                        self.input.skip_subtree(&start)?;
-                    }
-                    b"pStyle" => {
-                        props.classification = read_val_attribute(&start)
-                            .filter(|s| !s.is_empty())
-                            .and_then(|s| self.package.classify_style(&s));
-                        self.input.skip_subtree(&start)?;
-                    }
-                    b"numPr" => {
-                        props.list_info = self.parse_numpr(&start)?;
-                    }
-                    b"rPr" => {
-                        self.input.skip_subtree(&start)?;
-                    }
-                    _ => {}
-                },
-                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"pPr" => {
-                    return Ok(props);
-                }
-                quick_xml::events::Event::End(_)
-                | quick_xml::events::Event::Text(_)
-                | quick_xml::events::Event::GeneralRef(_)
-                | quick_xml::events::Event::CData(_)
-                | quick_xml::events::Event::Comment(_)
-                | quick_xml::events::Event::Decl(_)
-                | quick_xml::events::Event::PI(_)
-                | quick_xml::events::Event::DocType(_) => {}
-                quick_xml::events::Event::Eof => {
-                    return Err(parse_error(
-                        "malformed document.xml: unexpected EOF inside <w:pPr>".to_string(),
-                    ));
                 }
             }
         }
@@ -999,7 +613,7 @@ impl DocumentReader {
     ) -> Result<bool> {
         match start.local_name().as_ref() {
             b"pPr" if !state.paragraph_emitted && !state.properties_seen => {
-                state.props = self.parse_ppr(start)?;
+                state.props = parse_ppr(&mut self.input, &self.package)?;
                 state.properties_seen = true;
                 self.resolve_local_ppr(state);
             }
@@ -1116,82 +730,6 @@ impl DocumentReader {
         }
     }
 
-    fn parse_tcpr(&mut self, _start: &BytesStart<'_>) -> Result<ResolvedCellProperties> {
-        let mut colspan = None;
-        loop {
-            let event = self.input.read_owned()?;
-
-            match event {
-                quick_xml::events::Event::Empty(empty) => {
-                    if empty.local_name().as_ref() == b"gridSpan" {
-                        let val = read_val_attribute(&empty);
-                        colspan = properties::parse_grid_span_value(val.as_deref());
-                    }
-                }
-                quick_xml::events::Event::Start(start) => {
-                    if start.local_name().as_ref() == b"gridSpan" {
-                        let val = read_val_attribute(&start);
-                        colspan = properties::parse_grid_span_value(val.as_deref());
-                    }
-                    self.input.skip_subtree(&start)?;
-                }
-                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"tcPr" => {
-                    return Ok(ResolvedCellProperties { colspan });
-                }
-                quick_xml::events::Event::Eof => {
-                    return Err(parse_error(
-                        "malformed document.xml: unexpected EOF inside <w:tcPr>".to_string(),
-                    ));
-                }
-                quick_xml::events::Event::End(_)
-                | quick_xml::events::Event::Text(_)
-                | quick_xml::events::Event::GeneralRef(_)
-                | quick_xml::events::Event::CData(_)
-                | quick_xml::events::Event::Comment(_)
-                | quick_xml::events::Event::Decl(_)
-                | quick_xml::events::Event::PI(_)
-                | quick_xml::events::Event::DocType(_) => {}
-            }
-        }
-    }
-
-    fn parse_trpr(&mut self, _start: &BytesStart<'_>) -> Result<ResolvedRowProperties> {
-        let mut is_header = false;
-        loop {
-            let event = self.input.read_owned()?;
-
-            match event {
-                quick_xml::events::Event::Empty(empty) => {
-                    if empty.local_name().as_ref() == b"tblHeader" {
-                        is_header = parse_on_off_attribute(&empty);
-                    }
-                }
-                quick_xml::events::Event::Start(start) => {
-                    if start.local_name().as_ref() == b"tblHeader" {
-                        is_header = parse_on_off_attribute(&start);
-                    }
-                    self.input.skip_subtree(&start)?;
-                }
-                quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"trPr" => {
-                    return Ok(ResolvedRowProperties { is_header });
-                }
-                quick_xml::events::Event::Eof => {
-                    return Err(parse_error(
-                        "malformed document.xml: unexpected EOF inside <w:trPr>".to_string(),
-                    ));
-                }
-                quick_xml::events::Event::End(_)
-                | quick_xml::events::Event::Text(_)
-                | quick_xml::events::Event::GeneralRef(_)
-                | quick_xml::events::Event::CData(_)
-                | quick_xml::events::Event::Comment(_)
-                | quick_xml::events::Event::Decl(_)
-                | quick_xml::events::Event::PI(_)
-                | quick_xml::events::Event::DocType(_) => {}
-            }
-        }
-    }
-
     fn emit_table_cell_start(&mut self, is_header: bool, colspan: Option<u32>) {
         if is_header {
             self.emit.push(Event::StartTableHeader {
@@ -1228,7 +766,7 @@ impl DocumentReader {
             match event {
                 quick_xml::events::Event::Start(start) => match start.local_name().as_ref() {
                     b"tcPr" if !cell_started && cell_props.is_none() => {
-                        cell_props = Some(self.parse_tcpr(&start)?);
+                        cell_props = Some(parse_tcpr(&mut self.input)?);
                     }
                     b"tcPr" => {
                         self.input.skip_subtree(&start)?;
@@ -1311,7 +849,7 @@ impl DocumentReader {
             match event {
                 quick_xml::events::Event::Start(start) => match start.local_name().as_ref() {
                     b"trPr" if !row_started && row_props.is_none() => {
-                        row_props = Some(self.parse_trpr(&start)?);
+                        row_props = Some(parse_trpr(&mut self.input)?);
                         if row_props.as_ref().is_some_and(|props| !props.is_header) {
                             *header_band_active = false;
                         }
@@ -1465,238 +1003,6 @@ impl DocumentReader {
         }
     }
 
-    fn parse_drawing_subtree(&mut self) -> Result<()> {
-        let mut state = DrawingScanState::default();
-        let mut drawing_depth: u32 = 1;
-
-        while drawing_depth > 0 {
-            let event = self.input.read_owned()?;
-
-            match event {
-                quick_xml::events::Event::Start(tag) => {
-                    self.handle_drawing_child_start(&mut state, &tag);
-                    drawing_depth = drawing_depth.saturating_add(1);
-                }
-                quick_xml::events::Event::Empty(tag) => {
-                    self.handle_drawing_child_empty(&mut state, &tag);
-                }
-                quick_xml::events::Event::End(tag) => {
-                    if tag.local_name().as_ref() == b"drawing" && drawing_depth == 1 {
-                        drawing_depth = drawing_depth.saturating_sub(1);
-                    } else {
-                        Self::handle_drawing_child_end(&mut state, tag.local_name().as_ref());
-                        drawing_depth = drawing_depth.saturating_sub(1);
-                    }
-                }
-                quick_xml::events::Event::Eof => {
-                    self.handle_eof();
-                    drawing_depth = 0;
-                }
-                quick_xml::events::Event::Text(_)
-                | quick_xml::events::Event::GeneralRef(_)
-                | quick_xml::events::Event::CData(_)
-                | quick_xml::events::Event::Comment(_)
-                | quick_xml::events::Event::Decl(_)
-                | quick_xml::events::Event::PI(_)
-                | quick_xml::events::Event::DocType(_) => {}
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Parses a `<w:pict>` subtree and emits images for VML `<v:imagedata>` elements.
-    fn parse_pict_subtree(&mut self) -> Result<()> {
-        let mut state = VmlScanState {
-            shape_alt_stack: Vec::new(),
-        };
-        let mut pict_depth: u32 = 1;
-
-        while pict_depth > 0 {
-            let event = self.input.read_owned()?;
-
-            match event {
-                quick_xml::events::Event::Start(tag) => {
-                    self.handle_pict_child_start(&mut state, &tag)?;
-                    pict_depth = pict_depth.saturating_add(1);
-                }
-                quick_xml::events::Event::Empty(tag) => {
-                    self.handle_pict_child_empty(&mut state, &tag)?;
-                }
-                quick_xml::events::Event::End(tag) => {
-                    if tag.local_name().as_ref() == b"pict" && pict_depth == 1 {
-                        pict_depth = pict_depth.saturating_sub(1);
-                    } else {
-                        Self::handle_pict_child_end(&mut state, tag.local_name().as_ref());
-                        pict_depth = pict_depth.saturating_sub(1);
-                    }
-                }
-                quick_xml::events::Event::Eof => {
-                    return Err(parse_error(
-                        "malformed document.xml: unexpected EOF inside <w:pict>".to_string(),
-                    ));
-                }
-                quick_xml::events::Event::Text(_)
-                | quick_xml::events::Event::GeneralRef(_)
-                | quick_xml::events::Event::CData(_)
-                | quick_xml::events::Event::Comment(_)
-                | quick_xml::events::Event::Decl(_)
-                | quick_xml::events::Event::PI(_)
-                | quick_xml::events::Event::DocType(_) => {}
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Handles a start tag inside a VML `<w:pict>` subtree.
-    fn handle_pict_child_start(
-        &mut self,
-        state: &mut VmlScanState,
-        tag: &BytesStart<'_>,
-    ) -> Result<()> {
-        let local_name = tag.local_name();
-        let local = local_name.as_ref();
-        match local {
-            b"shape" => {
-                state
-                    .shape_alt_stack
-                    .push(read_decoded_attribute(tag, b"alt"));
-            }
-            b"imagedata" => self.emit_pict_imagedata(state, tag)?,
-            _ => {}
-        }
-        Ok(())
-    }
-
-    /// Handles an empty tag inside a VML `<w:pict>` subtree.
-    fn handle_pict_child_empty(
-        &mut self,
-        state: &mut VmlScanState,
-        tag: &BytesStart<'_>,
-    ) -> Result<()> {
-        let local_name = tag.local_name();
-        let local = local_name.as_ref();
-        if local == b"imagedata" {
-            self.emit_pict_imagedata(state, tag)?;
-        }
-        Ok(())
-    }
-
-    /// Handles an end tag inside a VML `<w:pict>` subtree.
-    fn handle_pict_child_end(state: &mut VmlScanState, local: &[u8]) {
-        if local == b"shape" {
-            let _ = state.shape_alt_stack.pop();
-        }
-    }
-
-    /// Emits an image event for a VML `<v:imagedata>` relationship reference.
-    fn emit_pict_imagedata(
-        &mut self,
-        state: &mut VmlScanState,
-        tag: &BytesStart<'_>,
-    ) -> Result<()> {
-        // TODO(vml-binData): <v:imagedata src="wordml://..."/> (inline w:binData reference) is not supported; the entry naturally degrades to "no rId found" and emits nothing.
-        let image_rid = read_attribute(tag, b"r:id")
-            .or_else(|| read_attribute(tag, b"r:embed"))
-            .or_else(|| read_attribute(tag, b"r:link"));
-        let Some(rid) = image_rid else {
-            return Ok(());
-        };
-
-        let alt = read_decoded_attribute(tag, b"o:title")
-            .filter(|s| !s.is_empty())
-            .or_else(|| {
-                state
-                    .shape_alt_stack
-                    .iter()
-                    .rev()
-                    .find_map(core::clone::Clone::clone)
-            });
-
-        // Note: if the same rId appears in both <w:drawing> and a bare <w:pict> (not inside <mc:AlternateContent>), two Image events are emitted. This is intentional — we faithfully represent what the document contains. AlternateContent-wrapped duplicates are deduped via the mc:Fallback denylist entry.
-        self.emit.push(Event::Image {
-            alt,
-            decorative: false,
-            id: None,
-            source: self.package.image_source_for_rid(&rid),
-            title: None,
-        });
-
-        Ok(())
-    }
-
-    fn handle_drawing_child_start(&mut self, state: &mut DrawingScanState, tag: &BytesStart<'_>) {
-        let local_name = tag.local_name();
-        let local = local_name.as_ref();
-        match local {
-            b"docPr" => {
-                state.pending_alt = read_decoded_attribute(tag, b"descr");
-            }
-            b"pic" => {
-                state.pic_depth = state.pic_depth.saturating_add(1);
-                if state.pic_depth == 1 {
-                    state.current_pic_alt = state.pending_alt.take();
-                    state.emitted_for_current_pic = false;
-                }
-            }
-            b"blipFill" if state.pic_depth > 0 => {
-                state.blip_fill_depth = state.blip_fill_depth.saturating_add(1);
-            }
-            b"blip" => self.maybe_emit_drawing_blip(state, tag),
-            _ => {}
-        }
-    }
-
-    fn handle_drawing_child_empty(&mut self, state: &mut DrawingScanState, tag: &BytesStart<'_>) {
-        let local_name = tag.local_name();
-        let local = local_name.as_ref();
-        match local {
-            b"docPr" => {
-                state.pending_alt = read_decoded_attribute(tag, b"descr");
-            }
-            b"blip" => self.maybe_emit_drawing_blip(state, tag),
-            _ => {}
-        }
-    }
-
-    fn handle_drawing_child_end(state: &mut DrawingScanState, local: &[u8]) {
-        match local {
-            b"blipFill" if state.blip_fill_depth > 0 => {
-                state.blip_fill_depth = state.blip_fill_depth.saturating_sub(1);
-            }
-            b"pic" if state.pic_depth > 0 => {
-                state.pic_depth = state.pic_depth.saturating_sub(1);
-                if state.pic_depth == 0 {
-                    state.current_pic_alt = None;
-                    state.emitted_for_current_pic = false;
-                }
-            }
-            _ => {}
-        }
-    }
-
-    fn maybe_emit_drawing_blip(&mut self, state: &mut DrawingScanState, tag: &BytesStart<'_>) {
-        if state.pic_depth == 0 || state.blip_fill_depth == 0 || state.emitted_for_current_pic {
-            return;
-        }
-
-        let embed = read_attribute(tag, b"r:embed");
-        let link = read_attribute(tag, b"r:link");
-        let Some(rid) = embed.or(link) else {
-            return;
-        };
-
-        state.emitted_for_current_pic = true;
-        self.emit.push(Event::Image {
-            alt: state.current_pic_alt.clone(),
-            decorative: false,
-            id: None,
-            source: self.package.image_source_for_rid(&rid),
-            title: None,
-        });
-    }
-
     fn read_until_event(&mut self) -> Result<()> {
         let event = self.input.read_owned()?;
 
@@ -1828,8 +1134,11 @@ mod tests {
     use std::io::{Cursor, Read};
     use std::sync::Arc;
 
-    use docspec_core::{AssetHandle, ImageSource, ListStyleType};
+    use docspec_core::{
+        AssetHandle, Color, ImageSource, ListStyleType, TextAlignment, TextStyleKind,
+    };
 
+    use super::props::parse_numpr;
     use super::*;
     use crate::rels::HyperlinkMap;
 
@@ -2035,8 +1344,8 @@ mod tests {
         let mut reader = make_reader(
             r#"<w:numPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:numId w:val="7"/><w:ilvl w:val="2"/></w:numPr>"#,
         );
-        let start = read_first_start(&mut reader);
-        let parsed = reader.parse_numpr(&start).expect("numPr parses");
+        let _ = read_first_start(&mut reader);
+        let parsed = parse_numpr(&mut reader.input).expect("numPr parses");
         assert_eq!(parsed, Some((7, 2)));
     }
 
@@ -2045,8 +1354,8 @@ mod tests {
         let mut reader = make_reader(
             r#"<w:numPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:numId w:val="7"/></w:numPr>"#,
         );
-        let start = read_first_start(&mut reader);
-        let parsed = reader.parse_numpr(&start).expect("numPr parses");
+        let _ = read_first_start(&mut reader);
+        let parsed = parse_numpr(&mut reader.input).expect("numPr parses");
         assert_eq!(parsed, Some((7, 0)));
     }
 
@@ -2055,8 +1364,8 @@ mod tests {
         let mut reader = make_reader(
             r#"<w:numPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:unknown><w:numId w:val="9"/></w:unknown><w:numId w:val="3"/><w:ilvl w:val="1"/></w:numPr>"#,
         );
-        let start = read_first_start(&mut reader);
-        let parsed = reader.parse_numpr(&start).expect("numPr parses");
+        let _ = read_first_start(&mut reader);
+        let parsed = parse_numpr(&mut reader.input).expect("numPr parses");
         assert_eq!(parsed, Some((3, 1)));
     }
 
@@ -2069,8 +1378,8 @@ mod tests {
             r#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:jc w:val="center"/><w:pStyle w:val="Heading2"/><w:numPr><w:numId w:val="4"/><w:ilvl w:val="1"/></w:numPr></w:pPr>"#,
             styles,
         );
-        let start = read_first_start(&mut reader);
-        let parsed = reader.parse_ppr(&start).expect("pPr parses");
+        let _ = read_first_start(&mut reader);
+        let parsed = parse_ppr(&mut reader.input, &reader.package).expect("pPr parses");
         assert_eq!(
             parsed,
             ResolvedParagraphProperties {
@@ -2086,8 +1395,8 @@ mod tests {
         let mut reader = make_reader(
             r#"<w:pPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:pPr>"#,
         );
-        let start = read_first_start(&mut reader);
-        let parsed = reader.parse_ppr(&start).expect("pPr parses");
+        let _ = read_first_start(&mut reader);
+        let parsed = parse_ppr(&mut reader.input, &reader.package).expect("pPr parses");
         assert_eq!(parsed, ResolvedParagraphProperties::default());
     }
 
@@ -2460,7 +1769,8 @@ mod tests {
                 Ok(quick_xml::events::Event::Start(start))
                     if start.local_name().as_ref() == b"rPr" =>
                 {
-                    return reader.parse_rpr(&start).expect("rPr fragment parses");
+                    return parse_rpr(&mut reader.input, &reader.package)
+                        .expect("rPr fragment parses");
                 }
                 Ok(quick_xml::events::Event::Eof) => panic!("missing rPr start"),
                 Ok(_) => {}
@@ -2474,8 +1784,8 @@ mod tests {
         let mut reader = make_reader(
             r#"<w:tcPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:gridSpan w:val="3"/></w:tcPr>"#,
         );
-        let start = read_first_start(&mut reader);
-        let parsed = reader.parse_tcpr(&start).expect("tcPr parses");
+        let _ = read_first_start(&mut reader);
+        let parsed = parse_tcpr(&mut reader.input).expect("tcPr parses");
 
         assert_eq!(parsed, ResolvedCellProperties { colspan: Some(3) });
     }
@@ -2485,8 +1795,8 @@ mod tests {
         let mut reader = make_reader(
             r#"<w:tcPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:tcPr>"#,
         );
-        let start = read_first_start(&mut reader);
-        let parsed = reader.parse_tcpr(&start).expect("tcPr parses");
+        let _ = read_first_start(&mut reader);
+        let parsed = parse_tcpr(&mut reader.input).expect("tcPr parses");
 
         assert_eq!(parsed, ResolvedCellProperties { colspan: None });
     }
@@ -2496,8 +1806,8 @@ mod tests {
         let mut reader = make_reader(
             r#"<w:trPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tblHeader/></w:trPr>"#,
         );
-        let start = read_first_start(&mut reader);
-        let parsed = reader.parse_trpr(&start).expect("trPr parses");
+        let _ = read_first_start(&mut reader);
+        let parsed = parse_trpr(&mut reader.input).expect("trPr parses");
 
         assert_eq!(parsed, ResolvedRowProperties { is_header: true });
     }
@@ -2507,8 +1817,8 @@ mod tests {
         let mut reader = make_reader(
             r#"<w:trPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:trPr>"#,
         );
-        let start = read_first_start(&mut reader);
-        let parsed = reader.parse_trpr(&start).expect("trPr parses");
+        let _ = read_first_start(&mut reader);
+        let parsed = parse_trpr(&mut reader.input).expect("trPr parses");
 
         assert_eq!(parsed, ResolvedRowProperties { is_header: false });
     }
