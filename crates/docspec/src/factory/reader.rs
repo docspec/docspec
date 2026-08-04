@@ -56,11 +56,15 @@ impl AnyReader {
     /// # Example
     ///
     /// ```no_run
+    /// # fn main() -> docspec::Result<()> {
+    /// # // The example names a format, so it is only compiled when that format is.
+    /// # #[cfg(feature = "docx")]
+    /// # {
     /// use docspec::AnyReader;
     /// use docspec::InputFormat;
     ///
-    /// # fn main() -> docspec::Result<()> {
     /// let reader = AnyReader::from_path(InputFormat::Docx, "document.docx")?;
+    /// # }
     /// # Ok(())
     /// # }
     /// ```
@@ -108,12 +112,15 @@ impl AnyReader {
     /// # Example
     ///
     /// ```
+    /// # fn main() -> docspec::Result<()> {
+    /// # #[cfg(feature = "markdown")]
+    /// # {
     /// use std::io::Cursor;
     /// use docspec::AnyReader;
     /// use docspec::InputFormat;
     ///
-    /// # fn main() -> docspec::Result<()> {
     /// let reader = AnyReader::from_reader(InputFormat::Markdown, Cursor::new("# Hello"))?;
+    /// # }
     /// # Ok(())
     /// # }
     /// ```
@@ -161,11 +168,14 @@ impl AnyReader {
     /// # Example
     ///
     /// ```
+    /// # fn main() -> docspec::Result<()> {
+    /// # #[cfg(feature = "markdown")]
+    /// # {
     /// use docspec::AnyReader;
     /// use docspec::InputFormat;
     ///
-    /// # fn main() -> docspec::Result<()> {
     /// let reader = AnyReader::from_str(InputFormat::Markdown, "# Hello")?;
+    /// # }
     /// # Ok(())
     /// # }
     /// ```
