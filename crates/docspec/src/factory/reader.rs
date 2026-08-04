@@ -69,12 +69,12 @@ impl AnyReader {
     where
         P: AsRef<std::path::Path>,
     {
-        #[cfg(not(any(feature = "markdown", feature = "html", feature = "docx")))]
+        #[cfg(not(feature = "_reader"))]
         {
             let _ = path;
             match format {}
         }
-        #[cfg(any(feature = "markdown", feature = "html", feature = "docx"))]
+        #[cfg(feature = "_reader")]
         match format {
             #[cfg(feature = "docx")]
             InputFormat::Docx => Ok(Self::Docx(DocxReader::from_path(path.as_ref())?)),
@@ -122,12 +122,12 @@ impl AnyReader {
     where
         R: Read + Seek + Send + 'static,
     {
-        #[cfg(not(any(feature = "markdown", feature = "html", feature = "docx")))]
+        #[cfg(not(feature = "_reader"))]
         {
             let _ = reader;
             match format {}
         }
-        #[cfg(any(feature = "markdown", feature = "html", feature = "docx"))]
+        #[cfg(feature = "_reader")]
         match format {
             #[cfg(feature = "html")]
             InputFormat::Html => {
@@ -171,12 +171,12 @@ impl AnyReader {
     /// ```
     #[inline]
     pub fn from_str(format: InputFormat, input: &str) -> Result<Self> {
-        #[cfg(not(any(feature = "markdown", feature = "html", feature = "docx")))]
+        #[cfg(not(feature = "_reader"))]
         {
             let _ = input;
             match format {}
         }
-        #[cfg(any(feature = "markdown", feature = "html", feature = "docx"))]
+        #[cfg(feature = "_reader")]
         match format {
             #[cfg(feature = "html")]
             InputFormat::Html => {
@@ -200,11 +200,11 @@ impl AnyReader {
 impl EventSource for AnyReader {
     #[inline]
     fn next_event(&mut self) -> Result<Option<Event>> {
-        #[cfg(not(any(feature = "markdown", feature = "html", feature = "docx")))]
+        #[cfg(not(feature = "_reader"))]
         {
             match *self {}
         }
-        #[cfg(any(feature = "markdown", feature = "html", feature = "docx"))]
+        #[cfg(feature = "_reader")]
         match self {
             #[cfg(feature = "html")]
             Self::Html(r) => r.next_event(),
@@ -225,7 +225,7 @@ mod send_static_assertions {
     }
     #[test]
     fn any_reader_is_send_static() {
-        #[cfg(any(feature = "markdown", feature = "html", feature = "docx"))]
+        #[cfg(feature = "_reader")]
         assert_send_static::<crate::AnyReader>();
     }
     #[cfg(feature = "docx")]

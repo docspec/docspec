@@ -37,6 +37,10 @@ enum AnyWriterInner<W: Write> {
     PandocNative(PandocNativeWriter<W>),
     #[cfg(feature = "markdown-writer")]
     Markdown(MarkdownWriter<W>),
+    /// Consumes `W` when no writer feature is enabled, where the enum is otherwise
+    /// variant-free and the type parameter would be unused.
+    #[cfg(not(feature = "_writer"))]
+    _Phantom(core::marker::PhantomData<W>),
 }
 
 impl<W: Write> AnyWriter<W> {
@@ -44,24 +48,12 @@ impl<W: Write> AnyWriter<W> {
     #[inline]
     #[must_use]
     pub fn new(format: OutputFormat, writer: W) -> Self {
-        #[cfg(not(any(
-            feature = "blocknote-writer",
-            feature = "oxa-writer",
-            feature = "html-writer",
-            feature = "pandoc-native-writer",
-            feature = "markdown-writer"
-        )))]
+        #[cfg(not(feature = "_writer"))]
         {
             drop(writer);
             match format {}
         }
-        #[cfg(any(
-            feature = "blocknote-writer",
-            feature = "oxa-writer",
-            feature = "html-writer",
-            feature = "pandoc-native-writer",
-            feature = "markdown-writer"
-        ))]
+        #[cfg(feature = "_writer")]
         {
             let inner = match format {
                 #[cfg(feature = "blocknote-writer")]
@@ -97,7 +89,7 @@ impl<W: Write> EventSink for AnyWriterInner<W> {
             Self::PandocNative(w) => w.finish(),
             #[cfg(feature = "markdown-writer")]
             Self::Markdown(w) => w.finish(),
-            #[cfg(not(feature = "blocknote-writer"))]
+            #[cfg(not(feature = "_writer"))]
             Self::_Phantom(_) => Ok(()),
         }
     }
@@ -114,7 +106,7 @@ impl<W: Write> EventSink for AnyWriterInner<W> {
             Self::PandocNative(w) => w.handle_event(event),
             #[cfg(feature = "markdown-writer")]
             Self::Markdown(w) => w.handle_event(event),
-            #[cfg(not(feature = "blocknote-writer"))]
+            #[cfg(not(feature = "_writer"))]
             Self::_Phantom(_) => {
                 let _ = event;
                 Ok(())
