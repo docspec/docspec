@@ -81,6 +81,48 @@ pub(super) fn normalize_relative_target(
     Ok(normalized.join("/"))
 }
 
+#[cfg(all(test, coverage))]
+mod coverage_tests {
+    use super::*;
+
+    #[test]
+    fn derive_part_rels_path_handles_root_part() {
+        let result = derive_part_rels_path("document.xml");
+
+        assert_eq!(result, "_rels/document.xml.rels");
+    }
+
+    #[test]
+    fn resolve_relative_target_handles_package_absolute_target() {
+        let result = resolve_relative_target("word/document.xml", "/media/image.png");
+
+        assert_eq!(result, "media/image.png");
+    }
+
+    #[test]
+    fn resolve_relative_target_handles_root_part() {
+        let result = resolve_relative_target("document.xml", "styles.xml");
+
+        assert_eq!(result, "styles.xml");
+    }
+
+    #[test]
+    fn normalize_relative_target_rejects_package_root_escape() {
+        let result = normalize_relative_target("word/document.xml", "../../escape.xml");
+
+        match result {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "rels target escapes package root: word/../../escape.xml"
+                );
+                assert_eq!(position, None);
+            }
+            other => assert_eq!(format!("{other:?}"), "expected package-root escape error"),
+        }
+    }
+}
+
 #[cfg(test)]
 #[cfg(not(coverage))]
 mod tests {
