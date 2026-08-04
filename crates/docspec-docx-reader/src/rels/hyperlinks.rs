@@ -100,13 +100,10 @@ mod coverage_tests {
     use std::io::Cursor;
 
     fn assert_parse_error(result: docspec_core::Result<HyperlinkMap>, expected_message: &str) {
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(message, expected_message);
-                assert_eq!(position, None);
-            }
-            other => assert_eq!(format!("{other:?}"), "expected relationship parse error"),
-        }
+        assert_eq!(
+            format!("{result:?}"),
+            format!("Err(Parse {{ message: {expected_message:?}, position: None }})")
+        );
     }
 
     #[test]
@@ -117,13 +114,8 @@ mod coverage_tests {
 
         let result = collect_hyperlink_map(Cursor::new(rels_xml.as_bytes()));
 
-        match result {
-            Ok(map) => assert_eq!(
-                map,
-                HashMap::from([("rId1".to_string(), "https://example.com".to_string())])
-            ),
-            Err(err) => assert_eq!(format!("{err:?}"), "expected hyperlink map"),
-        }
+        let expected = HashMap::from([("rId1".to_string(), "https://example.com".to_string())]);
+        assert_eq!(result.as_ref().ok(), Some(&expected));
     }
 
     #[test]

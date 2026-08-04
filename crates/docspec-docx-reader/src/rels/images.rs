@@ -128,13 +128,10 @@ mod coverage_tests {
     use super::*;
 
     fn assert_parse_error(result: docspec_core::Result<ImageMap>, expected_message: &str) {
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(message, expected_message);
-                assert_eq!(position, None);
-            }
-            other => assert_eq!(format!("{other:?}"), "expected relationship parse error"),
-        }
+        assert_eq!(
+            format!("{result:?}"),
+            format!("Err(Parse {{ message: {expected_message:?}, position: None }})")
+        );
     }
 
     #[test]
@@ -145,14 +142,12 @@ mod coverage_tests {
 
         let result = collect_image_map(rels_xml.as_bytes(), "word/document.xml");
 
-        match result {
-            Ok(map) => assert_eq!(
-                map.get("rId1")
-                    .map(|rel| (rel.target.as_str(), rel.is_external)),
-                Some(("word/media/image.png", false))
-            ),
-            Err(err) => assert_eq!(format!("{err:?}"), "expected image map"),
-        }
+        assert_eq!(
+            result.as_ref().ok().and_then(|map| map
+                .get("rId1")
+                .map(|rel| (rel.target.as_str(), rel.is_external))),
+            Some(("word/media/image.png", false))
+        );
     }
 
     #[test]
