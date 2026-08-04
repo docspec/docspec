@@ -1,23 +1,27 @@
 //! DOCX main document part (`document.xml`) streaming event parser.
 
-use alloc::collections::VecDeque;
 use core::fmt;
 use std::io::{BufReader, Read};
 use std::sync::{Arc, Mutex};
 
-use docspec_core::{
-    Color, Error, Event, ImageSource, Result, TableHeaderScope, TextAlignment, TextStyleKind,
-};
+use docspec_core::{Color, Error, Event, Result, TableHeaderScope, TextAlignment, TextStyleKind};
 use quick_xml::events::{BytesRef, BytesStart};
 
 use crate::properties;
-use crate::rels::{HyperlinkMap, ImageMap};
-use crate::styles::StyleList;
+
+mod context;
+mod emit;
+mod input;
+
+pub use context::DocxData;
+use context::PackageContext;
+use emit::EmitState;
+use input::XmlCursor;
 
 const MAX_LIST_LEVEL: u32 = 8;
 
 /// Document processing phase.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Phase {
     /// `EndDocument` has been emitted.
     Finished,
@@ -53,17 +57,6 @@ enum ParagraphBlockKind {
         ilvl: u32,
         style_type: docspec_core::ListStyleType,
     },
-}
-
-/// One open level on the list nesting stack.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-struct ListStackEntry {
-    /// The w:numId of the list this entry belongs to.
-    num_id: u32,
-    /// The 0-indexed nesting depth (w:ilvl).
-    ilvl: u32,
-    /// Whether this entry's level is ordered (true) or unordered (false).
-    is_ordered: bool,
 }
 
 #[derive(Default)]
@@ -151,115 +144,51 @@ struct VmlScanState {
     shape_alt_stack: Vec<Option<String>>,
 }
 
-/// Bundle of package-level data the document reader consults during streaming.
-///
-/// Forward-compatible: additional package parts (theme, settings)
-/// will be added as fields here without breaking the constructor signature.
-pub struct DocxData {
-    /// Styles loaded from the styles part, used to classify paragraph and run styles.
-    pub style_list: StyleList,
-    /// Map of relationship Id → Target URL for every <w:hyperlink> r:id reference. Resolved from word/_rels/document.xml.rels at package-open time; empty if the rels file is absent or contains no hyperlink relationships.
-    pub hyperlink_map: HyperlinkMap,
-    /// Numbering definitions loaded from the numbering part, used to resolve list styles.
-    pub numbering: crate::numbering::MinimalNumbering,
-    /// Map of relationship Id → [`crate::rels::ImageRel`] for every image relationship in the document part. Resolved from word/_rels/document.xml.rels at package-open time; empty if absent.
-    pub image_map: ImageMap,
-}
-
 /// Streaming parser for the DOCX main document XML part.
 pub struct DocumentReader {
-    /// Reusable buffer for quick-xml event reading.
-    buf: Vec<u8>,
-    /// True when a preformatted paragraph ended but the block close is deferred until the next boundary.
-    pending_preformatted_close: bool,
-    /// Style kinds currently opened for the active run.
-    open_styles: Vec<TextStyleKind>,
     /// Document processing phase.
     phase: Phase,
-    /// Queue of `DocSpec` events to emit.
-    queue: VecDeque<Event>,
+    /// Pending output events and the state that governs them.
+    emit: EmitState,
     /// Deferred parser error returned after already-queued events are drained.
     pending_error: Option<Error>,
-    /// Package-level data (styles, future: theme, numbering).
-    data: DocxData,
-    /// Hyperlink relationship map from the package. Consulted while parsing
-    /// `<w:hyperlink r:id="...">` to resolve the URL.
-    hyperlink_map: HyperlinkMap,
-    /// Open list nesting stack. Each entry represents one open list level.
-    list_stack: Vec<ListStackEntry>,
-    /// Counter per (numId, ilvl) tracking how many items at each level have been emitted
-    /// document-wide. Used to compute the effective start value per OOXML §17.9.17:
-    /// "counting the number of paragraphs at this level since the last restart".
-    /// Persists across non-list paragraph breaks.
-    list_counters: std::collections::HashMap<(u32, u32), u64>,
-    /// The quick-xml reader streaming from the document entry.
-    xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
-    /// Shared DOCX ZIP archive — used to stream embedded asset bytes on demand.
-    archive: Arc<Mutex<zip::ZipArchive<Box<dyn crate::package::ReadSeek + 'static>>>>,
-    /// Content-type lookup table — used by `DocxAssetHandle` to resolve MIME types.
-    content_types: Arc<crate::content_types::ContentTypes>,
+    /// Read-only package data (styles, numbering, relationships, archive).
+    package: PackageContext,
+    /// The XML token pump streaming from the document entry.
+    input: XmlCursor,
 }
 
 impl fmt::Debug for DocumentReader {
+    /// Renders parse state only.
+    ///
+    /// The queue is reported by length rather than contents: it can hold an
+    /// entire subtree's events, so formatting them would make `Debug` itself
+    /// expensive. The XML reader and scratch buffer are omitted for the same
+    /// reason.
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut debug = f.debug_struct("DocumentReader");
-        debug
-            .field("buf", &self.buf)
-            .field(
-                "pending_preformatted_close",
-                &self.pending_preformatted_close,
-            )
-            .field("open_styles", &self.open_styles)
-            .field("phase", &"<phase>")
-            .field("queue", &self.queue)
-            .field("data", &"<DocxData>")
-            .field("hyperlink_map", &self.hyperlink_map)
-            .field("list_stack", &self.list_stack)
-            .field("list_counters", &self.list_counters);
-        if std::env::var_os("DOCSPEC_DEBUG_PENDING_ERROR").is_some() {
-            debug.field("pending_error", &self.pending_error);
-        }
-        debug.field("xml", &"<quick_xml::Reader>");
-        debug.field("archive", &"<Arc<Mutex<ZipArchive>>>");
-        debug.field("content_types", &"<Arc<ContentTypes>>");
-        debug.finish()
+        f.debug_struct("DocumentReader")
+            .field("phase", &self.phase)
+            .field("queued", &self.emit.queued())
+            .field("pending_error", &self.pending_error)
+            .field("package", &self.package)
+            .finish_non_exhaustive()
     }
 }
 
 impl DocumentReader {
     pub fn from_xml_reader_and_archive(
-        mut xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
+        xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
         data: DocxData,
         archive: Arc<Mutex<zip::ZipArchive<Box<dyn crate::package::ReadSeek + 'static>>>>,
         content_types: Arc<crate::content_types::ContentTypes>,
     ) -> Self {
-        xml.config_mut().check_end_names = false;
-        let DocxData {
-            style_list,
-            hyperlink_map,
-            numbering,
-            image_map,
-        } = data;
         Self {
-            buf: Vec::with_capacity(4096),
-            pending_preformatted_close: false,
-            open_styles: Vec::new(),
             phase: Phase::NotStarted,
-            queue: VecDeque::new(),
+            emit: EmitState::default(),
             pending_error: None,
-            data: DocxData {
-                style_list,
-                hyperlink_map: HyperlinkMap::default(),
-                numbering,
-                image_map,
-            },
-            hyperlink_map,
-            list_stack: Vec::new(),
-            list_counters: std::collections::HashMap::new(),
-            xml,
-            archive,
-            content_types,
+            package: PackageContext::new(data, archive, content_types),
+            input: XmlCursor::new(xml),
         }
     }
 
@@ -289,131 +218,6 @@ impl DocumentReader {
 }
 
 impl DocumentReader {
-    fn flush_pending_preformatted_close(&mut self) {
-        if self.pending_preformatted_close {
-            self.queue.push_back(Event::EndPreformatted);
-            self.pending_preformatted_close = false;
-        }
-    }
-
-    fn flush_list_stack(&mut self) {
-        while let Some(entry) = self.list_stack.pop() {
-            self.emit_list_item_end(entry.is_ordered);
-        }
-    }
-
-    /// Increments the counter for `(num_id, ilvl)` and returns the start value to emit.
-    ///
-    /// Returns `Some(counter)` when this is the first item for this level, or when the
-    /// list is resuming after a break (non-sequential). Returns `None` when the item
-    /// immediately follows the previous item at the same level with no intervening
-    /// non-list content (sequential continuation).
-    fn compute_start(&mut self, num_id: u32, ilvl: u32, sequential: bool) -> Option<u64> {
-        let counter = self.list_counters.entry((num_id, ilvl)).or_insert(0);
-        let is_first = *counter == 0;
-        let emitted_counter = counter.saturating_add(1);
-        *counter = emitted_counter;
-        (is_first || !sequential).then_some(emitted_counter)
-    }
-
-    /// Reconciles the list stack for a new item at `(num_id, ilvl)`.
-    ///
-    /// Returns `true` if a same-level entry was found and popped from the stack
-    /// (the new item is a sequential continuation of the previous item at this level).
-    /// Returns `false` if the stack had no entry at this level (the list is starting
-    /// fresh or resuming after a break).
-    fn reconcile_list_stack(&mut self, num_id: u32, ilvl: u32, is_ordered: bool) -> bool {
-        let mut found_sequential = false;
-        while let Some(top) = self.list_stack.last().copied() {
-            match top.ilvl.cmp(&ilvl) {
-                core::cmp::Ordering::Greater => {
-                    self.list_stack.pop();
-                    self.emit_list_item_end(top.is_ordered);
-                }
-                core::cmp::Ordering::Equal => {
-                    self.list_stack.pop();
-                    self.emit_list_item_end(top.is_ordered);
-                    found_sequential = true;
-                    break;
-                }
-                core::cmp::Ordering::Less => break,
-            }
-        }
-
-        let target_depth = usize::try_from(ilvl).unwrap_or(usize::MAX);
-        while self.list_stack.len() < target_depth {
-            let phantom_ilvl = u32::try_from(self.list_stack.len()).unwrap_or(u32::MAX);
-            let phantom_style = if is_ordered {
-                docspec_core::ListStyleType::Decimal
-            } else {
-                docspec_core::ListStyleType::Disc
-            };
-            self.list_stack.push(ListStackEntry {
-                num_id,
-                ilvl: phantom_ilvl,
-                is_ordered,
-            });
-            if is_ordered {
-                self.emit_list_item_start_ordered(num_id, phantom_ilvl, None, phantom_style);
-            } else {
-                self.emit_list_item_start_unordered(num_id, phantom_ilvl, phantom_style);
-            }
-        }
-
-        self.list_stack.push(ListStackEntry {
-            num_id,
-            ilvl,
-            is_ordered,
-        });
-        found_sequential
-    }
-
-    fn emit_list_item_start_ordered(
-        &mut self,
-        num_id: u32,
-        ilvl: u32,
-        start: Option<u64>,
-        style_type: docspec_core::ListStyleType,
-    ) {
-        self.queue.push_back(Event::StartOrderedListItem {
-            id: Some(num_id.to_string()),
-            level: ilvl,
-            start,
-            style_type,
-        });
-    }
-
-    fn emit_list_item_start_unordered(
-        &mut self,
-        num_id: u32,
-        ilvl: u32,
-        style_type: docspec_core::ListStyleType,
-    ) {
-        self.queue.push_back(Event::StartUnorderedListItem {
-            id: Some(num_id.to_string()),
-            level: ilvl,
-            style_type,
-        });
-    }
-
-    fn emit_list_item_end(&mut self, is_ordered: bool) {
-        self.queue.push_back(if is_ordered {
-            Event::EndOrderedListItem
-        } else {
-            Event::EndUnorderedListItem
-        });
-    }
-
-    fn emit_style_if_not_open(&mut self, kind: TextStyleKind) {
-        if !self.open_styles.contains(&kind) {
-            self.queue.push_back(Event::StartTextStyle {
-                kind: kind.clone(),
-                id: None,
-            });
-            self.open_styles.push(kind);
-        }
-    }
-
     fn set_resolved_run_kind(kinds: &mut Vec<TextStyleKind>, kind: TextStyleKind, enabled: bool) {
         kinds.retain(|current| current != &kind);
         if enabled {
@@ -438,7 +242,7 @@ impl DocumentReader {
     fn apply_resolved_rpr_style(&mut self, tag: &BytesStart<'_>, kinds: &mut Vec<TextStyleKind>) {
         if let Some(crate::styles::StyleClassification::Code) = read_val_attribute(tag)
             .filter(|s| !s.is_empty())
-            .and_then(|s| self.data.style_list.classify(&s))
+            .and_then(|s| self.package.classify_style(&s))
         {
             if !kinds.contains(&TextStyleKind::Code) {
                 kinds.push(TextStyleKind::Code);
@@ -522,21 +326,13 @@ impl DocumentReader {
         let mut acc = RunPropertyAccumulator::default();
 
         loop {
-            self.buf.clear();
-            let event = self
-                .xml
-                .read_event_into(&mut self.buf)
-                .map_err(map_quick_xml_error)?
-                .into_owned();
+            let event = self.input.read_owned()?;
             match event {
                 quick_xml::events::Event::Start(start) => {
                     let local_name = start.local_name();
                     let local = local_name.as_ref();
                     let _ = self.apply_resolved_rpr_property(local, &start, &mut acc);
-                    let end = start.to_end().into_owned();
-                    self.xml
-                        .read_to_end_into(end.name(), &mut self.buf)
-                        .map_err(map_quick_xml_error)?;
+                    self.input.skip_subtree(&start)?;
                 }
                 quick_xml::events::Event::Empty(empty) => {
                     let local_name = empty.local_name();
@@ -586,30 +382,19 @@ impl DocumentReader {
             return;
         }
         for kind in Self::resolved_run_styles(props) {
-            self.emit_style_if_not_open(kind);
+            self.emit.emit_style_if_not_open(kind);
         }
         *content_emitted = true;
     }
 
     fn close_run_styles(&mut self, props: Option<&ResolvedRunProperties>) {
-        let styles = Self::resolved_run_styles(props);
-        for kind in styles.into_iter().rev() {
-            if let Some(index) = self.open_styles.iter().rposition(|open| open == &kind) {
-                self.open_styles.remove(index);
-                self.queue.push_back(Event::EndTextStyle);
-            }
-        }
+        self.emit.close_styles(Self::resolved_run_styles(props));
     }
 
     fn collect_text_content(&mut self) -> Result<String> {
         let mut content = String::new();
         loop {
-            self.buf.clear();
-            let event = self
-                .xml
-                .read_event_into(&mut self.buf)
-                .map_err(map_quick_xml_error)?
-                .into_owned();
+            let event = self.input.read_owned()?;
             match event {
                 quick_xml::events::Event::Text(text) => {
                     let decoded = text
@@ -632,10 +417,7 @@ impl DocumentReader {
                     return Ok(content);
                 }
                 quick_xml::events::Event::Start(start) => {
-                    let end = start.to_end().into_owned();
-                    self.xml
-                        .read_to_end_into(end.name(), &mut self.buf)
-                        .map_err(map_quick_xml_error)?;
+                    self.input.skip_subtree(&start)?;
                 }
                 quick_xml::events::Event::Empty(_)
                 | quick_xml::events::Event::End(_)
@@ -713,26 +495,20 @@ impl DocumentReader {
                 let text = Self::normalize_symbol_text(props.as_ref(), text);
                 if !text.is_empty() {
                     self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
-                    self.queue.push_back(Event::Text { content: text });
+                    self.emit.push(Event::Text { content: text });
                 }
             }
             b"tab" => {
                 self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
-                self.queue.push_back(Event::Text {
+                self.emit.push(Event::Text {
                     content: "\t".to_string(),
                 });
-                let end = start.to_end().into_owned();
-                self.xml
-                    .read_to_end_into(end.name(), &mut self.buf)
-                    .map_err(map_quick_xml_error)?;
+                self.input.skip_subtree(start)?;
             }
             b"br" => {
                 self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
-                self.queue.push_back(Event::LineBreak);
-                let end = start.to_end().into_owned();
-                self.xml
-                    .read_to_end_into(end.name(), &mut self.buf)
-                    .map_err(map_quick_xml_error)?;
+                self.emit.push(Event::LineBreak);
+                self.input.skip_subtree(start)?;
             }
             b"drawing" => {
                 self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
@@ -743,16 +519,10 @@ impl DocumentReader {
                 self.parse_pict_subtree()?;
             }
             b"instrText" | b"fldChar" => {
-                let end = start.to_end().into_owned();
-                self.xml
-                    .read_to_end_into(end.name(), &mut self.buf)
-                    .map_err(map_quick_xml_error)?;
+                self.input.skip_subtree(start)?;
             }
             _ if is_denied_container(local_name.as_ref()) => {
-                let end = start.to_end().into_owned();
-                self.xml
-                    .read_to_end_into(end.name(), &mut self.buf)
-                    .map_err(map_quick_xml_error)?;
+                self.input.skip_subtree(start)?;
             }
             _ => {}
         }
@@ -777,18 +547,18 @@ impl DocumentReader {
             }
             b"tab" => {
                 self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
-                self.queue.push_back(Event::Text {
+                self.emit.push(Event::Text {
                     content: "\t".to_string(),
                 });
             }
             b"br" => {
                 self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
-                self.queue.push_back(Event::LineBreak);
+                self.emit.push(Event::LineBreak);
             }
             b"sym" => {
                 if let Some(text) = Self::resolve_sym_char(props.as_ref(), empty) {
                     self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
-                    self.queue.push_back(Event::Text { content: text });
+                    self.emit.push(Event::Text { content: text });
                 }
             }
             _ => {}
@@ -800,12 +570,7 @@ impl DocumentReader {
         let mut content_emitted = false;
 
         loop {
-            self.buf.clear();
-            let event = self
-                .xml
-                .read_event_into(&mut self.buf)
-                .map_err(map_quick_xml_error)?
-                .into_owned();
+            let event = self.input.read_owned()?;
             match event {
                 quick_xml::events::Event::Start(start) => {
                     self.handle_run_child_start(&start, &mut props, &mut content_emitted)?;
@@ -823,7 +588,7 @@ impl DocumentReader {
                     let text = Self::decode_general_ref(&reference)?;
                     if !text.is_empty() {
                         self.emit_deferred_styles_if_needed(props.as_ref(), &mut content_emitted);
-                        self.queue.push_back(Event::Text { content: text });
+                        self.emit.push(Event::Text { content: text });
                     }
                 }
                 quick_xml::events::Event::End(_)
@@ -848,12 +613,7 @@ impl DocumentReader {
         let mut ilvl = None;
 
         loop {
-            self.buf.clear();
-            let event = self
-                .xml
-                .read_event_into(&mut self.buf)
-                .map_err(map_quick_xml_error)?
-                .into_owned();
+            let event = self.input.read_owned()?;
             match event {
                 quick_xml::events::Event::Empty(empty) => match empty.name().as_ref() {
                     b"w:numId" => num_id = parse_u32_attr(&empty, b"w:val"),
@@ -861,10 +621,7 @@ impl DocumentReader {
                     _ => {}
                 },
                 quick_xml::events::Event::Start(start) => {
-                    let end = start.to_end().into_owned();
-                    self.xml
-                        .read_to_end_into(end.name(), &mut self.buf)
-                        .map_err(map_quick_xml_error)?;
+                    self.input.skip_subtree(&start)?;
                 }
                 quick_xml::events::Event::End(end) if end.name().as_ref() == b"w:numPr" => {
                     return Ok(num_id.map(|num_id| (num_id, ilvl.unwrap_or(0))));
@@ -890,12 +647,7 @@ impl DocumentReader {
         let mut props = ResolvedParagraphProperties::default();
 
         loop {
-            self.buf.clear();
-            let event = self
-                .xml
-                .read_event_into(&mut self.buf)
-                .map_err(map_quick_xml_error)?
-                .into_owned();
+            let event = self.input.read_owned()?;
             match event {
                 quick_xml::events::Event::Empty(empty) => match empty.local_name().as_ref() {
                     b"jc" => {
@@ -905,7 +657,7 @@ impl DocumentReader {
                     b"pStyle" => {
                         props.classification = read_val_attribute(&empty)
                             .filter(|s| !s.is_empty())
-                            .and_then(|s| self.data.style_list.classify(&s));
+                            .and_then(|s| self.package.classify_style(&s));
                     }
                     _ => {}
                 },
@@ -913,28 +665,19 @@ impl DocumentReader {
                     b"jc" => {
                         let val = read_val_attribute(&start);
                         props.alignment = val.as_deref().and_then(properties::parse_alignment);
-                        let end = start.to_end().into_owned();
-                        self.xml
-                            .read_to_end_into(end.name(), &mut self.buf)
-                            .map_err(map_quick_xml_error)?;
+                        self.input.skip_subtree(&start)?;
                     }
                     b"pStyle" => {
                         props.classification = read_val_attribute(&start)
                             .filter(|s| !s.is_empty())
-                            .and_then(|s| self.data.style_list.classify(&s));
-                        let end = start.to_end().into_owned();
-                        self.xml
-                            .read_to_end_into(end.name(), &mut self.buf)
-                            .map_err(map_quick_xml_error)?;
+                            .and_then(|s| self.package.classify_style(&s));
+                        self.input.skip_subtree(&start)?;
                     }
                     b"numPr" => {
                         props.list_info = self.parse_numpr(&start)?;
                     }
                     b"rPr" => {
-                        let end = start.to_end().into_owned();
-                        self.xml
-                            .read_to_end_into(end.name(), &mut self.buf)
-                            .map_err(map_quick_xml_error)?;
+                        self.input.skip_subtree(&start)?;
                     }
                     _ => {}
                 },
@@ -962,21 +705,21 @@ impl DocumentReader {
         &mut self,
         props: &ResolvedParagraphProperties,
     ) -> (ParagraphBlockKind, bool) {
-        if self.pending_preformatted_close {
+        if self.emit.has_pending_preformatted_close() {
             if matches!(
                 props.classification.as_ref(),
                 Some(crate::styles::StyleClassification::Code)
             ) {
-                self.queue.push_back(Event::LineBreak);
-                self.pending_preformatted_close = false;
+                self.emit.push(Event::LineBreak);
+                self.emit.cancel_preformatted_close();
                 return (ParagraphBlockKind::Preformatted, true);
             }
-            self.flush_pending_preformatted_close();
+            self.emit.flush_pending_preformatted_close();
         }
 
         let list_classification = props.list_info.and_then(|(num_id, raw_ilvl)| {
             let ilvl = core::cmp::min(raw_ilvl, MAX_LIST_LEVEL);
-            let result = self.data.numbering.resolve(num_id, ilvl);
+            let result = self.package.resolve_numbering(num_id, ilvl);
             result
                 .is_list
                 .then_some((num_id, ilvl, result.is_ordered, result.style_type))
@@ -984,22 +727,22 @@ impl DocumentReader {
 
         let block_kind = match props.classification.as_ref() {
             Some(crate::styles::StyleClassification::Heading { level }) => {
-                self.flush_list_stack();
+                self.emit.flush_list_stack();
                 ParagraphBlockKind::Heading { level: *level }
             }
             Some(crate::styles::StyleClassification::BlockQuote) => {
-                self.flush_list_stack();
+                self.emit.flush_list_stack();
                 ParagraphBlockKind::BlockQuote
             }
             Some(crate::styles::StyleClassification::Code) => {
-                self.flush_list_stack();
+                self.emit.flush_list_stack();
                 ParagraphBlockKind::Preformatted
             }
             _ => match list_classification {
                 None => ParagraphBlockKind::Paragraph,
                 Some((num_id, ilvl, is_ordered, style_type)) => {
-                    let sequential = self.reconcile_list_stack(num_id, ilvl, is_ordered);
-                    let start = self.compute_start(num_id, ilvl, sequential);
+                    let sequential = self.emit.reconcile_list_stack(num_id, ilvl, is_ordered);
+                    let start = self.emit.compute_start(num_id, ilvl, sequential);
                     if is_ordered {
                         ParagraphBlockKind::OrderedListItem {
                             num_id,
@@ -1027,23 +770,23 @@ impl DocumentReader {
     ) {
         match block_kind {
             ParagraphBlockKind::Paragraph => {
-                self.flush_list_stack();
-                self.queue.push_back(Event::StartParagraph {
+                self.emit.flush_list_stack();
+                self.emit.push(Event::StartParagraph {
                     alignment: props.alignment.clone(),
                     id: None,
                 });
             }
             ParagraphBlockKind::Heading { level } => {
-                self.queue.push_back(Event::StartHeading {
+                self.emit.push(Event::StartHeading {
                     level: *level,
                     id: None,
                 });
             }
             ParagraphBlockKind::BlockQuote => {
-                self.queue.push_back(Event::StartBlockQuote { id: None });
+                self.emit.push(Event::StartBlockQuote { id: None });
             }
             ParagraphBlockKind::Preformatted => {
-                self.queue.push_back(Event::StartPreformatted {
+                self.emit.push(Event::StartPreformatted {
                     id: None,
                     syntax: None,
                 });
@@ -1054,8 +797,9 @@ impl DocumentReader {
                 start,
                 style_type,
             } => {
-                self.emit_list_item_start_ordered(*num_id, *ilvl, *start, *style_type);
-                self.queue.push_back(Event::StartParagraph {
+                self.emit
+                    .emit_list_item_start_ordered(*num_id, *ilvl, *start, *style_type);
+                self.emit.push(Event::StartParagraph {
                     alignment: props.alignment.clone(),
                     id: None,
                 });
@@ -1065,8 +809,9 @@ impl DocumentReader {
                 ilvl,
                 style_type,
             } => {
-                self.emit_list_item_start_unordered(*num_id, *ilvl, *style_type);
-                self.queue.push_back(Event::StartParagraph {
+                self.emit
+                    .emit_list_item_start_unordered(*num_id, *ilvl, *style_type);
+                self.emit.push(Event::StartParagraph {
                     alignment: props.alignment.clone(),
                     id: None,
                 });
@@ -1075,9 +820,7 @@ impl DocumentReader {
     }
 
     fn close_paragraph_block(&mut self, block_kind: &ParagraphBlockKind) {
-        while self.open_styles.pop().is_some() {
-            self.queue.push_back(Event::EndTextStyle);
-        }
+        self.emit.close_all_styles();
 
         let end_event = match block_kind {
             ParagraphBlockKind::Paragraph
@@ -1086,11 +829,11 @@ impl DocumentReader {
             ParagraphBlockKind::Heading { .. } => Event::EndHeading,
             ParagraphBlockKind::BlockQuote => Event::EndBlockQuote,
             ParagraphBlockKind::Preformatted => {
-                self.pending_preformatted_close = true;
+                self.emit.defer_preformatted_close();
                 return;
             }
         };
-        self.queue.push_back(end_event);
+        self.emit.push(end_event);
     }
 
     fn parse_empty_p(&mut self) {
@@ -1121,19 +864,18 @@ impl DocumentReader {
 
     fn emit_local_tab(&mut self, state: &mut ParagraphParseState) {
         self.ensure_local_paragraph_started(state);
-        self.queue.push_back(Event::Text {
+        self.emit.push(Event::Text {
             content: "\t".to_string(),
         });
     }
 
     fn emit_local_line_break(&mut self, state: &mut ParagraphParseState) {
         self.ensure_local_paragraph_started(state);
-        self.queue.push_back(Event::LineBreak);
+        self.emit.push(Event::LineBreak);
     }
 
     fn drain_new_events_into(&mut self, existing_len: usize, buffered: &mut Vec<Event>) {
-        let appended = self.queue.split_off(existing_len);
-        buffered.extend(appended);
+        self.emit.drain_since(existing_len, buffered);
     }
 
     fn resolved_hyperlink(
@@ -1150,7 +892,7 @@ impl DocumentReader {
         let tooltip = read_attribute(tag, b"w:tooltip");
 
         let href = if let Some(rid_val) = rid {
-            self.hyperlink_map.get(&rid_val).cloned()?
+            self.package.hyperlink_target(&rid_val)?
         } else {
             let anchor_val = anchor.filter(|a| !a.is_empty())?;
             format!("#{anchor_val}")
@@ -1175,15 +917,15 @@ impl DocumentReader {
         }
 
         if let Some((href, title)) = resolved {
-            self.queue.push_back(Event::StartLink {
+            self.emit.push(Event::StartLink {
                 href,
                 id: None,
                 title,
             });
-            self.queue.extend(buffered);
-            self.queue.push_back(Event::EndLink);
+            self.emit.extend(buffered);
+            self.emit.push(Event::EndLink);
         } else {
-            self.queue.extend(buffered);
+            self.emit.extend(buffered);
         }
     }
 
@@ -1203,16 +945,11 @@ impl DocumentReader {
 
         let mut nested_depth: u32 = 1;
         while nested_depth > 0 {
-            self.buf.clear();
-            let event = self
-                .xml
-                .read_event_into(&mut self.buf)
-                .map_err(map_quick_xml_error)?
-                .into_owned();
+            let event = self.input.read_owned()?;
             match event {
                 quick_xml::events::Event::Start(tag) => match tag.local_name().as_ref() {
                     b"r" => {
-                        let existing_len = self.queue.len();
+                        let existing_len = self.emit.queued();
                         self.parse_r(&tag)?;
                         self.drain_new_events_into(existing_len, &mut buffered);
                     }
@@ -1220,10 +957,7 @@ impl DocumentReader {
                         nested_depth = nested_depth.saturating_add(1);
                     }
                     _ => {
-                        let end = tag.to_end().into_owned();
-                        self.xml
-                            .read_to_end_into(end.name(), &mut self.buf)
-                            .map_err(map_quick_xml_error)?;
+                        self.input.skip_subtree(&tag)?;
                     }
                 },
                 quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"hyperlink" => {
@@ -1254,10 +988,7 @@ impl DocumentReader {
     }
 
     fn consume_current_start(&mut self, start: &BytesStart<'_>) -> Result<()> {
-        let end = start.to_end().into_owned();
-        self.xml
-            .read_to_end_into(end.name(), &mut self.buf)
-            .map_err(map_quick_xml_error)?;
+        self.input.skip_subtree(start)?;
         Ok(())
     }
 
@@ -1353,12 +1084,7 @@ impl DocumentReader {
     fn parse_p(&mut self, _start: &BytesStart<'_>) -> Result<()> {
         let mut state = ParagraphParseState::default();
         loop {
-            self.buf.clear();
-            let event = self
-                .xml
-                .read_event_into(&mut self.buf)
-                .map_err(map_quick_xml_error)?
-                .into_owned();
+            let event = self.input.read_owned()?;
 
             match event {
                 quick_xml::events::Event::Start(start) => {
@@ -1393,12 +1119,7 @@ impl DocumentReader {
     fn parse_tcpr(&mut self, _start: &BytesStart<'_>) -> Result<ResolvedCellProperties> {
         let mut colspan = None;
         loop {
-            self.buf.clear();
-            let event = self
-                .xml
-                .read_event_into(&mut self.buf)
-                .map_err(map_quick_xml_error)?
-                .into_owned();
+            let event = self.input.read_owned()?;
 
             match event {
                 quick_xml::events::Event::Empty(empty) => {
@@ -1412,10 +1133,7 @@ impl DocumentReader {
                         let val = read_val_attribute(&start);
                         colspan = properties::parse_grid_span_value(val.as_deref());
                     }
-                    let end = start.to_end().into_owned();
-                    self.xml
-                        .read_to_end_into(end.name(), &mut self.buf)
-                        .map_err(map_quick_xml_error)?;
+                    self.input.skip_subtree(&start)?;
                 }
                 quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"tcPr" => {
                     return Ok(ResolvedCellProperties { colspan });
@@ -1440,12 +1158,7 @@ impl DocumentReader {
     fn parse_trpr(&mut self, _start: &BytesStart<'_>) -> Result<ResolvedRowProperties> {
         let mut is_header = false;
         loop {
-            self.buf.clear();
-            let event = self
-                .xml
-                .read_event_into(&mut self.buf)
-                .map_err(map_quick_xml_error)?
-                .into_owned();
+            let event = self.input.read_owned()?;
 
             match event {
                 quick_xml::events::Event::Empty(empty) => {
@@ -1457,10 +1170,7 @@ impl DocumentReader {
                     if start.local_name().as_ref() == b"tblHeader" {
                         is_header = parse_on_off_attribute(&start);
                     }
-                    let end = start.to_end().into_owned();
-                    self.xml
-                        .read_to_end_into(end.name(), &mut self.buf)
-                        .map_err(map_quick_xml_error)?;
+                    self.input.skip_subtree(&start)?;
                 }
                 quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"trPr" => {
                     return Ok(ResolvedRowProperties { is_header });
@@ -1484,7 +1194,7 @@ impl DocumentReader {
 
     fn emit_table_cell_start(&mut self, is_header: bool, colspan: Option<u32>) {
         if is_header {
-            self.queue.push_back(Event::StartTableHeader {
+            self.emit.push(Event::StartTableHeader {
                 scope: Some(TableHeaderScope::Column),
                 abbr: None,
                 colspan,
@@ -1492,7 +1202,7 @@ impl DocumentReader {
                 id: None,
             });
         } else {
-            self.queue.push_back(Event::StartTableCell {
+            self.emit.push(Event::StartTableCell {
                 colspan,
                 rowspan: None,
                 id: None,
@@ -1503,9 +1213,9 @@ impl DocumentReader {
     fn emit_empty_table_cell(&mut self, is_header: bool, colspan: Option<u32>) {
         self.emit_table_cell_start(is_header, colspan);
         if is_header {
-            self.queue.push_back(Event::EndTableHeader);
+            self.emit.push(Event::EndTableHeader);
         } else {
-            self.queue.push_back(Event::EndTableCell);
+            self.emit.push(Event::EndTableCell);
         }
     }
 
@@ -1513,12 +1223,7 @@ impl DocumentReader {
         let mut cell_props: Option<ResolvedCellProperties> = None;
         let mut cell_started = false;
         loop {
-            self.buf.clear();
-            let event = self
-                .xml
-                .read_event_into(&mut self.buf)
-                .map_err(map_quick_xml_error)?
-                .into_owned();
+            let event = self.input.read_owned()?;
 
             match event {
                 quick_xml::events::Event::Start(start) => match start.local_name().as_ref() {
@@ -1526,10 +1231,7 @@ impl DocumentReader {
                         cell_props = Some(self.parse_tcpr(&start)?);
                     }
                     b"tcPr" => {
-                        let end = start.to_end().into_owned();
-                        self.xml
-                            .read_to_end_into(end.name(), &mut self.buf)
-                            .map_err(map_quick_xml_error)?;
+                        self.input.skip_subtree(&start)?;
                     }
                     b"p" => {
                         if !cell_started {
@@ -1547,13 +1249,8 @@ impl DocumentReader {
                         }
                         self.parse_tbl(&start, false)?;
                     }
-                    _ if is_denied_container(start.local_name().as_ref())
-                        || start.local_name().as_ref() == b"tcPr" =>
-                    {
-                        let end = start.to_end().into_owned();
-                        self.xml
-                            .read_to_end_into(end.name(), &mut self.buf)
-                            .map_err(map_quick_xml_error)?;
+                    _ if is_denied_container(start.local_name().as_ref()) => {
+                        self.input.skip_subtree(&start)?;
                     }
                     _ => {}
                 },
@@ -1567,24 +1264,24 @@ impl DocumentReader {
                             self.emit_table_cell_start(is_header, colspan);
                             cell_started = true;
                         }
-                        self.queue.push_back(Event::StartParagraph {
+                        self.emit.push(Event::StartParagraph {
                             alignment: None,
                             id: None,
                         });
-                        self.queue.push_back(Event::EndParagraph);
+                        self.emit.push(Event::EndParagraph);
                     }
                     _ => {}
                 },
                 quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"tc" => {
-                    self.flush_list_stack();
-                    self.flush_pending_preformatted_close();
+                    self.emit.flush_list_stack();
+                    self.emit.flush_pending_preformatted_close();
                     if !cell_started {
                         let colspan = cell_props.as_ref().and_then(|props| props.colspan);
                         self.emit_empty_table_cell(is_header, colspan);
                     } else if is_header {
-                        self.queue.push_back(Event::EndTableHeader);
+                        self.emit.push(Event::EndTableHeader);
                     } else {
-                        self.queue.push_back(Event::EndTableCell);
+                        self.emit.push(Event::EndTableCell);
                     }
                     return Ok(());
                 }
@@ -1609,12 +1306,7 @@ impl DocumentReader {
         let mut row_props: Option<ResolvedRowProperties> = None;
         let mut row_started = false;
         loop {
-            self.buf.clear();
-            let event = self
-                .xml
-                .read_event_into(&mut self.buf)
-                .map_err(map_quick_xml_error)?
-                .into_owned();
+            let event = self.input.read_owned()?;
 
             match event {
                 quick_xml::events::Event::Start(start) => match start.local_name().as_ref() {
@@ -1625,10 +1317,7 @@ impl DocumentReader {
                         }
                     }
                     b"trPr" => {
-                        let end = start.to_end().into_owned();
-                        self.xml
-                            .read_to_end_into(end.name(), &mut self.buf)
-                            .map_err(map_quick_xml_error)?;
+                        self.input.skip_subtree(&start)?;
                     }
                     b"tc" => {
                         let row_is_header = row_props.as_ref().is_some_and(|props| props.is_header);
@@ -1636,18 +1325,13 @@ impl DocumentReader {
                             if !row_is_header {
                                 *header_band_active = false;
                             }
-                            self.queue.push_back(Event::StartTableRow { id: None });
+                            self.emit.push(Event::StartTableRow { id: None });
                             row_started = true;
                         }
                         self.parse_tc(&start, row_is_header && *header_band_active)?;
                     }
-                    _ if is_denied_container(start.local_name().as_ref())
-                        || start.local_name().as_ref() == b"trPr" =>
-                    {
-                        let end = start.to_end().into_owned();
-                        self.xml
-                            .read_to_end_into(end.name(), &mut self.buf)
-                            .map_err(map_quick_xml_error)?;
+                    _ if is_denied_container(start.local_name().as_ref()) => {
+                        self.input.skip_subtree(&start)?;
                     }
                     _ => {}
                 },
@@ -1662,7 +1346,7 @@ impl DocumentReader {
                             if !row_is_header {
                                 *header_band_active = false;
                             }
-                            self.queue.push_back(Event::StartTableRow { id: None });
+                            self.emit.push(Event::StartTableRow { id: None });
                             row_started = true;
                         }
                         self.emit_empty_table_cell(row_is_header && *header_band_active, None);
@@ -1670,9 +1354,9 @@ impl DocumentReader {
                     _ => {}
                 },
                 quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"tr" => {
-                    self.flush_pending_preformatted_close();
+                    self.emit.flush_pending_preformatted_close();
                     if row_started {
-                        self.queue.push_back(Event::EndTableRow);
+                        self.emit.push(Event::EndTableRow);
                     }
                     return Ok(());
                 }
@@ -1694,17 +1378,12 @@ impl DocumentReader {
     }
 
     fn parse_tbl(&mut self, _start: &BytesStart<'_>, is_outermost: bool) -> Result<()> {
-        self.flush_list_stack();
-        self.flush_pending_preformatted_close();
-        self.queue.push_back(Event::StartTable { id: None });
+        self.emit.flush_list_stack();
+        self.emit.flush_pending_preformatted_close();
+        self.emit.push(Event::StartTable { id: None });
         let mut header_band_active = is_outermost;
         loop {
-            self.buf.clear();
-            let event = self
-                .xml
-                .read_event_into(&mut self.buf)
-                .map_err(map_quick_xml_error)?
-                .into_owned();
+            let event = self.input.read_owned()?;
 
             match event {
                 quick_xml::events::Event::Start(start) => {
@@ -1712,23 +1391,20 @@ impl DocumentReader {
                         self.parse_tr(&start, &mut header_band_active)?;
                     }
                     if is_denied_container(start.local_name().as_ref()) {
-                        let end = start.to_end().into_owned();
-                        self.xml
-                            .read_to_end_into(end.name(), &mut self.buf)
-                            .map_err(map_quick_xml_error)?;
+                        self.input.skip_subtree(&start)?;
                     }
                 }
                 quick_xml::events::Event::Empty(empty) => {
                     if empty.local_name().as_ref() == b"tr" {
                         header_band_active = false;
-                        self.queue.push_back(Event::StartTableRow { id: None });
-                        self.queue.push_back(Event::EndTableRow);
+                        self.emit.push(Event::StartTableRow { id: None });
+                        self.emit.push(Event::EndTableRow);
                     }
                 }
                 quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"tbl" => {
-                    self.flush_list_stack();
-                    self.flush_pending_preformatted_close();
-                    self.queue.push_back(Event::EndTable);
+                    self.emit.flush_list_stack();
+                    self.emit.flush_pending_preformatted_close();
+                    self.emit.push(Event::EndTable);
                     return Ok(());
                 }
                 quick_xml::events::Event::Eof => {
@@ -1749,9 +1425,9 @@ impl DocumentReader {
     }
 
     fn handle_eof(&mut self) {
-        self.flush_list_stack();
-        self.flush_pending_preformatted_close();
-        self.queue.push_back(Event::EndDocument);
+        self.emit.flush_list_stack();
+        self.emit.flush_pending_preformatted_close();
+        self.emit.push(Event::EndDocument);
         self.phase = Phase::Finished;
     }
 
@@ -1772,10 +1448,7 @@ impl DocumentReader {
         }
         match local {
             _ if is_denied_container(local) => {
-                let end = tag.to_end().into_owned();
-                self.xml
-                    .read_to_end_into(end.name(), &mut self.buf)
-                    .map_err(map_quick_xml_error)?;
+                self.input.skip_subtree(tag)?;
             }
             b"p" => {
                 self.parse_p(tag)?;
@@ -1797,11 +1470,7 @@ impl DocumentReader {
         let mut drawing_depth: u32 = 1;
 
         while drawing_depth > 0 {
-            let event = self
-                .xml
-                .read_event_into(&mut self.buf)
-                .map_err(map_quick_xml_error)?
-                .into_owned();
+            let event = self.input.read_owned()?;
 
             match event {
                 quick_xml::events::Event::Start(tag) => {
@@ -1831,7 +1500,6 @@ impl DocumentReader {
                 | quick_xml::events::Event::PI(_)
                 | quick_xml::events::Event::DocType(_) => {}
             }
-            self.buf.clear();
         }
 
         Ok(())
@@ -1845,11 +1513,7 @@ impl DocumentReader {
         let mut pict_depth: u32 = 1;
 
         while pict_depth > 0 {
-            let event = self
-                .xml
-                .read_event_into(&mut self.buf)
-                .map_err(map_quick_xml_error)?
-                .into_owned();
+            let event = self.input.read_owned()?;
 
             match event {
                 quick_xml::events::Event::Start(tag) => {
@@ -1880,7 +1544,6 @@ impl DocumentReader {
                 | quick_xml::events::Event::PI(_)
                 | quick_xml::events::Event::DocType(_) => {}
             }
-            self.buf.clear();
         }
 
         Ok(())
@@ -1952,11 +1615,11 @@ impl DocumentReader {
             });
 
         // Note: if the same rId appears in both <w:drawing> and a bare <w:pict> (not inside <mc:AlternateContent>), two Image events are emitted. This is intentional — we faithfully represent what the document contains. AlternateContent-wrapped duplicates are deduped via the mc:Fallback denylist entry.
-        self.queue.push_back(Event::Image {
+        self.emit.push(Event::Image {
             alt,
             decorative: false,
             id: None,
-            source: self.image_source_for_rid(&rid),
+            source: self.package.image_source_for_rid(&rid),
             title: None,
         });
 
@@ -2025,46 +1688,17 @@ impl DocumentReader {
         };
 
         state.emitted_for_current_pic = true;
-        self.queue.push_back(Event::Image {
+        self.emit.push(Event::Image {
             alt: state.current_pic_alt.clone(),
             decorative: false,
             id: None,
-            source: self.image_source_for_rid(&rid),
+            source: self.package.image_source_for_rid(&rid),
             title: None,
         });
     }
 
-    fn image_source_for_rid(&self, rid: &str) -> ImageSource {
-        let asset_id = match self.data.image_map.get(rid) {
-            Some(rel) if rel.is_external => {
-                return ImageSource::Uri {
-                    uri: rel.target.clone(),
-                }
-            }
-            Some(rel) => format!("zip://{}", rel.target),
-            None => rid.to_string(),
-        };
-        ImageSource::Asset(Arc::new(crate::asset_provider::DocxAssetHandle::new(
-            Arc::clone(&self.archive),
-            Arc::clone(&self.content_types),
-            asset_id,
-        )))
-    }
-
     fn read_until_event(&mut self) -> Result<()> {
-        let event = self
-            .xml
-            .read_event_into(&mut self.buf)
-            .map_err(|err| match err {
-                quick_xml::Error::Io(source) => Error::Io {
-                    source: std::io::Error::new(source.kind(), source.to_string()),
-                },
-                other => Error::Parse {
-                    message: format!("malformed document.xml: {other}"),
-                    position: None,
-                },
-            })?
-            .into_owned();
+        let event = self.input.read_owned()?;
 
         match event {
             quick_xml::events::Event::Start(tag) => self.handle_start(&tag)?,
@@ -2080,7 +1714,6 @@ impl DocumentReader {
             quick_xml::events::Event::Eof => self.handle_eof(),
         }
 
-        self.buf.clear();
         Ok(())
     }
 
@@ -2088,7 +1721,7 @@ impl DocumentReader {
     #[inline]
     pub fn next_event(&mut self) -> Result<Option<Event>> {
         loop {
-            if let Some(event) = self.queue.pop_front() {
+            if let Some(event) = self.emit.pop() {
                 return Ok(Some(event));
             }
             if let Some(err) = self.pending_error.take() {
@@ -2098,7 +1731,7 @@ impl DocumentReader {
             match self.phase {
                 Phase::NotStarted => {
                     self.phase = Phase::Running;
-                    self.queue.push_back(Event::StartDocument {
+                    self.emit.push(Event::StartDocument {
                         id: None,
                         language: None,
                         metadata: None,
@@ -2107,7 +1740,7 @@ impl DocumentReader {
                 Phase::Finished => return Ok(None),
                 Phase::Running => {
                     if let Err(err) = self.read_until_event() {
-                        if self.queue.is_empty() {
+                        if self.emit.is_empty() {
                             return Err(err);
                         }
                         self.pending_error = Some(err);
@@ -2183,18 +1816,6 @@ fn parse_error(message: String) -> Error {
     }
 }
 
-fn map_quick_xml_error(err: quick_xml::Error) -> Error {
-    match err {
-        quick_xml::Error::Io(source) => Error::Io {
-            source: std::io::Error::new(source.kind(), source.to_string()),
-        },
-        other => Error::Parse {
-            message: format!("malformed document.xml: {other}"),
-            position: None,
-        },
-    }
-}
-
 #[cfg(test)]
 #[cfg(not(coverage))]
 mod tests {
@@ -2210,6 +1831,7 @@ mod tests {
     use docspec_core::{AssetHandle, ImageSource, ListStyleType};
 
     use super::*;
+    use crate::rels::HyperlinkMap;
 
     fn asset_source(id: &str) -> ImageSource {
         #[derive(Debug)]
@@ -2385,13 +2007,7 @@ mod tests {
 
     fn read_first_start(reader: &mut DocumentReader) -> BytesStart<'static> {
         loop {
-            reader.buf.clear();
-            match reader
-                .xml
-                .read_event_into(&mut reader.buf)
-                .expect("valid XML event")
-                .into_owned()
-            {
+            match reader.input.read_owned().expect("valid XML event") {
                 quick_xml::events::Event::Start(start) => return start,
                 quick_xml::events::Event::Eof => panic!("expected start tag"),
                 _ => {}
@@ -2834,21 +2450,20 @@ mod tests {
     }
 
     fn drain_queue(reader: &mut DocumentReader) -> Vec<Event> {
-        reader.queue.drain(..).collect()
+        core::iter::from_fn(|| reader.emit.pop()).collect()
     }
 
     fn parse_rpr_fragment(xml_fragment: &str) -> ResolvedRunProperties {
         let mut reader = make_reader(xml_fragment);
-        let mut buf = Vec::new();
         loop {
-            match reader.xml.read_event_into(&mut buf) {
+            match reader.input.read_owned() {
                 Ok(quick_xml::events::Event::Start(start))
                     if start.local_name().as_ref() == b"rPr" =>
                 {
                     return reader.parse_rpr(&start).expect("rPr fragment parses");
                 }
                 Ok(quick_xml::events::Event::Eof) => panic!("missing rPr start"),
-                Ok(_) => buf.clear(),
+                Ok(_) => {}
                 Err(err) => panic!("unexpected XML error: {err}"),
             }
         }
