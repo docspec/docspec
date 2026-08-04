@@ -33,8 +33,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       # One reader or writer at a time, plus none at all, catches the conditions that go
-      # stale without paying for the whole feature powerset. `--all-targets` because the
-      # tests carry their own feature conditions, which go stale the same way.
+      # stale without paying for the whole feature powerset. Tests and doc examples carry
+      # their own feature conditions and go stale the same way, hence `--all-targets` and
+      # the separate `--doc` run: `--all-targets` does not build doctests.
       - name: Check each feature selection on its own
         run: |
           set -euo pipefail
@@ -43,8 +44,9 @@ jobs:
             blocknote-writer oxa-writer html-writer pandoc-native-writer markdown-writer \
             docx,markdown-writer all-readers all-writers full
           do
-            echo "::group::--no-default-features --features '$features' --all-targets"
+            echo "::group::--no-default-features --features '$features'"
             cargo check -p docspec --no-default-features --features "$features" --all-targets
+            cargo test --doc -p docspec --no-default-features --features "$features"
             echo "::endgroup::"
           done
 
