@@ -110,16 +110,10 @@ mod coverage_tests {
     fn normalize_relative_target_rejects_package_root_escape() {
         let result = normalize_relative_target("word/document.xml", "../../escape.xml");
 
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(
-                    message,
-                    "rels target escapes package root: word/../../escape.xml"
-                );
-                assert_eq!(position, None);
-            }
-            other => assert_eq!(format!("{other:?}"), "expected package-root escape error"),
-        }
+        assert_eq!(
+            format!("{result:?}"),
+            "Err(Parse { message: \"rels target escapes package root: word/../../escape.xml\", position: None })"
+        );
     }
 }
 
