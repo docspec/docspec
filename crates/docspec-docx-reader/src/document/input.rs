@@ -51,7 +51,10 @@ impl<R> NodeCappedReader<R> {
     }
 }
 
-impl<R: Read> Read for NodeCappedReader<R> {
+impl<R> Read for NodeCappedReader<R>
+where
+    R: Read,
+{
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let n = self.inner.read(buf)?;
         self.read_in_window = self
@@ -74,21 +77,20 @@ pub(crate) struct XmlCursor {
 }
 
 impl XmlCursor {
-    /// Wraps a quick-xml reader, inserting a per-node size cap around its input.
+    /// Builds a quick-xml reader over `stream`, inserting a per-node size cap
+    /// between the source and the parser.
     ///
-    /// End-name checking is disabled because the parser resolves element scope
-    /// from its own state and must tolerate the mismatched close tags that real
-    /// Word output contains.
-    pub(crate) fn new(reader: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>) -> Self {
-        // Unwrap the caller's reader down to the boxed stream and re-wrap it with
-        // the per-node cap. Nothing has been read yet at construction, so
-        // `BufReader::into_inner` discards only an empty buffer.
-        let stream: Box<dyn Read + Send> = reader.into_inner().into_inner();
+    /// Takes the raw source rather than a pre-built [`quick_xml::Reader`] so
+    /// parsing is always anchored at byte zero and no buffered bytes or reader
+    /// configuration can be silently discarded. End-name checking is disabled
+    /// because the parser resolves element scope from its own state and must
+    /// tolerate the mismatched close tags that real Word output contains.
+    pub(crate) fn new(stream: Box<dyn Read + Send>) -> Self {
         let capped = NodeCappedReader::new(stream, MAX_XML_NODE_BYTES);
-        let mut capped_reader = quick_xml::Reader::from_reader(BufReader::new(capped));
-        capped_reader.config_mut().check_end_names = false;
+        let mut reader = quick_xml::Reader::from_reader(BufReader::new(capped));
+        reader.config_mut().check_end_names = false;
         Self {
-            reader: capped_reader,
+            reader,
             scratch: Vec::with_capacity(SCRATCH_CAPACITY),
         }
     }
