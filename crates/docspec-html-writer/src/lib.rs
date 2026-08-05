@@ -331,4 +331,9 @@ mod tests {
             "<html><body></body></html>",
         );
     }
+
+    #[test]
+    fn orphan_end_document_produces_empty_output() {
+        assert_output([Event::EndDocument], "");
+    }
 }
