@@ -35,7 +35,10 @@ const MAX_METADATA_PART_BYTES: u64 = 64 * 1024 * 1024;
 /// Reads at most `cap + 1` bytes so an over-cap entry is detected without
 /// decompressing the whole (potentially enormous) part. `part_name` is used only
 /// for the error message.
-fn read_entry_capped<R: Read>(entry: &mut R, cap: u64, part_name: &str) -> Result<Vec<u8>> {
+fn read_entry_capped<R>(entry: &mut R, cap: u64, part_name: &str) -> Result<Vec<u8>>
+where
+    R: Read,
+{
     let mut bytes = Vec::new();
     entry
         .take(cap.saturating_add(1))

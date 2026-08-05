@@ -1,7 +1,7 @@
 //! DOCX main document part (`document.xml`) streaming event parser.
 
 use core::fmt;
-use std::io::{BufReader, Read};
+use std::io::Read;
 use std::sync::{Arc, Mutex};
 
 use docspec_core::{Error, Event, Result, TableHeaderScope};
@@ -140,7 +140,7 @@ impl fmt::Debug for DocumentReader {
 
 impl DocumentReader {
     pub fn from_xml_reader_and_archive(
-        xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
+        stream: Box<dyn Read + Send>,
         data: DocxData,
         archive: Arc<Mutex<zip::ZipArchive<Box<dyn crate::package::ReadSeek + 'static>>>>,
         content_types: Arc<crate::content_types::ContentTypes>,
@@ -150,7 +150,7 @@ impl DocumentReader {
             emit: EmitState::default(),
             pending_error: None,
             package: PackageContext::new(data, archive, content_types),
-            input: XmlCursor::new(xml),
+            input: XmlCursor::new(stream),
             table_depth: 0,
         }
     }
@@ -158,10 +158,7 @@ impl DocumentReader {
     #[cfg(test)]
     #[cfg(not(coverage))]
     #[allow(clippy::expect_used, clippy::as_conversions)]
-    pub(crate) fn from_xml_reader(
-        xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
-        data: DocxData,
-    ) -> Self {
+    pub(crate) fn from_xml_reader(stream: Box<dyn Read + Send>, data: DocxData) -> Self {
         use std::io::Cursor;
         const EMPTY_ZIP: &[u8] = &[
             0x50, 0x4B, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -172,7 +169,7 @@ impl DocumentReader {
         )
         .expect("minimal empty zip must be valid");
         Self::from_xml_reader_and_archive(
-            xml,
+            stream,
             data,
             Arc::new(Mutex::new(archive)),
             Arc::new(crate::content_types::ContentTypes::default()),
@@ -1256,14 +1253,13 @@ mod tests {
         numbering: crate::numbering::MinimalNumbering,
     ) -> DocumentReader {
         let stream: Box<dyn Read + Send> = Box::new(Cursor::new(document_xml.as_bytes().to_vec()));
-        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
         let data = DocxData {
             style_list: crate::styles::StyleList::default(),
             hyperlink_map: HyperlinkMap::default(),
             numbering,
             image_map: crate::rels::ImageMap::default(),
         };
-        DocumentReader::from_xml_reader(xml, data)
+        DocumentReader::from_xml_reader(stream, data)
     }
 
     fn list_paragraph(num_id: u32, ilvl: u32, text: &str) -> String {
@@ -1288,8 +1284,7 @@ mod tests {
     fn make_reader_with_styles(document_xml: &str, styles_body: &str) -> DocumentReader {
         let stream: Box<dyn std::io::Read + Send> =
             Box::new(std::io::Cursor::new(document_xml.to_string().into_bytes()));
-        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
-        DocumentReader::from_xml_reader(xml, make_docx_data(styles_body))
+        DocumentReader::from_xml_reader(stream, make_docx_data(styles_body))
     }
 
     fn collect_events(reader: &mut DocumentReader) -> Vec<docspec_core::Event> {
@@ -1312,14 +1307,13 @@ mod tests {
 
     fn make_reader(document_xml: &str) -> DocumentReader {
         let stream: Box<dyn Read + Send> = Box::new(Cursor::new(document_xml.as_bytes().to_vec()));
-        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
         let data = DocxData {
             style_list: crate::styles::StyleList::default(),
             hyperlink_map: HyperlinkMap::default(),
             numbering: crate::numbering::MinimalNumbering::new(),
             image_map: crate::rels::ImageMap::default(),
         };
-        DocumentReader::from_xml_reader(xml, data)
+        DocumentReader::from_xml_reader(stream, data)
     }
 
     fn make_reader_with_hyperlinks(
@@ -1327,14 +1321,13 @@ mod tests {
         hyperlink_map: HyperlinkMap,
     ) -> DocumentReader {
         let stream: Box<dyn Read + Send> = Box::new(Cursor::new(document_xml.as_bytes().to_vec()));
-        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
         let data = DocxData {
             style_list: crate::styles::StyleList::default(),
             hyperlink_map,
             numbering: crate::numbering::MinimalNumbering::new(),
             image_map: crate::rels::ImageMap::default(),
         };
-        DocumentReader::from_xml_reader(xml, data)
+        DocumentReader::from_xml_reader(stream, data)
     }
 
     fn document_with_hyperlink_body(body: &str) -> String {
@@ -1362,14 +1355,13 @@ mod tests {
         image_map: crate::rels::ImageMap,
     ) -> DocumentReader {
         let stream: Box<dyn Read + Send> = Box::new(Cursor::new(document_xml.as_bytes().to_vec()));
-        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
         let data = DocxData {
             style_list: crate::styles::StyleList::default(),
             hyperlink_map: HyperlinkMap::default(),
             numbering: crate::numbering::MinimalNumbering::new(),
             image_map,
         };
-        DocumentReader::from_xml_reader(xml, data)
+        DocumentReader::from_xml_reader(stream, data)
     }
 
     #[test]
@@ -3616,14 +3608,13 @@ mod tests {
         let style_list = crate::styles::StyleList::parse(Cursor::new(xml_str.into_bytes()))
             .expect("valid styles XML");
         let stream: Box<dyn Read + Send> = Box::new(Cursor::new(document_xml.as_bytes().to_vec()));
-        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
         let data = DocxData {
             style_list,
             hyperlink_map: HyperlinkMap::default(),
             numbering,
             image_map: crate::rels::ImageMap::default(),
         };
-        DocumentReader::from_xml_reader(xml, data)
+        DocumentReader::from_xml_reader(stream, data)
     }
 
     #[test]
