@@ -22,6 +22,9 @@ pub struct Cli {
 #[non_exhaustive]
 pub enum Commands {
     /// Convert documents between formats.
+    #[command(
+        long_about = "Convert documents between formats using a streaming event pipeline.\n\nInput: Markdown and DOCX are supported. DOCX preserves headings, tables, lists, hyperlinks, images, run styles, and colors. Known DOCX losses include vertical cell merges, comments, footnotes, headers and footers, document metadata, tracked deletions, and field-code hyperlinks. HTML input is experimental and preserves only <p> elements and their text; all other tags are dropped.\n\nOutput: BlockNote JSON is supported. HTML, oxa.dev JSON, Pandoc native, and Markdown outputs are experimental and silently drop structure they cannot express."
+    )]
     Convert(ConvertArgs),
     /// Run the HTTP API server.
     #[cfg(feature = "http")]
@@ -30,10 +33,6 @@ pub enum Commands {
 
 /// Arguments for the `convert` subcommand.
 #[derive(clap::Args, Debug)]
-#[command(
-    about = "Convert documents between formats using streaming event pipeline",
-    long_about = "Convert documents between formats using streaming event pipeline.\n\nSupports converting Markdown, HTML, or DOCX input to BlockNote JSON, HTML, oxa.dev JSON, or Pandoc native output.\n\nNote: HTML and DOCX input currently preserve only paragraph text. Other HTML input\nelements and non-paragraph output events (headings, lists, tables, formatting, etc.)\nare silently dropped. DOCX input preserves only paragraphs and text; styles, tables,\nlists, images, headers/footers, and tracked changes are silently dropped. Use BlockNote\nJSON output for fuller feature coverage."
-)]
 pub struct ConvertArgs {
     /// When to use colors.
     #[arg(long, value_name = "WHEN", default_value = "auto")]
