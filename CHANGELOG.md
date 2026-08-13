@@ -12,6 +12,17 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.21.9](https://github.com/docspec/docspec/compare/v1.21.8...v1.21.9) - 2026-08-13
+
+### Fixed
+
+- *(deps)* update rust crate posthog-rs to 0.23.0
+
+### Other
+
+- *(html-writer)* cover orphan end document
+- update Cargo.lock dependencies
+
 ## [1.21.8](https://github.com/docspec/docspec/compare/v1.21.7...v1.21.8) - 2026-08-04
 
 ### Fixed
