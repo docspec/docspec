@@ -59,6 +59,7 @@ uuid = { version = "1", features = ["v4"], optional = true }
 docspec-core = { workspace = true }
 docspec-json = { workspace = true }
 docspec = { workspace = true, features = ["full"] }
+tempfile = "3"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
