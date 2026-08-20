@@ -1,7 +1,7 @@
 //! DOCX main document part (`document.xml`) streaming event parser.
 
 use core::fmt;
-use std::io::{BufReader, Read};
+use std::io::Read;
 use std::sync::{Arc, Mutex};
 
 use docspec_core::{Error, Event, Result, TableHeaderScope};
@@ -27,6 +27,16 @@ use props::{
 use text::{collect_text_content, decode_general_ref, normalize_symbol_text, resolve_sym_char};
 
 const MAX_LIST_LEVEL: u32 = 8;
+
+/// Maximum `<w:tbl>` nesting depth before parsing fails.
+///
+/// Nested tables are parsed by recursion (`parse_tbl` → `parse_tr` → `parse_tc`
+/// → `parse_tbl`), so an adversarial document of deeply nested tables would
+/// overflow the call stack and abort the process — a tiny file crashing the
+/// server, unreachable by any byte or node cap. Real documents nest tables a
+/// handful of levels at most; 100 is far beyond that while staying well clear of
+/// stack exhaustion.
+const MAX_TABLE_NESTING_DEPTH: u32 = 100;
 
 /// Document processing phase.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -105,6 +115,9 @@ pub struct DocumentReader {
     package: PackageContext,
     /// The XML token pump streaming from the document entry.
     input: XmlCursor,
+    /// Current `<w:tbl>` nesting depth, bounded by [`MAX_TABLE_NESTING_DEPTH`]
+    /// to keep the recursive table parser off a stack-overflow path.
+    table_depth: u32,
 }
 
 impl fmt::Debug for DocumentReader {
@@ -127,7 +140,7 @@ impl fmt::Debug for DocumentReader {
 
 impl DocumentReader {
     pub fn from_xml_reader_and_archive(
-        xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
+        stream: Box<dyn Read + Send>,
         data: DocxData,
         archive: Arc<Mutex<zip::ZipArchive<Box<dyn crate::package::ReadSeek + 'static>>>>,
         content_types: Arc<crate::content_types::ContentTypes>,
@@ -137,17 +150,15 @@ impl DocumentReader {
             emit: EmitState::default(),
             pending_error: None,
             package: PackageContext::new(data, archive, content_types),
-            input: XmlCursor::new(xml),
+            input: XmlCursor::new(stream),
+            table_depth: 0,
         }
     }
 
     #[cfg(test)]
     #[cfg(not(coverage))]
     #[allow(clippy::expect_used, clippy::as_conversions)]
-    pub(crate) fn from_xml_reader(
-        xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
-        data: DocxData,
-    ) -> Self {
+    pub(crate) fn from_xml_reader(stream: Box<dyn Read + Send>, data: DocxData) -> Self {
         use std::io::Cursor;
         const EMPTY_ZIP: &[u8] = &[
             0x50, 0x4B, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -158,7 +169,7 @@ impl DocumentReader {
         )
         .expect("minimal empty zip must be valid");
         Self::from_xml_reader_and_archive(
-            xml,
+            stream,
             data,
             Arc::new(Mutex::new(archive)),
             Arc::new(crate::content_types::ContentTypes::default()),
@@ -915,7 +926,26 @@ impl DocumentReader {
         }
     }
 
-    fn parse_tbl(&mut self, _start: &BytesStart<'_>, is_outermost: bool) -> Result<()> {
+    /// Parses a `<w:tbl>`, bounding recursion depth so deeply nested tables fail
+    /// fast instead of overflowing the call stack.
+    ///
+    /// The depth counter is incremented for the whole lifetime of the inner
+    /// parse and decremented on every exit path, so sibling tables at the same
+    /// level do not accumulate depth.
+    fn parse_tbl(&mut self, start: &BytesStart<'_>, is_outermost: bool) -> Result<()> {
+        self.table_depth = self.table_depth.saturating_add(1);
+        if self.table_depth > MAX_TABLE_NESTING_DEPTH {
+            self.table_depth = self.table_depth.saturating_sub(1);
+            return Err(parse_error(format!(
+                "table nesting exceeds the depth limit of {MAX_TABLE_NESTING_DEPTH} (possible zip bomb)"
+            )));
+        }
+        let result = self.parse_tbl_inner(start, is_outermost);
+        self.table_depth = self.table_depth.saturating_sub(1);
+        result
+    }
+
+    fn parse_tbl_inner(&mut self, _start: &BytesStart<'_>, is_outermost: bool) -> Result<()> {
         self.emit.flush_list_stack();
         self.emit.flush_pending_preformatted_close();
         self.emit.push(Event::StartTable { id: None });
@@ -1223,14 +1253,13 @@ mod tests {
         numbering: crate::numbering::MinimalNumbering,
     ) -> DocumentReader {
         let stream: Box<dyn Read + Send> = Box::new(Cursor::new(document_xml.as_bytes().to_vec()));
-        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
         let data = DocxData {
             style_list: crate::styles::StyleList::default(),
             hyperlink_map: HyperlinkMap::default(),
             numbering,
             image_map: crate::rels::ImageMap::default(),
         };
-        DocumentReader::from_xml_reader(xml, data)
+        DocumentReader::from_xml_reader(stream, data)
     }
 
     fn list_paragraph(num_id: u32, ilvl: u32, text: &str) -> String {
@@ -1255,8 +1284,7 @@ mod tests {
     fn make_reader_with_styles(document_xml: &str, styles_body: &str) -> DocumentReader {
         let stream: Box<dyn std::io::Read + Send> =
             Box::new(std::io::Cursor::new(document_xml.to_string().into_bytes()));
-        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
-        DocumentReader::from_xml_reader(xml, make_docx_data(styles_body))
+        DocumentReader::from_xml_reader(stream, make_docx_data(styles_body))
     }
 
     fn collect_events(reader: &mut DocumentReader) -> Vec<docspec_core::Event> {
@@ -1279,14 +1307,13 @@ mod tests {
 
     fn make_reader(document_xml: &str) -> DocumentReader {
         let stream: Box<dyn Read + Send> = Box::new(Cursor::new(document_xml.as_bytes().to_vec()));
-        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
         let data = DocxData {
             style_list: crate::styles::StyleList::default(),
             hyperlink_map: HyperlinkMap::default(),
             numbering: crate::numbering::MinimalNumbering::new(),
             image_map: crate::rels::ImageMap::default(),
         };
-        DocumentReader::from_xml_reader(xml, data)
+        DocumentReader::from_xml_reader(stream, data)
     }
 
     fn make_reader_with_hyperlinks(
@@ -1294,14 +1321,13 @@ mod tests {
         hyperlink_map: HyperlinkMap,
     ) -> DocumentReader {
         let stream: Box<dyn Read + Send> = Box::new(Cursor::new(document_xml.as_bytes().to_vec()));
-        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
         let data = DocxData {
             style_list: crate::styles::StyleList::default(),
             hyperlink_map,
             numbering: crate::numbering::MinimalNumbering::new(),
             image_map: crate::rels::ImageMap::default(),
         };
-        DocumentReader::from_xml_reader(xml, data)
+        DocumentReader::from_xml_reader(stream, data)
     }
 
     fn document_with_hyperlink_body(body: &str) -> String {
@@ -1329,14 +1355,13 @@ mod tests {
         image_map: crate::rels::ImageMap,
     ) -> DocumentReader {
         let stream: Box<dyn Read + Send> = Box::new(Cursor::new(document_xml.as_bytes().to_vec()));
-        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
         let data = DocxData {
             style_list: crate::styles::StyleList::default(),
             hyperlink_map: HyperlinkMap::default(),
             numbering: crate::numbering::MinimalNumbering::new(),
             image_map,
         };
-        DocumentReader::from_xml_reader(xml, data)
+        DocumentReader::from_xml_reader(stream, data)
     }
 
     #[test]
@@ -3583,14 +3608,13 @@ mod tests {
         let style_list = crate::styles::StyleList::parse(Cursor::new(xml_str.into_bytes()))
             .expect("valid styles XML");
         let stream: Box<dyn Read + Send> = Box::new(Cursor::new(document_xml.as_bytes().to_vec()));
-        let xml = quick_xml::Reader::from_reader(std::io::BufReader::new(stream));
         let data = DocxData {
             style_list,
             hyperlink_map: HyperlinkMap::default(),
             numbering,
             image_map: crate::rels::ImageMap::default(),
         };
-        DocumentReader::from_xml_reader(xml, data)
+        DocumentReader::from_xml_reader(stream, data)
     }
 
     #[test]
