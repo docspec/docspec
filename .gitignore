@@ -13,7 +13,12 @@ target/
 /crates/docspec-wasm/pkg/
 /crates/docspec-wasm/pkg-*/
 /crates/docspec-wasm/crates/
-*.wasm
+# Anchored deliberately. A bare `*.wasm` matches at any depth, and this
+# repository tracks binary fixtures through LFS, so it would silently refuse to
+# stage a future .wasm fixture -- `git add` reporting success while adding
+# nothing. Generated packages are already covered by the rules above and by
+# `target/`; this only backstops a stray wasm-pack --out-dir inside the crate.
+/crates/docspec-wasm/**/*.wasm
 
 # Coverage artifacts
 lcov.info
