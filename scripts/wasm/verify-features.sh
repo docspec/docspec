@@ -21,14 +21,21 @@ aggregate_features=(all-readers all-writers full)
 # only ever lints the DEFAULT feature set. Reader-only and writer-only builds
 # went unlinted entirely and had accumulated real violations that `cargo check`
 # cannot see.
+#
+# --all-targets, not the library alone: build.rs and tests/wasm.rs are both
+# feature-aware and neither was being built here. `tests/wasm.rs` derives its
+# expected capability lists from the same cfgs the library uses, so it is the
+# one target that can catch a name or ordering drift in a non-default
+# selection -- and it was only ever compiled by `cargo test --workspace`, i.e.
+# at the default features. The build script was linted nowhere at all.
 check_selection() {
   local selection="$1"
   if [[ -z "${selection}" ]]; then
     cargo clippy --locked --target wasm32-unknown-unknown \
-      -p docspec-wasm --lib --no-default-features
+      -p docspec-wasm --all-targets --no-default-features
   else
     cargo clippy --locked --target wasm32-unknown-unknown \
-      -p docspec-wasm --lib --no-default-features --features "${selection}"
+      -p docspec-wasm --all-targets --no-default-features --features "${selection}"
   fi
 }
 
@@ -36,7 +43,7 @@ check_selection ""
 for selection in "${individual_features[@]}" "${format_bundles[@]}" "${aggregate_features[@]}"; do
   check_selection "${selection}"
 done
-cargo clippy --locked --target wasm32-unknown-unknown -p docspec-wasm --lib
+cargo clippy --locked --target wasm32-unknown-unknown -p docspec-wasm --all-targets
 check_selection "docx-reader,markdown-writer"
 
 graph_file="$(mktemp)"
