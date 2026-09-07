@@ -39,6 +39,15 @@ if grep -Fq 'convert_markdown_to_blocknote' "${minimal_types}"; then
 fi
 grep -Fq 'convert_markdown_to_blocknote' "${full_types}"
 
+# The generated declarations must name exactly the compiled formats. This is the
+# guarantee a selective build offers TypeScript callers, and a hand-written
+# fixed string (`from: string`) silently gave it away.
+grep -Fqx 'export type InputFormat = "docx";' "${minimal_types}"
+grep -Fqx 'export type OutputFormat = "markdown";' "${minimal_types}"
+grep -Fqx 'export type InputFormat = "docx" | "html" | "markdown";' "${full_types}"
+grep -Fqx 'export type OutputFormat = "blocknote" | "html" | "markdown" | "oxa" | "pandoc-native";' "${full_types}"
+grep -Fq 'DocspecErrorCode' "${minimal_types}"
+
 minimal_wasm="${output_root}/nodejs-minimal/docspec_wasm_bg.wasm"
 full_wasm="${output_root}/nodejs-full/docspec_wasm_bg.wasm"
 minimal_raw="$(wc -c <"${minimal_wasm}")"
@@ -50,6 +59,45 @@ if (( minimal_raw >= full_raw || minimal_gzip >= full_gzip )); then
   echo "minimal WASM must be smaller than full (raw ${minimal_raw}/${full_raw}, gzip ${minimal_gzip}/${full_gzip})" >&2
   exit 1
 fi
+
+# Absolute budgets. The relative check above passes even when BOTH artifacts
+# inflate, which is precisely the regression a size-motivated feature must
+# catch. gzip is the number users actually download, so gate on that.
+#
+# Measured 2026-09-07: minimal 153001, full 348520. Budgets carry ~10% headroom.
+# Raising one is a deliberate act -- record why in the commit message.
+: "${MINIMAL_GZIP_BUDGET:=168000}"
+: "${FULL_GZIP_BUDGET:=383000}"
+check_budget() {
+  local name="$1" actual="$2" budget="$3"
+  if (( actual > budget )); then
+    echo "${name} gzip ${actual} exceeds budget ${budget} (+$(( actual - budget )) bytes)" >&2
+    echo "investigate the growth, or raise the budget deliberately." >&2
+    exit 1
+  fi
+  printf '  %s gzip %s / budget %s (%s bytes headroom)\n' \
+    "${name}" "${actual}" "${budget}" "$(( budget - actual ))"
+}
+check_budget minimal "${minimal_gzip}" "${MINIMAL_GZIP_BUDGET}"
+check_budget full "${full_gzip}" "${FULL_GZIP_BUDGET}"
+
+# Byte-level selectivity. The cargo-tree assertions in verify-features.sh prove
+# crate absence; this proves the compiled artifact carries no trace of a format
+# that was not selected -- the literal promise of a selective build.
+for absent in blocknote pandoc oxa; do
+  if grep -c -a -o "${absent}" "${minimal_wasm}" >/dev/null 2>&1 \
+     && [ "$(grep -c -a -o "${absent}" "${minimal_wasm}")" != "0" ]; then
+    echo "minimal WASM contains '${absent}', which was not selected" >&2
+    exit 1
+  fi
+done
+for present in blocknote pandoc oxa; do
+  if [ "$(grep -c -a -o "${present}" "${full_wasm}")" = "0" ]; then
+    echo "full WASM is missing '${present}'; the selectivity probe is vacuous" >&2
+    exit 1
+  fi
+done
+echo "  byte-level selectivity verified (minimal excludes blocknote/pandoc/oxa; full includes them)"
 
 printf 'minimal_raw=%s\nfull_raw=%s\nminimal_gzip=%s\nfull_gzip=%s\n' \
   "${minimal_raw}" "${full_raw}" "${minimal_gzip}" "${full_gzip}" \

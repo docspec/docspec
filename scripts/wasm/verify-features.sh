@@ -17,13 +17,17 @@ individual_features=(
 format_bundles=(docx html markdown blocknote oxa pandoc-native)
 aggregate_features=(all-readers all-writers full)
 
+# clippy, not check: the workspace lint set is strict, and the `clippy` CI job
+# only ever lints the DEFAULT feature set. Reader-only and writer-only builds
+# went unlinted entirely and had accumulated real violations that `cargo check`
+# cannot see.
 check_selection() {
   local selection="$1"
   if [[ -z "${selection}" ]]; then
-    cargo check --locked --target wasm32-unknown-unknown \
+    cargo clippy --locked --target wasm32-unknown-unknown \
       -p docspec-wasm --lib --no-default-features
   else
-    cargo check --locked --target wasm32-unknown-unknown \
+    cargo clippy --locked --target wasm32-unknown-unknown \
       -p docspec-wasm --lib --no-default-features --features "${selection}"
   fi
 }
@@ -32,46 +36,84 @@ check_selection ""
 for selection in "${individual_features[@]}" "${format_bundles[@]}" "${aggregate_features[@]}"; do
   check_selection "${selection}"
 done
-cargo check --locked --target wasm32-unknown-unknown -p docspec-wasm --lib
+cargo clippy --locked --target wasm32-unknown-unknown -p docspec-wasm --lib
 check_selection "docx-reader,markdown-writer"
 
 graph_file="$(mktemp)"
 trap 'rm -f "${graph_file}"' EXIT
-cargo tree --locked --target wasm32-unknown-unknown -p docspec-wasm \
-  --no-default-features --features docx-reader,markdown-writer \
-  --edges normal --prefix none >"${graph_file}"
 
-required_crates=(docspec docspec-core docspec-docx-reader docspec-markdown-writer)
-excluded_crates=(
-  docspec-blocknote-writer
+# Server, CLI, and telemetry crates must never reach any WASM artifact.
+# ARCHITECTURE.md rests the docspec-http exclusion on tokio specifically, so
+# assert the async runtime and its transport stack by name.
+never_present=(
   docspec-cli
-  docspec-html-reader
-  docspec-html-writer
   docspec-http
-  docspec-markdown-reader
-  docspec-oxa-writer
-  docspec-pandoc-native-writer
-  docspec-telemetry
-  opentelemetry
+  axum
+  hyper
   posthog-rs
   reqwest
   sentry
+  tokio
   tracing
   tracing-subscriber
 )
 
-for crate_name in "${required_crates[@]}"; do
-  if ! grep -Eq "^${crate_name} v" "${graph_file}"; then
-    echo "required crate missing from minimal dependency graph: ${crate_name}" >&2
+# A denylist entry that names a crate no longer in Cargo.lock can never match,
+# so it silently stops asserting anything. (This is not hypothetical: the list
+# previously carried `docspec-telemetry` and `opentelemetry`, neither of which
+# exists in this workspace.) Fail loudly instead of rotting quietly.
+for crate_name in "${never_present[@]}"; do
+  if ! grep -Eq "^name = \"${crate_name}\"$" "${repository_root}/Cargo.lock"; then
+    echo "denylist entry is not in Cargo.lock and asserts nothing: ${crate_name}" >&2
+    echo "remove it, or correct the name." >&2
     exit 1
   fi
 done
 
-for crate_name in "${excluded_crates[@]}"; do
-  if grep -Eq "^${crate_name} v" "${graph_file}"; then
-    echo "unselected crate present in minimal dependency graph: ${crate_name}" >&2
-    exit 1
-  fi
-done
+# Dependencies that exist only to serve a direction we did not select, or that
+# no read-only conversion can use. `zopfli` is a compressor and `getopts` is a
+# CLI argument parser; both were once pulled in transitively for nothing.
+assert_graph() {
+  local selection="$1" required="$2" excluded="$3"
+  cargo tree --locked --target wasm32-unknown-unknown -p docspec-wasm \
+    --no-default-features --features "${selection}" \
+    --edges normal --prefix none >"${graph_file}"
+
+  local crate_name
+  for crate_name in ${required}; do
+    if ! grep -Eq "^${crate_name} v" "${graph_file}"; then
+      echo "[${selection}] required crate missing from graph: ${crate_name}" >&2
+      exit 1
+    fi
+  done
+  for crate_name in ${excluded} "${never_present[@]}"; do
+    if grep -Eq "^${crate_name} v" "${graph_file}"; then
+      echo "[${selection}] unselected crate present in graph: ${crate_name}" >&2
+      exit 1
+    fi
+  done
+  echo "  graph verified: ${selection}"
+}
+
+# Minimal DOCX to Markdown: no markdown parser, no compressor, no other format.
+assert_graph "docx-reader,markdown-writer" \
+  "docspec docspec-core docspec-docx-reader docspec-markdown-writer zip flate2 quick-xml" \
+  "docspec-blocknote-writer docspec-html-reader docspec-html-writer
+   docspec-markdown-reader docspec-oxa-writer docspec-pandoc-native-writer
+   docspec-json pulldown-cmark html5gum zopfli getopts"
+
+# Default package: no DOCX stack at all.
+assert_graph "markdown-reader,blocknote-writer" \
+  "docspec docspec-core docspec-markdown-reader docspec-blocknote-writer docspec-json pulldown-cmark" \
+  "docspec-docx-reader docspec-html-reader docspec-html-writer
+   docspec-markdown-writer docspec-oxa-writer docspec-pandoc-native-writer
+   zip flate2 quick-xml zopfli getopts"
+
+# Full package: every format crate present, server and CLI still absent.
+assert_graph "full" \
+  "docspec docspec-core docspec-docx-reader docspec-html-reader
+   docspec-markdown-reader docspec-blocknote-writer docspec-html-writer
+   docspec-markdown-writer docspec-oxa-writer docspec-pandoc-native-writer" \
+  "zopfli getopts"
 
 echo "verified empty, individual, bundle, aggregate, default, and minimal WASM feature selections"

@@ -53,6 +53,21 @@ docspec = { workspace = true, default-features = false }
 docspec-test-utils = { workspace = true }
 serde_json = "1"
 
+# Pins wasm-opt so the artifact does not silently change if wasm-pack alters its
+# defaults. The table key MUST be `custom`, not the profile name: wasm-pack maps
+# every `--profile <name>` to BuildProfile::Custom and reads
+# `metadata.wasm_pack.profile.custom` (wasm-pack 0.14.0, manifest/mod.rs:539).
+# A `[...profile.wasm-release]` table is accepted and then silently ignored --
+# there is no deny_unknown_fields on the profile table.
+#
+# Reason for -O over -Oz, despite the cargo profile's opt-level = "z": measured
+# on the `full` package, -Oz trades 24,415 raw bytes (-2.5%) for LARGER
+# compressed transfers -- gzip -9 348,520 -> 351,136 and brotli -q11
+# 268,440 -> 270,320. Users pay the compressed size on every load, so -O wins.
+# -Os and -O3 measured no better than -O on any axis. Re-measure before changing.
+[package.metadata.wasm-pack.profile.custom]
+wasm-opt = ["-O"]
+
 [lints.rust]
 unsafe_code = "forbid"
 missing_docs = "deny"

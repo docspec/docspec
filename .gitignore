@@ -2,9 +2,18 @@
 target/
 /crates/*/target/
 
-# Generated WASM packages. The checked-in pkg directory contains only its ignore rule
-# and generated package files must never become source artifacts.
+# Generated WASM packages. Nothing under these paths is tracked; wasm-pack also
+# writes its own `pkg/.gitignore` containing `*`, but do not depend on that --
+# these rules must stand on their own.
+#
+# The `crates/` entry is not a typo: wasm-pack resolves --out-dir relative to the
+# CRATE directory, so `--out-dir crates/docspec-wasm/pkg` (a natural thing to
+# type, since every other path in the docs is repo-relative) writes to
+# crates/docspec-wasm/crates/docspec-wasm/pkg/.
+/crates/docspec-wasm/pkg/
 /crates/docspec-wasm/pkg-*/
+/crates/docspec-wasm/crates/
+*.wasm
 
 # Coverage artifacts
 lcov.info
