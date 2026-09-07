@@ -13,7 +13,9 @@ exclude = ["tests/fixtures/**", "tests/snapshots/**"]
 [dependencies]
 docspec-core = { workspace = true }
 quick-xml = "0.41"
-zip = { version = "8", default-features = false, features = ["deflate"] }
+zip = { version = "8", default-features = false, features = [
+  "deflate-flate2-zlib-rs",
+] }
 flate2 = "1"
 crc32fast = "1"
 
