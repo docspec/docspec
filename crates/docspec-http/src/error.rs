@@ -427,12 +427,9 @@ mod tests {
     // and slice indexing are standard testing patterns that express expected outcomes.
     #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
-    use axum::{
-        http::{
-            header::{ALLOW, CONTENT_TYPE},
-            StatusCode,
-        },
-        response::IntoResponse as _,
+    use axum::http::{
+        header::{ALLOW, CONTENT_TYPE},
+        StatusCode,
     };
 
     use super::*;

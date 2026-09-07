@@ -1,145 +1,230 @@
 //! Streaming reader for a single ZIP entry without buffering it in memory.
-//!
-//! `StreamingArchive::open` uses `ZipArchive` only to locate an entry and capture
-//! its compressed byte range. The returned reader then streams that byte range
-//! directly from the DOCX file with bounded memory.
 
 use std::fs::File;
-use std::io::{Read, Seek as _, SeekFrom};
+use std::io::{self, Read, Seek as _, SeekFrom};
 use std::path::Path;
 
+use crc32fast::Hasher;
 use docspec_core::{Error, Result};
 use flate2::read::DeflateDecoder;
 use zip::{result::ZipError, CompressionMethod, ZipArchive};
 
+use crate::package::ReadSeek;
+
+#[derive(Clone, Copy)]
+struct EntryMetadata {
+    data_start: u64,
+    compressed_size: u64,
+    uncompressed_size: u64,
+    crc32: u32,
+    compression: CompressionMethod,
+}
+
 enum EntryReader {
-    Stored(std::io::Take<File>),
-    Deflated(DeflateDecoder<std::io::Take<File>>),
+    Stored(std::io::Take<Box<dyn ReadSeek + 'static>>),
+    DeflatedLegacy(DeflateDecoder<std::io::Take<Box<dyn ReadSeek + 'static>>>),
+    DeflatedStrict(
+        crate::deflate_reader::DeflateReader<std::io::Take<Box<dyn ReadSeek + 'static>>>,
+    ),
 }
 
 impl Read for EntryReader {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self {
             Self::Stored(reader) => reader.read(buf),
-            Self::Deflated(reader) => reader.read(buf),
+            Self::DeflatedLegacy(reader) => reader.read(buf),
+            Self::DeflatedStrict(reader) => reader.read(buf),
         }
     }
 }
 
-/// Streaming reader for one DOCX ZIP entry.
-///
-/// Constructed via [`StreamingArchive::open`]. The archive is inspected once for
-/// entry metadata; `Read` then pulls bytes directly from the compressed entry
-/// range without materializing the full XML document.
 pub(crate) struct StreamingArchive {
     reader: EntryReader,
+    compressed_size: u64,
+    uncompressed_size: u64,
+    bytes_read: u64,
+    expected_crc32: u32,
+    crc32: Hasher,
+    verified: bool,
+    verify_integrity: bool,
 }
 
 impl StreamingArchive {
-    /// Opens the ZIP archive at `path` and positions the reader on the entry
-    /// named `entry_name` (typically `"word/document.xml"`).
     pub(crate) fn open(path: &Path, entry_name: &str) -> Result<Self> {
         let file = File::open(path).map_err(Error::from)?;
-        let mut archive = ZipArchive::new(file).map_err(|err| match err {
-            ZipError::Io(source) => Error::Io { source },
-            other => Error::Parse {
-                message: format!("not a valid ZIP archive: {other}"),
-                position: None,
-            },
-        })?;
+        let mut archive = ZipArchive::new(file).map_err(map_archive_error)?;
+        let metadata = entry_metadata(&mut archive, entry_name)?;
+        let source: Box<dyn ReadSeek + 'static> = Box::new(archive.into_inner());
+        Self::from_source(source, metadata, false)
+    }
 
-        let entry = archive.by_name(entry_name).map_err(|err| match err {
-            ZipError::Io(source) => Error::Io { source },
-            other => Error::Parse {
-                message: format!("document target not found: {other}"),
-                position: None,
-            },
-        })?;
-        let data_start = entry.data_start().ok_or_else(|| Error::Parse {
-            message: format!("document target has no data offset: {entry_name}"),
-            position: None,
-        })?;
-        let compressed_size = entry.compressed_size();
-        let compression = entry.compression();
-        drop(entry);
+    pub(crate) fn open_from_archive<R>(
+        source: R,
+        archive: &mut ZipArchive<Box<dyn ReadSeek + 'static>>,
+        entry_name: &str,
+    ) -> Result<Self>
+    where
+        R: Read + std::io::Seek + Send + 'static,
+    {
+        let metadata = entry_metadata(archive, entry_name)?;
+        Self::from_source(Box::new(source), metadata, true)
+    }
 
-        let mut stream_file = archive.into_inner();
-        stream_file
-            .seek(SeekFrom::Start(data_start))
-            .map_err(Error::from)?;
-        let compressed_reader = stream_file.take(compressed_size);
-        let reader = match compression {
-            CompressionMethod::Stored => EntryReader::Stored(compressed_reader),
-            CompressionMethod::Deflated => {
-                EntryReader::Deflated(DeflateDecoder::new(compressed_reader))
+    fn from_source(
+        mut source: Box<dyn ReadSeek + 'static>,
+        metadata: EntryMetadata,
+        verify_integrity: bool,
+    ) -> Result<Self> {
+        if verify_integrity {
+            let source_length = source.seek(SeekFrom::End(0)).map_err(Error::from)?;
+            let data_end = metadata
+                .data_start
+                .checked_add(metadata.compressed_size)
+                .ok_or_else(|| parse_error("ZIP entry boundary overflow"))?;
+            if data_end > source_length {
+                return Err(parse_error("ZIP entry exceeds archive boundary"));
             }
-            _ => {
-                return Err(Error::Parse {
-                    message: format!("unsupported ZIP compression method: {compression:?}"),
-                    position: None,
-                });
+        }
+        source
+            .seek(SeekFrom::Start(metadata.data_start))
+            .map_err(Error::from)?;
+        let limited = source.take(metadata.compressed_size);
+        let reader = match metadata.compression {
+            CompressionMethod::Stored => EntryReader::Stored(limited),
+            CompressionMethod::Deflated if verify_integrity => {
+                EntryReader::DeflatedStrict(crate::deflate_reader::DeflateReader::new(limited))
+            }
+            CompressionMethod::Deflated => {
+                EntryReader::DeflatedLegacy(DeflateDecoder::new(limited))
+            }
+            compression => {
+                return Err(parse_error(format!(
+                    "unsupported ZIP compression method: {compression:?}"
+                )))
             }
         };
+        Ok(Self {
+            reader,
+            compressed_size: metadata.compressed_size,
+            uncompressed_size: metadata.uncompressed_size,
+            bytes_read: 0,
+            expected_crc32: metadata.crc32,
+            crc32: Hasher::new(),
+            verified: false,
+            verify_integrity,
+        })
+    }
 
-        Ok(Self { reader })
+    fn verify_end(&mut self) -> io::Result<()> {
+        if self.bytes_read != self.uncompressed_size {
+            return Err(invalid_data(format!(
+                "ZIP entry length mismatch: expected {}, read {}",
+                self.uncompressed_size, self.bytes_read
+            )));
+        }
+        let compressed_read = match &self.reader {
+            EntryReader::Stored(reader) => self
+                .compressed_size
+                .checked_sub(reader.limit())
+                .ok_or_else(|| invalid_data("ZIP compressed length underflow"))?,
+            EntryReader::DeflatedLegacy(reader) => reader.total_in(),
+            EntryReader::DeflatedStrict(reader) => reader.total_in(),
+        };
+        if compressed_read != self.compressed_size {
+            return Err(invalid_data(format!(
+                "ZIP compressed length mismatch: expected {}, read {compressed_read}",
+                self.compressed_size
+            )));
+        }
+        let actual_crc32 = self.crc32.clone().finalize();
+        if actual_crc32 != self.expected_crc32 {
+            return Err(invalid_data(format!(
+                "ZIP entry CRC mismatch: expected {:08x}, calculated {actual_crc32:08x}",
+                self.expected_crc32
+            )));
+        }
+        self.verified = true;
+        Ok(())
     }
 }
 
 impl Read for StreamingArchive {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.reader.read(buf)
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if self.verified || buf.is_empty() {
+            return Ok(0);
+        }
+        let count = self.reader.read(buf)?;
+        if count == 0 {
+            if self.verify_integrity {
+                self.verify_end()?;
+            } else {
+                self.verified = true;
+            }
+            return Ok(0);
+        }
+        if !self.verify_integrity {
+            return Ok(count);
+        }
+        let count_u64 = u64::try_from(count).map_err(io::Error::other)?;
+        let next = self
+            .bytes_read
+            .checked_add(count_u64)
+            .ok_or_else(|| invalid_data("ZIP entry length overflow"))?;
+        if next > self.uncompressed_size {
+            return Err(invalid_data(format!(
+                "ZIP entry exceeds declared length {}",
+                self.uncompressed_size
+            )));
+        }
+        let bytes = buf
+            .get(..count)
+            .ok_or_else(|| invalid_data("ZIP reader returned an invalid byte count"))?;
+        self.crc32.update(bytes);
+        self.bytes_read = next;
+        Ok(count)
     }
 }
 
-// Compile-time assertion: StreamingArchive must be Send + 'static.
+fn entry_metadata<R>(archive: &mut ZipArchive<R>, entry_name: &str) -> Result<EntryMetadata>
+where
+    R: Read + std::io::Seek,
+{
+    let entry = archive.by_name(entry_name).map_err(|error| match error {
+        ZipError::Io(source) => Error::Io { source },
+        other => parse_error(format!("document target not found: {other}")),
+    })?;
+    let data_start = entry
+        .data_start()
+        .ok_or_else(|| parse_error(format!("document target has no data offset: {entry_name}")))?;
+    Ok(EntryMetadata {
+        data_start,
+        compressed_size: entry.compressed_size(),
+        uncompressed_size: entry.size(),
+        crc32: entry.crc32(),
+        compression: entry.compression(),
+    })
+}
+
+fn map_archive_error(error: ZipError) -> Error {
+    match error {
+        ZipError::Io(source) => Error::Io { source },
+        other => parse_error(format!("not a valid ZIP archive: {other}")),
+    }
+}
+
+fn parse_error(message: impl Into<String>) -> Error {
+    Error::Parse {
+        message: message.into(),
+        position: None,
+    }
+}
+
+fn invalid_data(message: impl Into<String>) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, message.into())
+}
+
 const _: fn(&Path, &str) -> Result<StreamingArchive> = StreamingArchive::open;
 
-const _: fn() = || {
-    fn assert_send<T>()
-    where
-        T: Send + 'static,
-    {
-    }
-    assert_send::<StreamingArchive>();
-};
-
 #[cfg(test)]
-#[cfg(not(coverage))]
-mod tests {
-    #![allow(clippy::expect_used, clippy::unwrap_used)]
-
-    use super::*;
-    use std::io::Write as _;
-
-    fn make_test_docx_with_entry(entry_name: &str, content: &[u8]) -> tempfile::NamedTempFile {
-        let tmp = tempfile::NamedTempFile::new().expect("tempfile");
-        let buf = std::io::Cursor::new(Vec::new());
-        let mut writer = zip::ZipWriter::new(buf);
-        let options = zip::write::SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated);
-        writer.start_file(entry_name, options).expect("start_file");
-        writer.write_all(content).expect("write_all");
-        let zip_bytes = writer.finish().expect("finish").into_inner();
-        let mut file = tmp.reopen().expect("reopen");
-        file.write_all(&zip_bytes).expect("write to tempfile");
-        drop(file);
-        tmp
-    }
-
-    #[test]
-    fn streaming_archive_reads_entry_content() {
-        let xml_content = b"<?xml version=\"1.0\"?><root>hello</root>";
-        let tmp = make_test_docx_with_entry("word/document.xml", xml_content);
-        let mut archive = StreamingArchive::open(tmp.path(), "word/document.xml").unwrap();
-        let mut buf = Vec::new();
-        archive.read_to_end(&mut buf).unwrap();
-        assert_eq!(buf, xml_content);
-    }
-
-    #[test]
-    fn streaming_archive_open_missing_entry_returns_error() {
-        let tmp = make_test_docx_with_entry("word/document.xml", b"<?xml?>");
-        let result = StreamingArchive::open(tmp.path(), "word/missing.xml");
-        assert!(result.is_err());
-    }
-}
+#[path = "streaming_archive_tests.rs"]
+mod tests;

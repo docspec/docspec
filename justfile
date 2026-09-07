@@ -56,13 +56,13 @@ typos:
 taplo:
     taplo fmt --check
 
-# Build the WASM artifact for browser use (debug)
-wasm:
-    wasm-pack build --dev --target web crates/docspec-wasm
+# Build a development WASM package. `just wasm` preserves the legacy browser package.
+wasm target="web" features="markdown-reader,blocknote-writer" out_dir="pkg":
+    wasm-pack build --dev --target {{ quote(target) }} --out-dir {{ quote(out_dir) }} crates/docspec-wasm -- --locked --no-default-features {{ if features == "" { "" } else { "--features " + quote(features) } }}
 
-# Build the WASM artifact for browser use (release)
-wasm-release:
-    wasm-pack build --release --target web crates/docspec-wasm
+# Build an optimized WASM package. Pass a new `out_dir` for each distributable build.
+wasm-release target="web" features="markdown-reader,blocknote-writer" out_dir="pkg":
+    wasm-pack build --profile wasm-release --target {{ quote(target) }} --out-dir {{ quote(out_dir) }} crates/docspec-wasm -- --locked --no-default-features {{ if features == "" { "" } else { "--features " + quote(features) } }}
 
 # Clean build artifacts
 clean:

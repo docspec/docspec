@@ -79,7 +79,7 @@ mod linux_only {
         target_dir().join("release/examples/memtest_child")
     }
 
-    fn run_child_and_get_peak_rss(docx_path: &std::path::Path) -> u64 {
+    fn run_child_and_get_peak_rss(docx_path: &std::path::Path, reader_streaming: bool) -> u64 {
         let bin = child_bin_path();
         assert!(
             bin.exists(),
@@ -87,7 +87,11 @@ mod linux_only {
             bin.display()
         );
 
-        let output = std::process::Command::new(&bin)
+        let mut command = std::process::Command::new(&bin);
+        if reader_streaming {
+            command.arg("--reader-streaming");
+        }
+        let output = command
             .arg(docx_path)
             .output()
             .expect("failed to spawn memtest_child");
@@ -120,7 +124,7 @@ mod linux_only {
         tmp.flush().expect("flush");
         drop(bytes);
 
-        let rss_kib = run_child_and_get_peak_rss(tmp.path());
+        let rss_kib = run_child_and_get_peak_rss(tmp.path(), false);
         let peak_mebibytes = rss_kib / 1024;
         eprintln!("50 MB doc.xml: child peak RSS = {peak_mebibytes} MB ({rss_kib} kB)");
 
@@ -144,7 +148,7 @@ mod linux_only {
         tmp.flush().expect("flush");
         drop(bytes);
 
-        let rss_kib = run_child_and_get_peak_rss(tmp.path());
+        let rss_kib = run_child_and_get_peak_rss(tmp.path(), false);
         let peak_mebibytes = rss_kib / 1024;
         eprintln!("200 MB doc.xml: child peak RSS = {peak_mebibytes} MB ({rss_kib} kB)");
 
@@ -154,6 +158,23 @@ mod linux_only {
         );
         eprintln!(
             "Memory budget OK: {peak_mebibytes} MB < 80 MB — memory is O(1) regardless of document size"
+        );
+    }
+
+    #[test]
+    #[ignore = "slow memory test, run manually after building memtest_child"]
+    fn seekable_reader_streaming_has_bounded_document_overhead() {
+        let bytes = synth_large_docx(50);
+        let mut tmp = tempfile::NamedTempFile::new().expect("tempfile");
+        tmp.write_all(&bytes).expect("write docx");
+        tmp.flush().expect("flush");
+        drop(bytes);
+
+        let rss_kib = run_child_and_get_peak_rss(tmp.path(), true);
+        assert!(
+            rss_kib < 80_000,
+            "from_reader_streaming peak RSS {} MB exceeds 80 MB",
+            rss_kib / 1024
         );
     }
 } // mod linux_only

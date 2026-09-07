@@ -82,14 +82,18 @@ cargo run -p docspec-cli -- http --host 0.0.0.0 --port 8080
 
 ### WebAssembly
 
-`docspec-wasm` builds with [`wasm-pack`](https://rustwasm.github.io/wasm-pack/) (`cargo install wasm-pack`) against the `wasm32-unknown-unknown` target:
+`docspec-wasm` builds source packages with [`wasm-pack`](https://rustwasm.github.io/wasm-pack/) against `wasm32-unknown-unknown`. Install the same tool version used by CI and build from `Cargo.lock`:
 
 ```bash
-just wasm          # wasm-pack build --dev --target web crates/docspec-wasm
-just wasm-release  # the optimized build
+rustup target add wasm32-unknown-unknown
+cargo install wasm-pack --locked --version 0.14.0
+
+just wasm          # development browser package with legacy default features
+just wasm-release  # optimized browser package with legacy default features
+just wasm-release nodejs docx-reader,markdown-writer pkg/node-docx-markdown
 ```
 
-The output bundle lands in `crates/docspec-wasm/pkg/`.
+`target` (`web` or `nodejs`), comma-separated `features`, and `out_dir` are recipe parameters. Use a fresh `out_dir` for each distributable package. Package contents are generated and untracked; TypeScript declarations are retained. See [`docspec-wasm`](crates/docspec-wasm) for the feature map, synchronous I/O contract, examples, memory limits, and runtime checks.
 
 ### Docker
 

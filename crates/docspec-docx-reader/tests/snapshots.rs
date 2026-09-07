@@ -5,8 +5,9 @@
 //! - `docspec`     — original DocSpec-curated fixtures (ODC-By-1.0)
 //! - `apache_tika` — mirror of the Apache Tika DOCX test documents (Apache-2.0)
 //!
-//! Every fixture is read through both `DocxReader::from_reader` and
-//! `DocxReader::from_path`; the two constructors must emit identical event
+//! Every fixture is read through `DocxReader::from_reader`,
+//! `DocxReader::from_reader_streaming`, and `DocxReader::from_path`; all
+//! constructors must emit identical event
 //! streams (a divergence anywhere in any corpus fails fast) and the
 //! `from_reader` stream is compared against the committed snapshot. This is
 //! the canonical way to keep the `StreamingArchive` (`from_path`) and
@@ -41,11 +42,18 @@ fn assert_fixture_snapshot(corpus: &str, file_name: &str) {
         .join(file_name);
 
     let from_reader_snapshot = capture(&path, |bytes| DocxReader::from_reader(Cursor::new(bytes)));
+    let from_reader_streaming_snapshot = capture(&path, |bytes| {
+        DocxReader::from_reader_streaming(Cursor::new(bytes))
+    });
     let from_path_snapshot = capture(&path, |_bytes| DocxReader::from_path(&path));
 
     assert_eq!(
         from_reader_snapshot, from_path_snapshot,
         "from_reader and from_path produced divergent event streams for {corpus}/{file_name}"
+    );
+    assert_eq!(
+        from_reader_snapshot, from_reader_streaming_snapshot,
+        "from_reader and from_reader_streaming produced divergent event streams for {corpus}/{file_name}"
     );
 
     let snapshot_path = format!("../../../tests/snapshots/docx/{corpus}");
