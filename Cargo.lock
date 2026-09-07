@@ -762,6 +762,7 @@ dependencies = [
 name = "docspec-docx-reader"
 version = "1.21.10"
 dependencies = [
+ "crc32fast",
  "docspec-blocknote-writer",
  "docspec-core",
  "docspec-test-utils",
@@ -880,6 +881,7 @@ dependencies = [
  "docspec",
  "docspec-core",
  "docspec-test-utils",
+ "js-sys",
  "serde_json",
  "wasm-bindgen",
 ]

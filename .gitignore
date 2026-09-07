@@ -2,6 +2,10 @@
 target/
 /crates/*/target/
 
+# Generated WASM packages. The checked-in pkg directory contains only its ignore rule
+# and generated package files must never become source artifacts.
+/crates/docspec-wasm/pkg-*/
+
 # Coverage artifacts
 lcov.info
 *.profraw

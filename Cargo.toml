@@ -25,7 +25,7 @@ license = "MIT"
 repository = "https://github.com/docspec/docspec"
 
 [workspace.dependencies]
-docspec = { path = "crates/docspec", version = "1.21.10" }
+docspec = { path = "crates/docspec", version = "1.21.10", default-features = false }
 docspec-core = { path = "crates/docspec-core", version = "1.21.10" }
 docspec-json = { path = "crates/docspec-json", version = "1.21.10" }
 docspec-markdown-reader = { path = "crates/docspec-markdown-reader", version = "1.21.10" }
@@ -189,6 +189,14 @@ large_enum_variant = "allow"
 # via attach_stacktrace) resolve to file:line pairs. Adds ~5% binary size;
 # drops symbol names — Sentry symbolication only needs file:line.
 debug = "line-tables-only"
+
+[profile.wasm-release]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+debug = false
+panic = "abort"
 
 [workspace.metadata.cargo-semver-checks.lints]
 feature_not_enabled_by_default = { required-update = "minor" }

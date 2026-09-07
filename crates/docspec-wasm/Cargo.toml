@@ -13,10 +13,41 @@ categories = ["encoding", "wasm"]
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = ["markdown-reader", "blocknote-writer"]
+
+docx-reader = ["docspec/docx"]
+html-reader = ["docspec/html"]
+markdown-reader = ["docspec/markdown"]
+
+blocknote-writer = ["docspec/blocknote-writer"]
+html-writer = ["docspec/html-writer"]
+markdown-writer = ["docspec/markdown-writer"]
+oxa-writer = ["docspec/oxa-writer"]
+pandoc-native-writer = ["docspec/pandoc-native-writer"]
+
+docx = ["docx-reader"]
+html = ["html-reader", "html-writer"]
+markdown = ["markdown-reader", "markdown-writer"]
+blocknote = ["blocknote-writer"]
+oxa = ["oxa-writer"]
+pandoc-native = ["pandoc-native-writer"]
+
+all-readers = ["docx-reader", "html-reader", "markdown-reader"]
+all-writers = [
+  "blocknote-writer",
+  "html-writer",
+  "markdown-writer",
+  "oxa-writer",
+  "pandoc-native-writer",
+]
+full = ["all-readers", "all-writers"]
+
 [dependencies]
 wasm-bindgen = "0.2"
+js-sys = "0.3"
 docspec-core = { workspace = true }
-docspec = { workspace = true, features = ["markdown", "blocknote"] }
+docspec = { workspace = true, default-features = false }
 
 [dev-dependencies]
 docspec-test-utils = { workspace = true }
@@ -42,7 +73,7 @@ restriction = { level = "deny", priority = -1 }
 cargo = { level = "deny", priority = -1 }
 cognitive_complexity = "deny"
 option_if_let_else = "deny"
-redundant_pub_crate = "deny"
+redundant_pub_crate = "allow"
 use_self = "deny"
 blanket_clippy_restriction_lints = "allow"
 implicit_return = "allow"
@@ -80,3 +111,9 @@ exhaustive_structs = "allow"
 module_name_repetitions = "allow"
 error_impl_error = "allow"
 multiple_crate_versions = "allow"
+as_conversions = "allow"
+cast_possible_truncation = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+pub_with_shorthand = "allow"
+single_call_fn = "allow"

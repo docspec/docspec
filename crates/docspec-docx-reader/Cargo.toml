@@ -15,6 +15,7 @@ docspec-core = { workspace = true }
 quick-xml = "0.41"
 zip = { version = "8", default-features = false, features = ["deflate"] }
 flate2 = "1"
+crc32fast = "1"
 
 [dev-dependencies]
 docspec-blocknote-writer = { workspace = true }
