@@ -46,6 +46,35 @@ done
 cargo clippy --locked --target wasm32-unknown-unknown -p docspec-wasm --all-targets
 check_selection "docx-reader,markdown-writer"
 
+# Compiling tests/wasm.rs is not the same as running it. Its expected capability
+# lists are a SECOND, hand-maintained copy of the same `#[cfg(feature = ...)]`
+# arms that formats.rs uses, so a misspelled or mis-ordered format name only
+# shows up when the two are actually compared at runtime.
+#
+# These run on the host, not wasm32: tests/wasm.rs is a native test (no
+# wasm-bindgen-test), so `cargo test` executes it directly.
+#
+# Six selections rather than all eighteen, because what varies is the SHAPE.
+# Empty, reader-only and writer-only cover the narrowing cases; `full` carries
+# every individual format name and so catches a per-format typo wherever it is;
+# minimal and default are the two selections that actually ship. The remaining
+# individual features and bundles are structurally identical to one of these and
+# are already compiled by the clippy sweep above.
+run_selection() {
+  local selection="$1"
+  if [[ -z "${selection}" ]]; then
+    cargo test --locked -p docspec-wasm --no-default-features
+  else
+    cargo test --locked -p docspec-wasm --no-default-features --features "${selection}"
+  fi
+}
+
+run_selection ""
+for selection in docx-reader oxa-writer docx-reader,markdown-writer \
+  markdown-reader,blocknote-writer full; do
+  run_selection "${selection}"
+done
+
 graph_file="$(mktemp)"
 trap 'rm -f "${graph_file}"' EXIT
 
