@@ -44,7 +44,10 @@ just wasm-release web '' pkg/web-empty
 
 The last command intentionally builds an empty package. Empty, reader-only, and
 writer-only feature selections are valid; `convert_stream` rejects unavailable
-directions before calling either host callback.
+directions before calling either host callback. The generated `.d.ts` narrows
+`InputFormat` and `OutputFormat` to the formats actually compiled in, so in
+those packages one or both becomes `never` and TypeScript rejects the call
+outright.
 
 ## Feature selection
 
@@ -71,17 +74,39 @@ interface ReadAtSource {
   readAt(offset: number, length: number): Uint8Array;
 }
 
-type WriteChunk = (chunk: Uint8Array) => void;
+// Either a bare function or an object with a `write` method.
+type WriteChunk =
+  | ((chunk: Uint8Array) => void)
+  | { write(chunk: Uint8Array): void };
+
+// Generated per build. A package compiled with `docx-reader,markdown-writer`
+// declares `InputFormat = "docx"` and `OutputFormat = "markdown"`; a package
+// with no reader or no writer declares `never`.
+type InputFormat = "docx" | "html" | "markdown";
+type OutputFormat = "blocknote" | "html" | "markdown" | "oxa" | "pandoc-native";
+
+type DocspecErrorCode =
+  | "INVALID_ARGUMENT"
+  | "UNSUPPORTED_INPUT_FORMAT"
+  | "UNSUPPORTED_OUTPUT_FORMAT"
+  | "IO_ERROR"
+  | "CONVERSION_ERROR";
+interface DocspecError extends Error { readonly code: DocspecErrorCode }
 
 export function input_formats(): string[];
 export function output_formats(): string[];
 export function convert_stream(
-  from: string,
-  to: string,
+  from: InputFormat,
+  to: OutputFormat,
   source: ReadAtSource,
   write: WriteChunk,
 ): void;
 ```
+
+The sink may be a bare function or an object with a `write` method. The object
+form lets a sink be passed the same way as a source, and means a method
+reference such as an OPFS handle's `write` is invoked with its own receiver
+rather than `undefined`.
 
 `input_formats()` and `output_formats()` return sorted canonical names for only
 the capabilities compiled into the package. Call them before presenting format
@@ -99,7 +124,19 @@ memory.
 Failures throw JavaScript `Error` objects with one of these stable `code`
 values: `INVALID_ARGUMENT`, `UNSUPPORTED_INPUT_FORMAT`,
 `UNSUPPORTED_OUTPUT_FORMAT`, `IO_ERROR`, or `CONVERSION_ERROR`. A callback
-exception stops conversion immediately. Output received before an error is
+exception stops conversion immediately.
+
+The codes distinguish who is at fault. `IO_ERROR` means the host misbehaved or
+its storage failed. A malformed document reports `CONVERSION_ERROR`, including
+when the damage makes the reader ask for an offset past the end of the source --
+a corrupt archive is attributable to the document, never to the host.
+
+`convert_stream` cannot be called from inside a host callback; doing so raises
+`INVALID_ARGUMENT` in the nested call, which the enclosing conversion then
+reports as `IO_ERROR` because the exception arose inside its callback. An
+exception escaping a callback leaves the instance usable: the next
+`convert_stream` re-registers cleanly and releases whatever the previous one
+retained. Output received before an error is
 provisional, so write to a private staging destination and publish it only after
 `convert_stream` returns successfully.
 

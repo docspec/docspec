@@ -27,6 +27,11 @@ impl ErrorCode {
 
 pub(crate) fn js_error(code: ErrorCode, message: &str) -> JsValue {
     let error = js_sys::Error::new(message);
+    // Reason: `code` is the crate's stable error contract. Reflect::set cannot
+    // fail on a freshly constructed js_sys::Error (a plain extensible object),
+    // so there is no meaningful recovery. The empty match, rather than
+    // `let _ = ...`, is deliberate: the workspace denies the restriction group,
+    // and `let_underscore_must_use` rejects discarding a #[must_use] Result.
     match js_sys::Reflect::set(
         error.as_ref(),
         &JsValue::from_str("code"),

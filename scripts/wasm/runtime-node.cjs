@@ -135,6 +135,132 @@ errorCode(
 );
 assert.deepEqual(convert(minimal.api, 'docx', 'markdown', docx).bytes, minimalDocx.bytes);
 
+// --- Regression tests for the host-I/O contract ------------------------------
+
+// A corrupt archive must be attributed to the DOCUMENT, not to host storage.
+// A ZIP central directory carries a local-header offset that is never bounded
+// against file length, so a corrupt file can drive the reader past EOF. That
+// used to fall through to a zero-length read past `size`, surfacing as an
+// IO_ERROR (or whatever the host's own bounds check threw) instead of a
+// CONVERSION_ERROR -- and the resulting code varied by host implementation.
+function docxWithLocalHeaderOffsetPastEof() {
+  const patched = Buffer.from(docx);
+  const eocd = patched.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  assert.ok(eocd > 0, 'end of central directory not found');
+  // Byte 42 of a central directory record is the relative offset of its local
+  // header. Point every one far past EOF, but inside the safe-integer range so
+  // the seek itself is accepted and the failure lands on the read.
+  let cursor = patched.readUInt32LE(eocd + 16);
+  let records = 0;
+  while (cursor + 46 <= patched.byteLength && patched.readUInt32LE(cursor) === 0x0201_4b50) {
+    patched.writeUInt32LE(0x7fff_ffff, cursor + 42);
+    records += 1;
+    cursor +=
+      46 +
+      patched.readUInt16LE(cursor + 28) +
+      patched.readUInt16LE(cursor + 30) +
+      patched.readUInt16LE(cursor + 32);
+  }
+  assert.ok(records > 0, 'no central directory records were patched');
+  return patched;
+}
+errorCode(
+  () => convert(minimal.api, 'docx', 'markdown', docxWithLocalHeaderOffsetPastEof()),
+  'CONVERSION_ERROR',
+);
+
+// An exception escaping through a shim that wasm-bindgen does NOT wrap (here
+// the `length` getter, read after readAt has already returned) skips Rust
+// destructors. That must not strand the instance: a conversion-wide guard flag
+// used to be left set, and every later call failed with a false "recursively"
+// error until the module was re-instantiated.
+let escaped = false;
+try {
+  minimal.api.convert_stream(
+    'docx',
+    'markdown',
+    {
+      size: docx.byteLength,
+      readAt(offset, length) {
+        const end = Math.min(docx.byteLength, offset + length);
+        const real = new Uint8Array(docx.buffer, docx.byteOffset + offset, Math.max(0, end - offset));
+        return new Proxy(real, {
+          get(target, property, receiver) {
+            if (property === 'length') throw new Error('boom from length getter');
+            return Reflect.get(target, property, receiver);
+          },
+        });
+      },
+    },
+    () => {},
+  );
+} catch {
+  escaped = true;
+}
+assert.ok(escaped, 'a throwing length getter should surface an exception');
+assert.deepEqual(
+  convert(minimal.api, 'docx', 'markdown', docx).bytes,
+  minimalDocx.bytes,
+  'instance was left unusable after an exception escaped a host callback',
+);
+
+// The sink may be an object, invoked with itself as the receiver. Passing a
+// bare method reference (`sink.write`, an OPFS handle's `handle.write`) is a
+// natural spelling that would otherwise run with `this === undefined`.
+const objectSink = {
+  chunks: [],
+  write(chunk) {
+    assert.ok(this === objectSink, 'sink method must receive the sink as `this`');
+    this.chunks.push(Buffer.from(chunk));
+  },
+};
+minimal.api.convert_stream('docx', 'markdown', sourceFor(docx).source, objectSink);
+assert.deepEqual(Buffer.concat(objectSink.chunks), minimalDocx.bytes);
+
+errorCode(
+  () => minimal.api.convert_stream('docx', 'markdown', sourceFor(docx).source, {}),
+  'INVALID_ARGUMENT',
+);
+errorCode(
+  () => minimal.api.convert_stream('docx', 'markdown', sourceFor(docx).source, 42),
+  'INVALID_ARGUMENT',
+);
+
+// A genuine Uint8Array that happens to carry a `then` property is data, not a
+// promise. The synchronicity check used to run before the type check and
+// rejected it.
+{
+  const { source } = sourceFor(docx);
+  const inner = source.readAt.bind(source);
+  const thenableSource = {
+    size: docx.byteLength,
+    readAt(offset, length) {
+      const bytes = new Uint8Array(inner(offset, length));
+      bytes.then = () => {};
+      return bytes;
+    },
+  };
+  const chunks = [];
+  minimal.api.convert_stream('docx', 'markdown', thenableSource, chunk => {
+    chunks.push(Buffer.from(chunk));
+  });
+  assert.deepEqual(Buffer.concat(chunks), minimalDocx.bytes);
+}
+
+// Re-entering from inside a host callback is still rejected. The inner call's
+// INVALID_ARGUMENT is thrown inside the callback, so the outer conversion sees
+// it as a host I/O failure.
+errorCode(
+  () =>
+    minimal.api.convert_stream('docx', 'markdown', sourceFor(docx).source, () => {
+      minimal.api.convert_stream('docx', 'markdown', sourceFor(docx).source, () => {});
+    }),
+  'IO_ERROR',
+);
+
+// Seeking past the end is legal and reads as EOF rather than calling the host.
+assert.deepEqual(convert(minimal.api, 'docx', 'markdown', docx).bytes, minimalDocx.bytes);
+
 const full = load('nodejs-full');
 assert.deepEqual(full.api.input_formats(), inputNames);
 assert.deepEqual(full.api.output_formats(), outputNames);
