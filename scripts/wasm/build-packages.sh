@@ -61,14 +61,16 @@ grep -Fqx 'export type OutputFormat = "blocknote" | "html" | "markdown" | "oxa" 
 
 # `DocspecErrorCode` narrows too. IO_ERROR and CONVERSION_ERROR are reachable
 # only once a conversion can run, so the trailing `;` -- which lands on the last
-# member of the union -- is what distinguishes the two shapes.
-grep -Fqx '  | "CONVERSION_ERROR";' "${minimal_types}"
-grep -Fqx '  | "CONVERSION_ERROR";' "${full_types}"
+# member of the union -- is what distinguishes the two shapes. The members are
+# flush left because wasm-bindgen strips leading whitespace from a
+# typescript_custom_section; build.rs emits them that way for the same reason.
+grep -Fqx '| "CONVERSION_ERROR";' "${minimal_types}"
+grep -Fqx '| "CONVERSION_ERROR";' "${full_types}"
 
 empty_types="${output_root}/web-empty/docspec_wasm.d.ts"
 grep -Fqx 'export type InputFormat = never;' "${empty_types}"
 grep -Fqx 'export type OutputFormat = never;' "${empty_types}"
-grep -Fqx '  | "UNSUPPORTED_OUTPUT_FORMAT";' "${empty_types}"
+grep -Fqx '| "UNSUPPORTED_OUTPUT_FORMAT";' "${empty_types}"
 if grep -Fq 'IO_ERROR' "${empty_types}"; then
   echo "empty package declares IO_ERROR, which it can never throw" >&2
   exit 1

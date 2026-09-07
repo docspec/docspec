@@ -53,12 +53,17 @@ fn union(names: &[String]) -> String {
 /// `output_format` before it ever touches host I/O. Declaring them anyway would
 /// tell a TypeScript caller to handle two branches that cannot fire -- the
 /// mirror image of the `never` narrowing that `union` exists to produce.
+///
+/// The members are written flush left because wasm-bindgen strips the leading
+/// whitespace of every line in a `typescript_custom_section`. Indenting here
+/// would mean the generated .d.ts never matches what this file appears to say,
+/// and any assertion written against the indented form would fail.
 fn error_codes(conversion: bool) -> String {
     let mut codes = String::from(
-        "  | \"INVALID_ARGUMENT\"\n  | \"UNSUPPORTED_INPUT_FORMAT\"\n  | \"UNSUPPORTED_OUTPUT_FORMAT\"",
+        "| \"INVALID_ARGUMENT\"\n| \"UNSUPPORTED_INPUT_FORMAT\"\n| \"UNSUPPORTED_OUTPUT_FORMAT\"",
     );
     if conversion {
-        codes.push_str("\n  | \"IO_ERROR\"\n  | \"CONVERSION_ERROR\"");
+        codes.push_str("\n| \"IO_ERROR\"\n| \"CONVERSION_ERROR\"");
     }
     codes
 }
