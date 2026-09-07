@@ -31,9 +31,14 @@ function sourceFor(bytes, shortRead = 29) {
 function convert(from, to, bytes) {
   const { source, calls } = sourceFor(bytes);
   const chunks = [];
+  // The chunk as the callback received it. `chunks` holds copies, so asserting
+  // ownership against them would compare a copy with a copy and could never
+  // observe reused WASM memory or a detached view.
+  const callbackChunks = [];
   convert_stream(from, to, source, chunk => {
     assert(chunk instanceof Uint8Array, 'writer did not receive Uint8Array');
     assert(chunk.byteLength <= 65_536, `output chunk exceeded 64 KiB: ${chunk.byteLength}`);
+    callbackChunks.push(chunk);
     chunks.push(new Uint8Array(chunk));
   });
   const size = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
@@ -43,7 +48,7 @@ function convert(from, to, bytes) {
     output.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return { output, chunks, calls };
+  return { output, chunks, callbackChunks, calls };
 }
 
 async function digest(bytes) {
@@ -72,9 +77,11 @@ self.onmessage = async event => {
     assert(Object.keys(matrix).length === 15, 'full conversion matrix did not contain 3 x 5 pairings');
 
     const first = convert('markdown', 'html', inputs.markdown);
-    const retained = new Uint8Array(first.chunks[0]);
+    const ownedChunk = first.callbackChunks[0];
+    const retained = new Uint8Array(ownedChunk);
     convert('markdown', 'html', inputs.markdown);
-    equal(Array.from(first.chunks[0]), Array.from(retained), 'output chunk ownership changed');
+    assert(ownedChunk.byteLength > 0, 'retained output chunk was detached by a later conversion');
+    equal(Array.from(ownedChunk), Array.from(retained), 'output chunk ownership changed');
 
     let error;
     try {

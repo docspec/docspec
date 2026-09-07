@@ -58,14 +58,19 @@ function sourceFor(bytes, options = {}) {
 function convert(api, from, to, bytes, options = {}) {
   const { source, calls } = sourceFor(bytes, options);
   const chunks = [];
+  // The chunk the callback was handed, kept as-is. `chunks` holds copies, so an
+  // ownership assertion made against it would compare a copy with a copy and
+  // could never observe WASM memory being reused or the view being detached.
+  const callbackChunks = [];
   api.convert_stream(from, to, source, chunk => {
     assert.ok(chunk instanceof Uint8Array);
     assert.ok(chunk.byteLength <= 65_536, `output chunk exceeded 64 KiB: ${chunk.byteLength}`);
     if (options.throwWrite) throw new Error('host write failed');
     if (options.promiseWrite) return Promise.resolve();
+    callbackChunks.push(chunk);
     chunks.push(new Uint8Array(chunk));
   });
-  return { bytes: Buffer.concat(chunks.map(chunk => Buffer.from(chunk))), calls, chunks };
+  return { bytes: Buffer.concat(chunks.map(chunk => Buffer.from(chunk))), calls, chunks, callbackChunks };
 }
 
 function convertDiscardingOutput(api, from, to, bytes) {
@@ -164,10 +169,24 @@ function docxWithLocalHeaderOffsetPastEof() {
   assert.ok(records > 0, 'no central directory records were patched');
   return patched;
 }
-errorCode(
-  () => convert(minimal.api, 'docx', 'markdown', docxWithLocalHeaderOffsetPastEof()),
-  'CONVERSION_ERROR',
-);
+{
+  const corrupt = docxWithLocalHeaderOffsetPastEof();
+  const { source, calls } = sourceFor(corrupt);
+  errorCode(
+    () => minimal.api.convert_stream('docx', 'markdown', source, () => {}),
+    'CONVERSION_ERROR',
+  );
+  // This is the fixture that actually drives the reader past `size`, so it is
+  // where the EOF decision is observable. Reaching the end must be decided
+  // inside the binding: a read handed to the host at or past `size` surfaces as
+  // whatever that host's own bounds check throws, which is exactly the
+  // host-dependent code this attribution exists to avoid.
+  assert.ok(calls.length > 0, 'corrupt fixture never reached the host at all');
+  assert.ok(
+    calls.every(call => call.offset < corrupt.byteLength),
+    'a read at or past source.size was handed to the host instead of returning EOF',
+  );
+}
 
 // An exception escaping through a shim that wasm-bindgen does NOT wrap (here
 // the `length` getter, read after readAt has already returned) skips Rust
@@ -258,7 +277,7 @@ errorCode(
   'IO_ERROR',
 );
 
-// Seeking past the end is legal and reads as EOF rather than calling the host.
+// The rejected re-entrant call must not have disturbed the outer instance.
 assert.deepEqual(convert(minimal.api, 'docx', 'markdown', docx).bytes, minimalDocx.bytes);
 
 const full = load('nodejs-full');
@@ -290,11 +309,22 @@ const largeMarkdown = new TextEncoder().encode('bounded text '.repeat(20_000));
 const owned = convert(full.api, 'markdown', 'html', largeMarkdown);
 assert.ok(owned.calls.length > 1);
 assert.ok(owned.calls.some(call => call.length === 65_536), 'large input never exercised the 64 KiB bound');
-const retainedChunk = Buffer.from(owned.chunks[0]);
-convert(full.api, 'markdown', 'html', markdown);
-assert.deepEqual(Buffer.from(owned.chunks[0]), retainedChunk, 'retained output chunk changed after return');
+// The chunk handed to the callback is the binding's to give away, and it must
+// survive a later conversion untouched. Asserted against `callbackChunks`, not
+// `chunks`: the latter are copies taken inside the callback, so comparing them
+// would pass even if the callback had been handed a live view into WASM memory.
+const ownedChunk = owned.callbackChunks[0];
+const retainedChunk = Buffer.from(ownedChunk);
+const cleanMarkdownHtml = convert(full.api, 'markdown', 'html', markdown).bytes;
+assert.ok(cleanMarkdownHtml.byteLength > 0);
+assert.ok(ownedChunk.byteLength > 0, 'retained output chunk was detached by a later conversion');
+assert.deepEqual(Buffer.from(ownedChunk), retainedChunk, 'retained output chunk changed after return');
 
-let provisional = [];
+// Output emitted before a failure is provisional. What the binding owes the
+// caller is that discarding it is *sufficient*: the next conversion must be
+// byte-identical to one run on a clean instance, with no residue from the
+// aborted attempt.
+const provisional = [];
 errorCode(() => {
   const { source } = sourceFor(largeMarkdown);
   full.api.convert_stream('markdown', 'html', source, chunk => {
@@ -302,10 +332,12 @@ errorCode(() => {
     throw new Error('reject staged output');
   });
 }, 'IO_ERROR');
-assert.ok(provisional.length > 0);
-provisional = [];
-assert.equal(provisional.length, 0, 'caller must discard provisional output after failure');
-assert.ok(convert(full.api, 'markdown', 'html', markdown).bytes.byteLength > 0);
+assert.ok(provisional.length > 0, 'the failing conversion emitted no provisional output to discard');
+assert.deepEqual(
+  convert(full.api, 'markdown', 'html', markdown).bytes,
+  cleanMarkdownHtml,
+  'provisional output from a failed conversion leaked into the next one',
+);
 
 const memoryResults = [];
 for (const count of [100, 1000, 10000, 100000]) {
