@@ -85,6 +85,10 @@ type WriteChunk =
 type InputFormat = "docx" | "html" | "markdown";
 type OutputFormat = "blocknote" | "html" | "markdown" | "oxa" | "pandoc-native";
 
+// Also generated per build. `IO_ERROR` and `CONVERSION_ERROR` are declared only
+// where a conversion can actually run; a reader-only, writer-only or empty
+// package narrows to the first three, because it rejects the direction before
+// reaching host I/O.
 type DocspecErrorCode =
   | "INVALID_ARGUMENT"
   | "UNSUPPORTED_INPUT_FORMAT"
@@ -124,7 +128,8 @@ memory.
 Failures throw JavaScript `Error` objects with one of these stable `code`
 values: `INVALID_ARGUMENT`, `UNSUPPORTED_INPUT_FORMAT`,
 `UNSUPPORTED_OUTPUT_FORMAT`, `IO_ERROR`, or `CONVERSION_ERROR`. A callback
-exception stops conversion immediately.
+exception stops conversion immediately. A package that compiled no reader or no
+writer declares only the first three, since the last two are unreachable there.
 
 The codes distinguish who is at fault. `IO_ERROR` means the host misbehaved or
 its storage failed. A malformed document reports `CONVERSION_ERROR`, including

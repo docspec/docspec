@@ -8,14 +8,22 @@ build_package() {
   local target="$1"
   local name="$2"
   local features="$3"
+  local profile="${4:---profile wasm-release}"
   local output_dir="${output_root}/${target}-${name}"
+  local feature_args=(--locked --no-default-features)
+  # An empty selection is a supported build, but `--features ""` is not the way
+  # to ask for one: cargo parses it as a feature named "". Omit the flag.
+  if [[ -n "${features}" ]]; then
+    feature_args+=(--features "${features}")
+  fi
 
   rm -rf "${output_dir}"
+  # shellcheck disable=SC2086 # profile is a deliberate multi-word flag pair
   wasm-pack build "${repository_root}/crates/docspec-wasm" \
     --target "${target}" \
-    --profile wasm-release \
+    ${profile} \
     --out-dir "${output_dir}" \
-    -- --locked --no-default-features --features "${features}"
+    -- "${feature_args[@]}"
 
   test -s "${output_dir}/docspec_wasm_bg.wasm"
   test -s "${output_dir}/docspec_wasm.d.ts"
@@ -26,6 +34,10 @@ build_package nodejs minimal docx-reader,markdown-writer
 build_package nodejs full full
 build_package web docx-to-markdown docx-reader,markdown-writer
 build_package web full full
+# A no-feature package, built --dev because only its declarations are read. It
+# is the only selection that exercises the `never` and narrowed-error-code
+# branches of build.rs; every distributable package above compiles a conversion.
+build_package web empty "" --dev
 
 minimal_types="${output_root}/nodejs-minimal/docspec_wasm.d.ts"
 full_types="${output_root}/nodejs-full/docspec_wasm.d.ts"
@@ -46,7 +58,25 @@ grep -Fqx 'export type InputFormat = "docx";' "${minimal_types}"
 grep -Fqx 'export type OutputFormat = "markdown";' "${minimal_types}"
 grep -Fqx 'export type InputFormat = "docx" | "html" | "markdown";' "${full_types}"
 grep -Fqx 'export type OutputFormat = "blocknote" | "html" | "markdown" | "oxa" | "pandoc-native";' "${full_types}"
-grep -Fq 'DocspecErrorCode' "${minimal_types}"
+
+# `DocspecErrorCode` narrows too. IO_ERROR and CONVERSION_ERROR are reachable
+# only once a conversion can run, so the trailing `;` -- which lands on the last
+# member of the union -- is what distinguishes the two shapes.
+grep -Fqx '  | "CONVERSION_ERROR";' "${minimal_types}"
+grep -Fqx '  | "CONVERSION_ERROR";' "${full_types}"
+
+empty_types="${output_root}/web-empty/docspec_wasm.d.ts"
+grep -Fqx 'export type InputFormat = never;' "${empty_types}"
+grep -Fqx 'export type OutputFormat = never;' "${empty_types}"
+grep -Fqx '  | "UNSUPPORTED_OUTPUT_FORMAT";' "${empty_types}"
+if grep -Fq 'IO_ERROR' "${empty_types}"; then
+  echo "empty package declares IO_ERROR, which it can never throw" >&2
+  exit 1
+fi
+if grep -Fq 'CONVERSION_ERROR' "${empty_types}"; then
+  echo "empty package declares CONVERSION_ERROR, which it can never throw" >&2
+  exit 1
+fi
 
 minimal_wasm="${output_root}/nodejs-minimal/docspec_wasm_bg.wasm"
 full_wasm="${output_root}/nodejs-full/docspec_wasm_bg.wasm"

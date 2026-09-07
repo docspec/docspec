@@ -45,6 +45,24 @@ fn union(names: &[String]) -> String {
     }
 }
 
+/// Renders the `DocspecErrorCode` union for what this package can actually throw.
+///
+/// `IO_ERROR` and `CONVERSION_ERROR` are reachable only once a conversion can
+/// run: `ErrorCode::Io` and `ErrorCode::Conversion` are both `#[cfg(conversion)]`,
+/// and without both halves `convert_stream` returns from `input_format` or
+/// `output_format` before it ever touches host I/O. Declaring them anyway would
+/// tell a TypeScript caller to handle two branches that cannot fire -- the
+/// mirror image of the `never` narrowing that `union` exists to produce.
+fn error_codes(conversion: bool) -> String {
+    let mut codes = String::from(
+        "  | \"INVALID_ARGUMENT\"\n  | \"UNSUPPORTED_INPUT_FORMAT\"\n  | \"UNSUPPORTED_OUTPUT_FORMAT\"",
+    );
+    if conversion {
+        codes.push_str("\n  | \"IO_ERROR\"\n  | \"CONVERSION_ERROR\"");
+    }
+    codes
+}
+
 fn main() -> Result<(), Box<dyn core::error::Error>> {
     println!("cargo::rustc-check-cfg=cfg(conversion)");
     println!("cargo::rustc-check-cfg=cfg(reader)");
@@ -71,7 +89,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
     // string typed `from`/`to` as `string`, which discarded the one guarantee a
     // selective build can offer its callers at compile time.
     let declarations = format!(
-        r#"export interface ReadAtSource {{
+        "export interface ReadAtSource {{
   readonly size: number;
   readAt(offset: number, length: number): Uint8Array;
 }}
@@ -81,11 +99,7 @@ export type WriteChunk =
 export type InputFormat = {input};
 export type OutputFormat = {output};
 export type DocspecErrorCode =
-  | "INVALID_ARGUMENT"
-  | "UNSUPPORTED_INPUT_FORMAT"
-  | "UNSUPPORTED_OUTPUT_FORMAT"
-  | "IO_ERROR"
-  | "CONVERSION_ERROR";
+{codes};
 export interface DocspecError extends Error {{
   readonly code: DocspecErrorCode;
 }}
@@ -95,9 +109,10 @@ export function convert_stream(
   source: ReadAtSource,
   write: WriteChunk,
 ): void;
-"#,
+",
         input = union(&readers),
         output = union(&writers),
+        codes = error_codes(!readers.is_empty() && !writers.is_empty()),
     );
 
     let out_dir = env::var("OUT_DIR")?;
