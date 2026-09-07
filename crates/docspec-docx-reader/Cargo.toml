@@ -16,7 +16,19 @@ quick-xml = "0.41"
 zip = { version = "8", default-features = false, features = [
   "deflate-flate2-zlib-rs",
 ] }
-flate2 = "1"
+# Name the deflate backend explicitly rather than inheriting it. `zip`'s
+# `deflate-flate2-zlib-rs` already turns on `flate2/zlib-rs`, and flate2 gates
+# its miniz_oxide backend on `not(feature = "any_zlib")`, so default features
+# here only added `rust_backend` -- a backend that could never be selected
+# while zlib-rs is on. Stating the one backend we use keeps the manifest from
+# implying a choice the build does not make.
+#
+# NOTE: this does not remove `miniz_oxide` from a wasm32 graph and is not
+# expected to. flate2 declares it under
+# `[target.'cfg(all(target_arch = "wasm32", ...))'.dependencies]` as a hard,
+# non-optional dependency, so it is present on wasm32 under every feature
+# selection. Nothing references it here, so it does not reach the artifact.
+flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
 crc32fast = "1"
 
 [dev-dependencies]

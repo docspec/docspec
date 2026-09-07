@@ -73,6 +73,13 @@ done
 # Dependencies that exist only to serve a direction we did not select, or that
 # no read-only conversion can use. `zopfli` is a compressor and `getopts` is a
 # CLI argument parser; both were once pulled in transitively for nothing.
+#
+# `zlib-rs` is asserted PRESENT wherever DOCX is selected, so a silent backend
+# swap has to fail here rather than surface later as unexplained size drift. It
+# is deliberately NOT paired with a miniz_oxide denial: flate2 declares that
+# crate under `[target.'cfg(target_arch = "wasm32")'.dependencies]` as a hard,
+# non-optional dependency, so it is in every wasm32 graph whichever backend the
+# features select. Denying it would assert something false and fail here always.
 assert_graph() {
   local selection="$1" required="$2" excluded="$3"
   cargo tree --locked --target wasm32-unknown-unknown -p docspec-wasm \
@@ -97,7 +104,8 @@ assert_graph() {
 
 # Minimal DOCX to Markdown: no markdown parser, no compressor, no other format.
 assert_graph "docx-reader,markdown-writer" \
-  "docspec docspec-core docspec-docx-reader docspec-markdown-writer zip flate2 quick-xml" \
+  "docspec docspec-core docspec-docx-reader docspec-markdown-writer zip flate2 quick-xml
+   zlib-rs" \
   "docspec-blocknote-writer docspec-html-reader docspec-html-writer
    docspec-markdown-reader docspec-oxa-writer docspec-pandoc-native-writer
    docspec-json pulldown-cmark html5gum zopfli getopts"
@@ -107,13 +115,14 @@ assert_graph "markdown-reader,blocknote-writer" \
   "docspec docspec-core docspec-markdown-reader docspec-blocknote-writer docspec-json pulldown-cmark" \
   "docspec-docx-reader docspec-html-reader docspec-html-writer
    docspec-markdown-writer docspec-oxa-writer docspec-pandoc-native-writer
-   zip flate2 quick-xml zopfli getopts"
+   zip flate2 quick-xml zopfli getopts zlib-rs"
 
 # Full package: every format crate present, server and CLI still absent.
 assert_graph "full" \
   "docspec docspec-core docspec-docx-reader docspec-html-reader
    docspec-markdown-reader docspec-blocknote-writer docspec-html-writer
-   docspec-markdown-writer docspec-oxa-writer docspec-pandoc-native-writer" \
+   docspec-markdown-writer docspec-oxa-writer docspec-pandoc-native-writer
+   zlib-rs" \
   "zopfli getopts"
 
 echo "verified empty, individual, bundle, aggregate, default, and minimal WASM feature selections"
