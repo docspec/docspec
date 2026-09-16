@@ -18,9 +18,10 @@ RUN cargo build -p docspec-cli --release && \
 FROM alpine:3.24
 
 # Binary is dynamically linked against musl. Runtime base MUST remain
-# Alpine-compatible (any image shipping `/lib/ld-musl-x86_64.so.1`).
+# Alpine-compatible (any image shipping the matching musl loader:
+# `/lib/ld-musl-x86_64.so.1` on amd64, `/lib/ld-musl-aarch64.so.1` on arm64).
 # Do not change to debian-slim or distroless/cc without also switching to
-# `--target x86_64-unknown-linux-musl` + `RUSTFLAGS=-C target-feature=+crt-static`
+# `--target <arch>-unknown-linux-musl` + `RUSTFLAGS=-C target-feature=+crt-static`
 # in the builder.
 RUN addgroup -S -g 10001 docspec \
   && adduser -S -D -u 10001 -G docspec docspec
