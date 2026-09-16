@@ -20,7 +20,7 @@ DocSpec rejects all of this. Documents are streams of content, not static struct
 
 DocSpec treats every document as a stream of events. Instead of building a tree, we emit events as we parse. A heading becomes `StartHeading` and `EndHeading` events. A paragraph becomes `StartParagraph`, `Text` events, then `EndParagraph`. A table becomes `StartTable`, `StartTableRow`, `StartTableCell`, cell content, `EndTableCell`, `EndTableRow`, `EndTable`.
 
-Events flow in strict document order. Nothing accumulates. Nothing buffers. The document enters as bytes and exits as bytes. In between, it is a stream of events flowing through a pipeline.
+Events flow in strict document order and do not accumulate into a document tree. The document enters as bytes and exits as bytes. In between, it is a stream of events flowing through a pipeline; each format documents any source or metadata state it retains.
 
 This architecture rests on two core abstractions: sources and sinks.
 
@@ -46,7 +46,7 @@ The dominant alternative to streaming is building an abstract syntax tree: parse
 
 Memory usage in a tree-based system is O(document size) at best, often worse. A 100 MB document typically needs 100 MB for content storage, plus overhead for tree node structures: pointers, sibling links, type tags, metadata. A 100 MB document can easily become 200–300 MB in memory.
 
-Streaming uses O(1) memory regardless of document size. Events flow through and are immediately consumed. Only a small, fixed-size buffer is needed for the current event. A 1 KB document and a 1 GB document use essentially the same amount of memory.
+The event pipeline is streaming: events flow through and are immediately consumed instead of becoming a document tree. Its document-flow buffers are bounded, but the exact memory ceiling remains format-specific. Formats can require retained metadata or random-access indexes; for example, DOCX keeps ZIP indexes, relationship/style tables, and parser state. The Markdown reader currently retains its complete source before parsing. A 1 KB document and a 1 GB document therefore do not have a universal identical memory cost.
 
 The tradeoff is that streaming is strictly one-pass. You cannot go back to a previous event. You cannot look ahead. We accept this constraint because it delivers correctness at scale. Documents are fundamentally sequential structures.
 
@@ -58,7 +58,7 @@ Performance characteristics differ dramatically. Trees cause cache misses as the
 
 For document conversion, the tree advantages rarely matter. You are translating from one format to another, not modifying the document structure arbitrarily. The transformations are largely local. The global context you need is minimal and can be tracked with simple state variables.
 
-The streaming model enables processing of documents larger than available memory. A tree-based system must load the entire document before processing. A streaming system processes as it reads.
+For formats whose parsers and metadata fit within available memory, the streaming model enables documents larger than the process's available document-flow buffer. A tree-based system must load the entire document tree before processing; DocSpec readers and writers instead process events as they become available.
 
 ---
 
@@ -92,7 +92,7 @@ The fail-fast approach simplifies reasoning about the system. You do not need to
 
 ## 6. The Sync-First Model
 
-The conversion pipeline is synchronous and pull-based. The consumer calls `next_event()` on the source to request each event, then passes it to the sink. This pull model provides natural backpressure — the source only produces when the consumer is ready, which is what enables constant memory usage. There are no background threads, message channels, or async machinery.
+The conversion pipeline is synchronous and pull-based. The consumer calls `next_event()` on the source to request each event, then passes it to the sink. This pull model provides natural backpressure — the source only produces when the consumer is ready, keeping event-flow buffering bounded. There are no background threads, message channels, or async machinery.
 
 This synchronous design is intentional. Document conversion is fundamentally CPU-bound work. Async machinery adds overhead without benefit for CPU-bound work. Task scheduling requires coordination. Context switching costs CPU cycles. Memory allocation for futures and task states adds pressure to the allocator.
 
@@ -133,7 +133,7 @@ The streaming design that makes DocSpec memory-efficient on a server also makes 
 
 On native servers, DocSpec runs as a library embedded in larger applications or as a standalone command-line tool. It processes documents using minimal memory, leaving resources available for other work.
 
-In WebAssembly, DocSpec runs directly in web browsers and Node.js server environments. The streaming design is absolutely essential here. WebAssembly modules typically have limited memory available, often 2 GB or less shared with the host JavaScript environment. Streaming keeps memory usage constant and small regardless of document size.
+In WebAssembly, DocSpec runs directly in web browsers and Node.js server environments. Bounded host transfers, DOCX decompression, and event flow avoid turning document bytes into a document tree. The total memory cost remains format-specific: DOCX retains ZIP indexes, relationship/style tables, and parser state, while Markdown currently retains its complete source before parsing. Browser applications should keep source and output storage outside the WASM instance and use the bounded streaming callbacks described by [`docspec-wasm`](crates/docspec-wasm/).
 
 On embedded systems, DocSpec runs on microcontrollers with kilobytes of RAM available. If the software works on a microcontroller with only 512 KB of heap available, it will work anywhere.
 
@@ -221,11 +221,11 @@ The `docspec-http` crate exposes DocSpec's sync conversion pipeline over HTTP us
 
 ## Summary
 
-DocSpec converts documents through a streaming event pipeline. Documents enter as bytes, become events flowing through the pipeline, exit as bytes in the target format. Nothing accumulates in memory. Everything flows through and is immediately processed.
+DocSpec converts documents through a streaming event pipeline. Documents enter as bytes, become events flowing through the pipeline, and exit as bytes in the target format. Event flow is immediately processed instead of becoming a document tree, while each format documents any retained source or metadata state.
 
 The event-based architecture decouples readers from writers through a shared event protocol. Any reader connects to any writer. Combinatorial power emerges from simple, composable components. Adding a new format instantly enables conversion to and from all existing formats.
 
-Streaming uses O(1) memory regardless of document size. A 50 MB image flows through the pipeline using only a 32 KB buffer. Documents of any size convert reliably without exhausting system resources.
+A 50 MB image flows through the asset path using only its bounded copy buffer instead of a 50 MB image allocation. This bound applies to the image payload path; the document still has format-specific retained metadata, as described in [Why Streaming Beats Trees](#3-why-streaming-beats-trees).
 
 Errors surface immediately with full context. Fail fast. No partial output. No silent corruption. Clear, structured error information enables appropriate responses from calling code.
 

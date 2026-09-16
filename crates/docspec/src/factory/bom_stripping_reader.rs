@@ -93,7 +93,7 @@ where
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-    use std::io::{Cursor, Read as _};
+    use std::io::Cursor;
 
     use super::*;
 

@@ -74,6 +74,8 @@
 //!   regardless of document size. This is the recommended path for large files.
 //! - **`from_reader`**: buffers `word/document.xml` into memory — O(N) in
 //!   document size. Use `from_path` when constant memory is required.
+//! - **`from_reader_streaming`**: owns one seekable source and streams
+//!   `word/document.xml` through an independent logical cursor.
 //!
 //! In both cases, `_rels/.rels` and `word/_rels/document.xml.rels` are fully
 //! read into memory at package-open time (typical combined size < 10 KB even
@@ -96,11 +98,13 @@ extern crate alloc;
 
 mod asset_provider;
 mod content_types;
+mod deflate_reader;
 mod document;
 mod numbering;
 mod package;
 mod properties;
 mod rels;
+mod shared_reader;
 mod streaming_archive;
 mod styles;
 mod symbol_fonts;
@@ -128,9 +132,10 @@ const _: for<'a> fn(&'a rels::ImageRel) -> (&'a str, bool) = _image_rel_fields;
 ///
 /// # Streaming
 ///
-/// Memory use depends on which constructor you call. `from_path` streams
-/// `word/document.xml` in constant memory (O(1)). `from_reader` buffers
-/// `word/document.xml` into memory (O(N) in document size). In both cases,
+/// Memory use depends on which constructor you call. `from_path` and
+/// `from_reader_streaming` stream `word/document.xml` through bounded transfer
+/// and decompression buffers. `from_reader` buffers the main XML in memory.
+/// In every case,
 /// `_rels/.rels` and `word/_rels/document.xml.rels` are fully read into memory
 /// at package-open time (typical combined size < 10 KB). The internal event
 /// queue remains bounded regardless of document size or hyperlink count.
@@ -198,6 +203,42 @@ impl DocxReader {
     {
         let (style_list, numbering, hyperlink_map, image_map, content_types, archive, stream) =
             package::open_package(reader)?;
+        let xml = quick_xml::Reader::from_reader(BufReader::new(stream));
+        let data = document::DocxData {
+            style_list,
+            hyperlink_map,
+            numbering,
+            image_map,
+        };
+        Ok(Self {
+            inner: document::DocumentReader::from_xml_reader_and_archive(
+                xml,
+                data,
+                archive,
+                content_types,
+            ),
+        })
+    }
+
+    /// Creates a streaming `DocxReader` from an owned seekable source.
+    ///
+    /// The source is shared by independent logical cursors for the main document
+    /// and lazy asset handles. Compressed document bytes, XML, and asset data are
+    /// consumed incrementally; ZIP indexes and small package metadata remain in
+    /// memory. Archive setup and package metadata errors are returned here, while
+    /// document data, length, and CRC errors are returned by [`EventSource::next_event`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`docspec_core::Error::Parse`] for an invalid archive or package and
+    /// [`docspec_core::Error::Io`] for source failures.
+    #[inline]
+    pub fn from_reader_streaming<R>(reader: R) -> Result<Self>
+    where
+        R: Read + Seek + Send + 'static,
+    {
+        let (style_list, numbering, hyperlink_map, image_map, content_types, archive, stream) =
+            package::open_package_streaming(reader)?;
         let xml = quick_xml::Reader::from_reader(BufReader::new(stream));
         let data = document::DocxData {
             style_list,

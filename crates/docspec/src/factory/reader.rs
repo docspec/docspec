@@ -44,9 +44,9 @@ impl AnyReader {
     /// `word/document.xml` in constant memory regardless of document size. Text
     /// formats open the file and delegate to [`from_reader`](Self::from_reader).
     ///
-    /// Prefer this over [`from_reader`](Self::from_reader) when the input is a
-    /// file on disk: `from_reader` must buffer the whole DOCX main part, because
-    /// an arbitrary `Read + Seek` source cannot be re-opened for streaming.
+    /// Prefer this when the input is a file on disk. Use
+    /// [`from_reader_streaming`](Self::from_reader_streaming) for bounded DOCX
+    /// document-part processing from another owned seekable source.
     ///
     /// # Errors
     ///
@@ -131,7 +131,7 @@ impl AnyReader {
     {
         #[cfg(not(reader))]
         {
-            let _ = reader;
+            drop(reader);
             match format {}
         }
         #[cfg(reader)]
@@ -150,6 +150,36 @@ impl AnyReader {
             }
             #[cfg(feature = "docx")]
             InputFormat::Docx => Ok(Self::Docx(DocxReader::from_reader(reader)?)),
+        }
+    }
+
+    /// Construct a reader that streams from an owned seekable source.
+    ///
+    /// DOCX uses independent logical cursors over the source so the main XML and
+    /// retained asset handles can be consumed without buffering the document part.
+    /// Text formats use their existing reader construction behavior.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if source access or format-specific construction fails.
+    #[inline]
+    pub fn from_reader_streaming<R>(format: InputFormat, reader: R) -> Result<Self>
+    where
+        R: Read + Seek + Send + 'static,
+    {
+        #[cfg(not(reader))]
+        {
+            drop(reader);
+            match format {}
+        }
+        #[cfg(reader)]
+        match format {
+            #[cfg(feature = "html")]
+            InputFormat::Html => Self::from_reader(format, reader),
+            #[cfg(feature = "markdown")]
+            InputFormat::Markdown => Self::from_reader(format, reader),
+            #[cfg(feature = "docx")]
+            InputFormat::Docx => Ok(Self::Docx(DocxReader::from_reader_streaming(reader)?)),
         }
     }
 

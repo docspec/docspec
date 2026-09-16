@@ -1,0 +1,19 @@
+{
+  "matrix": {
+    "docx->blocknote": { "bytes": 6221, "sha256": "e2cc97f88a315ce93b52e53896e3b58e95689148ec85d6c896e1b3367095014a" },
+    "docx->html": { "bytes": 83, "sha256": "ea12881f7158d6f4239380d13f17649eb24005d8505c4374ba735ef3f2297b2c" },
+    "docx->markdown": { "bytes": 45, "sha256": "faca0413c965584fca3afa2cff1bb8fea2eb562d955e93393c4513366cc35338" },
+    "docx->oxa": { "bytes": 171, "sha256": "46d3edb70a2620b433b193a01b100a1faa4e1b530cde27dbfd9c2bfbad07c66b" },
+    "docx->pandoc-native": { "bytes": 66, "sha256": "a6fa987313d94cbedb61dea7a2f30e2dfdd26d4d62b6d8d90703e1e5f10fef48" },
+    "html->blocknote": { "bytes": 91, "sha256": "9252287f9afc093440c4ef379afbb3ddbc8f2896710a6b87be7ea4cb975b6291" },
+    "html->html": { "bytes": 38, "sha256": "27a5b19ce6b83f128f0672048562f592c73b8fb3ebf735e2b07c83622e862151" },
+    "html->markdown": { "bytes": 7, "sha256": "e3e9e985f417930a6d8f755d23aaebfb9a9c3e73f3acb80711f98852d2d06e47" },
+    "html->oxa": { "bytes": 98, "sha256": "90912a7a5c5c5968ab7e17ce4d05802e612aeffc0512465607f37808e6a9c542" },
+    "html->pandoc-native": { "bytes": 20, "sha256": "9570c7cafb7fb5558410a17b9b05b14a06cde23b37913bbdd11dddee3c733d00" },
+    "markdown->blocknote": { "bytes": 199, "sha256": "bf47fd7a683aa97520311247b22ccec3eb4065cb07a3fea9df93c29154006dce" },
+    "markdown->html": { "bytes": 38, "sha256": "27a5b19ce6b83f128f0672048562f592c73b8fb3ebf735e2b07c83622e862151" },
+    "markdown->markdown": { "bytes": 16, "sha256": "d226e41a8cccb9d70d791d392c029eee260905dd16a0545436c3b00b39027162" },
+    "markdown->oxa": { "bytes": 98, "sha256": "90912a7a5c5c5968ab7e17ce4d05802e612aeffc0512465607f37808e6a9c542" },
+    "markdown->pandoc-native": { "bytes": 54, "sha256": "9335573baaca97a0cbe19baf536fefaebf19907d76d612f873435900e00b45f7" }
+  }
+}

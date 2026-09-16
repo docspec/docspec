@@ -175,7 +175,7 @@ impl StyleStack {
         for frame in &mut self.frames {
             frame.text_emitted = true;
         }
-        self.deferred_starts.drain(..).collect()
+        core::mem::take(&mut self.deferred_starts)
     }
 
     /// Closes every active style from innermost to outermost, suppressing

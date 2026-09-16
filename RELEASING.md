@@ -26,7 +26,7 @@ The typical release flows like this:
 2. release-plz detects the new commit and opens a release PR. The PR contains the proposed version bump and an updated `CHANGELOG.md`.
 3. A maintainer reviews the release PR (see the next section for what to check).
 4. The maintainer merges the release PR.
-5. The `release-plz-release` job inside `ci.yml` runs after every other CI job (`test`, `clippy`, `fmt`, `docker-build`) passes on `main`. It executes release-plz, which tags `vX.Y.Z` and publishes all 11 publishable crates to crates.io in topological order, with a 30-minute retry wrapper to handle index propagation lag.
+5. The `release-plz-release` job inside `ci.yml` runs after every other CI job (`test`, `clippy`, `fmt`, `features`, `wasm`, `docker-build`) passes on `main`. The WASM gate builds fresh optimized browser and Node packages from `Cargo.lock`, verifies selective feature dependency graphs and artifact sizes, and executes the API in Node plus Chromium and Firefox Workers. Release-plz then tags `vX.Y.Z` and publishes all 11 publishable crates to crates.io in topological order, with a 30-minute retry wrapper to handle index propagation lag.
 6. If release-plz reports that a release was created, the `docker-publish` job (also in `ci.yml`) calls `docker.yml` to build, push, sign, and attest the Docker image. The Docker image tags strip the Git tag's `v` prefix, so `v1.5.0` publishes `ghcr.io/docspec/api:1.5.0` plus `1.5`, `1`, and `latest`.
 
 From merge to fully published artifacts typically takes 30 to 60 minutes, depending on crates.io index propagation.
@@ -210,11 +210,13 @@ git push origin v1.5.0
 
 **Trusted Publishing OIDC failure.** Check that the workflow filename in the crates.io TP config matches the failing workflow exactly (`ci.yml` for automated releases, or `publish-crate-manual.yml` for emergency single-crate publishes), the environment name is `release`, and the repository owner and name are correct. A single character mismatch causes a silent OIDC failure.
 
-## WASM and Future npm Distribution
+## WASM source-build prerequisite
 
 `docspec-wasm` is `publish = false`. The crate is tagged at the ecosystem version with every release, so it stays in sync with the rest of the workspace, but it never reaches crates.io.
 
-Today, there is no npm distribution. The wasm crate exists as a foundation for future browser and Node.js integration. When npm distribution is added, the team will need to decide whether to ship raw wasm-pack output or introduce a hand-written TypeScript wrapper that provides a more ergonomic API. Either way, the npm publish step will be a separate workflow, not part of `ci.yml`.
+There is no npm distribution. Browser ESM and Node CommonJS packages are built from source with the pinned `wasm-pack` version in `ci.yml`, and the generated TypeScript declarations are retained in the build artifact. Generated packages remain untracked.
+
+The `wasm` CI job is a release prerequisite. It verifies every individual and aggregate feature selection, checks that the minimal DOCX-to-Markdown dependency graph excludes unselected formats and server/CLI dependencies, and requires the optimized minimal artifact to be smaller than the full artifact in raw and gzip form. It then runs exact-output and host-callback contract tests in Node, Chromium Workers, and Firefox Workers. A native-only green build cannot trigger a release.
 
 The ecosystem version tag (`vX.Y.Z`) will continue to apply to `docspec-wasm` even after npm distribution is added. The npm package version may or may not track the ecosystem version exactly, depending on how the TypeScript API evolves independently.
 

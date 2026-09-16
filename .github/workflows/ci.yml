@@ -50,6 +50,46 @@ jobs:
             echo "::endgroup::"
           done
 
+  wasm:
+    name: WASM browser and Node
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          lfs: true
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Install pinned WASM and browser tooling
+        run: |
+          cargo install wasm-pack --version 0.14.0 --locked
+          npm install --prefix target/wasm-test-tools --no-package-lock --save-exact playwright@1.63.0
+          target/wasm-test-tools/node_modules/.bin/playwright install --with-deps chromium firefox
+      - name: Verify selective feature builds and minimal graph
+        run: scripts/wasm/verify-features.sh
+      - name: Build fresh optimized browser and Node packages
+        run: scripts/wasm/build-packages.sh
+      - name: Execute Node and browser Worker acceptance tests
+        run: scripts/wasm/verify-runtime.sh
+      - name: Upload WASM acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: wasm-acceptance
+          path: |
+            target/wasm-pack/sizes.txt
+            target/wasm-pack/*-runtime-results.json
+            target/wasm-pack/*-worker-results.json
+            target/wasm-pack/*-opfs-example-results.json
+          if-no-files-found: error
+
   clippy:
     runs-on: ubuntu-latest
     permissions:
@@ -102,7 +142,7 @@ jobs:
     # are visible. Otherwise the PR job computes the next-version diff against
     # the still-old crates.io baseline and re-includes commits the release job
     # is in the middle of publishing, producing duplicate CHANGELOG entries.
-    needs: [test, clippy, fmt, features, docker-build, release-plz-release]
+    needs: [test, clippy, fmt, features, wasm, docker-build, release-plz-release]
     if: >-
       github.event_name == 'push'
       && github.ref == 'refs/heads/main'
@@ -134,7 +174,7 @@ jobs:
 
   release-plz-release:
     name: Tag and publish crates
-    needs: [test, clippy, fmt, features, docker-build]
+    needs: [test, clippy, fmt, features, wasm, docker-build]
     if: >-
       github.event_name == 'push'
       && github.ref == 'refs/heads/main'

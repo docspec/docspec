@@ -1,9 +1,9 @@
 //! Child process for memory measurement.
 //!
-//! Reads the DOCX file at the path given as the first command-line argument,
-//! drives `DocxReader::from_path` to completion, then prints the peak RSS to stderr.
+//! Reads the DOCX file path, drives either streaming constructor to completion,
+//! then prints the peak RSS to stderr.
 //!
-//! Usage: `memtest_child` <docx-path>
+//! Usage: `memtest_child [--reader-streaming] <docx-path>`.
 use std::path::Path;
 
 use docspec_docx_reader::{DocxReader, EventSource as _};
@@ -21,12 +21,22 @@ fn read_vm_hwm_kb() -> u64 {
 }
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {
-    let path_arg = std::env::args()
-        .nth(1)
-        .ok_or("Usage: memtest_child <docx-path>")?;
+    let mut args = std::env::args().skip(1);
+    let first = args
+        .next()
+        .ok_or("Usage: memtest_child [--reader-streaming] <docx-path>")?;
+    let (reader_streaming, path_arg) = if first == "--reader-streaming" {
+        (true, args.next().ok_or("missing DOCX path")?)
+    } else {
+        (false, first)
+    };
     let path = Path::new(&path_arg);
 
-    let mut reader = DocxReader::from_path(path)?;
+    let mut reader = if reader_streaming {
+        DocxReader::from_reader_streaming(std::fs::File::open(path)?)?
+    } else {
+        DocxReader::from_path(path)?
+    };
     while reader.next_event()?.is_some() {}
 
     let peak_kb = read_vm_hwm_kb();

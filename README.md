@@ -1,11 +1,11 @@
 # DocSpec
 
-**Streaming document conversion that never buffers the whole document.**
+**Streaming document conversion that avoids document trees.**
 
 Documents, as they flow. DocSpec reads a document as a stream of typed events and
-writes it back out in another format — one event at a time, in constant memory, no
-matter how large the file. Streaming is the whole point; the [Manifesto](MANIFESTO.md)
-explains why.
+writes it back out in another format — one event at a time, with bounded
+document-flow buffers where the selected format permits it. Streaming is the
+whole point; the [Manifesto](MANIFESTO.md) explains why.
 
 **Funded by** [NLnet](https://nlnet.nl) through the [NGI0 Commons Fund](https://nlnet.nl/commonsfund/), and the Netherlands' [Ministry of the Interior and Kingdom Relations](https://www.rijksoverheid.nl/ministeries/ministerie-van-binnenlandse-zaken-en-koninkrijksrelaties).
 
@@ -103,12 +103,12 @@ authoritative reference for exactly which events it handles and drops.
 
 ## Why DocSpec?
 
-Most document converters load the whole file into memory, build a tree, and hope it fits. That works until someone uploads a 200 MB report — or until you need the same converter to run inside a browser tab. DocSpec exists to turn real-world documents into what modern **web editors** actually consume — BlockNote JSON, oxa.dev — without ever holding the whole document at once.
+Most document converters load the whole file into memory, build a tree, and hope it fits. That works until someone uploads a 200 MB report — or until you need the same converter to run inside a browser tab. DocSpec exists to turn real-world documents into what modern **web editors** actually consume — BlockNote JSON, oxa.dev — while streaming the document event flow instead of constructing a document tree.
 
-Streaming event by event, in constant memory, is the one decision everything else follows from:
+Streaming event by event, with bounded document-flow buffers, is the one decision everything else follows from:
 
 - **It runs where your editor runs.** The same Rust compiles to a native server, a WebAssembly module in the browser, or an embedded target — one codebase, every surface, no separate front-end and back-end converters drifting apart.
-- **Its memory stays flat.** A 1 KB note and a 500 MB document cost about the same to convert. Constant memory is the architecture, not a tuning flag.
+- **Its document flow stays bounded.** Readers and writers transfer events and assets incrementally. Format-specific metadata still has a cost: DOCX retains ZIP indexes and related tables, and Markdown currently retains its full source before parsing.
 - **It stays honest.** On corrupt input it stops and says so — no half-converted output quietly reaching your database.
 
 DocSpec is the Rust successor to [NLdoc](https://gitlab.com/logius/nldoc), rebuilt for public-sector digital sovereignty: funded by [NLnet](https://nlnet.nl) and the Dutch Ministry of the Interior, and used in production by [La Suite](https://lasuite.numerique.gouv.fr) to import documents into its collaborative editor. The [Manifesto](MANIFESTO.md) is the long version of why.
@@ -157,8 +157,8 @@ reach for the individual crates when you want the smallest possible dependency f
 
 ## What we stand for
 
-- **Memory conscious** — constant memory regardless of file size; every allocation earns its keep.
-- **Streaming first** — events flow one at a time; nothing accumulates.
+- **Memory conscious** — bounded transfer buffers and explicit format-specific retained state; every allocation earns its keep.
+- **Streaming first** — events flow one at a time; each format documents the source and metadata state it must retain.
 - **Fail fast** — on corruption we stop and say so: no partial output, no silent truncation.
 - **No unsafe** — the workspace forbids `unsafe` entirely.
 - **Proven** — a 98% coverage floor on new and changed executable Rust lines in covered crates; no `unwrap` or `expect` in source.

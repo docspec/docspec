@@ -71,6 +71,33 @@ where
     ))
 }
 
+pub(crate) fn open_package_streaming<R>(reader: R) -> Result<PackageContents>
+where
+    R: Read + Seek + Send + 'static,
+{
+    let source = crate::shared_reader::SharedReader::new(reader);
+    let boxed: Box<dyn ReadSeek + 'static> = Box::new(source.cursor());
+    let mut archive = ZipArchive::new(boxed).map_err(map_zip_open_error)?;
+    let rels_bytes = read_root_rels_bytes(&mut archive)?;
+    let document_path = rels::find_document_target(std::io::Cursor::new(rels_bytes))?;
+    let (style_list, numbering, hyperlink_map, image_map, content_types) =
+        load_small_package_parts(&mut archive, &document_path)?;
+    let stream = crate::streaming_archive::StreamingArchive::open_from_archive(
+        source.cursor(),
+        &mut archive,
+        &document_path,
+    )?;
+    Ok((
+        style_list,
+        numbering,
+        hyperlink_map,
+        image_map,
+        Arc::new(content_types),
+        Arc::new(Mutex::new(archive)),
+        Box::new(stream),
+    ))
+}
+
 pub(crate) fn open_package_from_path(path: &Path) -> Result<PackageContents> {
     let asset_file = File::open(path).map_err(Error::from)?;
     let boxed: Box<dyn ReadSeek + 'static> = Box::new(asset_file);

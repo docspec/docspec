@@ -135,12 +135,14 @@ Memory use depends on which constructor you call:
 
 - **`from_path`**: streams `word/document.xml` in constant memory — O(1) regardless
   of document size. Use this when processing large files or when memory is constrained.
+- **`from_reader_streaming`**: owns a `Read + Seek + Send + 'static` source and
+  uses independent logical cursors for the main XML and retained asset handles.
 - **`from_reader`**: buffers `word/document.xml` into memory — O(N) in document size.
-  Use `from_path` when constant memory is required.
+  Use a streaming constructor when document-part memory must remain bounded.
 
-In both cases, `_rels/.rels` and `word/_rels/document.xml.rels` are fully read into
-memory at package-open time (typical combined size < 10 KB even for large documents).
-The internal event queue remains bounded regardless of document size or hyperlink count.
+The streaming constructors bound transfer, decompression, and event-flow buffers.
+ZIP indexes, relationships, styles, numbering, content types, and XML parser state
+still consume memory according to package structure.
 
 ## Read a DOCX
 
