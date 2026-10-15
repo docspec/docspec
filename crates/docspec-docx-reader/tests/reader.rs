@@ -1829,6 +1829,29 @@ mod events {
         assert_eq!(events, vec![start_document(), Event::EndDocument,]);
     }
 
+    /// `<w:body>` is optional in `CT_Document`, so a bodiless document is empty, not truncated.
+    #[test]
+    fn document_without_body_is_empty() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:document>"#,
+        );
+        assert_eq!(
+            drive(&mut reader),
+            vec![start_document(), Event::EndDocument]
+        );
+    }
+
+    #[test]
+    fn self_closing_document_is_empty() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+        );
+        assert_eq!(
+            drive(&mut reader),
+            vec![start_document(), Event::EndDocument]
+        );
+    }
+
     #[test]
     fn self_closing_drawing_emits_no_events() {
         let mut reader = make_reader(
@@ -7354,6 +7377,54 @@ mod truncated_document {
             id: None,
             rowspan: None,
         }
+    }
+
+    #[test]
+    fn eof_right_after_body_open_is_a_parse_error() {
+        assert_eq!(
+            read_until_error(""),
+            (
+                vec![start_document()],
+                "malformed document.xml: unexpected EOF inside <w:document>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_between_paragraphs_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:p><w:r><w:t>one</w:t></w:r></w:p>"),
+            (
+                vec![
+                    start_document(),
+                    start_paragraph(),
+                    text("one"),
+                    Event::EndParagraph,
+                ],
+                "malformed document.xml: unexpected EOF inside <w:document>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_after_table_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl>"),
+            (
+                vec![
+                    start_document(),
+                    start_table(),
+                    start_row(),
+                    start_cell(),
+                    start_paragraph(),
+                    Event::EndParagraph,
+                    Event::EndTableCell,
+                    Event::EndTableRow,
+                    Event::EndTable,
+                ],
+                "malformed document.xml: unexpected EOF inside <w:document>".to_string(),
+            )
+        );
     }
 
     #[test]
