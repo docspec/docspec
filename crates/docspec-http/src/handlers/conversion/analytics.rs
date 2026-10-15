@@ -78,15 +78,9 @@ pub(super) fn record_completion(ctx: CompletionContext<'_>) {
         conversion_duration_ms,
         trace_id_owned,
     } = ctx;
-    let client_arc: Option<std::sync::Arc<posthog_rs::Client>> =
-        match crate::telemetry::posthog_client_slot().read() {
-            Ok(guard) => guard.as_ref().map(std::sync::Arc::clone),
-            Err(_poisoned) => {
-                tracing::warn!("posthog slot poisoned; skipping conversion analytics");
-                None
-            }
-        };
-    if let Some(client) = client_arc {
+    if let Some(client) = crate::telemetry::current_posthog_client(
+        "posthog slot poisoned; skipping conversion analytics",
+    ) {
         let distinct_id_owned =
             request_id_opt.map_or_else(|| uuid::Uuid::new_v4().to_string(), str::to_owned);
         let is_anonymous = request_id_opt.is_none();

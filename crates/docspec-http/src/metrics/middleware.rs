@@ -16,7 +16,7 @@ use crate::metrics::{
 /// The route path for the Prometheus metrics endpoint.
 /// Requests to this path are excluded from HTTP metrics recording
 /// to prevent a feedback loop on every scrape.
-const METRICS_ROUTE_PATH: &str = "/metrics";
+pub(crate) const METRICS_ROUTE_PATH: &str = "/metrics";
 
 /// Tower middleware that records HTTP request metrics.
 ///

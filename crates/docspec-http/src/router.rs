@@ -4,7 +4,11 @@ use axum::{http::Request, Router};
 use metrics_exporter_prometheus::PrometheusHandle;
 use tower_http::request_id::{MakeRequestId, RequestId};
 
-use crate::metrics::{metrics_handler, middleware::record_http_metrics};
+use crate::format;
+use crate::metrics::{
+    metrics_handler,
+    middleware::{record_http_metrics, METRICS_ROUTE_PATH},
+};
 
 /// A [`MakeRequestId`] implementation that never generates a request ID.
 ///
@@ -51,7 +55,7 @@ pub fn router() -> Router {
     use tower::util::option_layer;
 
     let x_request_id = HeaderName::from_static("x-request-id");
-    let x_trace_id = HeaderName::from_static("x-trace-id");
+    let x_trace_id = HeaderName::from_static(format::X_TRACE_ID_HEADER);
 
     let conversion_route = post(post_conversion)
         .options(options_conversion)
@@ -73,7 +77,7 @@ pub fn router() -> Router {
                 .to_owned();
             let trace_id = request
                 .headers()
-                .get("x-trace-id")
+                .get(format::X_TRACE_ID_HEADER)
                 .and_then(|head| head.to_str().ok())
                 .unwrap_or_default()
                 .to_owned();
@@ -163,5 +167,8 @@ pub fn router() -> Router {
 ///     scrape from incrementing counters).
 #[inline]
 pub fn router_with_metrics(handle: PrometheusHandle) -> Router {
-    router().route("/metrics", axum::routing::get(metrics_handler(handle)))
+    router().route(
+        METRICS_ROUTE_PATH,
+        axum::routing::get(metrics_handler(handle)),
+    )
 }
