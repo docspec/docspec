@@ -3549,6 +3549,39 @@ mod events {
     }
 
     #[test]
+    fn tbl_header_cells_without_content_emit_empty_header_and_data_cells() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc/><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr></w:tc></w:tr><w:tr><w:tc/></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_document(),
+                start_table(),
+                start_row(),
+                start_header(),
+                Event::EndTableHeader,
+                Event::StartTableHeader {
+                    scope: Some(TableHeaderScope::Column),
+                    abbr: None,
+                    colspan: Some(2),
+                    rowspan: None,
+                    id: None,
+                },
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                start_row(),
+                start_cell(),
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
     fn tbl_header_multiple_consecutive_header_rows_all_emit_headers() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h1</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h2</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h3</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,

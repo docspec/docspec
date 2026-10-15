@@ -83,6 +83,53 @@ enum HyperlinkParseEnd {
     Eof,
 }
 
+/// Whether a `<w:tc>` is emitted as a table header cell or a table data cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CellKind {
+    /// Column header cell in the table's leading header-row band.
+    Header,
+    /// Ordinary data cell.
+    Data,
+}
+
+impl CellKind {
+    /// Kind of every cell in a row with `row_props`, while the header-row band
+    /// is `header_band_active`.
+    fn in_row(row_props: Option<&ResolvedRowProperties>, header_band_active: bool) -> Self {
+        if header_band_active && row_props.is_some_and(|props| props.is_header) {
+            Self::Header
+        } else {
+            Self::Data
+        }
+    }
+
+    /// The event that opens a cell of this kind.
+    fn start_event(self, colspan: Option<u32>) -> Event {
+        match self {
+            Self::Header => Event::StartTableHeader {
+                scope: Some(TableHeaderScope::Column),
+                abbr: None,
+                colspan,
+                rowspan: None,
+                id: None,
+            },
+            Self::Data => Event::StartTableCell {
+                colspan,
+                rowspan: None,
+                id: None,
+            },
+        }
+    }
+
+    /// The event that closes a cell of this kind.
+    fn end_event(self) -> Event {
+        match self {
+            Self::Header => Event::EndTableHeader,
+            Self::Data => Event::EndTableCell,
+        }
+    }
+}
+
 impl Default for ParagraphParseState {
     fn default() -> Self {
         Self {
@@ -713,34 +760,44 @@ impl DocumentReader {
         }
     }
 
-    fn emit_table_cell_start(&mut self, is_header: bool, colspan: Option<u32>) {
-        if is_header {
-            self.emit.push(Event::StartTableHeader {
-                scope: Some(TableHeaderScope::Column),
-                abbr: None,
-                colspan,
-                rowspan: None,
-                id: None,
-            });
-        } else {
-            self.emit.push(Event::StartTableCell {
-                colspan,
-                rowspan: None,
-                id: None,
-            });
+    fn emit_empty_table_cell(&mut self, kind: CellKind, colspan: Option<u32>) {
+        self.emit.push(kind.start_event(colspan));
+        self.emit.push(kind.end_event());
+    }
+
+    /// Emits the cell's start event once, before its first content.
+    fn ensure_cell_started(
+        &mut self,
+        kind: CellKind,
+        cell_props: Option<&ResolvedCellProperties>,
+        cell_started: &mut bool,
+    ) {
+        if !*cell_started {
+            let colspan = cell_props.and_then(|props| props.colspan);
+            self.emit.push(kind.start_event(colspan));
+            *cell_started = true;
         }
     }
 
-    fn emit_empty_table_cell(&mut self, is_header: bool, colspan: Option<u32>) {
-        self.emit_table_cell_start(is_header, colspan);
-        if is_header {
-            self.emit.push(Event::EndTableHeader);
-        } else {
-            self.emit.push(Event::EndTableCell);
+    /// Emits `StartTableRow` once, before the row's first cell.
+    ///
+    /// A row that is not a header row ends the table's header-row band.
+    fn ensure_row_started(
+        &mut self,
+        row_props: Option<&ResolvedRowProperties>,
+        row_started: &mut bool,
+        header_band_active: &mut bool,
+    ) {
+        if !*row_started {
+            if !row_props.is_some_and(|props| props.is_header) {
+                *header_band_active = false;
+            }
+            self.emit.push(Event::StartTableRow { id: None });
+            *row_started = true;
         }
     }
 
-    fn parse_tc(&mut self, _start: &BytesStart<'_>, is_header: bool) -> Result<()> {
+    fn parse_tc(&mut self, _start: &BytesStart<'_>, kind: CellKind) -> Result<()> {
         let mut cell_props: Option<ResolvedCellProperties> = None;
         let mut cell_started = false;
         loop {
@@ -755,19 +812,11 @@ impl DocumentReader {
                         self.input.skip_subtree(&start)?;
                     }
                     b"p" => {
-                        if !cell_started {
-                            let colspan = cell_props.as_ref().and_then(|props| props.colspan);
-                            self.emit_table_cell_start(is_header, colspan);
-                            cell_started = true;
-                        }
+                        self.ensure_cell_started(kind, cell_props.as_ref(), &mut cell_started);
                         self.parse_p(&start)?;
                     }
                     b"tbl" => {
-                        if !cell_started {
-                            let colspan = cell_props.as_ref().and_then(|props| props.colspan);
-                            self.emit_table_cell_start(is_header, colspan);
-                            cell_started = true;
-                        }
+                        self.ensure_cell_started(kind, cell_props.as_ref(), &mut cell_started);
                         self.parse_tbl(&start, false)?;
                     }
                     _ if is_denied_container(start.local_name().as_ref()) => {
@@ -780,11 +829,7 @@ impl DocumentReader {
                         cell_props = Some(ResolvedCellProperties::default());
                     }
                     b"p" => {
-                        if !cell_started {
-                            let colspan = cell_props.as_ref().and_then(|props| props.colspan);
-                            self.emit_table_cell_start(is_header, colspan);
-                            cell_started = true;
-                        }
+                        self.ensure_cell_started(kind, cell_props.as_ref(), &mut cell_started);
                         self.emit.push(Event::StartParagraph {
                             alignment: None,
                             id: None,
@@ -796,13 +841,11 @@ impl DocumentReader {
                 quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"tc" => {
                     self.emit.flush_list_stack();
                     self.emit.flush_pending_preformatted_close();
-                    if !cell_started {
-                        let colspan = cell_props.as_ref().and_then(|props| props.colspan);
-                        self.emit_empty_table_cell(is_header, colspan);
-                    } else if is_header {
-                        self.emit.push(Event::EndTableHeader);
+                    if cell_started {
+                        self.emit.push(kind.end_event());
                     } else {
-                        self.emit.push(Event::EndTableCell);
+                        let colspan = cell_props.as_ref().and_then(|props| props.colspan);
+                        self.emit_empty_table_cell(kind, colspan);
                     }
                     return Ok(());
                 }
@@ -839,15 +882,13 @@ impl DocumentReader {
                         self.input.skip_subtree(&start)?;
                     }
                     b"tc" => {
-                        let row_is_header = row_props.as_ref().is_some_and(|props| props.is_header);
-                        if !row_started {
-                            if !row_is_header {
-                                *header_band_active = false;
-                            }
-                            self.emit.push(Event::StartTableRow { id: None });
-                            row_started = true;
-                        }
-                        self.parse_tc(&start, row_is_header && *header_band_active)?;
+                        self.ensure_row_started(
+                            row_props.as_ref(),
+                            &mut row_started,
+                            header_band_active,
+                        );
+                        let kind = CellKind::in_row(row_props.as_ref(), *header_band_active);
+                        self.parse_tc(&start, kind)?;
                     }
                     _ if is_denied_container(start.local_name().as_ref()) => {
                         self.input.skip_subtree(&start)?;
@@ -860,15 +901,13 @@ impl DocumentReader {
                         *header_band_active = false;
                     }
                     b"tc" => {
-                        let row_is_header = row_props.as_ref().is_some_and(|props| props.is_header);
-                        if !row_started {
-                            if !row_is_header {
-                                *header_band_active = false;
-                            }
-                            self.emit.push(Event::StartTableRow { id: None });
-                            row_started = true;
-                        }
-                        self.emit_empty_table_cell(row_is_header && *header_band_active, None);
+                        self.ensure_row_started(
+                            row_props.as_ref(),
+                            &mut row_started,
+                            header_band_active,
+                        );
+                        let kind = CellKind::in_row(row_props.as_ref(), *header_band_active);
+                        self.emit_empty_table_cell(kind, None);
                     }
                     _ => {}
                 },
@@ -1799,7 +1838,7 @@ mod tests {
             r#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc>"#,
         );
         let start = read_first_start(&mut reader);
-        reader.parse_tc(&start, false).expect("tc parses");
+        reader.parse_tc(&start, CellKind::Data).expect("tc parses");
 
         assert_eq!(
             drain_queue(&mut reader),
@@ -1821,7 +1860,9 @@ mod tests {
             r#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>head</w:t></w:r></w:p></w:tc>"#,
         );
         let start = read_first_start(&mut reader);
-        reader.parse_tc(&start, true).expect("tc parses");
+        reader
+            .parse_tc(&start, CellKind::Header)
+            .expect("tc parses");
 
         assert_eq!(
             drain_queue(&mut reader),
@@ -1843,7 +1884,7 @@ mod tests {
             r#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p/></w:tc>"#,
         );
         let start = read_first_start(&mut reader);
-        reader.parse_tc(&start, false).expect("tc parses");
+        reader.parse_tc(&start, CellKind::Data).expect("tc parses");
 
         assert_eq!(
             drain_queue(&mut reader),
@@ -1862,7 +1903,7 @@ mod tests {
             r#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:tcPr><w:gridSpan w:val="1"/></w:tcPr><w:p/></w:tc>"#,
         );
         let start = read_first_start(&mut reader);
-        reader.parse_tc(&start, false).expect("tc parses");
+        reader.parse_tc(&start, CellKind::Data).expect("tc parses");
 
         assert_eq!(
             drain_queue(&mut reader),
