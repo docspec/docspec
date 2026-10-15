@@ -5,8 +5,6 @@ use std::io::{self, Write};
 use core::iter::Peekable;
 use core::str::Chars;
 
-const REPLACEMENT_CHARACTER: &[u8] = "\u{FFFD}".as_bytes();
-
 /// Writes `text` with inline-sensitive `CommonMark` punctuation escaped.
 ///
 /// Normalizes NUL and line endings before escaping and streams output without
@@ -111,7 +109,6 @@ where
         '<' => writer.write_all(b"\\<"),
         '&' => writer.write_all(b"\\&"),
         '!' => writer.write_all(b"\\!"),
-        '\u{FFFD}' => writer.write_all(REPLACEMENT_CHARACTER),
         ch => write_raw_char(writer, ch),
     }
 }
