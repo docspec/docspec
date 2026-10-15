@@ -808,11 +808,7 @@ impl DocumentReader {
                             self.emit_table_cell_start(is_header, colspan);
                             cell_started = true;
                         }
-                        self.emit.push(Event::StartParagraph {
-                            alignment: None,
-                            id: None,
-                        });
-                        self.emit.push(Event::EndParagraph);
+                        self.parse_empty_p();
                     }
                     _ => {}
                 },
@@ -2799,6 +2795,32 @@ mod tests {
                 Event::LineBreak,
                 text_event("second"),
                 Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn self_closing_paragraph_after_source_code_inside_table_cell_closes_preformatted_first() {
+        let body = format!(
+            "<w:tbl><w:tr><w:tc>{}<w:p/></w:tc></w:tr></w:tbl>",
+            source_code_paragraph("code")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                Event::StartTable { id: None },
+                Event::StartTableRow { id: None },
+                start_cell(None),
+                start_preformatted_event(),
+                text_event("code"),
+                Event::EndPreformatted,
+                start_para(),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
                 Event::EndDocument,
             ]
         );
