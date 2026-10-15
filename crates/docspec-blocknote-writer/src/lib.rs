@@ -209,10 +209,7 @@ enum BlockquoteContentState {
 #[derive(Debug)]
 enum DrainDestination {
     DocumentRoot,
-    Ancestor {
-        ancestor_index: usize,
-        kind: BlockKind,
-    },
+    Ancestor { kind: BlockKind },
 }
 
 /// Block-level events that are leaves (no Start/End counterpart) in the `DocSpec` stream.
@@ -1104,12 +1101,9 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn current_drain_destination(&self) -> DrainDestination {
-        for (idx, kind) in self.open_block_ancestors.iter().enumerate().rev() {
+        for kind in self.open_block_ancestors.iter().rev() {
             if blocknote_accepts_child(Some(*kind), ChildKind::Container(BlockKind::Heading)) {
-                return DrainDestination::Ancestor {
-                    ancestor_index: idx,
-                    kind: *kind,
-                };
+                return DrainDestination::Ancestor { kind: *kind };
             }
         }
         DrainDestination::DocumentRoot
@@ -1334,24 +1328,16 @@ impl<W: Write> BlockNoteWriter<W> {
         }
         match self.current_drain_destination() {
             DrainDestination::Ancestor {
-                ancestor_index,
                 kind: BlockKind::Blockquote,
             } => {
-                let _ = ancestor_index;
                 self.prepare_blockquote_children()?;
             }
             DrainDestination::Ancestor {
-                ancestor_index,
                 kind: BlockKind::OrderedListItem | BlockKind::UnorderedListItem,
             } => {
-                let _ = ancestor_index;
                 self.prepare_list_item_children()?;
             }
-            DrainDestination::Ancestor { ancestor_index, .. } => {
-                let _ = ancestor_index;
-                self.close_for_block_sibling()?;
-            }
-            DrainDestination::DocumentRoot => {
+            DrainDestination::Ancestor { .. } | DrainDestination::DocumentRoot => {
                 self.close_for_block_sibling()?;
             }
         }
@@ -1539,7 +1525,6 @@ mod tests {
         assert!(matches!(
             writer.current_drain_destination(),
             DrainDestination::Ancestor {
-                ancestor_index: 2,
                 kind: BlockKind::Blockquote,
             }
         ));
