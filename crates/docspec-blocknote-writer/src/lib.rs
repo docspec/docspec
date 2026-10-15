@@ -335,13 +335,7 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn close_current_list_item_object(&mut self) -> Result<()> {
-        if self
-            .list_stack
-            .last()
-            .is_some_and(|entry| entry.content_state == ListContentState::Pending)
-        {
-            self.initialize_current_list_item_content(None)?;
-        }
+        self.initialize_current_list_item_content(None)?;
         let popped_entry = self.list_stack.pop();
         if let Some(list_entry) = popped_entry {
             let ancestor_kind = match list_entry.kind {
@@ -364,9 +358,7 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn close_for_block_sibling(&mut self) -> Result<()> {
-        if !self.list_stack.is_empty() {
-            self.close_open_list_items()?;
-        }
+        self.close_open_list_items()?;
         if self.blockquote_depth.is_positive() {
             return self.prepare_blockquote_children();
         }
@@ -491,13 +483,6 @@ impl<W: Write> BlockNoteWriter<W> {
         self.in_link = false;
         self.link_emitted_styled_text = false;
         Ok(())
-    }
-
-    fn handle_end_list_item(&mut self) -> Result<()> {
-        if self.list_stack.is_empty() {
-            return Ok(());
-        }
-        self.close_current_list_item_object()
     }
 
     fn handle_end_paragraph(&mut self) -> Result<()> {
@@ -1167,13 +1152,7 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn open_current_list_item_children(&mut self) -> Result<()> {
-        if self
-            .list_stack
-            .last()
-            .is_some_and(|entry| entry.content_state == ListContentState::Pending)
-        {
-            self.initialize_current_list_item_content(None)?;
-        }
+        self.initialize_current_list_item_content(None)?;
         let content_array_open = self
             .list_stack
             .last()
@@ -1200,10 +1179,6 @@ impl<W: Write> BlockNoteWriter<W> {
         self.close_open_child_text_block()
     }
 
-    fn prepare_list_item_children(&mut self) -> Result<()> {
-        self.open_current_list_item_children()
-    }
-
     fn prepare_for_child_block(&mut self) -> Result<()> {
         match self.current_drain_destination() {
             DrainDestination::Ancestor {
@@ -1211,7 +1186,7 @@ impl<W: Write> BlockNoteWriter<W> {
             } => self.prepare_blockquote_children(),
             DrainDestination::Ancestor {
                 kind: BlockKind::OrderedListItem | BlockKind::UnorderedListItem,
-            } => self.prepare_list_item_children(),
+            } => self.open_current_list_item_children(),
             DrainDestination::Ancestor { .. } | DrainDestination::DocumentRoot => {
                 self.close_for_block_sibling()
             }
@@ -1254,9 +1229,7 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn handle_end_document(&mut self) -> Result<()> {
-        while !self.list_stack.is_empty() {
-            self.close_current_list_item_object()?;
-        }
+        self.close_open_list_items()?;
         self.json.close_array()
     }
 
@@ -1439,7 +1412,9 @@ impl<W: Write> EventSink for BlockNoteWriter<W> {
             Event::StartUnorderedListItem { level, .. } => {
                 self.handle_start_list_item(ListKind::Unordered, level, None)
             }
-            Event::EndOrderedListItem | Event::EndUnorderedListItem => self.handle_end_list_item(),
+            Event::EndOrderedListItem | Event::EndUnorderedListItem => {
+                self.close_current_list_item_object()
+            }
             Event::StartTable { id, .. } => self.handle_start_table(id.as_deref()),
             Event::EndTable => self.handle_end_table(),
             Event::StartTableRow { id, .. } => self.handle_start_table_row(id.as_deref()),
@@ -1625,9 +1600,9 @@ mod tests {
 
     #[test]
     fn close_for_block_sibling_with_nonempty_list_stack_closes_all_items() {
-        // Drives close_open_list_items call inside close_for_block_sibling (line 264).
+        // Drives the close_open_list_items call inside close_for_block_sibling.
         // After opening a list item, list_stack is non-empty; calling the private
-        // method directly exercises the !list_stack.is_empty() branch.
+        // method directly checks that every open item is closed.
         let mut buf = Vec::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
         assert!(writer
