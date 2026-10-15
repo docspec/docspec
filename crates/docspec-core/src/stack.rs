@@ -505,7 +505,7 @@ mod tests {
             sink.sink().events.get(4),
             Some(Event::EndDocument)
         ));
-        assert!(sink.stack().is_empty());
+        assert_eq!(sink.stack(), []);
     }
 
     #[test]
@@ -876,7 +876,7 @@ mod tests {
         assert_eq!(sink.sink().events.get(3), Some(&Event::EndParagraph));
         assert_eq!(sink.sink().events.get(4), Some(&Event::EndBlockQuote));
         assert_eq!(sink.sink().events.get(5), Some(&Event::EndDocument));
-        assert!(sink.stack().is_empty());
+        assert_eq!(sink.stack(), []);
     }
 
     #[test]
