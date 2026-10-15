@@ -6508,9 +6508,13 @@ mod tests {
             style_type: docspec_core::ListStyleType::Decimal,
         });
         let err = result.expect_err("start value exceeding u32::MAX must return an error");
+        // The suffix is std's TryFromIntError message, whose wording changed in Rust 1.99.
+        let std_message = u32::try_from(u64::from(u32::MAX) + 1)
+            .expect_err("u32::MAX + 1 does not fit in u32")
+            .to_string();
         assert_eq!(
             err.to_string(),
-            "ordered list start value out of range: 4294967296: out of range integral type conversion attempted"
+            format!("ordered list start value out of range: 4294967296: {std_message}")
         );
     }
 
