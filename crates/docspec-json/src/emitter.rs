@@ -48,7 +48,7 @@ impl<B: JsonBackend> JsonEmitter<B> {
     pub fn close_array(&mut self) -> Result<()> {
         self.stack.peek_array()?;
         self.backend.end_array()?;
-        self.stack.pop_array()?;
+        self.stack.pop()?;
         self.stack.mark_value_written()
     }
 
@@ -61,7 +61,7 @@ impl<B: JsonBackend> JsonEmitter<B> {
     pub fn close_object(&mut self) -> Result<()> {
         self.stack.peek_object()?;
         self.backend.end_object()?;
-        self.stack.pop_object()?;
+        self.stack.pop()?;
         self.stack.mark_value_written()
     }
 
@@ -197,12 +197,8 @@ impl<B: JsonBackend> KeyedEmitter<'_, B> {
     where
         F: FnOnce(&mut JsonEmitter<B>) -> Result<()>,
     {
-        let emitter = self.emitter;
-        emitter.write_key(self.name)?;
-        emitter.open_array()?;
-        let inner = f(emitter);
-        let close = emitter.close_array();
-        inner.and(close)
+        self.emitter.write_key(self.name)?;
+        self.emitter.array(f)
     }
 
     /// Consume the key and write an object value via closure.
@@ -218,12 +214,8 @@ impl<B: JsonBackend> KeyedEmitter<'_, B> {
     where
         F: FnOnce(&mut JsonEmitter<B>) -> Result<()>,
     {
-        let emitter = self.emitter;
-        emitter.write_key(self.name)?;
-        emitter.open_object()?;
-        let inner = f(emitter);
-        let close = emitter.close_object();
-        inner.and(close)
+        self.emitter.write_key(self.name)?;
+        self.emitter.object(f)
     }
 
     /// Consume the key and open an array. Caller must later call
@@ -260,11 +252,8 @@ impl<B: JsonBackend> KeyedEmitter<'_, B> {
     where
         V: WriteVal,
     {
-        let emitter = self.emitter;
-        let name = self.name;
-        emitter.write_key(name)?;
-        v.write_to(&mut emitter.backend)?;
-        emitter.stack.mark_value_written()
+        self.emitter.write_key(self.name)?;
+        self.emitter.value(v)
     }
 
     /// Consume the key and write a string value via streaming closure.
