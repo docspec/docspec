@@ -168,15 +168,6 @@ use docspec_core::{
 };
 use docspec_json::{JsonEmitter, Null, StrusonBackend};
 
-macro_rules! close_text_block {
-    ($writer:expr) => {{
-        $writer.close_open_link_if_any()?;
-        $writer.close_content_block()?;
-        $writer.context.in_text_block = false;
-        Ok(())
-    }};
-}
-
 /// Represents the kind of list (ordered or unordered).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ListKind {
@@ -334,6 +325,15 @@ impl<W: Write> BlockNoteWriter<W> {
         self.json.close_object()
     }
 
+    /// Close the open text block: any open inline link, its `content[]` array, an empty
+    /// `children[]` array, and the block object itself.
+    fn close_text_block(&mut self) -> Result<()> {
+        self.close_open_link_if_any()?;
+        self.close_content_block()?;
+        self.context.in_text_block = false;
+        Ok(())
+    }
+
     fn close_current_list_item_object(&mut self) -> Result<()> {
         if self
             .list_stack
@@ -371,9 +371,7 @@ impl<W: Write> BlockNoteWriter<W> {
             return self.prepare_blockquote_children();
         }
         if self.context.in_text_block {
-            self.close_open_link_if_any()?;
-            self.close_content_block()?;
-            self.context.in_text_block = false;
+            self.close_text_block()?;
         }
         Ok(())
     }
@@ -401,7 +399,7 @@ impl<W: Write> BlockNoteWriter<W> {
     /// construction.
     fn close_open_child_text_block(&mut self) -> Result<()> {
         if self.context.in_text_block {
-            return close_text_block!(self);
+            return self.close_text_block();
         }
         Ok(())
     }
@@ -513,12 +511,7 @@ impl<W: Write> BlockNoteWriter<W> {
                 .is_some_and(|e| e.first_paragraph_consumed)
             && self.context.in_text_block
         {
-            self.close_open_link_if_any()?;
-            self.json.close_array()?;
-            self.json.key("children").array(|_| Ok(()))?;
-            self.json.close_object()?;
-            self.context.in_text_block = false;
-            return Ok(());
+            return self.close_text_block();
         }
         if self.blockquote_depth.is_positive()
             && self.context.in_text_block
@@ -527,7 +520,7 @@ impl<W: Write> BlockNoteWriter<W> {
                 .last()
                 .is_some_and(|state| *state == BlockquoteContentState::InChildren)
         {
-            return close_text_block!(self);
+            return self.close_text_block();
         }
         if self.in_list_item_content() {
             if let Some(entry) = self.list_stack.last_mut() {
@@ -541,7 +534,7 @@ impl<W: Write> BlockNoteWriter<W> {
         {
             return Ok(());
         }
-        close_text_block!(self)
+        self.close_text_block()
     }
 
     fn handle_end_table(&mut self) -> Result<()> {
@@ -1414,7 +1407,7 @@ impl<W: Write> EventSink for BlockNoteWriter<W> {
                 if !self.context.in_text_block {
                     return Ok(());
                 }
-                close_text_block!(self)
+                self.close_text_block()
             }
             Event::StartParagraph { alignment, id } => {
                 self.handle_paragraph(id.as_deref(), alignment.as_ref())
