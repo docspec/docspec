@@ -1215,11 +1215,9 @@ impl<W: Write> BlockNoteWriter<W> {
         match self.current_drain_destination() {
             DrainDestination::Ancestor {
                 kind: BlockKind::Blockquote,
-                ..
             } => self.prepare_blockquote_children(),
             DrainDestination::Ancestor {
                 kind: BlockKind::OrderedListItem | BlockKind::UnorderedListItem,
-                ..
             } => self.prepare_list_item_children(),
             DrainDestination::Ancestor { .. } | DrainDestination::DocumentRoot => {
                 self.close_for_block_sibling()
@@ -1326,25 +1324,10 @@ impl<W: Write> BlockNoteWriter<W> {
         if buffered.is_empty() {
             return Ok(());
         }
-        match self.current_drain_destination() {
-            DrainDestination::Ancestor {
-                kind: BlockKind::Blockquote,
-            } => {
-                self.prepare_blockquote_children()?;
-            }
-            DrainDestination::Ancestor {
-                kind: BlockKind::OrderedListItem | BlockKind::UnorderedListItem,
-            } => {
-                self.prepare_list_item_children()?;
-            }
-            DrainDestination::Ancestor { .. } | DrainDestination::DocumentRoot => {
-                self.close_for_block_sibling()?;
-            }
-        }
+        self.prepare_for_child_block()?;
         let rebase_offset = match self.current_drain_destination() {
             DrainDestination::Ancestor {
                 kind: BlockKind::OrderedListItem | BlockKind::UnorderedListItem,
-                ..
             } => self.compute_rebase_offset(&buffered),
             DrainDestination::Ancestor { .. } | DrainDestination::DocumentRoot => 0,
         };
