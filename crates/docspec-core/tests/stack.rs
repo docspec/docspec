@@ -451,14 +451,14 @@ mod tests {
         send(&mut sink, Event::EndTextStyle);
         send(&mut sink, Event::EndDocument);
 
-        assert!(sink.stack().is_empty());
+        assert_eq!(sink.stack(), []);
     }
 
     #[test]
     fn new_creates_empty_stack() {
         let mock = MockSink::new();
         let sink = StackTrackingSink::new(mock);
-        assert!(sink.stack().is_empty());
+        assert_eq!(sink.stack(), []);
     }
 
     #[test]

@@ -939,7 +939,6 @@ impl<W: Write> BlockNoteWriter<W> {
                 colspan,
                 id,
                 rowspan,
-                ..
             }
             | Event::StartTableHeader {
                 colspan,
@@ -1437,7 +1436,7 @@ impl<W: Write> EventSink for BlockNoteWriter<W> {
         let result = match event {
             Event::StartDocument { .. } => self.json.open_array(),
             Event::EndDocument => self.handle_end_document(),
-            Event::StartHeading { level, id, .. } => {
+            Event::StartHeading { level, id } => {
                 self.prepare_for_child_block()?;
                 self.handle_heading(level, id.as_deref())
             }
@@ -1451,16 +1450,16 @@ impl<W: Write> EventSink for BlockNoteWriter<W> {
                 self.handle_paragraph(id.as_deref(), alignment.as_ref())
             }
             Event::EndParagraph => self.handle_end_paragraph(),
-            Event::StartBlockQuote { id, .. } => {
+            Event::StartBlockQuote { id } => {
                 self.prepare_for_child_block()?;
                 self.handle_blockquote(id.as_deref())
             }
             Event::EndBlockQuote => self.handle_end_blockquote(),
-            Event::StartPreformatted { id, syntax, .. } => {
+            Event::StartPreformatted { id, syntax } => {
                 self.prepare_for_child_block()?;
                 self.handle_preformatted(id.as_deref(), syntax.as_deref())
             }
-            Event::ThematicBreak { id, .. } => {
+            Event::ThematicBreak { id } => {
                 self.prepare_for_child_block()?;
                 self.handle_divider(id.as_deref())
             }
@@ -1478,9 +1477,9 @@ impl<W: Write> EventSink for BlockNoteWriter<W> {
                 self.handle_start_list_item(ListKind::Unordered, level, None)
             }
             Event::EndOrderedListItem | Event::EndUnorderedListItem => self.handle_end_list_item(),
-            Event::StartTable { id, .. } => self.handle_start_table(id.as_deref()),
+            Event::StartTable { id } => self.handle_start_table(id.as_deref()),
             Event::EndTable => self.handle_end_table(),
-            Event::StartTableRow { id, .. } => self.handle_start_table_row(id.as_deref()),
+            Event::StartTableRow { id } => self.handle_start_table_row(id.as_deref()),
             Event::EndTableRow => self.handle_end_table_row(),
             event @ (Event::StartTableCell { .. } | Event::StartTableHeader { .. }) => {
                 self.handle_start_table_cell_event(event)
@@ -1517,14 +1516,14 @@ mod tests {
     fn list_stack_empty_after_new() {
         let mut buf = Vec::new();
         let writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.list_stack.is_empty());
+        assert_eq!(writer.list_stack, []);
     }
 
     #[test]
     fn blockquote_state_stack_empty_after_new() {
         let mut buf = Vec::new();
         let writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.blockquote_content_states.is_empty());
+        assert_eq!(writer.blockquote_content_states, []);
     }
 
     #[test]
