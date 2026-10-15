@@ -138,44 +138,8 @@ impl<W: Write> EventSink for OxaWriter<W> {
                     j.key("value").value(content.as_str())
                 })
             }
-            Event::EndBlockQuote
-            | Event::EndCaption
-            | Event::EndDefinitionDetail
-            | Event::EndDefinitionList
-            | Event::EndDefinitionTerm
-            | Event::EndFootnote
-            | Event::EndHeading
-            | Event::EndLink
-            | Event::EndOrderedListItem
-            | Event::EndPreformatted
-            | Event::EndTable
-            | Event::EndTableCell
-            | Event::EndTableHeader
-            | Event::EndTableRow
-            | Event::EndTextStyle
-            | Event::EndUnorderedListItem
-            | Event::FootnoteRef { .. }
-            | Event::Image { .. }
-            | Event::LineBreak
-            | Event::SoftBreak
-            | Event::StartBlockQuote { .. }
-            | Event::StartCaption { .. }
-            | Event::StartDefinitionDetail { .. }
-            | Event::StartDefinitionList { .. }
-            | Event::StartDefinitionTerm { .. }
-            | Event::StartFootnote { .. }
-            | Event::StartHeading { .. }
-            | Event::StartLink { .. }
-            | Event::StartOrderedListItem { .. }
-            | Event::StartPreformatted { .. }
-            | Event::StartTable { .. }
-            | Event::StartTableCell { .. }
-            | Event::StartTableHeader { .. }
-            | Event::StartTableRow { .. }
-            | Event::StartTextStyle { .. }
-            | Event::StartUnorderedListItem { .. }
-            | Event::ThematicBreak { .. }
-            | _ => Ok(()),
+            // Every other event is unsupported by this writer and ignored.
+            _ => Ok(()),
         }
     }
 }
