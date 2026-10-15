@@ -80,7 +80,6 @@ struct ParagraphParseState {
 enum HyperlinkParseEnd {
     HyperlinkClosed,
     ParagraphClosed,
-    Eof,
 }
 
 impl Default for ParagraphParseState {
@@ -308,10 +307,7 @@ impl DocumentReader {
                 | quick_xml::events::Event::PI(_)
                 | quick_xml::events::Event::DocType(_) => {}
                 quick_xml::events::Event::Eof => {
-                    if content_emitted {
-                        self.close_run_styles(props.as_ref());
-                    }
-                    return Ok(());
+                    return Err(unexpected_eof("r"));
                 }
             }
         }
@@ -581,8 +577,7 @@ impl DocumentReader {
                 | quick_xml::events::Event::PI(_)
                 | quick_xml::events::Event::DocType(_) => {}
                 quick_xml::events::Event::Eof => {
-                    self.emit_buffered_hyperlink(resolved, buffered);
-                    return Ok(HyperlinkParseEnd::Eof);
+                    return Err(unexpected_eof("hyperlink"));
                 }
             }
         }
@@ -629,11 +624,6 @@ impl DocumentReader {
                     HyperlinkParseEnd::HyperlinkClosed => {}
                     HyperlinkParseEnd::ParagraphClosed => {
                         self.finish_paragraph_parse(state);
-                        return Ok(true);
-                    }
-                    HyperlinkParseEnd::Eof => {
-                        self.finish_paragraph_parse(state);
-                        self.handle_eof();
                         return Ok(true);
                     }
                 }
@@ -705,9 +695,7 @@ impl DocumentReader {
                 | quick_xml::events::Event::PI(_)
                 | quick_xml::events::Event::DocType(_) => {}
                 quick_xml::events::Event::Eof => {
-                    self.finish_paragraph_parse(&mut state);
-                    self.handle_eof();
-                    return Ok(());
+                    return Err(unexpected_eof("p"));
                 }
             }
         }
@@ -3194,7 +3182,7 @@ mod tests {
         let doc = format!(
             r#"<?xml version="1.0" encoding="UTF-8"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{}"#,
-            r#"<w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>item</w:t></w:r>"#
+            r#"<w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>item</w:t></w:r></w:p>"#
         );
         let mut reader = make_reader_with_numbering(&doc, decimal_numbering());
         let events = collect_events(&mut reader);
