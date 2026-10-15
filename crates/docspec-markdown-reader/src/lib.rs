@@ -534,7 +534,7 @@ impl MarkdownReader {
                 for event in self.html_block_inline_stack.close_all() {
                     self.queue.push_back(event);
                 }
-                if let Some(event) = self.html_block_heading_acc.finish_block() {
+                if let Some(event) = self.html_block_heading_acc.close() {
                     self.queue.push_back(event);
                 }
             }

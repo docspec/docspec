@@ -22,9 +22,8 @@ pub(crate) const MARK_COLOR: docspec_core::Color = docspec_core::Color::Rgb {
 ///
 /// Returns `None` for non-style intents (`Heading`, `LineBreak`,
 /// `ThematicBreak`, `Ignored`) so the type system enforces that the
-/// stack is never asked to track them. Callers in the HTML translator
-/// already match on these variants and route them to dedicated handlers;
-/// the `None` arm exists to make that contract explicit.
+/// stack is never asked to track them. The HTML translator branches on
+/// this result first and routes the `None` cases to dedicated handlers.
 pub(crate) fn tag_intent_to_style_kind(intent: &TagIntent) -> Option<TextStyleKind> {
     Some(match *intent {
         TagIntent::Bold => TextStyleKind::Bold,
