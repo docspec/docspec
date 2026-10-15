@@ -1,8 +1,10 @@
 //! XML helpers shared by every DOCX part parser.
 //!
-//! `document.xml`, `styles.xml`, `numbering.xml`, `[Content_Types].xml` and the
-//! relationship parts all report malformed input the same way and read
-//! attributes through the same decoder, so those steps live here once.
+//! Every DOCX part parser (`document.xml`, `styles.xml`, `numbering.xml`,
+//! `[Content_Types].xml` and the relationship parts) reports malformed input
+//! through [`parse_error`]. `[Content_Types].xml` and `numbering.xml` also read
+//! attributes through [`attr_string`]; `styles.xml` and the relationship parts
+//! still decode attributes in their own code.
 
 use std::io::Read;
 
