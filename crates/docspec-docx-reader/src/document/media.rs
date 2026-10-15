@@ -54,8 +54,7 @@ impl DocumentReader {
                     }
                 }
                 quick_xml::events::Event::Eof => {
-                    self.handle_eof();
-                    drawing_depth = 0;
+                    return Err(unexpected_eof("drawing"));
                 }
                 quick_xml::events::Event::Text(_)
                 | quick_xml::events::Event::GeneralRef(_)

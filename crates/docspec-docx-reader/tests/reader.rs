@@ -2201,45 +2201,6 @@ mod events {
     }
 
     #[test]
-    fn eof_mid_text_flushes_text_and_closes_paragraph() {
-        let bytes = fixture::synth_docx(
-            SIMPLE_RELS,
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>partial"#,
-        );
-        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
-        let events = drive(&mut reader);
-        assert_eq!(
-            events,
-            vec![
-                start_document(),
-                start_paragraph(),
-                text("partial"),
-                Event::EndParagraph,
-                Event::EndDocument,
-            ]
-        );
-    }
-
-    #[test]
-    fn eof_mid_paragraph_auto_closes() {
-        let bytes = fixture::synth_docx(
-            SIMPLE_RELS,
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>"#,
-        );
-        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
-        let events = drive(&mut reader);
-        assert_eq!(
-            events,
-            vec![
-                start_document(),
-                start_paragraph(),
-                Event::EndParagraph,
-                Event::EndDocument
-            ]
-        );
-    }
-
-    #[test]
     fn w_tab_self_closing_emits_text_tab_between_text_runs() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>a</w:t><w:tab/><w:t>b</w:t></w:r></w:p></w:body></w:document>"#,
@@ -4660,31 +4621,6 @@ mod events {
     }
 
     #[test]
-    fn hyperlink_eof_with_open_link_auto_closes() {
-        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <w:body><w:p><w:hyperlink r:id="rId1"><w:r><w:t>x</w:t></w:r>"#;
-        let rels_xml = document_hyperlink_rels(
-            TRANSITIONAL_HYPERLINK_TYPE,
-            "https://example.com",
-            "External",
-        );
-        let events = hyperlink_events(document_xml, Some(&rels_xml));
-        assert_eq!(
-            events,
-            vec![
-                start_document(),
-                start_paragraph(),
-                start_link("https://example.com", None),
-                text("x"),
-                Event::EndLink,
-                Event::EndParagraph,
-                Event::EndDocument,
-            ]
-        );
-    }
-
-    #[test]
     fn hyperlink_inside_preformatted_paragraph_passes_through() {
         let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -5315,29 +5251,6 @@ mod events {
                 text(" "),
                 text(" "),
                 text("sdt"),
-                Event::EndParagraph,
-                Event::EndDocument,
-            ]
-        );
-    }
-
-    #[test]
-    fn eof_inside_styled_run_auto_closes_styles() {
-        let mut reader = make_reader(
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>bold"#,
-        );
-        let events = drive(&mut reader);
-        assert_eq!(
-            events,
-            vec![
-                start_document(),
-                start_paragraph(),
-                Event::StartTextStyle {
-                    kind: TextStyleKind::Bold,
-                    id: None,
-                },
-                text("bold"),
-                Event::EndTextStyle,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -7397,7 +7310,7 @@ mod cross_feature_lists {
 mod truncated_document {
     use std::io::Cursor;
 
-    use docspec_core::{Error, Event, EventSource as _};
+    use docspec_core::{Error, Event, EventSource as _, TextStyleKind};
     use docspec_docx_reader::DocxReader;
     use docspec_test_utils::builders::{start_document, start_paragraph, text};
 
@@ -7441,6 +7354,71 @@ mod truncated_document {
             id: None,
             rowspan: None,
         }
+    }
+
+    #[test]
+    fn eof_inside_t_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:p><w:r><w:t>partial"),
+            (
+                vec![start_document(), start_paragraph()],
+                "malformed document.xml: unexpected EOF inside <w:t>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_r_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>bold</w:t>"),
+            (
+                vec![
+                    start_document(),
+                    start_paragraph(),
+                    Event::StartTextStyle {
+                        kind: TextStyleKind::Bold,
+                        id: None,
+                    },
+                    text("bold"),
+                ],
+                "malformed document.xml: unexpected EOF inside <w:r>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_hyperlink_is_a_parse_error() {
+        assert_eq!(
+            read_until_error(r#"<w:p><w:hyperlink w:anchor="target"><w:r><w:t>x</w:t></w:r>"#),
+            (
+                vec![start_document(), start_paragraph()],
+                "malformed document.xml: unexpected EOF inside <w:hyperlink>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_p_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:p><w:r><w:t>whole</w:t></w:r>"),
+            (
+                vec![start_document(), start_paragraph(), text("whole")],
+                "malformed document.xml: unexpected EOF inside <w:p>".to_string(),
+            )
+        );
+    }
+
+    /// Regression: EOF inside a drawing used to end the document twice, with an
+    /// `EndParagraph` after the first `EndDocument`.
+    #[test]
+    fn eof_inside_drawing_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:p><w:drawing><a:x>"),
+            (
+                vec![start_document(), start_paragraph()],
+                "malformed document.xml: unexpected EOF inside <w:drawing>".to_string(),
+            )
+        );
     }
 
     #[test]
