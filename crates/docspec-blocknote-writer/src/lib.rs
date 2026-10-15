@@ -486,16 +486,7 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn handle_end_paragraph(&mut self) -> Result<()> {
-        let in_current_blockquote_list_item =
-            self.blockquote_depth.is_positive() && self.current_blockquote_contains_list_item();
-        if !self.list_stack.is_empty()
-            && (self.blockquote_depth.is_zero() || in_current_blockquote_list_item)
-            && self
-                .list_stack
-                .last()
-                .is_some_and(|e| e.first_paragraph_consumed)
-            && self.context.in_text_block
-        {
+        if self.paragraph_is_list_item_child() && self.context.in_text_block {
             return self.close_text_block();
         }
         if self.blockquote_depth.is_positive()
@@ -666,18 +657,10 @@ impl<W: Write> BlockNoteWriter<W> {
         if self.context.in_table_cell {
             return Ok(());
         }
-        let in_current_blockquote_list_item =
-            self.blockquote_depth.is_positive() && self.current_blockquote_contains_list_item();
         // Second and subsequent paragraphs inside a list item dispatch as child paragraph blocks
         // in the item's children[] array (T11). Must be checked before in_list_item_content()
         // because content may still be open when first_paragraph_consumed is set.
-        if !self.list_stack.is_empty()
-            && (self.blockquote_depth.is_zero() || in_current_blockquote_list_item)
-            && self
-                .list_stack
-                .last()
-                .is_some_and(|e| e.first_paragraph_consumed)
-        {
+        if self.paragraph_is_list_item_child() {
             if self
                 .list_stack
                 .last()
@@ -705,9 +688,7 @@ impl<W: Write> BlockNoteWriter<W> {
             self.context.in_text_block = true;
             return Ok(());
         }
-        if !self.list_stack.is_empty()
-            && (self.blockquote_depth.is_zero() || in_current_blockquote_list_item)
-        {
+        if self.paragraph_targets_list_item() {
             self.initialize_current_list_item_content(alignment)?;
             return Ok(());
         }
@@ -767,9 +748,7 @@ impl<W: Write> BlockNoteWriter<W> {
     ///
     /// Drops `title` and `id` — `BlockNote`'s inline link schema has no slot for these.
     fn handle_start_link(&mut self, href: &str) -> Result<()> {
-        if self.list_stack.last().is_some_and(|entry| {
-            entry.content_state == ListContentState::Pending && !entry.first_paragraph_consumed
-        }) {
+        if self.list_item_awaiting_first_content() {
             self.initialize_current_list_item_content(None)?;
         }
         if !self.context.in_text_block
@@ -807,6 +786,31 @@ impl<W: Write> BlockNoteWriter<W> {
             });
         }
         Ok(())
+    }
+
+    /// Whether paragraph events belong to the innermost open list item: a list item is open,
+    /// and either no blockquote is open or the innermost open blockquote holds an open list item.
+    fn paragraph_targets_list_item(&self) -> bool {
+        !self.list_stack.is_empty()
+            && (self.blockquote_depth.is_zero() || self.current_blockquote_contains_list_item())
+    }
+
+    /// Whether a paragraph in the innermost open list item comes after its first paragraph,
+    /// making it a child `paragraph` block in the item's `children[]` array.
+    fn paragraph_is_list_item_child(&self) -> bool {
+        self.paragraph_targets_list_item()
+            && self
+                .list_stack
+                .last()
+                .is_some_and(|entry| entry.first_paragraph_consumed)
+    }
+
+    /// Whether the innermost list item has neither opened its `content[]` array nor consumed
+    /// its first paragraph, so inline content arriving now must open `content[]` first.
+    fn list_item_awaiting_first_content(&self) -> bool {
+        self.list_stack.last().is_some_and(|entry| {
+            entry.content_state == ListContentState::Pending && !entry.first_paragraph_consumed
+        })
     }
 
     fn current_blockquote_contains_list_item(&self) -> bool {
@@ -1030,9 +1034,7 @@ impl<W: Write> BlockNoteWriter<W> {
 
     fn handle_text_event(&mut self, content: &str) -> Result<()> {
         // Auto-open paragraph for orphan text (e.g., text after image closed paragraph)
-        if self.list_stack.last().is_some_and(|entry| {
-            entry.content_state == ListContentState::Pending && !entry.first_paragraph_consumed
-        }) {
+        if self.list_item_awaiting_first_content() {
             self.initialize_current_list_item_content(None)?;
         }
         if self.blockquote_depth.is_positive() && !self.context.in_text_block {
