@@ -99,7 +99,8 @@ impl<W: Write> EventSink for HtmlWriter<W> {
                 self.serializer.write_text(&content)?;
             }
             _ => {
-                // HTML writer drops all inline styles (StartTextStyle, EndTextStyle) per documented contract
+                // Every other event (headings, lists, tables, links, images, text styles,
+                // breaks, and Text outside a paragraph) is dropped; see the crate docs.
             }
         }
         Ok(())
