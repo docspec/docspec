@@ -105,6 +105,34 @@ pub fn posthog_client_slot(
     POSTHOG_CLIENT.get_or_init(|| std::sync::RwLock::new(None))
 }
 
+/// Returns a clone of the installed `PostHog` client, if any.
+///
+/// The read guard is dropped before returning, so callers may hold the
+/// client across an await point. If the slot is poisoned, logs `context` as
+/// a warning and returns `None`.
+#[cfg(feature = "posthog")]
+pub(crate) fn current_posthog_client(
+    context: &'static str,
+) -> Option<std::sync::Arc<posthog_rs::Client>> {
+    clone_slot_contents(posthog_client_slot(), context)
+}
+
+/// Clones the `Arc` held in `slot`, warning with `context` and returning
+/// `None` if the lock is poisoned.
+#[cfg(feature = "posthog")]
+fn clone_slot_contents<T>(
+    slot: &std::sync::RwLock<Option<std::sync::Arc<T>>>,
+    context: &'static str,
+) -> Option<std::sync::Arc<T>> {
+    match slot.read() {
+        Ok(guard) => guard.as_ref().map(std::sync::Arc::clone),
+        Err(_poisoned) => {
+            tracing::warn!("{context}");
+            None
+        }
+    }
+}
+
 /// Constructs a `PostHog` client from environment variables and returns it
 /// wrapped in an `Arc`.
 ///
@@ -165,14 +193,9 @@ pub fn install_posthog_client(client: Option<std::sync::Arc<posthog_rs::Client>>
 #[cfg(feature = "posthog")]
 #[inline]
 pub async fn shutdown() {
-    let client_arc = match posthog_client_slot().read() {
-        Ok(guard) => guard.as_ref().map(std::sync::Arc::clone),
-        Err(_poisoned) => {
-            tracing::warn!("posthog client slot poisoned during shutdown; skipping flush");
-            None
-        }
-    };
-    if let Some(client) = client_arc {
+    if let Some(client) =
+        current_posthog_client("posthog client slot poisoned during shutdown; skipping flush")
+    {
         client.shutdown().await;
     }
 }
@@ -211,6 +234,7 @@ mod tests {
     #![allow(
         clippy::expect_used,
         clippy::unwrap_used,
+        clippy::panic,
         clippy::semicolon_outside_block
     )]
     #[cfg(feature = "sentry")]
@@ -261,6 +285,32 @@ mod tests {
             let mut guard = slot.write().expect("slot write should not be poisoned");
             let _ = guard.take();
         }
+    }
+
+    #[cfg(feature = "posthog")]
+    #[test]
+    fn clone_slot_contents_clones_installed_value() {
+        let slot = std::sync::RwLock::new(Some(std::sync::Arc::new("client")));
+        let cloned = super::clone_slot_contents(&slot, "unused");
+        assert_eq!(cloned.as_deref(), Some(&"client"));
+    }
+
+    #[cfg(feature = "posthog")]
+    #[test]
+    fn clone_slot_contents_returns_none_when_poisoned() {
+        let slot = std::sync::Arc::new(std::sync::RwLock::new(Some(std::sync::Arc::new("client"))));
+        let poisoner = std::sync::Arc::clone(&slot);
+        let joined = std::thread::spawn(move || {
+            let _guard = poisoner.write().unwrap();
+            panic!("poison the slot");
+        })
+        .join();
+        assert!(joined.is_err());
+        assert!(slot.is_poisoned());
+        assert_eq!(
+            super::clone_slot_contents(&slot, "slot poisoned in test"),
+            None
+        );
     }
 
     #[cfg(feature = "posthog")]
