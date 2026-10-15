@@ -2655,21 +2655,6 @@ mod tests {
         collect_events(&mut reader)
     }
 
-    fn start_document_event() -> Event {
-        Event::StartDocument {
-            id: None,
-            language: None,
-            metadata: None,
-        }
-    }
-
-    fn start_paragraph_event() -> Event {
-        Event::StartParagraph {
-            alignment: None,
-            id: None,
-        }
-    }
-
     fn start_preformatted_event() -> Event {
         Event::StartPreformatted {
             id: None,
@@ -2693,11 +2678,11 @@ mod tests {
         assert_eq!(
             events_for_body_with_source_code_style(&body),
             vec![
-                start_document_event(),
+                start_doc(),
                 start_preformatted_event(),
                 text_event("code"),
                 Event::EndPreformatted,
-                start_paragraph_event(),
+                start_para(),
                 text_event("after"),
                 Event::EndParagraph,
                 Event::EndDocument,
@@ -2715,11 +2700,11 @@ mod tests {
         assert_eq!(
             events_for_body_with_source_code_style(&body),
             vec![
-                start_document_event(),
+                start_doc(),
                 start_preformatted_event(),
                 text_event("code"),
                 Event::EndPreformatted,
-                start_paragraph_event(),
+                start_para(),
                 Event::LineBreak,
                 text_event("after"),
                 Event::EndParagraph,
@@ -2737,11 +2722,11 @@ mod tests {
         assert_eq!(
             events_for_body_with_source_code_style(&body),
             vec![
-                start_document_event(),
+                start_doc(),
                 start_preformatted_event(),
                 text_event("code"),
                 Event::EndPreformatted,
-                start_paragraph_event(),
+                start_para(),
                 text_event("\t"),
                 text_event("after"),
                 Event::EndParagraph,
@@ -2756,11 +2741,11 @@ mod tests {
         assert_eq!(
             events_for_body_with_source_code_style(&body),
             vec![
-                start_document_event(),
+                start_doc(),
                 start_preformatted_event(),
                 text_event("code"),
                 Event::EndPreformatted,
-                start_paragraph_event(),
+                start_para(),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -2778,11 +2763,11 @@ mod tests {
         assert_eq!(
             events_for_body_with_source_code_style(&body),
             vec![
-                start_document_event(),
+                start_doc(),
                 start_preformatted_event(),
                 text_event("first"),
                 Event::EndPreformatted,
-                start_paragraph_event(),
+                start_para(),
                 text_event("regular"),
                 Event::EndParagraph,
                 start_preformatted_event(),
@@ -2803,7 +2788,7 @@ mod tests {
         assert_eq!(
             events_for_body_with_source_code_style(&body),
             vec![
-                start_document_event(),
+                start_doc(),
                 start_preformatted_event(),
                 text_event("first"),
                 Event::LineBreak,
@@ -2824,18 +2809,14 @@ mod tests {
         assert_eq!(
             events_for_body_with_source_code_style(&body),
             vec![
-                start_document_event(),
+                start_doc(),
                 Event::StartTable { id: None },
                 Event::StartTableRow { id: None },
-                Event::StartTableCell {
-                    colspan: None,
-                    rowspan: None,
-                    id: None,
-                },
+                start_cell(None),
                 start_preformatted_event(),
                 text_event("code"),
                 Event::EndPreformatted,
-                start_paragraph_event(),
+                start_para(),
                 text_event("after"),
                 Event::EndParagraph,
                 Event::EndTableCell,
