@@ -283,7 +283,7 @@ mod tests {
     #[test]
     fn capturing_backend_starts_empty() {
         let b = CapturingBackend::new();
-        assert!(b.tokens().is_empty());
+        assert_eq!(b.tokens(), []);
     }
 
     #[test]
@@ -358,6 +358,6 @@ mod tests {
         let mut b = CapturingBackend::new();
         let result = b.write_string_streaming(|_w| Err(std::io::Error::other("test error")));
         assert!(result.is_err());
-        assert!(b.tokens().is_empty());
+        assert_eq!(b.tokens(), []);
     }
 }

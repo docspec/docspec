@@ -127,7 +127,7 @@ mod tests {
         );
 
         let bom_in_text = events.iter().any(|event| match event {
-            Event::Text { content, .. } => content.starts_with('\u{FEFF}'),
+            Event::Text { content } => content.starts_with('\u{FEFF}'),
             _ => false,
         });
         assert!(

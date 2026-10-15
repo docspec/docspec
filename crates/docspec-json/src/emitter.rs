@@ -732,7 +732,7 @@ mod tests {
             assert!(e.close_object().is_ok());
             assert!(e.close_array().is_ok());
             assert!(e.close_object().is_ok());
-            assert!(!finish_tokens(e).is_empty());
+            assert_ne!(finish_tokens(e), Vec::<Token>::new());
         }
 
         #[test]
