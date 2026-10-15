@@ -27,7 +27,7 @@ const ROOT_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://sch
 
 const DOCUMENT_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>"#;
 
-const STYLES: &str = r#"<?xml version="1.0"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="SourceCode"><w:name w:val="Source Code"/></w:style></w:styles>"#;
+const STYLES: &str = r#"<?xml version="1.0"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="SourceCode"><w:name w:val="Source Code"/></w:style><w:style w:type="character" w:styleId="VerbatimChar"><w:name w:val="Verbatim Char"/></w:style></w:styles>"#;
 
 fn docx_to_blocknote(body: &str) -> String {
     let document = format!(
@@ -101,6 +101,41 @@ fn code_paragraph_between_plain_paragraphs_converts_to_sibling_blocks() {
                     "text": "from the beginning of the docx reader.",
                     "styles": {}
                 }],
+                "children": []
+            }
+        ]),
+    );
+}
+
+/// Runs styled `Verbatim Char` inside a code paragraph are plain text in the code block.
+///
+/// The event model forbids text styles inside a preformatted block, and a `BlockNote`
+/// code block holds unstyled text.
+#[test]
+fn verbatim_char_runs_inside_code_paragraph_convert_to_unstyled_code_text() {
+    let body = concat!(
+        r#"<w:p><w:pPr><w:pStyle w:val="SourceCode"/></w:pPr>"#,
+        r#"<w:r><w:rPr><w:rStyle w:val="VerbatimChar"/></w:rPr><w:t>readDocx</w:t></w:r>"#,
+        r#"<w:r><w:br/></w:r>"#,
+        r#"<w:r><w:rPr><w:rStyle w:val="VerbatimChar"/><w:b/></w:rPr><w:t>-&gt; Pandoc</w:t></w:r></w:p>"#,
+        r#"<w:p><w:r><w:t>after</w:t></w:r></w:p>"#,
+    );
+
+    assert_json_eq(
+        &docx_to_blocknote(body),
+        json!([
+            {
+                "type": "codeBlock",
+                "content": [
+                    {"type": "text", "text": "readDocx", "styles": {}},
+                    {"type": "text", "text": "\n", "styles": {}},
+                    {"type": "text", "text": "-> Pandoc", "styles": {}}
+                ],
+                "children": []
+            },
+            {
+                "type": "paragraph",
+                "content": [{"type": "text", "text": "after", "styles": {}}],
                 "children": []
             }
         ]),

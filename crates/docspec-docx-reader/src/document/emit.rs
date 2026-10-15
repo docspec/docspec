@@ -31,11 +31,18 @@ pub(crate) struct EmitState {
     list_stack: Vec<ListStackEntry>,
     list_counters: HashMap<(u32, u32), u64>,
     pending_preformatted_close: bool,
+    /// True from a queued `StartPreformatted` until its `EndPreformatted`.
+    in_preformatted: bool,
 }
 
 impl EmitState {
     /// Queues an event for emission.
     pub(crate) fn push(&mut self, event: Event) {
+        match event {
+            Event::StartPreformatted { .. } => self.in_preformatted = true,
+            Event::EndPreformatted => self.in_preformatted = false,
+            _ => {}
+        }
         self.queue.push_back(event);
     }
 
@@ -224,8 +231,12 @@ impl EmitState {
     }
 
     /// Opens an inline style span unless that kind is already open.
+    ///
+    /// Inside a preformatted block no span opens: text styles and preformatted
+    /// blocks must not nest. Nothing is opened, so closing the run's styles
+    /// afterwards emits nothing either.
     pub(crate) fn emit_style_if_not_open(&mut self, kind: TextStyleKind) {
-        if !self.open_styles.contains(&kind) {
+        if !self.in_preformatted && !self.open_styles.contains(&kind) {
             self.push(Event::StartTextStyle {
                 kind: kind.clone(),
                 id: None,
