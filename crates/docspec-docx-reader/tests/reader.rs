@@ -7393,3 +7393,177 @@ mod cross_feature_lists {
         );
     }
 }
+
+mod truncated_document {
+    use std::io::Cursor;
+
+    use docspec_core::{Error, Event, EventSource as _};
+    use docspec_docx_reader::DocxReader;
+    use docspec_test_utils::builders::{start_document, start_paragraph, text};
+
+    use crate::fixture;
+
+    const SIMPLE_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+
+    /// Reads a `document.xml` whose body is `truncated_body` with nothing after it,
+    /// returning the events emitted before the reader failed and the error message.
+    fn read_until_error(truncated_body: &str) -> (Vec<Event>, String) {
+        let document_xml = format!(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml"><w:body>{truncated_body}"#,
+        );
+        let bytes = fixture::synth_docx(SIMPLE_RELS, &document_xml);
+        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+        let mut events = Vec::new();
+        loop {
+            match reader.next_event() {
+                Ok(Some(event)) => events.push(event),
+                Ok(None) => panic!("expected a parse error, got end of stream after {events:?}"),
+                Err(Error::Parse { message, position }) => {
+                    assert_eq!(position, None, "parse errors carry no position");
+                    return (events, message);
+                }
+                Err(other) => panic!("expected Error::Parse, got: {other:?}"),
+            }
+        }
+    }
+
+    fn start_table() -> Event {
+        Event::StartTable { id: None }
+    }
+
+    fn start_row() -> Event {
+        Event::StartTableRow { id: None }
+    }
+
+    fn start_cell() -> Event {
+        Event::StartTableCell {
+            colspan: None,
+            id: None,
+            rowspan: None,
+        }
+    }
+
+    #[test]
+    fn eof_inside_rpr_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:p><w:r><w:rPr><w:b/>"),
+            (
+                vec![start_document(), start_paragraph()],
+                "malformed document.xml: unexpected EOF inside <w:rPr>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_numpr_is_a_parse_error() {
+        assert_eq!(
+            read_until_error(r#"<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/>"#),
+            (
+                vec![start_document()],
+                "malformed document.xml: unexpected EOF inside <w:numPr>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_ppr_is_a_parse_error() {
+        assert_eq!(
+            read_until_error(r#"<w:p><w:pPr><w:jc w:val="center"/>"#),
+            (
+                vec![start_document()],
+                "malformed document.xml: unexpected EOF inside <w:pPr>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_tcpr_is_a_parse_error() {
+        assert_eq!(
+            read_until_error(r#"<w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/>"#),
+            (
+                vec![start_document(), start_table(), start_row()],
+                "malformed document.xml: unexpected EOF inside <w:tcPr>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_trpr_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:tbl><w:tr><w:trPr><w:tblHeader/>"),
+            (
+                vec![start_document(), start_table()],
+                "malformed document.xml: unexpected EOF inside <w:trPr>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_tc_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:tbl><w:tr><w:tc><w:p><w:r><w:t>x</w:t></w:r></w:p>"),
+            (
+                vec![
+                    start_document(),
+                    start_table(),
+                    start_row(),
+                    start_cell(),
+                    start_paragraph(),
+                    text("x"),
+                    Event::EndParagraph,
+                ],
+                "malformed document.xml: unexpected EOF inside <w:tc>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_tr_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:tbl><w:tr><w:tc><w:p/></w:tc>"),
+            (
+                vec![
+                    start_document(),
+                    start_table(),
+                    start_row(),
+                    start_cell(),
+                    start_paragraph(),
+                    Event::EndParagraph,
+                    Event::EndTableCell,
+                ],
+                "malformed document.xml: unexpected EOF inside <w:tr>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_tbl_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr>"),
+            (
+                vec![
+                    start_document(),
+                    start_table(),
+                    start_row(),
+                    start_cell(),
+                    start_paragraph(),
+                    Event::EndParagraph,
+                    Event::EndTableCell,
+                    Event::EndTableRow,
+                ],
+                "malformed document.xml: unexpected EOF inside <w:tbl>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_pict_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:p><w:pict><v:shape>"),
+            (
+                vec![start_document(), start_paragraph()],
+                "malformed document.xml: unexpected EOF inside <w:pict>".to_string(),
+            )
+        );
+    }
+}

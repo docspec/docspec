@@ -5,6 +5,8 @@ use docspec_core::Error;
 use quick_xml::events::Event;
 use quick_xml::XmlVersion;
 
+use crate::document::xml::parse_error;
+
 /// Maps relationship Id (e.g., "rId7") to Target URL/path for every <Relationship> entry whose Type ends with "/hyperlink".
 pub(crate) type HyperlinkMap = HashMap<String, String>;
 
@@ -267,13 +269,6 @@ where
             Ok(_) => {}
         }
         buf.clear();
-    }
-}
-
-fn parse_error(message: String) -> Error {
-    Error::Parse {
-        message,
-        position: None,
     }
 }
 

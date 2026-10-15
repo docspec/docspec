@@ -15,6 +15,7 @@ mod input;
 mod media;
 mod props;
 mod text;
+pub(crate) mod xml;
 
 pub use context::DocxData;
 use context::PackageContext;
@@ -25,6 +26,7 @@ use props::{
     ResolvedParagraphProperties, ResolvedRowProperties, ResolvedRunProperties,
 };
 use text::{collect_text_content, decode_general_ref, normalize_symbol_text, resolve_sym_char};
+use xml::parse_error;
 
 const MAX_LIST_LEVEL: u32 = 8;
 
@@ -503,7 +505,7 @@ impl DocumentReader {
 
         let rid = read_attribute(tag, b"r:id");
         let anchor = read_attribute(tag, b"w:anchor");
-        let tooltip = read_attribute(tag, b"w:tooltip");
+        let title = read_decoded_attribute(tag, b"w:tooltip");
 
         let href = if let Some(rid_val) = rid {
             self.package.hyperlink_target(&rid_val)?
@@ -511,12 +513,6 @@ impl DocumentReader {
             let anchor_val = anchor.filter(|a| !a.is_empty())?;
             format!("#{anchor_val}")
         };
-
-        let title = tooltip.and_then(|t| {
-            quick_xml::escape::unescape(&t)
-                .ok()
-                .map(std::borrow::Cow::into_owned)
-        });
 
         Some((href, title))
     }
@@ -547,15 +543,9 @@ impl DocumentReader {
         &mut self,
         start: &BytesStart<'_>,
         is_preformatted: bool,
-        is_empty: bool,
     ) -> Result<HyperlinkParseEnd> {
         let resolved = self.resolved_hyperlink(start, is_preformatted);
         let mut buffered: Vec<Event> = Vec::new();
-
-        if is_empty {
-            self.emit_buffered_hyperlink(resolved, buffered);
-            return Ok(HyperlinkParseEnd::HyperlinkClosed);
-        }
 
         let mut nested_depth: u32 = 1;
         while nested_depth > 0 {
@@ -635,7 +625,6 @@ impl DocumentReader {
                 match self.parse_hyperlink(
                     start,
                     matches!(state.block_kind, ParagraphBlockKind::Preformatted),
-                    false,
                 )? {
                     HyperlinkParseEnd::HyperlinkClosed => {}
                     HyperlinkParseEnd::ParagraphClosed => {
@@ -676,14 +665,8 @@ impl DocumentReader {
             }
             b"tab" => self.emit_local_tab(state),
             b"br" => self.emit_local_line_break(state),
-            b"r" | b"drawing" | b"pict" => self.ensure_local_paragraph_started(state),
-            b"hyperlink" => {
+            b"r" | b"drawing" | b"pict" | b"hyperlink" => {
                 self.ensure_local_paragraph_started(state);
-                self.parse_hyperlink(
-                    empty,
-                    matches!(state.block_kind, ParagraphBlockKind::Preformatted),
-                    true,
-                )?;
             }
             _ => {}
         }
@@ -824,9 +807,7 @@ impl DocumentReader {
                     return Ok(());
                 }
                 quick_xml::events::Event::Eof => {
-                    return Err(parse_error(
-                        "malformed document.xml: unexpected EOF inside <w:tc>".to_string(),
-                    ));
+                    return Err(unexpected_eof("tc"));
                 }
                 quick_xml::events::Event::End(_)
                 | quick_xml::events::Event::Text(_)
@@ -899,9 +880,7 @@ impl DocumentReader {
                     return Ok(());
                 }
                 quick_xml::events::Event::Eof => {
-                    return Err(parse_error(
-                        "malformed document.xml: unexpected EOF inside <w:tr>".to_string(),
-                    ));
+                    return Err(unexpected_eof("tr"));
                 }
                 quick_xml::events::Event::End(_)
                 | quick_xml::events::Event::Text(_)
@@ -946,9 +925,7 @@ impl DocumentReader {
                     return Ok(());
                 }
                 quick_xml::events::Event::Eof => {
-                    return Err(parse_error(
-                        "malformed document.xml: unexpected EOF inside <w:tbl>".to_string(),
-                    ));
+                    return Err(unexpected_eof("tbl"));
                 }
                 quick_xml::events::Event::End(_)
                 | quick_xml::events::Event::Text(_)
@@ -1074,13 +1051,6 @@ fn is_denied_container(local: &[u8]) -> bool {
     )
 }
 
-fn read_val_attribute(tag: &BytesStart<'_>) -> Option<String> {
-    let a = tag.try_get_attribute(b"w:val").ok().flatten()?;
-    core::str::from_utf8(a.value.as_ref())
-        .ok()
-        .map(str::to_owned)
-}
-
 fn read_attribute(tag: &BytesStart<'_>, name: &[u8]) -> Option<String> {
     let a = tag.try_get_attribute(name).ok().flatten()?;
     core::str::from_utf8(a.value.as_ref())
@@ -1111,15 +1081,15 @@ fn read_rfonts_symbol(tag: &BytesStart<'_>) -> Option<crate::symbol_fonts::Symbo
 }
 
 fn parse_on_off_attribute(tag: &BytesStart<'_>) -> bool {
-    let val = read_val_attribute(tag);
+    let val = read_attribute(tag, b"w:val");
     properties::parse_on_off(val.as_deref())
 }
 
-fn parse_error(message: String) -> Error {
-    Error::Parse {
-        message,
-        position: None,
-    }
+/// Builds the error for `document.xml` ending inside the open `<w:{element}>`.
+fn unexpected_eof(element: &str) -> Error {
+    parse_error(format!(
+        "malformed document.xml: unexpected EOF inside <w:{element}>"
+    ))
 }
 
 #[cfg(test)]
