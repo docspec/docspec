@@ -111,36 +111,53 @@ mod tests {
         );
     }
 
-    #[test]
-    fn color_always_flag_enables_ansi() {
-        docspec_cmd()
-            .args([
-                "convert",
-                "--color",
-                "always",
-                "/tmp/nonexistent-docspec-test-file-xyz.md",
-                "-t",
-                "blocknote",
-            ])
-            .assert()
-            .failure()
-            .stderr(contains("\x1b["));
+    const SAME_FILE_ERROR_PLAIN: &str = "error: input and output paths refer to the same file\n";
+    const SAME_FILE_ERROR_COLOR: &str =
+        "\x1b[1;31merror:\x1b[0m input and output paths refer to the same file\n";
+
+    /// Fails deterministically (input == output) with the given --color and NO_COLOR.
+    fn color_case(color: Option<&str>, no_color: Option<&str>) -> assert_cmd::assert::Assert {
+        let mut cmd = docspec_cmd();
+        cmd.arg("convert");
+        if let Some(choice) = color {
+            cmd.args(["--color", choice]);
+        }
+        cmd.args(["same.md", "-o", "same.md"]);
+        match no_color {
+            Some(value) => cmd.env("NO_COLOR", value),
+            None => cmd.env_remove("NO_COLOR"),
+        };
+        cmd.assert().failure().code(1)
     }
 
     #[test]
-    fn color_never_flag_disables_ansi() {
-        docspec_cmd()
-            .args([
-                "convert",
-                "--color",
-                "never",
-                "/tmp/nonexistent-docspec-test-file-xyz.md",
-                "-t",
-                "blocknote",
-            ])
-            .assert()
-            .failure()
-            .stderr(contains("\x1b[").not());
+    fn color_always_without_no_color_enables_ansi() {
+        color_case(Some("always"), None).stderr(SAME_FILE_ERROR_COLOR);
+    }
+
+    #[test]
+    fn color_always_with_empty_no_color_enables_ansi() {
+        color_case(Some("always"), Some("")).stderr(SAME_FILE_ERROR_COLOR);
+    }
+
+    #[test]
+    fn color_always_overrides_no_color() {
+        color_case(Some("always"), Some("1")).stderr(SAME_FILE_ERROR_COLOR);
+    }
+
+    #[test]
+    fn color_never_without_no_color_disables_ansi() {
+        color_case(Some("never"), None).stderr(SAME_FILE_ERROR_PLAIN);
+    }
+
+    #[test]
+    fn color_never_with_no_color_disables_ansi() {
+        color_case(Some("never"), Some("1")).stderr(SAME_FILE_ERROR_PLAIN);
+    }
+
+    #[test]
+    fn color_auto_without_tty_disables_ansi() {
+        color_case(Some("auto"), None).stderr(SAME_FILE_ERROR_PLAIN);
     }
 
     #[test]
@@ -362,21 +379,6 @@ mod tests {
             .failure()
             .code(1)
             .stderr(contains("error:"));
-    }
-
-    #[test]
-    fn no_color_env_disables_ansi() {
-        docspec_cmd()
-            .env("NO_COLOR", "1")
-            .args([
-                "convert",
-                "/tmp/nonexistent-docspec-test-file-xyz.md",
-                "-t",
-                "blocknote",
-            ])
-            .assert()
-            .failure()
-            .stderr(contains("\x1b[").not());
     }
 
     #[test]

@@ -35,6 +35,9 @@ pub enum Commands {
 #[derive(clap::Args, Debug)]
 pub struct ConvertArgs {
     /// When to use colors.
+    ///
+    /// `always` and `never` override `NO_COLOR`. `auto` disables color when
+    /// `NO_COLOR` is set to a non-empty value or stderr is not a terminal.
     #[arg(long, value_name = "WHEN", default_value = "auto")]
     pub color: ColorChoice,
 
