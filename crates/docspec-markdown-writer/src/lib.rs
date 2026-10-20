@@ -77,6 +77,27 @@ impl<W: Write> MarkdownWriter<W> {
             text_in_current_block: false,
         }
     }
+
+    /// Closes the open block, if any, and resets the block state.
+    ///
+    /// A block that received text ends with `\n\n`. An empty heading still
+    /// emits its ATX prefix followed by `\n\n`. An empty paragraph emits
+    /// nothing.
+    fn close_block(&mut self) -> Result<()> {
+        match (self.in_block, self.text_in_current_block) {
+            (Some(_), true) => {
+                self.writer.write_all(b"\n\n")?;
+            }
+            (Some(BlockKind::Heading(level)), false) => {
+                write_atx_prefix(&mut self.writer, level)?;
+                self.writer.write_all(b"\n\n")?;
+            }
+            (Some(BlockKind::Paragraph), false) | (None, _) => {}
+        }
+        self.in_block = None;
+        self.text_in_current_block = false;
+        Ok(())
+    }
 }
 
 fn write_atx_prefix<W>(writer: &mut W, level: u8) -> Result<()>
@@ -107,22 +128,7 @@ impl<W: Write> EventSink for MarkdownWriter<W> {
     #[inline]
     fn finish(mut self) -> Result<()> {
         if self.started && !self.finished {
-            match self.in_block {
-                Some(BlockKind::Paragraph) => {
-                    if self.text_in_current_block {
-                        self.writer.write_all(b"\n\n")?;
-                    }
-                }
-                Some(BlockKind::Heading(level)) => {
-                    if self.text_in_current_block {
-                        self.writer.write_all(b"\n\n")?;
-                    } else {
-                        write_atx_prefix(&mut self.writer, level)?;
-                        self.writer.write_all(b"\n\n")?;
-                    }
-                }
-                None => {}
-            }
+            self.close_block()?;
         }
         self.writer.flush()?;
         Ok(())
@@ -161,11 +167,7 @@ impl<W: Write> EventSink for MarkdownWriter<W> {
                 self.text_in_current_block = false;
             }
             Event::EndParagraph if self.in_block == Some(BlockKind::Paragraph) => {
-                if self.text_in_current_block {
-                    self.writer.write_all(b"\n\n")?;
-                }
-                self.in_block = None;
-                self.text_in_current_block = false;
+                self.close_block()?;
             }
             Event::StartHeading { level, .. }
                 if self.started && !self.finished && self.in_block.is_none() =>
@@ -175,17 +177,7 @@ impl<W: Write> EventSink for MarkdownWriter<W> {
                 self.text_in_current_block = false;
             }
             Event::EndHeading if matches!(self.in_block, Some(BlockKind::Heading(_))) => {
-                match (self.in_block, self.text_in_current_block) {
-                    (Some(BlockKind::Heading(level)), false) => {
-                        write_atx_prefix(&mut self.writer, level)?;
-                        self.writer.write_all(b"\n\n")?;
-                    }
-                    _ => {
-                        self.writer.write_all(b"\n\n")?;
-                    }
-                }
-                self.in_block = None;
-                self.text_in_current_block = false;
+                self.close_block()?;
             }
             Event::Text { content } if self.in_block.is_some() => {
                 if self.text_in_current_block {
