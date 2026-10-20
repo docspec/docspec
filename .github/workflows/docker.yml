@@ -33,7 +33,9 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      # arm64 is emulated (~78 min); only the release push pays for it, PR validation stays amd64.
       - uses: docker/setup-qemu-action@v4
+        if: inputs.push
 
       - uses: docker/setup-buildx-action@v4
 
@@ -79,7 +81,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ inputs.push && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           push: ${{ inputs.push }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
