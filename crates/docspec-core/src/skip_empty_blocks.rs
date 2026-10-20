@@ -1,6 +1,6 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
-use crate::{Event, EventSource, Result};
+use crate::{block_kind_for_end, block_kind_for_start, BlockKind, Event, EventSource, Result};
 
 /// A streaming `EventSource` adapter that suppresses empty `Heading`, `BlockQuote`, and
 /// `Paragraph` Start/End pairs from the wrapped source.
@@ -159,22 +159,26 @@ impl<S: EventSource> EventSource for SkipEmptyBlocks<S> {
     }
 }
 
-// Returns true if `event` is a candidate start event for empty-block suppression.
-fn is_skippable_start(event: &Event) -> bool {
-    matches!(
-        event,
-        Event::StartHeading { .. } | Event::StartBlockQuote { .. } | Event::StartParagraph { .. }
-    )
+/// Block kinds whose empty Start/End pairs are suppressed.
+const SKIPPABLE_KINDS: [BlockKind; 3] = [
+    BlockKind::Heading,
+    BlockKind::Blockquote,
+    BlockKind::Paragraph,
+];
+
+// Returns the skippable block kind that `event` starts, or `None` if it starts no skippable block.
+fn skippable_start_kind(event: &Event) -> Option<BlockKind> {
+    block_kind_for_start(event).filter(|kind| SKIPPABLE_KINDS.contains(kind))
 }
 
-// Returns true if `end` is the matching close event for the given `start`.
+// Returns true if `event` is a candidate start event for empty-block suppression.
+fn is_skippable_start(event: &Event) -> bool {
+    skippable_start_kind(event).is_some()
+}
+
+// Returns true if `end` is the matching close event for the given skippable `start`.
 fn is_matching_end(start: &Event, end: &Event) -> bool {
-    matches!(
-        (start, end),
-        (Event::StartHeading { .. }, Event::EndHeading)
-            | (Event::StartBlockQuote { .. }, Event::EndBlockQuote)
-            | (Event::StartParagraph { .. }, Event::EndParagraph)
-    )
+    skippable_start_kind(start).is_some_and(|kind| block_kind_for_end(end) == Some(kind))
 }
 
 #[cfg(test)]

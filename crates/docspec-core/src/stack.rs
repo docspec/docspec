@@ -133,16 +133,10 @@ impl<S: EventSink> StackTrackingSink<S> {
         self.sink.handle_event(Event::EndDocument)
     }
 
-    /// Handles any intermediate End event (not `EndDocument`): validates the stack,
-    /// auto-closes intervening blocks, pops the target frame, and forwards the event.
-    fn handle_end_event(&mut self, event: Event) -> Result<()> {
-        let Some(target_kind) = block_kind_for_end(&event) else {
-            return Err(Error::InvalidSequence {
-                expected: "valid End event".to_string(),
-                found: format!("{event:?}"),
-                message: "handle_end_event called with non-End event".to_string(),
-            });
-        };
+    /// Handles any intermediate End event (not `EndDocument`) closing a `target_kind` block:
+    /// validates the stack, auto-closes intervening blocks, pops the target frame, and
+    /// forwards the event.
+    fn handle_end_event(&mut self, target_kind: BlockKind, event: Event) -> Result<()> {
         if self.stack.is_empty() {
             return Err(Error::InvalidSequence {
                 expected: "open block".to_string(),
@@ -323,8 +317,8 @@ impl<S: EventSink> EventSink for StackTrackingSink<S> {
             return self.handle_end_document();
         }
 
-        if block_kind_for_end(&event).is_some() {
-            return self.handle_end_event(event);
+        if let Some(kind) = block_kind_for_end(&event) {
+            return self.handle_end_event(kind, event);
         }
 
         self.handle_other_event(event)
