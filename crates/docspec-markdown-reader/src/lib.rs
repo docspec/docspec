@@ -569,7 +569,7 @@ impl MarkdownReader {
 
     fn handle_item_start(&mut self) {
         let depth = self.list_stack.len().saturating_sub(1);
-        let level = u32::try_from(depth).map_or(u32::MAX, |v| v);
+        let level = u32::try_from(depth).unwrap_or(u32::MAX);
         if let Some(ctx) = self.list_stack.last_mut() {
             if ctx.ordered {
                 self.queue.push_back(Event::StartOrderedListItem {

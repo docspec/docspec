@@ -69,7 +69,7 @@ fn any_reader_from_reader_docx_hello() {
         .any(|e| matches!(e, Event::StartParagraph { .. })));
     assert!(events
         .iter()
-        .any(|e| matches!(e, Event::Text { content, .. } if content == "hello")));
+        .any(|e| matches!(e, Event::Text { content,  } if content == "hello")));
     assert!(events.iter().any(|e| matches!(e, Event::EndParagraph)));
     assert!(events.iter().any(|e| matches!(e, Event::EndDocument)));
 }
@@ -118,7 +118,7 @@ fn any_reader_from_path_docx() {
     let events: Vec<_> = core::iter::from_fn(|| reader.next_event().unwrap()).collect();
     assert!(events
         .iter()
-        .any(|e| matches!(e, Event::Text { content, .. } if content == "file")));
+        .any(|e| matches!(e, Event::Text { content,  } if content == "file")));
 }
 
 #[test]
@@ -146,6 +146,6 @@ fn any_reader_strip_bom_markdown() {
     let events: Vec<_> = core::iter::from_fn(|| reader.next_event().unwrap()).collect();
     let has_hi = events
         .iter()
-        .any(|e| matches!(e, Event::Text { content, .. } if content == "Hi"));
+        .any(|e| matches!(e, Event::Text { content,  } if content == "Hi"));
     assert!(has_hi, "BOM should be stripped; events: {events:?}");
 }
