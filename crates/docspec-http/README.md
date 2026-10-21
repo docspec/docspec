@@ -104,10 +104,10 @@ All errors use [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Detail
 | 405  | Wrong method (response includes `Allow` header)          |
 | 406  | `Accept` header excludes all supported output types      |
 | 415  | `Content-Type` must be `text/markdown`, `text/html`, or `application/vnd.openxmlformats-officedocument.wordprocessingml.document` |
-| 422  | Reader or writer error while converting events (malformed markdown, HTML, or DOCX) |
-| 500  | Internal error, including writer finalization failure    |
+| 422  | The input could not be converted: parse error, truncated document, dangling reference, or a value the output format cannot hold |
+| 500  | DocSpec defect or infrastructure failure, never caused by the document |
 
-The `422` `detail` is the reader or writer error message verbatim (for example ``malformed _rels/.rels: at 6..11: unrecognized entity `bogus` ``). It describes the submitted document so the caller can fix it, per [RFC 9457 §3.1.4](https://www.rfc-editor.org/rfc/rfc9457#section-3.1.4), and is not meant to carry server paths, stack traces or configuration ([§5](https://www.rfc-editor.org/rfc/rfc9457#section-5)). Today this holds because the readers and writers work on the in-memory request body; the message is forwarded unfiltered, so a new reader or writer must not put paths or OS errors in its error text. The `500` `detail` is a fixed string; the cause goes to logs and Sentry only.
+The split is decided by error kind, not by the stage that failed: a writer that cannot finish because the document ended early is `422`; an event stream that violates DocSpec's own well-formedness rules is `500`. The `422` `detail` is the reader or writer error message verbatim (for example ``malformed _rels/.rels: at 6..11: unrecognized entity `bogus` ``). It describes the submitted document so the caller can fix it, per [RFC 9457 §3.1.4](https://www.rfc-editor.org/rfc/rfc9457#section-3.1.4), and is not meant to carry server paths, stack traces or configuration ([§5](https://www.rfc-editor.org/rfc/rfc9457#section-5)). Today this holds because the readers and writers work on the in-memory request body; the message is forwarded unfiltered, so a new reader or writer must not put paths or OS errors in its error text. The `500` `detail` is a fixed string; the cause goes to logs and Sentry only.
 
 Accepted `Accept` values for `/conversion`: `text/html` (HTML), `application/vnd.oxa+json` (oxa.dev), `application/vnd.pandoc.native` (Pandoc native), `application/vnd.docspec.blocknote+json`, `application/vnd.blocknote+json` (BlockNote alias), `application/*`, or `*/*`. Wildcards and missing `Accept` default to BlockNote for back-compat. Anything else returns 406.
 

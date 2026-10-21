@@ -341,6 +341,35 @@ async fn post_conversion_docx_invalid_zip_returns_422() {
 }
 
 #[tokio::test]
+async fn post_conversion_docx_truncated_between_paragraphs_returns_422() {
+    // document.xml ends after a complete paragraph but before </w:body>: the
+    // document is the problem, so this must be 422, never 500.
+    let doc_xml = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>whole</w:t></w:r></w:p>"#;
+    let response = app()
+        .oneshot(common::docx_request(common::synth_docx(
+            common::SIMPLE_RELS,
+            doc_xml,
+        )))
+        .await
+        .expect("request succeeds");
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        response.headers().get(header::CONTENT_TYPE).unwrap(),
+        PROBLEM_JSON_CT
+    );
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        json!({
+            "type": "about:blank",
+            "title": "Unprocessable Entity",
+            "status": 422,
+            "detail": "parse error: malformed document.xml: unexpected EOF inside <w:body>",
+        })
+    );
+}
+
+#[tokio::test]
 async fn post_conversion_docx_empty_body_returns_400() {
     let request = common::request(
         "POST",

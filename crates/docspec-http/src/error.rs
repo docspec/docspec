@@ -159,6 +159,10 @@ pub enum HttpError {
     /// client — the RFC 9457 response detail is always the generic
     /// "An unexpected error occurred during conversion" string.
     ///
+    /// Of the `docspec_core::Error` kinds, only `InvalidSequence` (a reader
+    /// violated the event well-formedness rules) maps here; every other kind
+    /// is [`HttpError::Unprocessable`].
+    ///
     /// → HTTP 500 Internal Server Error.
     Internal {
         /// The underlying error that caused this internal failure.
@@ -185,6 +189,11 @@ pub enum HttpError {
         path: String,
     },
     /// Document conversion failed due to invalid or malformed input.
+    ///
+    /// Every `docspec_core::Error` kind except `InvalidSequence` maps here,
+    /// whichever stage raised it: a parse error, a writer that cannot finish
+    /// because the document ended early, a dangling reference, or a value the
+    /// output format cannot hold.
     ///
     /// `detail` is the reader or writer error message verbatim, for example
     /// ``malformed _rels/.rels: at 6..11: unrecognized entity `bogus` ``. It describes the caller's
