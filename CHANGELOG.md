@@ -12,6 +12,17 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.21.11](https://github.com/docspec/docspec/compare/v1.21.10...v1.21.11) - 2026-10-21
+
+### Fixed
+
+- *(http)* classify conversion errors by kind, not by call position
+
+### Other
+
+- *(docx-reader)* share XML error, attribute and EOF helpers
+- *(http)* cite RFC 9457 for problem details and document 422 detail policy
+
 ## [1.21.10](https://github.com/docspec/docspec/compare/v1.21.9...v1.21.10) - 2026-10-21
 
 ### Fixed
