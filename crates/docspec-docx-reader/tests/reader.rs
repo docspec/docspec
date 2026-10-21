@@ -2201,45 +2201,6 @@ mod events {
     }
 
     #[test]
-    fn eof_mid_text_flushes_text_and_closes_paragraph() {
-        let bytes = fixture::synth_docx(
-            SIMPLE_RELS,
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>partial"#,
-        );
-        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
-        let events = drive(&mut reader);
-        assert_eq!(
-            events,
-            vec![
-                start_document(),
-                start_paragraph(),
-                text("partial"),
-                Event::EndParagraph,
-                Event::EndDocument,
-            ]
-        );
-    }
-
-    #[test]
-    fn eof_mid_paragraph_auto_closes() {
-        let bytes = fixture::synth_docx(
-            SIMPLE_RELS,
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p>"#,
-        );
-        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
-        let events = drive(&mut reader);
-        assert_eq!(
-            events,
-            vec![
-                start_document(),
-                start_paragraph(),
-                Event::EndParagraph,
-                Event::EndDocument
-            ]
-        );
-    }
-
-    #[test]
     fn w_tab_self_closing_emits_text_tab_between_text_runs() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>a</w:t><w:tab/><w:t>b</w:t></w:r></w:p></w:body></w:document>"#,
@@ -3549,6 +3510,39 @@ mod events {
     }
 
     #[test]
+    fn tbl_header_cells_without_content_emit_empty_header_and_data_cells() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc/><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr></w:tc></w:tr><w:tr><w:tc/></w:tr></w:tbl></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_document(),
+                start_table(),
+                start_row(),
+                start_header(),
+                Event::EndTableHeader,
+                Event::StartTableHeader {
+                    scope: Some(TableHeaderScope::Column),
+                    abbr: None,
+                    colspan: Some(2),
+                    rowspan: None,
+                    id: None,
+                },
+                Event::EndTableHeader,
+                Event::EndTableRow,
+                start_row(),
+                start_cell(),
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
     fn tbl_header_multiple_consecutive_header_rows_all_emit_headers() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h1</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h2</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>h3</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
@@ -4660,31 +4654,6 @@ mod events {
     }
 
     #[test]
-    fn hyperlink_eof_with_open_link_auto_closes() {
-        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <w:body><w:p><w:hyperlink r:id="rId1"><w:r><w:t>x</w:t></w:r>"#;
-        let rels_xml = document_hyperlink_rels(
-            TRANSITIONAL_HYPERLINK_TYPE,
-            "https://example.com",
-            "External",
-        );
-        let events = hyperlink_events(document_xml, Some(&rels_xml));
-        assert_eq!(
-            events,
-            vec![
-                start_document(),
-                start_paragraph(),
-                start_link("https://example.com", None),
-                text("x"),
-                Event::EndLink,
-                Event::EndParagraph,
-                Event::EndDocument,
-            ]
-        );
-    }
-
-    #[test]
     fn hyperlink_inside_preformatted_paragraph_passes_through() {
         let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -5315,29 +5284,6 @@ mod events {
                 text(" "),
                 text(" "),
                 text("sdt"),
-                Event::EndParagraph,
-                Event::EndDocument,
-            ]
-        );
-    }
-
-    #[test]
-    fn eof_inside_styled_run_auto_closes_styles() {
-        let mut reader = make_reader(
-            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>bold"#,
-        );
-        let events = drive(&mut reader);
-        assert_eq!(
-            events,
-            vec![
-                start_document(),
-                start_paragraph(),
-                Event::StartTextStyle {
-                    kind: TextStyleKind::Bold,
-                    id: None,
-                },
-                text("bold"),
-                Event::EndTextStyle,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
@@ -7390,6 +7336,300 @@ mod cross_feature_lists {
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
+        );
+    }
+}
+
+mod truncated_document {
+    use std::io::Cursor;
+
+    use docspec_core::{Error, Event, EventSource as _, TextStyleKind};
+    use docspec_docx_reader::DocxReader;
+    use docspec_test_utils::builders::{start_document, start_paragraph, text};
+
+    use crate::fixture;
+
+    const SIMPLE_RELS: &str = r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+
+    /// Reads a `document.xml` whose body is `truncated_body` with nothing after it,
+    /// returning the events emitted before the reader failed and the error message.
+    fn read_until_error(truncated_body: &str) -> (Vec<Event>, String) {
+        let document_xml = format!(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml"><w:body>{truncated_body}"#,
+        );
+        let bytes = fixture::synth_docx(SIMPLE_RELS, &document_xml);
+        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+        let mut events = Vec::new();
+        loop {
+            match reader.next_event() {
+                Ok(Some(event)) => events.push(event),
+                Ok(None) => panic!("expected a parse error, got end of stream after {events:?}"),
+                Err(Error::Parse { message, position }) => {
+                    assert_eq!(position, None, "parse errors carry no position");
+                    return (events, message);
+                }
+                Err(other) => panic!("expected Error::Parse, got: {other:?}"),
+            }
+        }
+    }
+
+    fn start_table() -> Event {
+        Event::StartTable { id: None }
+    }
+
+    fn start_row() -> Event {
+        Event::StartTableRow { id: None }
+    }
+
+    fn start_cell() -> Event {
+        Event::StartTableCell {
+            colspan: None,
+            id: None,
+            rowspan: None,
+        }
+    }
+
+    #[test]
+    fn eof_inside_t_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:p><w:r><w:t>partial"),
+            (
+                vec![start_document(), start_paragraph()],
+                "malformed document.xml: unexpected EOF inside <w:t>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_r_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>bold</w:t>"),
+            (
+                vec![
+                    start_document(),
+                    start_paragraph(),
+                    Event::StartTextStyle {
+                        kind: TextStyleKind::Bold,
+                        id: None,
+                    },
+                    text("bold"),
+                ],
+                "malformed document.xml: unexpected EOF inside <w:r>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_hyperlink_is_a_parse_error() {
+        assert_eq!(
+            read_until_error(r#"<w:p><w:hyperlink w:anchor="target"><w:r><w:t>x</w:t></w:r>"#),
+            (
+                vec![start_document(), start_paragraph()],
+                "malformed document.xml: unexpected EOF inside <w:hyperlink>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn self_closing_body_is_a_complete_document() {
+        let document_xml = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#;
+        let bytes = fixture::synth_docx(SIMPLE_RELS, document_xml);
+        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+        let mut events = Vec::new();
+        while let Some(event) = reader.next_event().expect("empty body must not fail") {
+            events.push(event);
+        }
+        assert_eq!(events, vec![start_document(), Event::EndDocument]);
+    }
+
+    /// `CT_Document` declares `w:body` as optional, so a document without one is valid.
+    fn read_all_events(document_xml: &str) -> Vec<Event> {
+        let bytes = fixture::synth_docx(SIMPLE_RELS, document_xml);
+        let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+        let mut events = Vec::new();
+        while let Some(event) = reader.next_event().expect("document must not fail") {
+            events.push(event);
+        }
+        events
+    }
+
+    #[test]
+    fn self_closing_document_is_an_empty_document() {
+        let events = read_all_events(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+        );
+        assert_eq!(events, vec![start_document(), Event::EndDocument]);
+    }
+
+    #[test]
+    fn document_without_body_is_an_empty_document() {
+        let events = read_all_events(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"></w:document>"#,
+        );
+        assert_eq!(events, vec![start_document(), Event::EndDocument]);
+    }
+
+    #[test]
+    fn eof_inside_body_after_complete_paragraph_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:p><w:r><w:t>whole</w:t></w:r></w:p>"),
+            (
+                vec![
+                    start_document(),
+                    start_paragraph(),
+                    text("whole"),
+                    Event::EndParagraph,
+                ],
+                "malformed document.xml: unexpected EOF inside <w:body>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_p_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:p><w:r><w:t>whole</w:t></w:r>"),
+            (
+                vec![start_document(), start_paragraph(), text("whole")],
+                "malformed document.xml: unexpected EOF inside <w:p>".to_string(),
+            )
+        );
+    }
+
+    /// Regression: EOF inside a drawing used to end the document twice, with an
+    /// `EndParagraph` after the first `EndDocument`.
+    #[test]
+    fn eof_inside_drawing_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:p><w:drawing><a:x>"),
+            (
+                vec![start_document(), start_paragraph()],
+                "malformed document.xml: unexpected EOF inside <w:drawing>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_rpr_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:p><w:r><w:rPr><w:b/>"),
+            (
+                vec![start_document(), start_paragraph()],
+                "malformed document.xml: unexpected EOF inside <w:rPr>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_numpr_is_a_parse_error() {
+        assert_eq!(
+            read_until_error(r#"<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/>"#),
+            (
+                vec![start_document()],
+                "malformed document.xml: unexpected EOF inside <w:numPr>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_ppr_is_a_parse_error() {
+        assert_eq!(
+            read_until_error(r#"<w:p><w:pPr><w:jc w:val="center"/>"#),
+            (
+                vec![start_document()],
+                "malformed document.xml: unexpected EOF inside <w:pPr>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_tcpr_is_a_parse_error() {
+        assert_eq!(
+            read_until_error(r#"<w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/>"#),
+            (
+                vec![start_document(), start_table(), start_row()],
+                "malformed document.xml: unexpected EOF inside <w:tcPr>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_trpr_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:tbl><w:tr><w:trPr><w:tblHeader/>"),
+            (
+                vec![start_document(), start_table()],
+                "malformed document.xml: unexpected EOF inside <w:trPr>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_tc_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:tbl><w:tr><w:tc><w:p><w:r><w:t>x</w:t></w:r></w:p>"),
+            (
+                vec![
+                    start_document(),
+                    start_table(),
+                    start_row(),
+                    start_cell(),
+                    start_paragraph(),
+                    text("x"),
+                    Event::EndParagraph,
+                ],
+                "malformed document.xml: unexpected EOF inside <w:tc>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_tr_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:tbl><w:tr><w:tc><w:p/></w:tc>"),
+            (
+                vec![
+                    start_document(),
+                    start_table(),
+                    start_row(),
+                    start_cell(),
+                    start_paragraph(),
+                    Event::EndParagraph,
+                    Event::EndTableCell,
+                ],
+                "malformed document.xml: unexpected EOF inside <w:tr>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_tbl_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr>"),
+            (
+                vec![
+                    start_document(),
+                    start_table(),
+                    start_row(),
+                    start_cell(),
+                    start_paragraph(),
+                    Event::EndParagraph,
+                    Event::EndTableCell,
+                    Event::EndTableRow,
+                ],
+                "malformed document.xml: unexpected EOF inside <w:tbl>".to_string(),
+            )
+        );
+    }
+
+    #[test]
+    fn eof_inside_pict_is_a_parse_error() {
+        assert_eq!(
+            read_until_error("<w:p><w:pict><v:shape>"),
+            (
+                vec![start_document(), start_paragraph()],
+                "malformed document.xml: unexpected EOF inside <w:pict>".to_string(),
+            )
         );
     }
 }

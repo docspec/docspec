@@ -3,9 +3,12 @@
 use std::collections::HashMap;
 use std::io::Read;
 
-use docspec_core::Error;
 use quick_xml::events::Event;
-use quick_xml::XmlVersion;
+
+use crate::document::xml::{attr_string, parse_error};
+
+/// Error prefix for malformed attributes in `[Content_Types].xml`.
+const ATTRIBUTE_ERROR_CONTEXT: &str = "malformed [Content_Types].xml";
 
 /// Content type lookup for DOCX package parts.
 ///
@@ -118,15 +121,17 @@ where
 {
     match element.local_name().as_ref() {
         b"Default" => {
-            let ext = attr_string(reader, element, b"Extension")?;
-            let content_type = attr_string(reader, element, b"ContentType")?;
+            let ext = attr_string(reader, element, b"Extension", ATTRIBUTE_ERROR_CONTEXT)?;
+            let content_type =
+                attr_string(reader, element, b"ContentType", ATTRIBUTE_ERROR_CONTEXT)?;
             if let (Some(ext_val), Some(ct_val)) = (ext, content_type) {
                 ct.defaults.insert(ext_val.to_ascii_lowercase(), ct_val);
             }
         }
         b"Override" => {
-            let part_name = attr_string(reader, element, b"PartName")?;
-            let content_type = attr_string(reader, element, b"ContentType")?;
+            let part_name = attr_string(reader, element, b"PartName", ATTRIBUTE_ERROR_CONTEXT)?;
+            let content_type =
+                attr_string(reader, element, b"ContentType", ATTRIBUTE_ERROR_CONTEXT)?;
             if let (Some(part), Some(ct_val)) = (part_name, content_type) {
                 let key = part.strip_prefix('/').unwrap_or(&part).to_string();
                 ct.overrides.insert(key, ct_val);
@@ -135,34 +140,6 @@ where
         _ => {}
     }
     Ok(())
-}
-
-fn attr_string<R>(
-    reader: &quick_xml::Reader<R>,
-    element: &quick_xml::events::BytesStart<'_>,
-    name: &[u8],
-) -> docspec_core::Result<Option<String>>
-where
-    R: Read,
-{
-    for attribute_result in element.attributes() {
-        let attribute = attribute_result
-            .map_err(|err| parse_error(format!("malformed [Content_Types].xml: {err}")))?;
-        if attribute.key.local_name().as_ref() == name {
-            return attribute
-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                .map(|value| Some(value.into_owned()))
-                .map_err(|err| parse_error(format!("malformed [Content_Types].xml: {err}")));
-        }
-    }
-    Ok(None)
-}
-
-fn parse_error(message: String) -> Error {
-    Error::Parse {
-        message,
-        position: None,
-    }
 }
 
 #[cfg(test)]

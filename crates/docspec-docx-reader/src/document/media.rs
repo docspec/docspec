@@ -12,7 +12,7 @@
 use docspec_core::{Event, Result};
 use quick_xml::events::BytesStart;
 
-use super::{parse_error, read_attribute, read_decoded_attribute, DocumentReader};
+use super::{read_attribute, read_decoded_attribute, unexpected_eof, DocumentReader};
 
 #[derive(Default)]
 struct DrawingScanState {
@@ -54,8 +54,7 @@ impl DocumentReader {
                     }
                 }
                 quick_xml::events::Event::Eof => {
-                    self.handle_eof();
-                    drawing_depth = 0;
+                    return Err(unexpected_eof("drawing"));
                 }
                 quick_xml::events::Event::Text(_)
                 | quick_xml::events::Event::GeneralRef(_)
@@ -97,9 +96,7 @@ impl DocumentReader {
                     }
                 }
                 quick_xml::events::Event::Eof => {
-                    return Err(parse_error(
-                        "malformed document.xml: unexpected EOF inside <w:pict>".to_string(),
-                    ));
+                    return Err(unexpected_eof("pict"));
                 }
                 quick_xml::events::Event::Text(_)
                 | quick_xml::events::Event::GeneralRef(_)

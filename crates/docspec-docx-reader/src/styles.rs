@@ -1,8 +1,10 @@
 use std::io::Read;
 
-use docspec_core::{Error, Result};
+use docspec_core::Result;
 use quick_xml::events::Event;
 use quick_xml::XmlVersion;
+
+use crate::document::xml::parse_error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -186,13 +188,6 @@ fn get_attr(elem: &quick_xml::events::BytesStart<'_>, name: &[u8]) -> Result<Opt
         }
     }
     Ok(None)
-}
-
-fn parse_error(message: String) -> Error {
-    Error::Parse {
-        message,
-        position: None,
-    }
 }
 
 #[cfg(test)]
