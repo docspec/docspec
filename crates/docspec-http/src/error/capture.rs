@@ -115,18 +115,47 @@ mod tests {
     }
 
     #[cfg(feature = "posthog")]
+    const CHILD_PROBE: &str = "poisoned_slot_child_probe";
+
+    #[cfg(feature = "posthog")]
     #[test]
     fn poisoned_posthog_slot_skips_error_capture_in_an_isolated_process() {
         let test_binary = std::env::current_exe().unwrap_or_default();
         assert!(!test_binary.as_os_str().is_empty());
-        assert!(std::process::Command::new(test_binary)
-            .args([
-                "--ignored",
-                "--exact",
-                "error::capture::tests::poisoned_slot_child_probe",
-            ])
-            .status()
-            .is_ok_and(|status| status.success()));
+        let module = module_path!()
+            .split_once("::")
+            .map_or("", |(_crate_name, path)| path);
+        let child_name = format!("{module}::{CHILD_PROBE}");
+        let output = std::process::Command::new(test_binary)
+            .args(["--ignored", "--exact", child_name.as_str()])
+            .output();
+        let output = output.unwrap_or_else(|error| {
+            std::panic::panic_any(format!("failed to spawn child probe: {error}"))
+        });
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success() && stdout.contains("1 passed"),
+            "child probe `{child_name}` did not run and pass: {stdout}"
+        );
+    }
+
+    #[cfg(feature = "posthog")]
+    #[derive(Clone, Default)]
+    struct SharedBuffer(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+    #[cfg(feature = "posthog")]
+    impl std::io::Write for SharedBuffer {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
     }
 
     #[cfg(feature = "posthog")]
@@ -144,10 +173,30 @@ mod tests {
         .join();
         assert!(poison_result.is_err());
 
-        super::capture_error_telemetry(
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            "server error",
-            None,
+        let buffer = SharedBuffer::default();
+        let writer = buffer.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(move || writer.clone())
+            .with_ansi(false)
+            .finish();
+        tracing::subscriber::with_default(subscriber, || {
+            super::capture_error_telemetry(
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "server error",
+                None,
+            );
+        });
+
+        let logged = String::from_utf8_lossy(
+            &buffer
+                .0
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        )
+        .into_owned();
+        assert!(
+            logged.contains("posthog slot poisoned; skipping error capture"),
+            "poisoned-slot warning not emitted: {logged}"
         );
 
         slot.clear_poison();
