@@ -11,15 +11,24 @@ use axum::{
 };
 use docspec_json::{JsonEmitter, StrusonBackend};
 
-/// RFC 7807 Problem Details for HTTP APIs.
+/// RFC 9457 Problem Details for HTTP APIs.
 ///
-/// Contains exactly four fields per [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807):
-/// `type`, `title`, `status`, and `detail`. Serialized without `serde`
-/// via [`ProblemJson::to_json_bytes`].
+/// Contains exactly four of the members defined in
+/// [RFC 9457 §3.1](https://www.rfc-editor.org/rfc/rfc9457#section-3.1):
+/// `type`, `title`, `status`, and `detail`. `type` is always the predefined
+/// `about:blank` problem type
+/// ([§4.2.1](https://www.rfc-editor.org/rfc/rfc9457#section-4.2.1)).
+/// Serialized without `serde` via [`ProblemJson::to_json_bytes`].
 #[derive(Debug)]
 pub struct ProblemJson {
     /// Human-readable explanation specific to this occurrence.
     ///
+    /// Describes the caller's request or document so they can correct it
+    /// ([RFC 9457 §3.1.4](https://www.rfc-editor.org/rfc/rfc9457#section-3.1.4)).
+    /// It never carries server implementation details such as file system
+    /// paths, stack traces or configuration
+    /// ([§5](https://www.rfc-editor.org/rfc/rfc9457#section-5)); internal
+    /// failures use a fixed message instead (see [`HttpError::Internal`]).
     /// May contain user-supplied data such as path names or MIME type strings.
     /// Dynamic values are stored as [`Cow::Owned`]; static strings as [`Cow::Borrowed`].
     pub detail: Cow<'static, str>,
@@ -27,15 +36,20 @@ pub struct ProblemJson {
     pub status: u16,
     /// Short, human-readable summary of the problem type.
     ///
-    /// Matches the standard HTTP reason phrase for the status code.
+    /// Matches the HTTP reason phrase for the status code, as
+    /// [RFC 9457 §4.2.1](https://www.rfc-editor.org/rfc/rfc9457#section-4.2.1)
+    /// recommends for the `about:blank` type. The one exception is `422`:
+    /// RFC 9110 renamed it "Unprocessable Content", but this server keeps the
+    /// earlier "Unprocessable Entity" for wire compatibility.
     pub title: &'static str,
     /// URI reference identifying the problem type.
     ///
-    /// This server always uses `"about:blank"`.
+    /// This server always uses `"about:blank"`
+    /// ([RFC 9457 §4.2.1](https://www.rfc-editor.org/rfc/rfc9457#section-4.2.1)).
     pub type_uri: &'static str,
 }
 
-/// Pre-encoded RFC 7807 body used when serializing a `ProblemJson` fails.
+/// Pre-encoded RFC 9457 body used when serializing a `ProblemJson` fails.
 ///
 /// Written out verbatim so the fallback never re-enters the JSON emitter that
 /// just failed.
@@ -62,7 +76,7 @@ impl ProblemJson {
     /// an unquoted integer.
     ///
     /// Uses [`JsonEmitter`] backed by `struson` for serialization. If
-    /// serialization fails, returns a static RFC 7807 `500` body rather than
+    /// serialization fails, returns a static RFC 9457 `500` body rather than
     /// panicking, so constructing an error response can never itself abort the
     /// request.
     #[inline]
@@ -77,7 +91,7 @@ impl ProblemJson {
     }
 }
 
-/// Builds the RFC 7807 response, degrading to a static body if serialization fails.
+/// Builds the RFC 9457 response, degrading to a static body if serialization fails.
 fn problem_response(
     problem: &ProblemJson,
     status: StatusCode,
@@ -86,7 +100,7 @@ fn problem_response(
     problem_response_from(problem.try_to_json_bytes(), status, allow)
 }
 
-/// Builds the RFC 7807 response from an already-attempted serialization.
+/// Builds the RFC 9457 response from an already-attempted serialization.
 ///
 /// Split from [`problem_response`] so the degraded path can be exercised
 /// directly: with a `Vec<u8>` sink the emitter never fails in practice, so the
@@ -125,7 +139,7 @@ fn problem_response_from(
 /// HTTP-layer errors returned by the conversion API.
 ///
 /// Each variant maps to a specific HTTP status code and is serialized as
-/// an RFC 7807 Problem JSON body via [`IntoResponse`].
+/// an RFC 9457 Problem JSON body via [`IntoResponse`].
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum HttpError {
@@ -142,7 +156,7 @@ pub enum HttpError {
     /// The `source` error is captured for observability (sent to Sentry via
     /// [`sentry::capture_error`], logged at `warn!` in stderr) and drives the
     /// error chain visible to operators. It is **never** exposed to the HTTP
-    /// client — the RFC 7807 response detail is always the generic
+    /// client — the RFC 9457 response detail is always the generic
     /// "An unexpected error occurred during conversion" string.
     ///
     /// → HTTP 500 Internal Server Error.
@@ -171,6 +185,18 @@ pub enum HttpError {
         path: String,
     },
     /// Document conversion failed due to invalid or malformed input.
+    ///
+    /// `detail` is the reader or writer error message verbatim, for example
+    /// ``malformed _rels/.rels: at 6..11: unrecognized entity `bogus` ``. It describes the caller's
+    /// own document and where to fix it, which is what
+    /// [RFC 9457 §3.1.4](https://www.rfc-editor.org/rfc/rfc9457#section-3.1.4)
+    /// asks of `detail`. Today the readers and writers run over in-memory
+    /// buffers, so their messages name no server file paths, stack traces or
+    /// configuration
+    /// ([§5](https://www.rfc-editor.org/rfc/rfc9457#section-5)). The handler
+    /// forwards the message unfiltered, so any new reader or writer must keep
+    /// paths and OS errors out of its error text. This level of detail is
+    /// intentional.
     ///
     /// → HTTP 422 Unprocessable Entity.
     Unprocessable {
@@ -255,7 +281,7 @@ fn capture_error_telemetry(
 }
 
 impl IntoResponse for HttpError {
-    /// Convert this error into an HTTP response with an RFC 7807 Problem JSON body.
+    /// Convert this error into an HTTP response with an RFC 9457 Problem JSON body.
     ///
     /// Sets `Content-Type: application/problem+json; charset=utf-8` and a JSON body
     /// with exactly four fields: `type`, `title`, `status`, `detail`.

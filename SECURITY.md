@@ -30,6 +30,8 @@ For library users: the caller receives typed error values. They decide what to s
 
 The general rule: the closer to an untrusted surface, the less detail the error contains. Information leakage is a vulnerability. Error messages that reveal internal structure help attackers craft better attacks. We do not help attackers.
 
+For the HTTP API: a 4xx problem response's `detail` describes the caller's request or document ([RFC 9457 §3.1.4](https://www.rfc-editor.org/rfc/rfc9457#section-3.1.4)). A 5xx `detail` is a fixed string; the underlying cause is logged and sent to Sentry, never returned to the client ([RFC 9457 §5](https://www.rfc-editor.org/rfc/rfc9457#section-5)).
+
 ---
 
 ## 3. Input Validation Philosophy
