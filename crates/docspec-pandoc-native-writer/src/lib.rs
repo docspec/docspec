@@ -80,9 +80,9 @@ impl<W: Write> PandocNativeWriter<W> {
     }
 
     #[inline]
-    fn write_attr(&mut self, id: &str, classes: &[&str]) -> Result<()> {
+    fn write_attr(&mut self, id: Option<&str>, classes: &[&str]) -> Result<()> {
         self.writer.write_all(b"(")?;
-        escape::write_haskell_string(&mut self.writer, id)?;
+        escape::write_haskell_string(&mut self.writer, id.unwrap_or(""))?;
         self.writer.write_all(b",[")?;
         for (i, class) in classes.iter().enumerate() {
             if i > 0 {
@@ -162,6 +162,37 @@ impl<W: Write> PandocNativeWriter<W> {
         Ok(())
     }
 
+    /// Whether a new top-level block may open: the document is open and no
+    /// paragraph or heading is in progress.
+    #[inline]
+    fn can_start_block(&self) -> bool {
+        self.started && !self.finished && self.inline_block.is_none()
+    }
+
+    /// Writes the `,` between top-level blocks, except before the first one.
+    #[inline]
+    fn write_block_separator(&mut self) -> Result<()> {
+        if !self.first_block {
+            self.writer.write_all(b",")?;
+        }
+        self.first_block = false;
+        Ok(())
+    }
+
+    /// Closes the open paragraph or heading: flushes pending inline code, closes
+    /// any orphaned text-style wrappers, and writes the block's closing `]`.
+    #[inline]
+    fn close_inline_block(&mut self) -> Result<()> {
+        if matches!(&self.code_frame, Some(CodeFrame::Inline { .. })) {
+            self.flush_code_frame()?;
+        }
+        self.close_orphaned_inline_frames()?;
+        self.writer.write_all(b"]")?;
+        self.inline_has_content.pop();
+        self.inline_block = None;
+        Ok(())
+    }
+
     #[inline]
     fn handle_end_document(&mut self) -> Result<()> {
         if matches!(&self.code_frame, Some(CodeFrame::Inline { .. })) {
@@ -187,15 +218,12 @@ impl<W: Write> PandocNativeWriter<W> {
         id: Option<String>,
         syntax: Option<String>,
     ) -> Result<()> {
-        if !self.first_block {
-            self.writer.write_all(b",")?;
-        }
+        self.write_block_separator()?;
         self.code_frame = Some(CodeFrame::Block {
             id,
             syntax,
             buffer: String::new(),
         });
-        self.first_block = false;
         Ok(())
     }
 
@@ -205,8 +233,8 @@ impl<W: Write> PandocNativeWriter<W> {
             Some(CodeFrame::Block { id, syntax, buffer }) => {
                 self.writer.write_all(b"CodeBlock ")?;
                 match syntax.as_deref() {
-                    Some(s) => self.write_attr(id.as_deref().unwrap_or(""), &[s])?,
-                    None => self.write_attr(id.as_deref().unwrap_or(""), &[])?,
+                    Some(s) => self.write_attr(id.as_deref(), &[s])?,
+                    None => self.write_attr(id.as_deref(), &[])?,
                 }
                 self.writer.write_all(b" ")?;
                 escape::write_haskell_string(&mut self.writer, &buffer)?;
@@ -214,7 +242,7 @@ impl<W: Write> PandocNativeWriter<W> {
             Some(CodeFrame::Inline { id, buffer, .. }) => {
                 self.write_inline_separator()?;
                 self.writer.write_all(b"Code ")?;
-                self.write_attr(id.as_deref().unwrap_or(""), &[])?;
+                self.write_attr(id.as_deref(), &[])?;
                 self.writer.write_all(b" ")?;
                 escape::write_haskell_string(&mut self.writer, &buffer)?;
             }
@@ -225,12 +253,9 @@ impl<W: Write> PandocNativeWriter<W> {
 
     #[inline]
     fn write_block_literal(&mut self, token: &[u8]) -> Result<()> {
-        if self.started && !self.finished && self.inline_block.is_none() {
-            if !self.first_block {
-                self.writer.write_all(b",")?;
-            }
+        if self.can_start_block() {
+            self.write_block_separator()?;
             self.writer.write_all(token)?;
-            self.first_block = false;
         }
         Ok(())
     }
@@ -275,17 +300,7 @@ impl<W: Write> EventSink for PandocNativeWriter<W> {
     #[inline]
     fn finish(mut self) -> Result<()> {
         if self.started && !self.finished {
-            if matches!(&self.code_frame, Some(CodeFrame::Inline { .. })) {
-                self.flush_code_frame()?;
-            }
-            while !self.inline_has_content.is_empty() {
-                self.writer.write_all(b"]")?;
-                self.inline_has_content.pop();
-            }
-            if self.code_frame.is_some() {
-                self.flush_code_frame()?;
-            }
-            self.writer.write_all(b"]")?;
+            self.handle_end_document()?;
         }
         self.writer.flush()?;
         Ok(())
@@ -317,77 +332,45 @@ impl<W: Write> EventSink for PandocNativeWriter<W> {
             return self.handle_event_in_code_frame(event);
         }
         match event {
-            Event::StartDocument { .. } => {
-                if !self.started && !self.finished {
-                    self.writer.write_all(b"[")?;
-                    self.started = true;
-                }
+            Event::StartDocument { .. } if !self.started && !self.finished => {
+                self.writer.write_all(b"[")?;
+                self.started = true;
             }
-            Event::EndDocument => {
-                if self.started && !self.finished {
-                    self.handle_end_document()?;
-                }
+            Event::EndDocument if self.started && !self.finished => {
+                self.handle_end_document()?;
             }
-            Event::StartParagraph { .. } => {
-                if self.started && !self.finished && self.inline_block.is_none() {
-                    if !self.first_block {
-                        self.writer.write_all(b",")?;
-                    }
-                    self.writer.write_all(b"Para [")?;
-                    self.inline_block = Some(InlineBlockKind::Paragraph);
-                    self.inline_has_content.push(false);
-                    self.first_block = false;
-                }
+            Event::StartParagraph { .. } if self.can_start_block() => {
+                self.write_block_separator()?;
+                self.writer.write_all(b"Para [")?;
+                self.inline_block = Some(InlineBlockKind::Paragraph);
+                self.inline_has_content.push(false);
             }
-            Event::StartHeading { id, level } => {
-                if self.started && !self.finished && self.inline_block.is_none() {
-                    if !self.first_block {
-                        self.writer.write_all(b",")?;
-                    }
-                    write!(self.writer, "Header {level} (")?;
-                    escape::write_haskell_string(&mut self.writer, id.as_deref().unwrap_or(""))?;
-                    self.writer.write_all(b",[],[]) [")?;
-                    self.inline_block = Some(InlineBlockKind::Heading);
-                    self.inline_has_content.push(false);
-                    self.first_block = false;
-                }
+            Event::StartHeading { id, level } if self.can_start_block() => {
+                self.write_block_separator()?;
+                write!(self.writer, "Header {level} ")?;
+                self.write_attr(id.as_deref(), &[])?;
+                self.writer.write_all(b" [")?;
+                self.inline_block = Some(InlineBlockKind::Heading);
+                self.inline_has_content.push(false);
             }
-            Event::EndParagraph => {
-                if self.inline_block == Some(InlineBlockKind::Paragraph) {
-                    if matches!(&self.code_frame, Some(CodeFrame::Inline { .. })) {
-                        self.flush_code_frame()?;
-                    }
-                    self.close_orphaned_inline_frames()?;
-                    self.writer.write_all(b"]")?;
-                    self.inline_has_content.pop();
-                    self.inline_block = None;
-                }
+            Event::EndParagraph if self.inline_block == Some(InlineBlockKind::Paragraph) => {
+                self.close_inline_block()?;
             }
-            Event::EndHeading => {
-                if self.inline_block == Some(InlineBlockKind::Heading) {
-                    if matches!(&self.code_frame, Some(CodeFrame::Inline { .. })) {
-                        self.flush_code_frame()?;
-                    }
-                    self.close_orphaned_inline_frames()?;
-                    self.writer.write_all(b"]")?;
-                    self.inline_has_content.pop();
-                    self.inline_block = None;
-                }
+            Event::EndHeading if self.inline_block == Some(InlineBlockKind::Heading) => {
+                self.close_inline_block()?;
             }
             Event::StartTextStyle { kind, id } if !self.inline_has_content.is_empty() => {
                 self.handle_start_text_style(&kind, id)?;
             }
-            Event::StartPreformatted { id, syntax }
-                if self.started && !self.finished && self.inline_block.is_none() =>
-            {
+            Event::StartPreformatted { id, syntax } if self.can_start_block() => {
                 self.handle_start_preformatted(id, syntax)?;
             }
             Event::EndTextStyle => match self.text_style_frames.pop() {
-                Some(TextStyleFrame::Wrapped) if self.inline_has_content.len() > 1 => {
+                Some(TextStyleFrame::Wrapped) => {
                     self.writer.write_all(b"]")?;
                     self.inline_has_content.pop();
                 }
-                Some(TextStyleFrame::Wrapped | TextStyleFrame::Flattened) | None => {}
+                Some(TextStyleFrame::Flattened) | None => {}
             },
             Event::Text { content } if !self.inline_has_content.is_empty() => {
                 self.write_inline_separator()?;
