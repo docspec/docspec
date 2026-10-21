@@ -214,15 +214,53 @@ async fn do_conversion(
     }
 
     let join_result = tokio::task::spawn_blocking(move || -> Result<(Vec<u8>, u64), HttpError> {
+        use std::io::Write as _;
+
         let mut output_buffer = Vec::new();
-        let body_vec: Vec<u8> = body.into();
-        let reader = docspec::AnyReader::from_reader(input_format, std::io::Cursor::new(body_vec))
-            .map_err(|error| {
-                tracing::debug!(error = %error, "reader construction failed");
-                HttpError::Unprocessable {
-                    detail: error.to_string(),
-                }
+
+        // DOCX only streams in constant memory through `from_path`, which reads
+        // `word/document.xml` straight from a file instead of buffering the whole
+        // decompressed part in memory (see `AnyReader::from_path` / `from_reader`).
+        // The request body is in memory, so spill it to a temp file and stream from
+        // there. `spill_guard` keeps that file on disk for the whole conversion and
+        // unlinks it on return (including on an early `?` return). Text formats gain
+        // nothing from a file — their readers buffer regardless — so they keep the
+        // in-memory path.
+        let spill_guard: Option<tempfile::NamedTempFile>;
+        let reader = if matches!(input_format, InputFormat::Docx) {
+            let mut temp_file = tempfile::NamedTempFile::new().map_err(|error| {
+                tracing::warn!(error = %error, "failed to create temp file for docx spill");
+                HttpError::internal(error)
             })?;
+            temp_file.write_all(body.as_ref()).map_err(|error| {
+                tracing::warn!(error = %error, "failed to write docx body to temp file");
+                HttpError::internal(error)
+            })?;
+            temp_file.flush().map_err(|error| {
+                tracing::warn!(error = %error, "failed to flush docx temp file");
+                HttpError::internal(error)
+            })?;
+            let reader =
+                docspec::AnyReader::from_path(input_format, temp_file.path()).map_err(|error| {
+                    tracing::debug!(error = %error, "reader construction failed");
+                    HttpError::Unprocessable {
+                        detail: error.to_string(),
+                    }
+                })?;
+            spill_guard = Some(temp_file);
+            reader
+        } else {
+            spill_guard = None;
+            let body_vec: Vec<u8> = body.into();
+            docspec::AnyReader::from_reader(input_format, std::io::Cursor::new(body_vec)).map_err(
+                |error| {
+                    tracing::debug!(error = %error, "reader construction failed");
+                    HttpError::Unprocessable {
+                        detail: error.to_string(),
+                    }
+                },
+            )?
+        };
         let mut reader = docspec_core::SkipEmptyBlocks::new(reader);
         let mut sink = docspec::AnyWriter::new(output_format, &mut output_buffer);
 
@@ -255,6 +293,9 @@ async fn do_conversion(
             tracing::warn!(error = ?conversion_error, "output size exceeded u64 range");
             HttpError::internal(conversion_error)
         })?;
+
+        // Streaming reads from the spilled DOCX are done; unlink the temp file now.
+        drop(spill_guard);
         Ok((output_buffer, output_bytes))
     })
     .await;
