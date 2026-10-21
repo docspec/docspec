@@ -12,6 +12,26 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [1.21.10](https://github.com/docspec/docspec/compare/v1.21.9...v1.21.10) - 2026-10-21
+
+### Fixed
+
+- *(docx-reader)* emit no text styles inside preformatted blocks
+- *(docx-reader)* close preformatted block before a paragraph without pPr
+- *(deps)* update rust crate html5ever to 0.40
+
+### Other
+
+- satisfy clippy lints introduced in Rust 1.99
+- satisfy clippy lints introduced in Rust 1.98
+- *(json)* remove duplicated emitter and backend logic
+- Merge pull request #457 from docspec/refactor/blocknote-writer-cleanup
+- *(blocknote-writer)* remove duplicated list and text-block logic
+- *(cli,writers)* remove dead parameters and stale ignore-lists
+- *(markdown-reader)* dedupe HTML translator and reader helpers
+- *(pandoc-native-writer)* deduplicate block open/close paths
+- *(http)* single MIME table and shared header/telemetry helpers
+
 ## [1.21.9](https://github.com/docspec/docspec/compare/v1.21.8...v1.21.9) - 2026-08-13
 
 ### Fixed
