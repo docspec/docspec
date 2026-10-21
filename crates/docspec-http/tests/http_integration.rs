@@ -57,6 +57,18 @@ async fn response_body_json(body: axum::body::Body) -> Value {
     serde_json::from_str(&text).expect("valid JSON")
 }
 
+/// The `instance` every problem body carries: the response's `X-Request-ID`
+/// as a `urn:uuid:` URI. The router assigns a UUID when the client sent none.
+fn instance_of(response: &axum::response::Response) -> String {
+    let id = response
+        .headers()
+        .get("x-request-id")
+        .expect("x-request-id present")
+        .to_str()
+        .expect("ascii request id");
+    format!("urn:uuid:{id}")
+}
+
 fn hello_blocknote_json() -> Value {
     serde_json::json!([{
         "type": "heading",
@@ -170,6 +182,7 @@ async fn post_conversion_empty_body() {
         CACHE_CONTROL
     );
 
+    let instance = instance_of(&response);
     let body = response_body_json(response.into_body()).await;
     assert_eq!(
         body,
@@ -178,6 +191,7 @@ async fn post_conversion_empty_body() {
             "title": "Bad Request",
             "status": 400,
             "detail": "Request body is empty",
+            "instance": instance,
         })
     );
 }
@@ -230,6 +244,7 @@ async fn post_conversion_missing_content_type() {
         CACHE_CONTROL
     );
 
+    let instance = instance_of(&response);
     let body = response_body_json(response.into_body()).await;
     assert_eq!(
         body,
@@ -238,6 +253,7 @@ async fn post_conversion_missing_content_type() {
             "title": "Unsupported Media Type",
             "status": 415,
             "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "instance": instance,
         })
     );
 }
@@ -357,14 +373,68 @@ async fn post_conversion_docx_truncated_between_paragraphs_returns_422() {
         response.headers().get(header::CONTENT_TYPE).unwrap(),
         PROBLEM_JSON_CT
     );
+    let instance = instance_of(&response);
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        json!({
+            "type": "https://problems.docspec.dev/malformed-input",
+            "title": "Unprocessable Content",
+            "status": 422,
+            "detail": "parse error: malformed document.xml: unexpected EOF inside <w:body>",
+            "instance": instance,
+        })
+    );
+}
+
+#[tokio::test]
+async fn client_uuid_request_id_becomes_instance() {
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[
+            ("content-type", "text/markdown"),
+            ("x-request-id", "0F8FAD5B-D9CB-469F-A165-70867728950E"),
+        ],
+        Body::empty(),
+    );
+    let response = app().oneshot(request).await.expect("request succeeds");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let body = response_body_json(response.into_body()).await;
     assert_eq!(
         body,
         json!({
             "type": "about:blank",
-            "title": "Unprocessable Content",
-            "status": 422,
-            "detail": "parse error: malformed document.xml: unexpected EOF inside <w:body>",
+            "title": "Bad Request",
+            "status": 400,
+            "detail": "Request body is empty",
+            "instance": "urn:uuid:0f8fad5b-d9cb-469f-a165-70867728950e",
+        })
+    );
+}
+
+#[tokio::test]
+async fn non_uuid_request_id_yields_no_instance() {
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[
+            ("content-type", "text/markdown"),
+            ("x-request-id", "job-42"),
+        ],
+        Body::empty(),
+    );
+    let response = app().oneshot(request).await.expect("request succeeds");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(response.headers().get("x-request-id").unwrap(), "job-42");
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        json!({
+            "type": "about:blank",
+            "title": "Bad Request",
+            "status": 400,
+            "detail": "Request body is empty",
         })
     );
 }
@@ -394,6 +464,7 @@ async fn post_conversion_wrong_content_type() {
 
     assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
 
+    let instance = instance_of(&response);
     let body = response_body_json(response.into_body()).await;
     assert_eq!(
         body,
@@ -402,6 +473,7 @@ async fn post_conversion_wrong_content_type() {
             "title": "Unsupported Media Type",
             "status": 415,
             "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document, got application/json",
+            "instance": instance,
         })
     );
 }
@@ -419,6 +491,7 @@ async fn post_conversion_multipart_content_type() {
 
     assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
 
+    let instance = instance_of(&response);
     let body = response_body_json(response.into_body()).await;
     assert_eq!(
         body,
@@ -427,6 +500,7 @@ async fn post_conversion_multipart_content_type() {
             "title": "Unsupported Media Type",
             "status": 415,
             "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document, got multipart/form-data; boundary=x",
+            "instance": instance,
         })
     );
 }
@@ -447,6 +521,7 @@ async fn post_conversion_wrong_accept() {
 
     assert_eq!(response.status(), StatusCode::NOT_ACCEPTABLE);
 
+    let instance = instance_of(&response);
     let body = response_body_json(response.into_body()).await;
     assert_eq!(
         body,
@@ -455,6 +530,7 @@ async fn post_conversion_wrong_accept() {
             "title": "Not Acceptable",
             "status": 406,
             "detail": "Accept header must include application/vnd.docspec.blocknote+json, application/vnd.blocknote+json, application/vnd.oxa+json, application/vnd.pandoc.native, text/html, application/*, or */*",
+            "instance": instance,
         })
     );
 }
@@ -517,6 +593,7 @@ async fn post_conversion_invalid_utf8() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
+    let instance = instance_of(&response);
     let body = response_body_json(response.into_body()).await;
     assert_eq!(
         body,
@@ -525,6 +602,7 @@ async fn post_conversion_invalid_utf8() {
             "title": "Bad Request",
             "status": 400,
             "detail": "Request body is not valid UTF-8",
+            "instance": instance,
         })
     );
 }
@@ -581,6 +659,7 @@ async fn put_conversion_returns_405() {
         PROBLEM_JSON_CT
     );
 
+    let instance = instance_of(&response);
     let body = response_body_json(response.into_body()).await;
     assert_eq!(
         body,
@@ -589,6 +668,7 @@ async fn put_conversion_returns_405() {
             "title": "Method Not Allowed",
             "status": 405,
             "detail": "Method not allowed. Allowed methods: POST, OPTIONS.",
+            "instance": instance,
         })
     );
 }
@@ -608,6 +688,7 @@ async fn delete_conversion_returns_405() {
         "POST, OPTIONS"
     );
 
+    let instance = instance_of(&response);
     let body = response_body_json(response.into_body()).await;
     assert_eq!(
         body,
@@ -616,6 +697,7 @@ async fn delete_conversion_returns_405() {
             "title": "Method Not Allowed",
             "status": 405,
             "detail": "Method not allowed. Allowed methods: POST, OPTIONS.",
+            "instance": instance,
         })
     );
 }
@@ -710,6 +792,7 @@ async fn put_health_returns_405() {
         "GET, HEAD, OPTIONS"
     );
 
+    let instance = instance_of(&response);
     let body = response_body_json(response.into_body()).await;
     assert_eq!(
         body,
@@ -718,6 +801,7 @@ async fn put_health_returns_405() {
             "title": "Method Not Allowed",
             "status": 405,
             "detail": "Method not allowed. Allowed methods: GET, HEAD, OPTIONS.",
+            "instance": instance,
         })
     );
 }
@@ -744,6 +828,7 @@ async fn unknown_path_returns_404() {
         CACHE_CONTROL
     );
 
+    let instance = instance_of(&response);
     let body = response_body_json(response.into_body()).await;
     assert_eq!(
         body,
@@ -752,6 +837,7 @@ async fn unknown_path_returns_404() {
             "title": "Not Found",
             "status": 404,
             "detail": "No route matches GET /unknown",
+            "instance": instance,
         })
     );
 }
@@ -984,6 +1070,7 @@ async fn post_conversion_html_empty_body() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
+    let instance = instance_of(&response);
     let body = response_body_json(response.into_body()).await;
     assert_eq!(
         body,
@@ -992,6 +1079,7 @@ async fn post_conversion_html_empty_body() {
             "title": "Bad Request",
             "status": 400,
             "detail": "Request body is empty",
+            "instance": instance,
         })
     );
 }
@@ -1004,6 +1092,7 @@ async fn query_string_not_in_404_detail() {
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
+    let instance = instance_of(&response);
     let body = response_body_json(response.into_body()).await;
     assert_eq!(
         body,
@@ -1012,6 +1101,7 @@ async fn query_string_not_in_404_detail() {
             "title": "Not Found",
             "status": 404,
             "detail": "No route matches GET /unknown",
+            "instance": instance,
         })
     );
 }

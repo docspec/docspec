@@ -109,6 +109,20 @@ All errors use [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Detail
 
 The split is decided by error kind, not by the stage that failed: a writer that cannot finish because the document ended early is `422`; an event stream that violates DocSpec's own well-formedness rules is `500`. The `422` `detail` is the reader or writer error message verbatim (for example ``malformed _rels/.rels: at 6..11: unrecognized entity `bogus` ``). It describes the submitted document so the caller can fix it, per [RFC 9457 §3.1.4](https://www.rfc-editor.org/rfc/rfc9457#section-3.1.4), and is not meant to carry server paths, stack traces or configuration ([§5](https://www.rfc-editor.org/rfc/rfc9457#section-5)). Today this holds because the readers and writers work on the in-memory request body; the message is forwarded unfiltered, so a new reader or writer must not put paths or OS errors in its error text. The `500` `detail` is a fixed string; the cause goes to logs and Sentry only.
 
+### Problem types
+
+The `type` member identifies the class of failure ([RFC 9457 §3.1.1](https://www.rfc-editor.org/rfc/rfc9457#section-3.1.1)); switch on it rather than on `detail`, which is free text ([§3.1.4](https://www.rfc-editor.org/rfc/rfc9457#section-3.1.4)). Types are chosen by the kind of the underlying error, never by its message. Where the status code already says everything, the type is `about:blank`.
+
+| `type` | Status | When |
+| --- | --- | --- |
+| `https://problems.docspec.dev/malformed-input` | 422 | The parser or emitter rejected the document's structure: a syntax error, or a document that ends before its structure closes (core `Parse` and `Json` errors). |
+| `https://problems.docspec.dev/unsupported-content` | 422 | The document is well-formed but holds a dangling reference, a missing media part, or a value the output format cannot represent (core `Other`, `Io` and any future error kind). |
+| `about:blank` | 400, 404, 405, 406, 415, 500 | The status code is the whole meaning. |
+
+Each type URI is a path on one host. `https://problems.docspec.dev/` serves a single document with an anchor per type and redirects each path to its anchor. This table is that document's source; the page itself lives in [docspec/problems.docspec.dev](https://github.com/docspec/problems.docspec.dev).
+
+The `instance` member ([§3.1.5](https://www.rfc-editor.org/rfc/rfc9457#section-3.1.5)) is the request id as a URI, `urn:uuid:<X-Request-ID>`, so a failure reported by a user can be found in the logs and in Sentry. It is present whenever the request id is a UUID, which is always the case for the id the server assigns. A client-supplied `X-Request-ID` that is not a UUID is not a URI; then `instance` is omitted and the id is still echoed in the header.
+
 Accepted `Accept` values for `/conversion`: `text/html` (HTML), `application/vnd.oxa+json` (oxa.dev), `application/vnd.pandoc.native` (Pandoc native), `application/vnd.docspec.blocknote+json`, `application/vnd.blocknote+json` (BlockNote alias), `application/*`, or `*/*`. Wildcards and missing `Accept` default to BlockNote for back-compat. Anything else returns 406. JSON responses, including problem details, carry no `charset` parameter (none is defined for JSON media types); `text/html` responses carry `charset=utf-8`.
 
 ## Deployment Notes

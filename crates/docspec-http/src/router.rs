@@ -111,6 +111,7 @@ pub fn router() -> Router {
             MakeRequestUuid,
         ))
         .layer(SetRequestIdLayer::new(x_trace_id.clone(), EchoOnly))
+        .layer(middleware::from_fn(crate::error::attach_problem_instance))
         .layer(option_layer(telemetry::tower_new_layer()))
         .layer(option_layer(telemetry::tower_http_layer()))
         .layer(middleware::from_fn(attach_sentry_tags))
@@ -136,6 +137,7 @@ pub fn router() -> Router {
             MakeRequestUuid,
         ))
         .layer(SetRequestIdLayer::new(x_trace_id.clone(), EchoOnly))
+        .layer(middleware::from_fn(crate::error::attach_problem_instance))
         .layer(
             TraceLayer::new_for_http()
                 .on_failure(DefaultOnFailure::new().level(tracing::Level::DEBUG)),
