@@ -276,8 +276,9 @@ async fn do_conversion(
         OutputFormat::PandocNative => {
             HeaderValue::from_static("application/vnd.pandoc.native; charset=utf-8")
         }
-        // BlockNote, and any future variant until it is added above explicitly.
-        OutputFormat::Blocknote | _ => HeaderValue::from_static(crate::mime::MIME_BLOCKNOTE),
+        // BlockNote, and any future variant until it is added above explicitly
+        // (`OutputFormat` is `#[non_exhaustive]`, so a wildcard arm is required).
+        _ => HeaderValue::from_static(crate::mime::MIME_BLOCKNOTE),
     };
 
     match join_result {
