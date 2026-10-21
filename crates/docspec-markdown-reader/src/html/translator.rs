@@ -3,25 +3,26 @@
 use super::tags::{tag_intent, TagIntent};
 use crate::html::tag_intent_to_style_kind;
 use docspec_core::{Event, StyleStack};
-use html5gum::{Token, Tokenizer};
+use html5gum::{HtmlString, Token, Tokenizer};
 
 /// Tokenize an HTML fragment (from pulldown-cmark's `Event::Html` or `Event::InlineHtml` payload).
 ///
-/// Returns an iterator over `html5gum::Token` items. Streaming: html5gum maintains a bounded
-/// internal buffer; we do NOT collect tokens into a Vec.
-///
-/// # Example
-///
-/// ```ignore
-/// let tokens: Vec<_> = tokenize_fragment("<b>hello</b>")
-///     .collect::<Result<Vec<_>, _>>()
-///     .unwrap();
-/// assert_eq!(tokens.len(), 3); // StartTag, String, EndTag
-/// ```
-pub(crate) fn tokenize_fragment(
-    input: &str,
-) -> impl Iterator<Item = Result<Token, core::convert::Infallible>> + '_ {
-    Tokenizer::new(input)
+/// Returns an iterator over `html5gum::Token` items. html5gum's string reader
+/// cannot fail (its error type is [`core::convert::Infallible`]), so the
+/// `Result` wrapper is unwrapped here once for every caller. Streaming:
+/// html5gum maintains a bounded internal buffer; we do NOT collect tokens
+/// into a Vec.
+pub(crate) fn tokenize_fragment(input: &str) -> impl Iterator<Item = Token> + '_ {
+    Tokenizer::new(input).map(|token_result| match token_result {
+        Ok(token) => token,
+        Err(never) => match never {},
+    })
+}
+
+/// Decodes the bytes of an HTML text token into an owned string, replacing
+/// invalid UTF-8 sequences with U+FFFD.
+fn decode_text(text: &HtmlString) -> String {
+    String::from_utf8_lossy(&text.0).into_owned()
 }
 
 /// State for accumulating a multi-line HTML heading whose tags and content
@@ -39,21 +40,21 @@ pub(crate) struct BlockHeadingAccumulator {
 }
 
 impl BlockHeadingAccumulator {
-    /// Called when a `StartTag` for h1..h6 is seen in an Html payload.
+    /// Called when a `StartTag` for h1..h6 is seen in an Html payload while
+    /// no heading is open. Returns the `StartHeading` event to emit.
     ///
-    /// Returns the `StartHeading` event to emit, or `None` if a heading is
-    /// already open (malformed nested heading — silently ignored).
-    pub(crate) fn open(&mut self, level: u8) -> Option<Event> {
-        if self.open_level.is_some() {
-            return None; // nested heading: silently ignored
-        }
+    /// Callers handle a nested heading tag (one seen while [`Self::is_open`])
+    /// before reaching this method.
+    pub(crate) fn open(&mut self, level: u8) -> Event {
         self.open_level = Some(level);
         self.nested_ignored_heading_depth = 0;
         self.heading_text_emitted = false;
-        Some(Event::StartHeading { id: None, level })
+        Event::StartHeading { id: None, level }
     }
 
-    /// Called when an `EndTag` for h1..h6 is seen in an Html payload.
+    /// Called when an `EndTag` for h1..h6 is seen in an Html payload, and by
+    /// the integration layer when the `HtmlBlock` end-tag is observed (to
+    /// auto-close an unclosed heading).
     ///
     /// Returns `Event::EndHeading` if a heading was open, or `None` if no
     /// heading was open (mismatched close — silently ignored).
@@ -63,14 +64,6 @@ impl BlockHeadingAccumulator {
         self.heading_text_emitted = false;
 
         was_open.then_some(Event::EndHeading)
-    }
-
-    /// Called by the integration layer when the `HtmlBlock` end-tag is observed.
-    ///
-    /// Auto-closes an unclosed heading, returning `Event::EndHeading` if a
-    /// heading was still open, or `None` if the block ended cleanly.
-    pub(crate) fn finish_block(&mut self) -> Option<Event> {
-        self.close()
     }
 
     /// Returns `true` if a heading is currently open inside this accumulator.
@@ -137,65 +130,31 @@ pub(crate) fn translate_inline(
     in_preformatted: bool,
 ) -> Vec<Event> {
     let mut out = Vec::new();
-    for token_result in tokenize_fragment(fragment) {
-        let token = match token_result {
-            Ok(token) => token,
-            Err(error) => match error {},
-        };
+    for token in tokenize_fragment(fragment) {
         match token {
             Token::StartTag(tag) => {
                 let intent = tag_intent(&tag.name);
-                match &intent {
-                    TagIntent::Bold
-                    | TagIntent::Italic
-                    | TagIntent::Underline
-                    | TagIntent::Strikethrough
-                    | TagIntent::Code
-                    | TagIntent::Subscript
-                    | TagIntent::Superscript
-                    | TagIntent::Mark => {
-                        // LOAD-BEARING: Rule 11 (event.rs:24-54) — StartTextStyle MUST NOT nest inside Preformatted.
-                        if !in_preformatted {
-                            if let Some(kind) = tag_intent_to_style_kind(&intent) {
-                                out.extend(stack.open(kind));
-                            }
-                        }
+                if let Some(kind) = tag_intent_to_style_kind(&intent) {
+                    // LOAD-BEARING: Rule 11 (event.rs:24-54) — StartTextStyle MUST NOT nest inside Preformatted.
+                    if !in_preformatted {
+                        out.extend(stack.open(kind));
                     }
-                    TagIntent::LineBreak | TagIntent::ThematicBreak => {
-                        if let Some(event) = translate_void(&intent, HtmlContext::Inline) {
-                            out.push(event);
-                        }
-                    }
-                    TagIntent::Heading(_) | TagIntent::Ignored => {}
+                } else {
+                    out.extend(translate_void(&intent, HtmlContext::Inline));
                 }
             }
             Token::EndTag(tag) => {
-                let intent = tag_intent(&tag.name);
-                match &intent {
-                    TagIntent::Bold
-                    | TagIntent::Italic
-                    | TagIntent::Underline
-                    | TagIntent::Strikethrough
-                    | TagIntent::Code
-                    | TagIntent::Subscript
-                    | TagIntent::Superscript
-                    | TagIntent::Mark => {
-                        // LOAD-BEARING: Rule 11 (event.rs:24-54) — EndTextStyle MUST NOT emit inside Preformatted.
-                        if !in_preformatted {
-                            if let Some(kind) = tag_intent_to_style_kind(&intent) {
-                                out.extend(stack.close(&kind));
-                            }
-                        }
+                if let Some(kind) = tag_intent_to_style_kind(&tag_intent(&tag.name)) {
+                    // LOAD-BEARING: Rule 11 (event.rs:24-54) — EndTextStyle MUST NOT emit inside Preformatted.
+                    if !in_preformatted {
+                        out.extend(stack.close(&kind));
                     }
-                    TagIntent::LineBreak
-                    | TagIntent::ThematicBreak
-                    | TagIntent::Heading(_)
-                    | TagIntent::Ignored => {}
                 }
             }
             Token::String(text) => {
-                let content = String::from_utf8_lossy(&text.0).into_owned();
-                out.push(Event::Text { content });
+                out.push(Event::Text {
+                    content: decode_text(&text),
+                });
             }
             Token::Comment(_) | Token::Doctype(_) | Token::Error(_) => {}
         }
@@ -216,87 +175,54 @@ pub(crate) fn translate_block(
     in_preformatted: bool,
 ) -> Vec<Event> {
     let mut out = Vec::new();
-    for token_result in tokenize_fragment(fragment) {
-        let token = match token_result {
-            Ok(token) => token,
-            Err(error) => match error {},
-        };
+    for token in tokenize_fragment(fragment) {
         match token {
             Token::StartTag(tag) => {
                 let intent = tag_intent(&tag.name);
-                match &intent {
-                    TagIntent::Heading(level) => {
-                        if heading_acc.is_open() {
-                            heading_acc.enter_nested_ignored_heading();
-                            continue;
-                        }
-                        if let Some(event) = heading_acc.open(*level) {
-                            out.push(event);
-                        }
+                if let Some(kind) = tag_intent_to_style_kind(&intent) {
+                    // LOAD-BEARING: Rule 11 (event.rs:24-54) — StartTextStyle MUST NOT nest inside Preformatted.
+                    if heading_acc.is_open()
+                        && !heading_acc.is_inside_nested_ignored_heading()
+                        && !in_preformatted
+                    {
+                        out.extend(inline_stack.open(kind));
                     }
-                    TagIntent::Bold
-                    | TagIntent::Italic
-                    | TagIntent::Underline
-                    | TagIntent::Strikethrough
-                    | TagIntent::Code
-                    | TagIntent::Subscript
-                    | TagIntent::Superscript
-                    | TagIntent::Mark => {
-                        // LOAD-BEARING: Rule 11 (event.rs:24-54) — StartTextStyle MUST NOT nest inside Preformatted.
-                        if heading_acc.is_open()
-                            && !heading_acc.is_inside_nested_ignored_heading()
-                            && !in_preformatted
-                        {
-                            if let Some(kind) = tag_intent_to_style_kind(&intent) {
-                                out.extend(inline_stack.open(kind));
-                            }
-                        }
+                } else if let TagIntent::Heading(level) = intent {
+                    if heading_acc.is_open() {
+                        heading_acc.enter_nested_ignored_heading();
+                    } else {
+                        out.push(heading_acc.open(level));
                     }
-                    TagIntent::LineBreak | TagIntent::ThematicBreak => {
-                        if let Some(event) = translate_void(&intent, HtmlContext::Block) {
-                            out.push(event);
-                        }
-                    }
-                    TagIntent::Ignored => {}
+                } else {
+                    out.extend(translate_void(&intent, HtmlContext::Block));
                 }
             }
             Token::EndTag(tag) => {
                 let intent = tag_intent(&tag.name);
-                match &intent {
-                    TagIntent::Heading(_) => {
-                        if heading_acc.is_inside_nested_ignored_heading() {
-                            heading_acc.exit_nested_ignored_heading();
-                        } else {
-                            out.extend(inline_stack.close_all());
-                            if let Some(event) = heading_acc.close() {
-                                out.push(event);
-                            }
+                if let Some(kind) = tag_intent_to_style_kind(&intent) {
+                    // LOAD-BEARING: Rule 11 (event.rs:24-54) — EndTextStyle MUST NOT emit inside Preformatted.
+                    if heading_acc.is_open()
+                        && !heading_acc.is_inside_nested_ignored_heading()
+                        && !in_preformatted
+                    {
+                        out.extend(inline_stack.close(&kind));
+                    }
+                } else if let TagIntent::Heading(_) = intent {
+                    if heading_acc.is_inside_nested_ignored_heading() {
+                        heading_acc.exit_nested_ignored_heading();
+                    } else {
+                        out.extend(inline_stack.close_all());
+                        if let Some(event) = heading_acc.close() {
+                            out.push(event);
                         }
                     }
-                    TagIntent::Bold
-                    | TagIntent::Italic
-                    | TagIntent::Underline
-                    | TagIntent::Strikethrough
-                    | TagIntent::Code
-                    | TagIntent::Subscript
-                    | TagIntent::Superscript
-                    | TagIntent::Mark => {
-                        // LOAD-BEARING: Rule 11 (event.rs:24-54) — EndTextStyle MUST NOT emit inside Preformatted.
-                        if heading_acc.is_open()
-                            && !heading_acc.is_inside_nested_ignored_heading()
-                            && !in_preformatted
-                        {
-                            if let Some(kind) = tag_intent_to_style_kind(&intent) {
-                                out.extend(inline_stack.close(&kind));
-                            }
-                        }
-                    }
-                    TagIntent::LineBreak | TagIntent::ThematicBreak | TagIntent::Ignored => {}
+                } else {
+                    // Void and ignored tags have no closing event.
                 }
             }
             Token::String(text) => {
                 if heading_acc.is_open() && !heading_acc.is_inside_nested_ignored_heading() {
-                    let content = String::from_utf8_lossy(&text.0).into_owned();
+                    let content = decode_text(&text);
                     if !heading_acc.has_heading_text() && content.trim().is_empty() {
                         continue;
                     }
@@ -331,17 +257,13 @@ mod tests {
 
     #[test]
     fn tokenize_empty() {
-        let tokens: Vec<_> = tokenize_fragment("")
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+        let tokens: Vec<_> = tokenize_fragment("").collect();
         assert_eq!(tokens.len(), 0, "empty input should yield no tokens");
     }
 
     #[test]
     fn tokenize_start_tag() {
-        let tokens: Vec<_> = tokenize_fragment("<b>")
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+        let tokens: Vec<_> = tokenize_fragment("<b>").collect();
         assert_eq!(tokens.len(), 1, "should have exactly one token");
         match &tokens[0] {
             Token::StartTag(tag) => {
@@ -353,9 +275,7 @@ mod tests {
 
     #[test]
     fn tokenize_end_tag() {
-        let tokens: Vec<_> = tokenize_fragment("</b>")
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+        let tokens: Vec<_> = tokenize_fragment("</b>").collect();
         assert_eq!(tokens.len(), 1, "should have exactly one token");
         match &tokens[0] {
             Token::EndTag(tag) => {
@@ -367,9 +287,7 @@ mod tests {
 
     #[test]
     fn tokenize_self_closing() {
-        let tokens: Vec<_> = tokenize_fragment("<br/>")
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+        let tokens: Vec<_> = tokenize_fragment("<br/>").collect();
         assert_eq!(tokens.len(), 1, "should have exactly one token");
         match &tokens[0] {
             Token::StartTag(tag) => {
@@ -382,9 +300,7 @@ mod tests {
 
     #[test]
     fn tokenize_text_inside_tag() {
-        let tokens: Vec<_> = tokenize_fragment("<b>hello</b>")
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+        let tokens: Vec<_> = tokenize_fragment("<b>hello</b>").collect();
         assert_eq!(tokens.len(), 3, "should have StartTag, String, EndTag");
 
         match &tokens[0] {
@@ -408,9 +324,7 @@ mod tests {
 
     #[test]
     fn tokenize_uppercase_normalized_to_lowercase() {
-        let tokens: Vec<_> = tokenize_fragment("<B>X</B>")
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+        let tokens: Vec<_> = tokenize_fragment("<B>X</B>").collect();
         assert_eq!(tokens.len(), 3, "should have StartTag, String, EndTag");
 
         match &tokens[0] {
@@ -436,9 +350,7 @@ mod tests {
 
     #[test]
     fn tokenize_handles_entities() {
-        let tokens: Vec<_> = tokenize_fragment("<b>&amp;</b>")
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+        let tokens: Vec<_> = tokenize_fragment("<b>&amp;</b>").collect();
         assert_eq!(tokens.len(), 3, "should have StartTag, String, EndTag");
 
         match &tokens[1] {
@@ -465,7 +377,7 @@ mod tests {
         let end = acc.close();
         assert_eq!(
             start,
-            Some(Event::StartHeading { id: None, level: 1 }),
+            Event::StartHeading { id: None, level: 1 },
             "open(1) should emit StartHeading level 1"
         );
         assert_eq!(
@@ -482,7 +394,7 @@ mod tests {
         let start = acc.open(3);
         assert_eq!(
             start,
-            Some(Event::StartHeading { id: None, level: 3 }),
+            Event::StartHeading { id: None, level: 3 },
             "open(3) should return StartHeading level 3"
         );
         assert!(acc.is_open(), "heading should be open after open()");
@@ -495,30 +407,6 @@ mod tests {
         assert!(!acc.is_open(), "heading should be closed after close()");
     }
 
-    /// A second open() while one is already open is silently ignored.
-    #[test]
-    fn block_heading_nested_heading_ignored() {
-        let mut acc = BlockHeadingAccumulator::default();
-        let first = acc.open(1);
-        let second = acc.open(2);
-        assert_eq!(
-            first,
-            Some(Event::StartHeading { id: None, level: 1 }),
-            "first open should succeed"
-        );
-        assert_eq!(
-            second, None,
-            "nested heading open should be silently ignored"
-        );
-        // The original heading level 1 is still tracked
-        let end = acc.close();
-        assert_eq!(
-            end,
-            Some(Event::EndHeading),
-            "close should end the first heading"
-        );
-    }
-
     /// close() with no heading open returns None without panicking.
     #[test]
     fn block_heading_close_without_open() {
@@ -527,34 +415,6 @@ mod tests {
         assert_eq!(
             result, None,
             "close() with no open heading should return None"
-        );
-    }
-
-    /// finish_block() auto-closes an unclosed heading.
-    #[test]
-    fn block_heading_finish_block_auto_closes() {
-        let mut acc = BlockHeadingAccumulator::default();
-        acc.open(2);
-        let result = acc.finish_block();
-        assert_eq!(
-            result,
-            Some(Event::EndHeading),
-            "finish_block() should auto-close an open heading"
-        );
-        assert!(
-            !acc.is_open(),
-            "heading should be closed after finish_block()"
-        );
-    }
-
-    /// finish_block() with no open heading returns None.
-    #[test]
-    fn block_heading_finish_block_when_clean() {
-        let mut acc = BlockHeadingAccumulator::default();
-        let result = acc.finish_block();
-        assert_eq!(
-            result, None,
-            "finish_block() with no open heading should return None"
         );
     }
 
