@@ -4,7 +4,11 @@ use axum::http::HeaderValue;
 use docspec::{InputFormat, OutputFormat};
 
 use crate::error::HttpError;
-use crate::mime::{MIME_BLOCKNOTE, MIME_BLOCKNOTE_ALIAS, MIME_HTML, MIME_OXA, MIME_PANDOC_NATIVE};
+use crate::mime::{classify_input, input_mime, output_mime, OUTPUT_MIMES};
+
+/// `Accept` wildcards that select the default output, [`OutputFormat::Blocknote`],
+/// for back-compat with clients that predate the other writers.
+const BLOCKNOTE_WILDCARDS: [&str; 2] = ["*/*", "application/*"];
 
 /// Negotiates the `Accept` header for the `/conversion` endpoint.
 ///
@@ -31,21 +35,17 @@ pub fn negotiate_accept(header_value: Option<&HeaderValue>) -> Result<OutputForm
 
     for part in header_str.split(',') {
         let type_part = part.trim().split(';').next().map_or("", str::trim);
-        if type_part.eq_ignore_ascii_case(MIME_OXA) {
-            return Ok(OutputFormat::Oxa);
-        }
-        if type_part.eq_ignore_ascii_case(MIME_PANDOC_NATIVE) {
-            return Ok(OutputFormat::PandocNative);
-        }
-        if type_part.eq_ignore_ascii_case(MIME_HTML) {
-            return Ok(OutputFormat::Html);
-        }
-        if type_part.eq_ignore_ascii_case("*/*")
-            || type_part.eq_ignore_ascii_case("application/*")
-            || type_part.eq_ignore_ascii_case(MIME_BLOCKNOTE)
-            || type_part.eq_ignore_ascii_case(MIME_BLOCKNOTE_ALIAS)
+        if BLOCKNOTE_WILDCARDS
+            .iter()
+            .any(|wildcard| type_part.eq_ignore_ascii_case(wildcard))
         {
             return Ok(OutputFormat::Blocknote);
+        }
+        if let Some(&(_, format)) = OUTPUT_MIMES
+            .iter()
+            .find(|(output_mime, _)| type_part.eq_ignore_ascii_case(output_mime))
+        {
+            return Ok(format);
         }
     }
     Err(HttpError::NotAcceptable)
@@ -85,11 +85,13 @@ pub fn validate_content_type(header_value: Option<&HeaderValue>) -> Result<Input
             .ok_or_else(|| HttpError::UnsupportedMediaType {
                 received: Some(header_str.to_owned()),
             })?;
+    let Some(format) = classify_input(&parsed) else {
+        return Err(HttpError::UnsupportedMediaType {
+            received: Some(header_str.to_owned()),
+        });
+    };
     // DOCX: strict — no parameters allowed (binary format; charset is meaningless)
-    if parsed.type_() == mime::APPLICATION
-        && parsed.subtype().as_str()
-            == "vnd.openxmlformats-officedocument.wordprocessingml.document"
-    {
+    if format == InputFormat::Docx {
         if parsed.params().next().is_some() {
             return Err(HttpError::UnsupportedMediaType {
                 received: Some(header_str.to_owned()),
@@ -97,15 +99,6 @@ pub fn validate_content_type(header_value: Option<&HeaderValue>) -> Result<Input
         }
         return Ok(InputFormat::Docx);
     }
-    let format = match (parsed.type_(), parsed.subtype().as_str()) {
-        (mime::TEXT, "markdown") => InputFormat::Markdown,
-        (mime::TEXT, "html") => InputFormat::Html,
-        _ => {
-            return Err(HttpError::UnsupportedMediaType {
-                received: Some(header_str.to_owned()),
-            });
-        }
-    };
     if let Some(charset) = parsed.get_param(mime::CHARSET) {
         if !charset.as_str().eq_ignore_ascii_case("utf-8") {
             return Err(HttpError::UnsupportedMediaType {
@@ -152,14 +145,9 @@ pub fn bucket_input_mime(header_value: Option<&HeaderValue>) -> &'static str {
     let Ok(parsed) = header_str.parse::<mime::Mime>() else {
         return crate::metrics::INPUT_MIME_UNSUPPORTED;
     };
-    match (parsed.type_(), parsed.subtype().as_str()) {
-        (mime::TEXT, "markdown") => crate::mime::MIME_MARKDOWN,
-        (mime::TEXT, "html") => crate::mime::MIME_HTML,
-        (mime::APPLICATION, "vnd.openxmlformats-officedocument.wordprocessingml.document") => {
-            crate::mime::MIME_DOCX
-        }
-        _ => crate::metrics::INPUT_MIME_UNSUPPORTED,
-    }
+    classify_input(&parsed)
+        .and_then(input_mime)
+        .unwrap_or(crate::metrics::INPUT_MIME_UNSUPPORTED)
 }
 
 /// Returns the bounded `output_mime_type` label value for a conversion outcome.
@@ -168,13 +156,9 @@ pub fn bucket_input_mime(header_value: Option<&HeaderValue>) -> &'static str {
 #[inline]
 #[must_use]
 pub fn bucket_output_mime(chosen_format: Option<OutputFormat>) -> &'static str {
-    match chosen_format {
-        Some(OutputFormat::Blocknote) => crate::mime::MIME_BLOCKNOTE,
-        Some(OutputFormat::Html) => crate::mime::MIME_HTML,
-        Some(OutputFormat::Oxa) => crate::mime::MIME_OXA,
-        Some(OutputFormat::PandocNative) => crate::mime::MIME_PANDOC_NATIVE,
-        None | Some(_) => crate::metrics::OUTPUT_MIME_NONE,
-    }
+    chosen_format
+        .and_then(output_mime)
+        .unwrap_or(crate::metrics::OUTPUT_MIME_NONE)
 }
 
 #[cfg(test)]
