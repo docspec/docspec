@@ -95,7 +95,7 @@ curl -X POST \
 
 ## Error Responses
 
-All errors use [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Details JSON (`application/problem+json; charset=utf-8`).
+All errors use [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Details JSON (`application/problem+json`).
 
 | Code | Meaning                                                  |
 | ---- | -------------------------------------------------------- |
@@ -109,7 +109,7 @@ All errors use [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Detail
 
 The split is decided by error kind, not by the stage that failed: a writer that cannot finish because the document ended early is `422`; an event stream that violates DocSpec's own well-formedness rules is `500`. The `422` `detail` is the reader or writer error message verbatim (for example ``malformed _rels/.rels: at 6..11: unrecognized entity `bogus` ``). It describes the submitted document so the caller can fix it, per [RFC 9457 §3.1.4](https://www.rfc-editor.org/rfc/rfc9457#section-3.1.4), and is not meant to carry server paths, stack traces or configuration ([§5](https://www.rfc-editor.org/rfc/rfc9457#section-5)). Today this holds because the readers and writers work on the in-memory request body; the message is forwarded unfiltered, so a new reader or writer must not put paths or OS errors in its error text. The `500` `detail` is a fixed string; the cause goes to logs and Sentry only.
 
-Accepted `Accept` values for `/conversion`: `text/html` (HTML), `application/vnd.oxa+json` (oxa.dev), `application/vnd.pandoc.native` (Pandoc native), `application/vnd.docspec.blocknote+json`, `application/vnd.blocknote+json` (BlockNote alias), `application/*`, or `*/*`. Wildcards and missing `Accept` default to BlockNote for back-compat. Anything else returns 406.
+Accepted `Accept` values for `/conversion`: `text/html` (HTML), `application/vnd.oxa+json` (oxa.dev), `application/vnd.pandoc.native` (Pandoc native), `application/vnd.docspec.blocknote+json`, `application/vnd.blocknote+json` (BlockNote alias), `application/*`, or `*/*`. Wildcards and missing `Accept` default to BlockNote for back-compat. Anything else returns 406. JSON responses, including problem details, carry no `charset` parameter (none is defined for JSON media types); `text/html` responses carry `charset=utf-8`.
 
 ## Deployment Notes
 
@@ -157,7 +157,7 @@ These follow Sentry's standard conventions:
 | Signal                                                  | Sentry?                                 | PostHog?                  |
 | ------------------------------------------------------- | --------------------------------------- | ------------------------- |
 | `500 Internal Server Error` (`HttpError::Internal`)     | yes (event)                             | yes (`$exception`)        |
-| `422 Unprocessable Entity` (`HttpError::Unprocessable`) | yes (event)                             | yes (`$exception`)        |
+| `422 Unprocessable Content` (`HttpError::Unprocessable`) | yes (event)                             | yes (`$exception`)        |
 | Other 4xx responses                                     | no                                      | no                        |
 | Panics                                                  | yes (event)                             | no (no panic hook)        |
 | `tracing::error!` calls                                 | yes (event)                             | no                        |
@@ -207,7 +207,7 @@ starts normally without PostHog.
 | Signal | Captured? | Event name |
 | --- | --- | --- |
 | `500 Internal Server Error` (`HttpError::Internal`) | yes | `$exception` |
-| `422 Unprocessable Entity` (`HttpError::Unprocessable`) | yes | `$exception` |
+| `422 Unprocessable Content` (`HttpError::Unprocessable`) | yes | `$exception` |
 | Other 4xx responses | no | — |
 | Panics | no (no panic hook) | — |
 | `POST /conversion` success or failure | yes | `conversion_completed` |
@@ -244,7 +244,7 @@ corresponding Sentry issue.
 
 ## Wire Contract
 
-Mirrors `github.com/docspecio/api` v3.0.2 where feasible: same endpoint path, RFC 7807 errors, `X-Request-ID`/`X-Trace-ID` header handling. Diverges in supported conversions.
+Mirrors `github.com/docspecio/api` v3.0.2 where feasible: same endpoint path, RFC 7807 errors, `X-Request-ID`/`X-Trace-ID` header handling. Diverges in supported conversions, in using the RFC 9110 reason phrase for 422 (`Unprocessable Content`), and in sending no `charset` parameter on JSON media types.
 
 ## Graceful Shutdown
 
