@@ -927,7 +927,8 @@ impl DocumentReader {
         }
     }
 
-    fn handle_eof(&mut self) {
+    /// Ends the document at `</w:body>`, or at the root's end tag when there is no body.
+    fn finish_document(&mut self) {
         self.emit.flush_list_stack();
         self.emit.flush_pending_preformatted_close();
         self.emit.push(Event::EndDocument);
@@ -963,8 +964,10 @@ impl DocumentReader {
     }
 
     fn handle_empty_body_tag(&mut self, tag: &BytesStart<'_>) {
-        if tag.local_name().as_ref() == b"p" {
-            self.parse_empty_p();
+        match tag.local_name().as_ref() {
+            b"p" => self.parse_empty_p(),
+            b"document" => self.finish_document(),
+            _ => {}
         }
     }
 
@@ -974,6 +977,11 @@ impl DocumentReader {
         match event {
             quick_xml::events::Event::Start(tag) => self.handle_start(&tag)?,
             quick_xml::events::Event::Empty(tag) => self.handle_empty_body_tag(&tag),
+            quick_xml::events::Event::End(end)
+                if matches!(end.local_name().as_ref(), b"body" | b"document") =>
+            {
+                self.finish_document();
+            }
             quick_xml::events::Event::End(_)
             | quick_xml::events::Event::Text(_)
             | quick_xml::events::Event::GeneralRef(_)
@@ -982,7 +990,7 @@ impl DocumentReader {
             | quick_xml::events::Event::Decl(_)
             | quick_xml::events::Event::PI(_)
             | quick_xml::events::Event::DocType(_) => {}
-            quick_xml::events::Event::Eof => self.handle_eof(),
+            quick_xml::events::Event::Eof => return Err(unexpected_eof("document")),
         }
 
         Ok(())
@@ -3182,7 +3190,7 @@ mod tests {
         let doc = format!(
             r#"<?xml version="1.0" encoding="UTF-8"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{}"#,
-            r#"<w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>item</w:t></w:r></w:p>"#
+            r#"<w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>item</w:t></w:r></w:p></w:body></w:document>"#
         );
         let mut reader = make_reader_with_numbering(&doc, decimal_numbering());
         let events = collect_events(&mut reader);
