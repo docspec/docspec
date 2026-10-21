@@ -105,7 +105,7 @@ mod streaming_archive;
 mod styles;
 mod symbol_fonts;
 
-use std::io::{BufReader, Read, Seek};
+use std::io::{Read, Seek};
 use std::path::Path;
 
 pub use docspec_core::EventSource;
@@ -161,7 +161,6 @@ impl DocxReader {
     {
         let (style_list, numbering, hyperlink_map, image_map, content_types, archive, stream) =
             package::open_package_from_path(path.as_ref())?;
-        let xml = quick_xml::Reader::from_reader(BufReader::new(stream));
         let data = document::DocxData {
             style_list,
             hyperlink_map,
@@ -170,7 +169,7 @@ impl DocxReader {
         };
         Ok(Self {
             inner: document::DocumentReader::from_xml_reader_and_archive(
-                xml,
+                stream,
                 data,
                 archive,
                 content_types,
@@ -198,7 +197,6 @@ impl DocxReader {
     {
         let (style_list, numbering, hyperlink_map, image_map, content_types, archive, stream) =
             package::open_package(reader)?;
-        let xml = quick_xml::Reader::from_reader(BufReader::new(stream));
         let data = document::DocxData {
             style_list,
             hyperlink_map,
@@ -207,7 +205,7 @@ impl DocxReader {
         };
         Ok(Self {
             inner: document::DocumentReader::from_xml_reader_and_archive(
-                xml,
+                stream,
                 data,
                 archive,
                 content_types,
