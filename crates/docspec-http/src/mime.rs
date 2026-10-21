@@ -2,8 +2,9 @@
 //!
 //! These constants are bare MIME types — no parameters (no `charset=utf-8`,
 //! no `q=...`). The `Content-Type` and `Accept` parsers strip parameters
-//! before comparing against these values; the conversion handler appends
-//! `; charset=utf-8` when constructing response `Content-Type` headers.
+//! before comparing against these values. Response `Content-Type` headers use
+//! the JSON types verbatim (no charset parameter is defined for JSON, RFC 8259
+//! §11) and append `; charset=utf-8` only to text types such as `text/html`.
 //!
 //! # Why one canonical home
 //!

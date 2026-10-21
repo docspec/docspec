@@ -270,15 +270,15 @@ async fn do_conversion(
     .await;
 
     let content_type = match output_format {
-        OutputFormat::Blocknote => {
-            HeaderValue::from_static("application/vnd.docspec.blocknote+json; charset=utf-8")
-        }
+        // JSON media types take no charset parameter (RFC 8259 §11); text ones do.
         OutputFormat::Html => HeaderValue::from_static("text/html; charset=utf-8"),
-        OutputFormat::Oxa => HeaderValue::from_static("application/vnd.oxa+json; charset=utf-8"),
+        OutputFormat::Oxa => HeaderValue::from_static(crate::mime::MIME_OXA),
         OutputFormat::PandocNative => {
             HeaderValue::from_static("application/vnd.pandoc.native; charset=utf-8")
         }
-        _ => HeaderValue::from_static("application/vnd.docspec.blocknote+json; charset=utf-8"),
+        // BlockNote, and any future variant until it is added above explicitly
+        // (`OutputFormat` is `#[non_exhaustive]`, so a wildcard arm is required).
+        _ => HeaderValue::from_static(crate::mime::MIME_BLOCKNOTE),
     };
 
     match join_result {

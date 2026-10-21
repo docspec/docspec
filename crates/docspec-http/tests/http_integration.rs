@@ -21,11 +21,11 @@ use docspec_test_utils::assert_json_eq;
 use tower::ServiceExt as _;
 
 const CACHE_CONTROL: &str = "max-age=0, private, must-revalidate";
-const OUTPUT_MIME: &str = "application/vnd.docspec.blocknote+json; charset=utf-8";
+const OUTPUT_MIME: &str = "application/vnd.docspec.blocknote+json";
 const OUTPUT_MIME_HTML: &str = "text/html; charset=utf-8";
-const OUTPUT_MIME_OXA: &str = "application/vnd.oxa+json; charset=utf-8";
+const OUTPUT_MIME_OXA: &str = "application/vnd.oxa+json";
 const OUTPUT_MIME_PANDOC_NATIVE: &str = "application/vnd.pandoc.native; charset=utf-8";
-const PROBLEM_JSON_CT: &str = "application/problem+json; charset=utf-8";
+const PROBLEM_JSON_CT: &str = "application/problem+json";
 const HEALTH_CT: &str = "text/plain; charset=utf-8";
 
 fn app() -> Router {
@@ -362,7 +362,7 @@ async fn post_conversion_docx_truncated_between_paragraphs_returns_422() {
         body,
         json!({
             "type": "about:blank",
-            "title": "Unprocessable Entity",
+            "title": "Unprocessable Content",
             "status": 422,
             "detail": "parse error: malformed document.xml: unexpected EOF inside <w:body>",
         })

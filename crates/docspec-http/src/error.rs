@@ -38,9 +38,9 @@ pub struct ProblemJson {
     ///
     /// Matches the HTTP reason phrase for the status code, as
     /// [RFC 9457 §4.2.1](https://www.rfc-editor.org/rfc/rfc9457#section-4.2.1)
-    /// recommends for the `about:blank` type. The one exception is `422`:
-    /// RFC 9110 renamed it "Unprocessable Content", but this server keeps the
-    /// earlier "Unprocessable Entity" for wire compatibility.
+    /// recommends for the `about:blank` type. Phrases follow
+    /// [RFC 9110 §15](https://www.rfc-editor.org/rfc/rfc9110#section-15), so
+    /// `422` is "Unprocessable Content".
     pub title: &'static str,
     /// URI reference identifying the problem type.
     ///
@@ -131,7 +131,7 @@ fn problem_response_from(
     };
     response.headers_mut().insert(
         CONTENT_TYPE,
-        HeaderValue::from_static("application/problem+json; charset=utf-8"),
+        HeaderValue::from_static("application/problem+json"),
     );
     response
 }
@@ -207,7 +207,7 @@ pub enum HttpError {
     /// paths and OS errors out of its error text. This level of detail is
     /// intentional.
     ///
-    /// → HTTP 422 Unprocessable Entity.
+    /// → HTTP 422 Unprocessable Content.
     Unprocessable {
         /// Explanation of what made the input invalid.
         detail: String,
@@ -292,7 +292,8 @@ fn capture_error_telemetry(
 impl IntoResponse for HttpError {
     /// Convert this error into an HTTP response with an RFC 9457 Problem JSON body.
     ///
-    /// Sets `Content-Type: application/problem+json; charset=utf-8` and a JSON body
+    /// Sets `Content-Type: application/problem+json` (no `charset`: none is defined
+    /// for JSON media types, RFC 8259 §11) and a JSON body
     /// with exactly four fields: `type`, `title`, `status`, `detail`.
     /// [`HttpError::MethodNotAllowed`] additionally sets the `Allow` response header.
     #[inline]
@@ -358,7 +359,7 @@ impl IntoResponse for HttpError {
             ),
             Self::Unprocessable { detail } => (
                 StatusCode::UNPROCESSABLE_ENTITY,
-                "Unprocessable Entity",
+                "Unprocessable Content",
                 Cow::Owned(detail),
                 None,
             ),
@@ -511,7 +512,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
         assert_eq!(
             response.headers().get(CONTENT_TYPE).unwrap(),
-            "application/problem+json; charset=utf-8"
+            "application/problem+json"
         );
         assert_eq!(
             axum::body::to_bytes(response.into_body(), usize::MAX)
@@ -595,7 +596,7 @@ mod tests {
     fn content_type_is_problem_json() {
         let response = HttpError::internal(dummy_error()).into_response();
         let content_type = response.headers().get(CONTENT_TYPE).unwrap();
-        assert_eq!(content_type, "application/problem+json; charset=utf-8");
+        assert_eq!(content_type, "application/problem+json");
     }
 
     #[test]
@@ -746,7 +747,7 @@ mod tests {
             json,
             serde_json::json!({
                 "type": "about:blank",
-                "title": "Unprocessable Entity",
+                "title": "Unprocessable Content",
                 "status": 422,
                 "detail": message,
             })
@@ -761,7 +762,7 @@ mod tests {
         .await;
         assert_eq!(
             bytes.as_slice(),
-            br#"{"type":"about:blank","title":"Unprocessable Entity","status":422,"detail":"bad\u0001input"}"#
+            br#"{"type":"about:blank","title":"Unprocessable Content","status":422,"detail":"bad\u0001input"}"#
         );
     }
 
