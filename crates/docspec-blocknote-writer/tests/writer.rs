@@ -2372,6 +2372,49 @@ mod tests {
     }
 
     #[test]
+    fn code_block_with_line_break_between_paragraphs_emits_sibling_blocks() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            text("before"),
+            Event::EndParagraph,
+            start_preformatted(None),
+            text("alpha"),
+            Event::LineBreak,
+            text("beta"),
+            Event::EndPreformatted,
+            start_paragraph(),
+            text("after"),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "before", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "codeBlock",
+                    "content": [
+                        {"type": "text", "text": "alpha", "styles": {}},
+                        {"type": "text", "text": "\n", "styles": {}},
+                        {"type": "text", "text": "beta", "styles": {}}
+                    ],
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "after", "styles": {}}],
+                    "children": []
+                }
+            ]),
+        );
+    }
+
+    #[test]
     fn empty_code_block() {
         let json = run_events(&[
             start_document(),

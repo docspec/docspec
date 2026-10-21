@@ -463,6 +463,12 @@ impl DocumentReader {
         if state.paragraph_emitted {
             return;
         }
+        if !state.properties_seen {
+            // No `<w:pPr>`: resolve the default properties now so a deferred
+            // preformatted close is flushed before this paragraph starts.
+            state.properties_seen = true;
+            self.resolve_local_ppr(state);
+        }
         if !state.block_start_emitted {
             self.emit_paragraph_start_for_block(&state.props, &state.block_kind);
             state.block_start_emitted = true;
@@ -802,11 +808,7 @@ impl DocumentReader {
                             self.emit_table_cell_start(is_header, colspan);
                             cell_started = true;
                         }
-                        self.emit.push(Event::StartParagraph {
-                            alignment: None,
-                            id: None,
-                        });
-                        self.emit.push(Event::EndParagraph);
+                        self.parse_empty_p();
                     }
                     _ => {}
                 },
@@ -2629,6 +2631,220 @@ mod tests {
                 },
                 docspec_core::Event::EndPreformatted,
                 docspec_core::Event::EndDocument,
+            ]
+        );
+    }
+
+    const SOURCE_CODE_STYLE: &str = r#"<w:style w:type="paragraph" w:styleId="SourceCode">
+            <w:name w:val="Source Code"/>
+        </w:style>"#;
+
+    fn source_code_paragraph(text: &str) -> String {
+        format!(
+            r#"<w:p><w:pPr><w:pStyle w:val="SourceCode"/></w:pPr><w:r><w:t>{text}</w:t></w:r></w:p>"#
+        )
+    }
+
+    fn events_for_body_with_source_code_style(body: &str) -> Vec<Event> {
+        let doc = document_with_body(body);
+        let mut reader = make_reader_with_styles(&doc, SOURCE_CODE_STYLE);
+        collect_events(&mut reader)
+    }
+
+    fn start_preformatted_event() -> Event {
+        Event::StartPreformatted {
+            id: None,
+            syntax: None,
+        }
+    }
+
+    fn text_event(content: &str) -> Event {
+        Event::Text {
+            content: content.to_string(),
+        }
+    }
+
+    #[test]
+    fn paragraph_without_ppr_after_source_code_closes_preformatted_first() {
+        let body = format!(
+            "{}{}",
+            source_code_paragraph("code"),
+            plain_paragraph("after")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                start_preformatted_event(),
+                text_event("code"),
+                Event::EndPreformatted,
+                start_para(),
+                text_event("after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn paragraph_without_ppr_starting_with_line_break_after_source_code_closes_preformatted_first()
+    {
+        let body = format!(
+            "{}<w:p><w:br/><w:r><w:t>after</w:t></w:r></w:p>",
+            source_code_paragraph("code")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                start_preformatted_event(),
+                text_event("code"),
+                Event::EndPreformatted,
+                start_para(),
+                Event::LineBreak,
+                text_event("after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn paragraph_without_ppr_starting_with_tab_after_source_code_closes_preformatted_first() {
+        let body = format!(
+            "{}<w:p><w:tab/><w:r><w:t>after</w:t></w:r></w:p>",
+            source_code_paragraph("code")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                start_preformatted_event(),
+                text_event("code"),
+                Event::EndPreformatted,
+                start_para(),
+                text_event("\t"),
+                text_event("after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn start_end_empty_paragraph_after_source_code_closes_preformatted_first() {
+        let body = format!("{}<w:p></w:p>", source_code_paragraph("code"));
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                start_preformatted_event(),
+                text_event("code"),
+                Event::EndPreformatted,
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn paragraph_without_ppr_between_source_code_paragraphs_splits_the_blocks() {
+        let body = format!(
+            "{}{}{}",
+            source_code_paragraph("first"),
+            plain_paragraph("regular"),
+            source_code_paragraph("second")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                start_preformatted_event(),
+                text_event("first"),
+                Event::EndPreformatted,
+                start_para(),
+                text_event("regular"),
+                Event::EndParagraph,
+                start_preformatted_event(),
+                text_event("second"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn consecutive_source_code_paragraphs_still_share_one_preformatted_block() {
+        let body = format!(
+            "{}{}",
+            source_code_paragraph("first"),
+            source_code_paragraph("second")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                start_preformatted_event(),
+                text_event("first"),
+                Event::LineBreak,
+                text_event("second"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn self_closing_paragraph_after_source_code_inside_table_cell_closes_preformatted_first() {
+        let body = format!(
+            "<w:tbl><w:tr><w:tc>{}<w:p/></w:tc></w:tr></w:tbl>",
+            source_code_paragraph("code")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                Event::StartTable { id: None },
+                Event::StartTableRow { id: None },
+                start_cell(None),
+                start_preformatted_event(),
+                text_event("code"),
+                Event::EndPreformatted,
+                start_para(),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn paragraph_without_ppr_after_source_code_inside_table_cell_closes_preformatted_first() {
+        let body = format!(
+            "<w:tbl><w:tr><w:tc>{}{}</w:tc></w:tr></w:tbl>",
+            source_code_paragraph("code"),
+            plain_paragraph("after")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                Event::StartTable { id: None },
+                Event::StartTableRow { id: None },
+                start_cell(None),
+                start_preformatted_event(),
+                text_event("code"),
+                Event::EndPreformatted,
+                start_para(),
+                text_event("after"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
             ]
         );
     }
