@@ -78,7 +78,7 @@ pub trait JsonBackend {
     ///
     /// Returns an error if the closure returns an I/O error, or if the buffered
     /// bytes are not valid UTF-8.
-    #[allow(clippy::missing_inline_in_public_items)]
+    #[inline]
     fn write_string_streaming<F>(&mut self, f: F) -> Result<()>
     where
         F: FnOnce(&mut dyn std::io::Write) -> std::io::Result<()>,
@@ -199,20 +199,6 @@ impl JsonBackend for CapturingBackend {
 
     #[inline]
     fn write_string(&mut self, s: &str) -> Result<()> {
-        self.tokens.push(Token::StringValue(s.to_string()));
-        Ok(())
-    }
-
-    #[inline]
-    fn write_string_streaming<F>(&mut self, f: F) -> Result<()>
-    where
-        F: FnOnce(&mut dyn std::io::Write) -> std::io::Result<()>,
-    {
-        let mut buf: Vec<u8> = Vec::new();
-        f(&mut buf).map_err(Error::from)?;
-        let s = core::str::from_utf8(&buf).map_err(|e| Error::Other {
-            message: format!("write_string_streaming produced invalid UTF-8: {e}"),
-        })?;
         self.tokens.push(Token::StringValue(s.to_string()));
         Ok(())
     }
