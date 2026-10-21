@@ -34,18 +34,16 @@ pub fn resolve_input_format(
 pub fn resolve_output_format(
     explicit: Option<crate::args::CliOutputFormat>,
     path: Option<&Path>,
-    error_message: &str,
-) -> Result<docspec::OutputFormat> {
+) -> docspec::OutputFormat {
     if let Some(format) = explicit {
-        return Ok(format.into());
+        return format.into();
     }
     if let Some(p) = path {
         if let Some(format) = docspec::detect_output_format(p) {
-            return Ok(format);
+            return format;
         }
     }
-    let _ = error_message;
-    Ok(docspec::OutputFormat::Blocknote)
+    docspec::OutputFormat::Blocknote
 }
 
 #[cfg(test)]
@@ -106,61 +104,58 @@ mod tests {
 
     #[test]
     fn detect_blocknote_from_json_output() {
-        let result = resolve_output_format(None, Some(Path::new("doc.json")), "err");
-        assert!(matches!(result, Ok(docspec::OutputFormat::Blocknote)));
+        let result = resolve_output_format(None, Some(Path::new("doc.json")));
+        assert!(matches!(result, docspec::OutputFormat::Blocknote));
     }
 
     #[test]
     fn detect_html_from_html_output() {
-        let result = resolve_output_format(None, Some(Path::new("doc.html")), "err");
-        assert!(matches!(result, Ok(docspec::OutputFormat::Html)));
+        let result = resolve_output_format(None, Some(Path::new("doc.html")));
+        assert!(matches!(result, docspec::OutputFormat::Html));
     }
 
     #[test]
     fn detect_html_from_htm_output() {
-        let result = resolve_output_format(None, Some(Path::new("doc.htm")), "err");
-        assert!(matches!(result, Ok(docspec::OutputFormat::Html)));
+        let result = resolve_output_format(None, Some(Path::new("doc.htm")));
+        assert!(matches!(result, docspec::OutputFormat::Html));
     }
 
     #[test]
     fn detect_pandoc_native_from_native_output() {
-        let result = resolve_output_format(None, Some(Path::new("doc.native")), "err");
-        assert!(matches!(result, Ok(docspec::OutputFormat::PandocNative)));
+        let result = resolve_output_format(None, Some(Path::new("doc.native")));
+        assert!(matches!(result, docspec::OutputFormat::PandocNative));
     }
 
     #[test]
     fn case_insensitive_extension_output() {
-        let result = resolve_output_format(None, Some(Path::new("doc.JSON")), "err");
-        assert!(matches!(result, Ok(docspec::OutputFormat::Blocknote)));
+        let result = resolve_output_format(None, Some(Path::new("doc.JSON")));
+        assert!(matches!(result, docspec::OutputFormat::Blocknote));
     }
 
     #[test]
     fn explicit_format_overrides_path_output() {
         use crate::args::CliOutputFormat;
-        let result = resolve_output_format(
-            Some(CliOutputFormat::Blocknote),
-            Some(Path::new("doc.md")),
-            "err",
-        );
-        assert!(matches!(result, Ok(docspec::OutputFormat::Blocknote)));
+        let result =
+            resolve_output_format(Some(CliOutputFormat::Blocknote), Some(Path::new("doc.md")));
+        assert!(matches!(result, docspec::OutputFormat::Blocknote));
     }
 
     #[test]
     fn unknown_extension_defaults_to_blocknote_output() {
-        let result = resolve_output_format(None, Some(Path::new("doc.xyz")), "my error");
-        assert!(matches!(result, Ok(docspec::OutputFormat::Blocknote)));
+        let result = resolve_output_format(None, Some(Path::new("doc.xyz")));
+        assert!(matches!(result, docspec::OutputFormat::Blocknote));
     }
 
     #[test]
     fn none_path_defaults_to_blocknote_output() {
-        let result = resolve_output_format(None, None, "no path err");
-        assert!(matches!(result, Ok(docspec::OutputFormat::Blocknote)));
+        let result = resolve_output_format(None, None);
+        assert!(matches!(result, docspec::OutputFormat::Blocknote));
     }
 
     #[test]
     fn json_path_without_explicit_flag_defaults_to_blocknote_not_oxa() {
         // Regression guard: .json is ambiguous; auto-detection must NOT pick oxa.
-        let result = resolve_output_format(None, Some(Path::new("doc.json")), "err");
-        assert!(matches!(result, Ok(docspec::OutputFormat::Blocknote)));
+        let result = resolve_output_format(None, Some(Path::new("doc.json")));
+        assert!(matches!(result, docspec::OutputFormat::Blocknote));
     }
 }
