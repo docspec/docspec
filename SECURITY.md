@@ -46,25 +46,36 @@ Parsers are hardened against malicious input through continuous fuzzing. Fuzz te
 
 Fuzzing runs in CI on every commit. It runs for hours, not minutes. We use coverage-guided fuzzing to find inputs that exercise new code paths. We track the corpus over time. A crash in fuzzing is treated as a security bug, even if it seems hard to exploit. We fix it.
 
-Document formats are attack surfaces. A malicious DOCX could try to exploit a ZIP parser. A malformed HTML document could try to cause excessive memory use. Our parsers are designed to handle these cases gracefully. They validate. They limit. They fail safely.
+Document formats are attack surfaces. A malicious DOCX could try to exploit a ZIP parser. A malformed HTML document could try to cause excessive memory use. Our parsers are designed to handle these cases gracefully. They validate. They fail safely.
 
 ---
 
 ## 4. Resource Limits
 
-Parsers and converters enforce resource bounds. Memory caps prevent a single large document from exhausting the process. Time limits prevent denial of service through documents designed to be slow to process.
+Limits exist where a document can make the process grow without bound. Every row below is enforced in code and pinned by a test. Anything not in a table is not bounded, and the "Not bounded" list says so with the issue that tracks it.
 
-Specific bounds depend on the integration surface:
+### Always on
 
-- Inline assets (embedded images) are capped at a maximum size before streaming to output
-- Nested structure depth is limited (e.g., maximum table nesting, list nesting) to prevent stack exhaustion
-- Integrators can configure per-conversion timeouts and maximum input sizes
+| Limit | Value | Where | On overflow |
+| --- | --- | --- | --- |
+| DOCX list nesting level | clamped to 8 | `docspec-docx-reader` (`MAX_LIST_LEVEL`) | deeper levels are flattened to level 8, not rejected |
+| Inline style nesting depth | 32 | `docspec-core` (`MAX_STYLE_DEPTH`), used by the HTML translator in `docspec-markdown-reader` | opens beyond the depth are ignored, not rejected |
 
-These limits exist in the implementation. They are not suggestions. They are enforced at the appropriate layer. The parser enforces nesting limits during processing. The converter tracks resource usage.
+Both bound a stack. Neither returns a dedicated HTTP status or CLI exit code; a document that hits them converts, with the excess flattened.
 
-Resource limits protect against denial of service. A malicious user could upload a document designed to consume excessive memory or CPU. The limits prevent this. A document that exceeds limits fails fast with a clear error message. The server remains stable. Other requests are not affected.
+### Opt-in, configured per server
 
-The streaming architecture helps here. Because we process documents as streams rather than loading them whole, we can handle documents larger than available memory. But we still enforce limits. A document with a billion nested tables will hit the nesting limit and fail. This protects the stack and prevents infinite loops.
+None exist today. A request body size limit (#497, `413 Content Too Large`) and a conversion timeout (#498, `503 Service Unavailable` with `Retry-After`) are planned as server flags. Until they land, both are unlimited.
+
+### Not bounded
+
+- The HTTP server holds the accepted request body and the whole conversion output in memory for the duration of a request. Memory per request is proportional to input plus output size.
+- There is no request body size cap at the HTTP layer. axum's 2 MiB default is deliberately disabled so large documents are accepted (#497).
+- There is no conversion, request, idle or read timeout at the HTTP layer. A slow client or a slow document holds the connection; use a reverse proxy for connection timeouts (#498).
+- DOCX package part size, `document.xml` node size and table nesting depth are unbounded (#496). A zip bomb or a deeply nested table can exhaust memory or the stack.
+- A single wide DOCX table is read into the reader's event queue before its first event is yielded, so memory is proportional to the largest table (#415).
+
+The streaming architecture is what makes the rest of a document cost constant memory: events flow one at a time from reader to writer. The limits tracked above are needed in the places where a format lets one node, one part, one nesting chain or one table defeat that.
 
 ---
 
@@ -122,7 +133,7 @@ Security in DocSpec flows from our core values:
 - Memory safety through Rust's type system
 - Defensive parsing through fail-fast validation
 - Least-privilege error handling through context-aware reporting
-- Resource protection through enforced limits
+- Resource bounds documented honestly in §4, enforced where they exist
 - Supply chain security through minimal, audited dependencies
 
 We build secure software by building correct software. The two are the same. Every principle in our manifesto — fail fast, no unsafe code, strict quality — contributes to security.
