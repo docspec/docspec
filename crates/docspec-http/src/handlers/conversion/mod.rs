@@ -201,6 +201,7 @@ fn classify_conversion_error(error: docspec_core::Error) -> HttpError {
         docspec_core::Error::Parse { .. } | docspec_core::Error::Json { .. } => {
             InputProblem::Malformed
         }
+        docspec_core::Error::Limit { .. } => InputProblem::Limit,
         _ => InputProblem::Unsupported,
     };
     HttpError::Unprocessable {
@@ -414,6 +415,20 @@ mod tests {
             (
                 InputProblem::Malformed,
                 "JSON error: cannot finish: open containers remain".to_owned()
+            )
+        );
+    }
+
+    #[test]
+    fn limit_error_is_unprocessable_with_limit_kind() {
+        let error = Error::Limit {
+            message: "table nesting exceeds the depth limit of 100".to_owned(),
+        };
+        assert_eq!(
+            unprocessable(classify_conversion_error(error)),
+            (
+                InputProblem::Limit,
+                "table nesting exceeds the depth limit of 100".to_owned()
             )
         );
     }

@@ -320,6 +320,43 @@ async fn post_conversion_docx_happy_path() {
     );
 }
 
+/// A DOCX whose body is `depth` nested tables.
+fn nested_tables_docx(depth: usize) -> Vec<u8> {
+    let mut body = String::new();
+    for _ in 0..depth {
+        body.push_str("<w:tbl><w:tr><w:tc>");
+    }
+    body.push_str("<w:p><w:r><w:t>deep</w:t></w:r></w:p>");
+    for _ in 0..depth {
+        body.push_str("</w:tc></w:tr></w:tbl>");
+    }
+    let doc_xml = format!(
+        r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{body}</w:body></w:document>"#
+    );
+    common::synth_docx(common::SIMPLE_RELS, &doc_xml)
+}
+
+#[tokio::test]
+async fn post_conversion_docx_over_reader_cap_returns_422_resource_limit() {
+    let response = app()
+        .oneshot(common::docx_request(nested_tables_docx(101)))
+        .await
+        .expect("request succeeds");
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let instance = instance_of(&response);
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        json!({
+            "type": "https://problems.docspec.dev/resource-limit",
+            "title": "Unprocessable Content",
+            "status": 422,
+            "detail": "table nesting exceeds the depth limit of 100 (possible zip bomb)",
+            "instance": instance,
+        })
+    );
+}
+
 #[tokio::test]
 async fn post_conversion_docx_with_charset_param_rejected_415() {
     let request = common::request(

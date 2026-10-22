@@ -116,6 +116,7 @@ The `type` member identifies the class of failure ([RFC 9457 §3.1.1](https://ww
 | `type` | Status | When |
 | --- | --- | --- |
 | `https://problems.docspec.dev/malformed-input` | 422 | The parser or emitter rejected the document's structure: a syntax error, or a document that ends before its structure closes (core `Parse` and `Json` errors). |
+| `https://problems.docspec.dev/resource-limit` | 422 | The document exceeds a resource cap of the reader: a package part or XML node over 64 MiB, or tables nested deeper than 100 (core `Limit`). |
 | `https://problems.docspec.dev/unsupported-content` | 422 | The document is well-formed but holds a dangling reference, a missing media part, or a value the output format cannot represent (core `Other`, `Io` and any future error kind). |
 | `about:blank` | 400, 404, 405, 406, 415, 500 | The status code is the whole meaning. |
 

@@ -31,6 +31,9 @@ pub const PROBLEM_TYPE_MALFORMED_INPUT: &str = "https://problems.docspec.dev/mal
 pub const PROBLEM_TYPE_UNSUPPORTED_CONTENT: &str =
     "https://problems.docspec.dev/unsupported-content";
 
+/// `type` of a `422` whose document exceeds a resource bound of this build.
+pub const PROBLEM_TYPE_RESOURCE_LIMIT: &str = "https://problems.docspec.dev/resource-limit";
+
 /// Why a document could not be converted; selects the `type` of a `422`.
 ///
 /// Chosen by `docspec_core::Error` kind, never by message text:
@@ -38,6 +41,7 @@ pub const PROBLEM_TYPE_UNSUPPORTED_CONTENT: &str =
 /// | Variant | Core error kinds | `type` |
 /// | --- | --- | --- |
 /// | [`Malformed`](Self::Malformed) | `Parse`, `Json` | [`PROBLEM_TYPE_MALFORMED_INPUT`] |
+/// | [`Limit`](Self::Limit) | `Limit` | [`PROBLEM_TYPE_RESOURCE_LIMIT`] |
 /// | [`Unsupported`](Self::Unsupported) | `Other`, `Io`, any future kind | [`PROBLEM_TYPE_UNSUPPORTED_CONTENT`] |
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -48,6 +52,9 @@ pub enum InputProblem {
     /// The document is well-formed but holds a dangling reference, a missing
     /// media part, or a value the output format cannot represent.
     Unsupported,
+    /// The document exceeds a resource bound of this build: a part, node or
+    /// nesting depth over its cap.
+    Limit,
 }
 
 impl InputProblem {
@@ -58,6 +65,7 @@ impl InputProblem {
         match self {
             Self::Malformed => PROBLEM_TYPE_MALFORMED_INPUT,
             Self::Unsupported => PROBLEM_TYPE_UNSUPPORTED_CONTENT,
+            Self::Limit => PROBLEM_TYPE_RESOURCE_LIMIT,
         }
     }
 }
@@ -817,8 +825,13 @@ mod tests {
             InputProblem::Unsupported.type_uri(),
             "https://problems.docspec.dev/unsupported-content"
         );
+        assert_eq!(
+            InputProblem::Limit.type_uri(),
+            "https://problems.docspec.dev/resource-limit"
+        );
         assert!(PROBLEM_TYPE_MALFORMED_INPUT.starts_with(PROBLEM_TYPE_BASE));
         assert!(PROBLEM_TYPE_UNSUPPORTED_CONTENT.starts_with(PROBLEM_TYPE_BASE));
+        assert!(PROBLEM_TYPE_RESOURCE_LIMIT.starts_with(PROBLEM_TYPE_BASE));
     }
 
     #[tokio::test]
