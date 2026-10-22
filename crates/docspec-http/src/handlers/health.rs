@@ -49,7 +49,7 @@ pub async fn options_health() -> impl IntoResponse {
         http::StatusCode::NO_CONTENT,
         [(
             http::header::ALLOW,
-            HeaderValue::from_static("GET, HEAD, OPTIONS"),
+            HeaderValue::from_static(format::ALLOW_HEALTH),
         )],
     )
 }

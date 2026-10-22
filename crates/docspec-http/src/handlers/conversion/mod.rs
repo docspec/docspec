@@ -9,9 +9,12 @@ use axum::{
     response::IntoResponse,
 };
 use docspec::{InputFormat, OutputFormat};
-use docspec_core::{EventSink as _, EventSource as _};
+use docspec_core::EventSource;
 
-use crate::{error::HttpError, mime_parser};
+use crate::{
+    error::{HttpError, InputProblem},
+    mime_parser,
+};
 
 enum Utf8Prevalidation {
     Required,
@@ -162,11 +165,54 @@ pub async fn post_conversion(
     response_or_error
 }
 
+/// Drives `reader` through [`docspec_core::SkipEmptyBlocks`] into `sink` with
+/// [`docspec_core::pipe`], which also finishes the sink, and classifies any
+/// failure by error kind.
+///
+/// Generic over the source so tests can inject a stream the real readers never
+/// produce.
+fn run_conversion<R, W>(reader: R, sink: docspec::AnyWriter<W>) -> Result<(), HttpError>
+where
+    R: EventSource,
+    W: std::io::Write,
+{
+    docspec_core::pipe(docspec_core::SkipEmptyBlocks::new(reader), sink)
+        .map_err(classify_conversion_error)
+}
+
+/// Maps a conversion failure to an HTTP status by *what* failed, not by
+/// which call returned it.
+///
+/// `InvalidSequence` means a reader emitted an event stream that violates the
+/// well-formedness rules, which can only be a `DocSpec` defect, so it is a
+/// `500` whose cause stays out of the response. Every other kind carries
+/// caller-derived data (a parser error, a writer left unfinished by an
+/// incomplete document, a dangling relationship) and is a `422` with the
+/// message as `detail`. `Io` is included: in this handler the input is an
+/// in-memory `Cursor` and the output a `Vec<u8>`, both infallible, so the only
+/// reachable `Io` is a media part missing from the caller's ZIP.
+fn classify_conversion_error(error: docspec_core::Error) -> HttpError {
+    if matches!(error, docspec_core::Error::InvalidSequence { .. }) {
+        tracing::warn!(error = %error, "conversion violated the event contract");
+        return HttpError::internal(error);
+    }
+    tracing::debug!(error = %error, "conversion rejected the input");
+    let kind = match error {
+        docspec_core::Error::Parse { .. } | docspec_core::Error::Json { .. } => {
+            InputProblem::Malformed
+        }
+        _ => InputProblem::Unsupported,
+    };
+    HttpError::Unprocessable {
+        detail: error.to_string(),
+        kind,
+    }
+}
+
 /// Perform the actual validation and conversion without recording outcome metrics.
 ///
 /// Body size is recorded here because it is only known after header validation
 /// succeeds and the body is confirmed non-empty.
-#[allow(clippy::too_many_lines)]
 async fn do_conversion(
     input_mime_label: &'static str,
     headers: HeaderMap,
@@ -217,37 +263,11 @@ async fn do_conversion(
         let mut output_buffer = Vec::new();
         let body_vec: Vec<u8> = body.into();
         let reader = docspec::AnyReader::from_reader(input_format, std::io::Cursor::new(body_vec))
-            .map_err(|error| {
-                tracing::debug!(error = %error, "reader construction failed");
-                HttpError::Unprocessable {
-                    detail: error.to_string(),
-                }
-            })?;
-        let mut reader = docspec_core::SkipEmptyBlocks::new(reader);
-        let mut sink = docspec::AnyWriter::new(output_format, &mut output_buffer);
-
-        loop {
-            match reader.next_event() {
-                Ok(Some(event)) => sink.handle_event(event).map_err(|error| {
-                    tracing::debug!(error = %error, "conversion sink failed");
-                    HttpError::Unprocessable {
-                        detail: error.to_string(),
-                    }
-                })?,
-                Ok(None) => break,
-                Err(error) => {
-                    tracing::debug!(error = %error, "reader failed");
-                    return Err(HttpError::Unprocessable {
-                        detail: error.to_string(),
-                    });
-                }
-            }
-        }
-
-        sink.finish().map_err(|error| {
-            tracing::warn!(error = ?error, "conversion sink finish failed");
-            HttpError::internal(error)
-        })?;
+            .map_err(classify_conversion_error)?;
+        run_conversion(
+            reader,
+            docspec::AnyWriter::new(output_format, &mut output_buffer),
+        )?;
 
         // Capture byte count before output_buffer is consumed by Body::from.
         // u64::try_from is lossless on 64-bit targets (usize ≤ u64::MAX).
@@ -260,15 +280,15 @@ async fn do_conversion(
     .await;
 
     let content_type = match output_format {
-        OutputFormat::Blocknote => {
-            HeaderValue::from_static("application/vnd.docspec.blocknote+json; charset=utf-8")
-        }
+        // JSON media types take no charset parameter (RFC 8259 §11); text ones do.
         OutputFormat::Html => HeaderValue::from_static("text/html; charset=utf-8"),
-        OutputFormat::Oxa => HeaderValue::from_static("application/vnd.oxa+json; charset=utf-8"),
+        OutputFormat::Oxa => HeaderValue::from_static(crate::mime::MIME_OXA),
         OutputFormat::PandocNative => {
             HeaderValue::from_static("application/vnd.pandoc.native; charset=utf-8")
         }
-        _ => HeaderValue::from_static("application/vnd.docspec.blocknote+json; charset=utf-8"),
+        // BlockNote, and any future variant until it is added above explicitly
+        // (`OutputFormat` is `#[non_exhaustive]`, so a wildcard arm is required).
+        _ => HeaderValue::from_static(crate::mime::MIME_BLOCKNOTE),
     };
 
     match join_result {
@@ -286,5 +306,198 @@ async fn do_conversion(
             tracing::warn!(error = ?join_error, "spawn_blocking join failed");
             Err(HttpError::internal(join_error))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
+    use docspec_core::{Error, Event, EventSource, Result};
+
+    use super::{classify_conversion_error, run_conversion};
+    use crate::error::{HttpError, InputProblem};
+    use docspec::{AnyWriter, OutputFormat};
+
+    /// Yields the given events, then `terminal` (an `Ok(None)` end of stream or
+    /// an error), the way a reader would.
+    struct FakeSource {
+        events: std::vec::IntoIter<Event>,
+        terminal: Option<Error>,
+    }
+
+    impl FakeSource {
+        fn new(events: Vec<Event>, terminal: Option<Error>) -> Self {
+            Self {
+                events: events.into_iter(),
+                terminal,
+            }
+        }
+    }
+
+    impl EventSource for FakeSource {
+        fn next_event(&mut self) -> Result<Option<Event>> {
+            if let Some(event) = self.events.next() {
+                return Ok(Some(event));
+            }
+            self.terminal.take().map_or(Ok(None), Err)
+        }
+    }
+
+    fn start_document() -> Event {
+        Event::StartDocument {
+            id: None,
+            language: None,
+            metadata: None,
+        }
+    }
+
+    fn start_paragraph() -> Event {
+        Event::StartParagraph {
+            alignment: None,
+            id: None,
+        }
+    }
+
+    fn text(content: &str) -> Event {
+        Event::Text {
+            content: content.to_owned(),
+        }
+    }
+
+    fn invalid_sequence() -> Error {
+        Error::InvalidSequence {
+            expected: "EndParagraph".to_owned(),
+            found: "EndDocument".to_owned(),
+            message: "paragraph left open".to_owned(),
+        }
+    }
+
+    fn unprocessable(error: HttpError) -> (InputProblem, String) {
+        match error {
+            HttpError::Unprocessable { detail, kind } => (kind, detail),
+            other => panic!("expected Unprocessable, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn invalid_sequence_is_internal() {
+        assert!(matches!(
+            classify_conversion_error(invalid_sequence()),
+            HttpError::Internal { .. }
+        ));
+    }
+
+    #[test]
+    fn parse_error_is_unprocessable_with_message() {
+        let error = Error::Parse {
+            message: "unexpected EOF inside <w:body>".to_owned(),
+            position: None,
+        };
+        assert_eq!(
+            unprocessable(classify_conversion_error(error)),
+            (
+                InputProblem::Malformed,
+                "parse error: unexpected EOF inside <w:body>".to_owned()
+            )
+        );
+    }
+
+    #[test]
+    fn json_error_is_unprocessable_with_message() {
+        let error = Error::Json {
+            message: "cannot finish: open containers remain".to_owned(),
+            position: None,
+        };
+        assert_eq!(
+            unprocessable(classify_conversion_error(error)),
+            (
+                InputProblem::Malformed,
+                "JSON error: cannot finish: open containers remain".to_owned()
+            )
+        );
+    }
+
+    #[test]
+    fn other_error_is_unprocessable_verbatim() {
+        let error = Error::Other {
+            message: "asset not found: rId9".to_owned(),
+        };
+        assert_eq!(
+            unprocessable(classify_conversion_error(error)),
+            (
+                InputProblem::Unsupported,
+                "asset not found: rId9".to_owned()
+            )
+        );
+    }
+
+    #[test]
+    fn io_error_is_unprocessable_with_message() {
+        let error = Error::Io {
+            source: std::io::Error::new(std::io::ErrorKind::NotFound, "media/image1.png"),
+        };
+        assert_eq!(
+            unprocessable(classify_conversion_error(error)),
+            (
+                InputProblem::Unsupported,
+                "I/O error: media/image1.png".to_owned()
+            )
+        );
+    }
+
+    #[test]
+    fn reader_contract_violation_is_internal() {
+        let mut out = Vec::new();
+        let source = FakeSource::new(vec![start_document()], Some(invalid_sequence()));
+        let result = run_conversion(source, AnyWriter::new(OutputFormat::Blocknote, &mut out));
+        assert!(matches!(result, Err(HttpError::Internal { .. })));
+    }
+
+    #[test]
+    fn reader_parse_error_is_unprocessable() {
+        let mut out = Vec::new();
+        let source = FakeSource::new(
+            vec![start_document(), start_paragraph(), text("partial")],
+            Some(Error::Parse {
+                message: "unexpected EOF inside <w:p>".to_owned(),
+                position: None,
+            }),
+        );
+        let result = run_conversion(source, AnyWriter::new(OutputFormat::Blocknote, &mut out));
+        assert_eq!(
+            unprocessable(result.unwrap_err()),
+            (
+                InputProblem::Malformed,
+                "parse error: unexpected EOF inside <w:p>".to_owned()
+            )
+        );
+    }
+
+    #[test]
+    fn malformed_stream_rejected_by_sink_is_internal() {
+        // The reader is "well-formed" from its own point of view; the stack
+        // tracker inside AnyWriter is what detects the violation.
+        let mut out = Vec::new();
+        let source = FakeSource::new(vec![Event::EndParagraph], None);
+        let result = run_conversion(source, AnyWriter::new(OutputFormat::Blocknote, &mut out));
+        assert!(matches!(result, Err(HttpError::Internal { .. })));
+    }
+
+    #[test]
+    fn incomplete_document_failing_in_finish_is_unprocessable() {
+        // No EndParagraph, no EndDocument: the stream ends cleanly but early,
+        // so the JSON emitter cannot finish. That is the input's fault.
+        let mut out = Vec::new();
+        let source = FakeSource::new(vec![start_document(), start_paragraph(), text("x")], None);
+        let result = run_conversion(source, AnyWriter::new(OutputFormat::Blocknote, &mut out));
+        assert_eq!(
+            unprocessable(result.unwrap_err()),
+            (
+                InputProblem::Malformed,
+                "JSON error: cannot finish: open containers remain or no root value written"
+                    .to_owned()
+            )
+        );
     }
 }

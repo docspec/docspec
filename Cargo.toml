@@ -19,24 +19,24 @@ members = [
 ]
 
 [workspace.package]
-version = "1.21.8"
+version = "1.21.11"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/docspec/docspec"
 
 [workspace.dependencies]
-docspec = { path = "crates/docspec", version = "1.21.8" }
-docspec-core = { path = "crates/docspec-core", version = "1.21.8" }
-docspec-json = { path = "crates/docspec-json", version = "1.21.8" }
-docspec-markdown-reader = { path = "crates/docspec-markdown-reader", version = "1.21.8" }
-docspec-html-reader = { path = "crates/docspec-html-reader", version = "1.21.8" }
-docspec-docx-reader = { path = "crates/docspec-docx-reader", version = "1.21.8" }
-docspec-blocknote-writer = { path = "crates/docspec-blocknote-writer", version = "1.21.8" }
-docspec-html-writer = { path = "crates/docspec-html-writer", version = "1.21.8" }
-docspec-http = { path = "crates/docspec-http", version = "1.21.8" }
-docspec-oxa-writer = { path = "crates/docspec-oxa-writer", version = "1.21.8" }
-docspec-pandoc-native-writer = { path = "crates/docspec-pandoc-native-writer", version = "1.21.8" }
-docspec-markdown-writer = { path = "crates/docspec-markdown-writer", version = "1.21.8" }
+docspec = { path = "crates/docspec", version = "1.21.11" }
+docspec-core = { path = "crates/docspec-core", version = "1.21.11" }
+docspec-json = { path = "crates/docspec-json", version = "1.21.11" }
+docspec-markdown-reader = { path = "crates/docspec-markdown-reader", version = "1.21.11" }
+docspec-html-reader = { path = "crates/docspec-html-reader", version = "1.21.11" }
+docspec-docx-reader = { path = "crates/docspec-docx-reader", version = "1.21.11" }
+docspec-blocknote-writer = { path = "crates/docspec-blocknote-writer", version = "1.21.11" }
+docspec-html-writer = { path = "crates/docspec-html-writer", version = "1.21.11" }
+docspec-http = { path = "crates/docspec-http", version = "1.21.11" }
+docspec-oxa-writer = { path = "crates/docspec-oxa-writer", version = "1.21.11" }
+docspec-pandoc-native-writer = { path = "crates/docspec-pandoc-native-writer", version = "1.21.11" }
+docspec-markdown-writer = { path = "crates/docspec-markdown-writer", version = "1.21.11" }
 docspec-test-utils = { path = "crates/docspec-test-utils" }
 self_cell = "1.2"
 
@@ -106,6 +106,15 @@ wildcard_enum_match_arm = "allow"
 # the discriminants of existing variants stable across SemVer minor releases. Strict
 # source-item ordering would force discriminant churn on every variant addition.
 arbitrary_source_item_ordering = "allow"
+# Reason: `Event::StartHeading { .. }` is how readers, writers, and adapters say "this
+# variant, whatever its fields". Spelling every field as `id: _` couples each match to
+# the variant's field list, so adding a field to one Event variant would touch every
+# crate; the `block_kinds!` macro cannot spell per-variant fields at all.
+rest_pattern_accessible_field = "allow"
+# Reason: Added to clippy::restriction in Rust 1.99. Moving the existing definitions out of
+# docx-reader `document/mod.rs` and `symbol_fonts/mod.rs` and markdown-reader `html/mod.rs`
+# is a module restructure that collides with in-flight PRs; tracked as a follow-up.
+definition_in_module_root = "allow"
 # Reason: let x = x.trim() is idiomatic Rust transformation via shadowing
 shadow_same = "allow"
 # Reason: let reader = reader.new_wrapper() is idiomatic adapter wrapping via shadowing

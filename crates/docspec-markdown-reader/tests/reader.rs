@@ -633,7 +633,7 @@ mod tests {
         let text_contents: Vec<&str> = events
             .iter()
             .filter_map(|event| {
-                if let Event::Text { content, .. } = event {
+                if let Event::Text { content } = event {
                     Some(content.as_str())
                 } else {
                     None

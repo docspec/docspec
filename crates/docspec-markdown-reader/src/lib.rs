@@ -321,6 +321,17 @@ impl MarkdownReader {
         self.queue.push_back(text_event);
     }
 
+    /// Queues events produced by the HTML translator, routing text through
+    /// [`Self::enqueue_text`] so pending style events are emitted before it.
+    fn enqueue_translated(&mut self, events: Vec<Event>) {
+        for event in events {
+            match event {
+                Event::Text { content } => self.enqueue_text(content),
+                other => self.queue.push_back(other),
+            }
+        }
+    }
+
     fn flush_html_styles(&mut self) {
         for event in self.inline_style_stack.close_all() {
             self.queue.push_back(event);
@@ -340,6 +351,17 @@ impl MarkdownReader {
                 });
                 link.started = true;
             }
+        }
+    }
+
+    /// Opens an implicit paragraph when inline content arrives outside any block.
+    fn ensure_paragraph(&mut self) {
+        if self.block_state == BlockState::None {
+            self.queue.push_back(Event::StartParagraph {
+                alignment: None,
+                id: None,
+            });
+            self.block_state = BlockState::AutoParagraph;
         }
     }
 
@@ -420,13 +442,7 @@ impl MarkdownReader {
             img.alt_buf.push_str(&content);
         } else {
             self.emit_pending_link_start();
-            if self.block_state == BlockState::None {
-                self.queue.push_back(Event::StartParagraph {
-                    alignment: None,
-                    id: None,
-                });
-                self.block_state = BlockState::AutoParagraph;
-            }
+            self.ensure_paragraph();
             self.open_style(&TextStyleKind::Code);
             self.enqueue_text(content);
             self.close_style(&TextStyleKind::Code);
@@ -534,7 +550,7 @@ impl MarkdownReader {
                 for event in self.html_block_inline_stack.close_all() {
                     self.queue.push_back(event);
                 }
-                if let Some(event) = self.html_block_heading_acc.finish_block() {
+                if let Some(event) = self.html_block_heading_acc.close() {
                     self.queue.push_back(event);
                 }
             }
@@ -569,7 +585,7 @@ impl MarkdownReader {
 
     fn handle_item_start(&mut self) {
         let depth = self.list_stack.len().saturating_sub(1);
-        let level = u32::try_from(depth).map_or(u32::MAX, |v| v);
+        let level = u32::try_from(depth).unwrap_or(u32::MAX);
         if let Some(ctx) = self.list_stack.last_mut() {
             if ctx.ordered {
                 self.queue.push_back(Event::StartOrderedListItem {
@@ -635,18 +651,7 @@ impl MarkdownReader {
         // `Event::Image` before `TagEnd::Paragraph`, so downstream writers close the
         // surrounding paragraph before serialising the image as a sibling block.
         self.flush_pending_paragraph_start();
-        if let Some(link) = self.link.take() {
-            if link.started {
-                self.queue.push_back(Event::EndLink);
-            } else {
-                self.queue.push_back(Event::StartLink {
-                    href: link.href,
-                    id: None,
-                    title: link.title,
-                });
-                self.queue.push_back(Event::EndLink);
-            }
-        }
+        self.handle_end_link();
 
         self.image = Some(ImageBuffer {
             alt_buf: String::new(),
@@ -728,13 +733,7 @@ impl MarkdownReader {
             buf.push_str(&content);
         } else {
             self.emit_pending_link_start();
-            if self.block_state == BlockState::None {
-                self.queue.push_back(Event::StartParagraph {
-                    alignment: None,
-                    id: None,
-                });
-                self.block_state = BlockState::AutoParagraph;
-            }
+            self.ensure_paragraph();
             self.enqueue_text(content);
         }
     }
@@ -786,12 +785,7 @@ impl MarkdownReader {
                     &mut self.html_block_inline_stack,
                     self.in_preformatted,
                 );
-                for event in events {
-                    match event {
-                        Event::Text { content } => self.enqueue_text(content),
-                        other => self.queue.push_back(other),
-                    }
-                }
+                self.enqueue_translated(events);
             }
             MarkdownPulldownEvent::Start(tag) => self.handle_start_tag(tag),
             MarkdownPulldownEvent::End(tag_end) => self.handle_end_tag(tag_end),
@@ -803,12 +797,7 @@ impl MarkdownReader {
                     &mut self.inline_style_stack,
                     self.in_preformatted,
                 );
-                for event in events {
-                    match event {
-                        Event::Text { content } => self.enqueue_text(content),
-                        other => self.queue.push_back(other),
-                    }
-                }
+                self.enqueue_translated(events);
             }
             MarkdownPulldownEvent::HardBreak => {
                 if let Some(img) = &mut self.image {

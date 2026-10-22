@@ -168,15 +168,6 @@ use docspec_core::{
 };
 use docspec_json::{JsonEmitter, Null, StrusonBackend};
 
-macro_rules! close_text_block {
-    ($writer:expr) => {{
-        $writer.close_open_link_if_any()?;
-        $writer.close_content_block()?;
-        $writer.context.in_text_block = false;
-        Ok(())
-    }};
-}
-
 /// Represents the kind of list (ordered or unordered).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ListKind {
@@ -209,10 +200,7 @@ enum BlockquoteContentState {
 #[derive(Debug)]
 enum DrainDestination {
     DocumentRoot,
-    Ancestor {
-        ancestor_index: usize,
-        kind: BlockKind,
-    },
+    Ancestor { kind: BlockKind },
 }
 
 /// Block-level events that are leaves (no Start/End counterpart) in the `DocSpec` stream.
@@ -337,14 +325,17 @@ impl<W: Write> BlockNoteWriter<W> {
         self.json.close_object()
     }
 
+    /// Close the open text block: any open inline link, its `content[]` array, an empty
+    /// `children[]` array, and the block object itself.
+    fn close_text_block(&mut self) -> Result<()> {
+        self.close_open_link_if_any()?;
+        self.close_content_block()?;
+        self.context.in_text_block = false;
+        Ok(())
+    }
+
     fn close_current_list_item_object(&mut self) -> Result<()> {
-        if self
-            .list_stack
-            .last()
-            .is_some_and(|entry| entry.content_state == ListContentState::Pending)
-        {
-            self.initialize_current_list_item_content(None)?;
-        }
+        self.initialize_current_list_item_content(None)?;
         let popped_entry = self.list_stack.pop();
         if let Some(list_entry) = popped_entry {
             let ancestor_kind = match list_entry.kind {
@@ -367,16 +358,12 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn close_for_block_sibling(&mut self) -> Result<()> {
-        if !self.list_stack.is_empty() {
-            self.close_open_list_items()?;
-        }
+        self.close_open_list_items()?;
         if self.blockquote_depth.is_positive() {
             return self.prepare_blockquote_children();
         }
         if self.context.in_text_block {
-            self.close_open_link_if_any()?;
-            self.close_content_block()?;
-            self.context.in_text_block = false;
+            self.close_text_block()?;
         }
         Ok(())
     }
@@ -404,7 +391,7 @@ impl<W: Write> BlockNoteWriter<W> {
     /// construction.
     fn close_open_child_text_block(&mut self) -> Result<()> {
         if self.context.in_text_block {
-            return close_text_block!(self);
+            return self.close_text_block();
         }
         Ok(())
     }
@@ -498,30 +485,9 @@ impl<W: Write> BlockNoteWriter<W> {
         Ok(())
     }
 
-    fn handle_end_list_item(&mut self) -> Result<()> {
-        if self.list_stack.is_empty() {
-            return Ok(());
-        }
-        self.close_current_list_item_object()
-    }
-
     fn handle_end_paragraph(&mut self) -> Result<()> {
-        let in_current_blockquote_list_item =
-            self.blockquote_depth.is_positive() && self.current_blockquote_contains_list_item();
-        if !self.list_stack.is_empty()
-            && (self.blockquote_depth.is_zero() || in_current_blockquote_list_item)
-            && self
-                .list_stack
-                .last()
-                .is_some_and(|e| e.first_paragraph_consumed)
-            && self.context.in_text_block
-        {
-            self.close_open_link_if_any()?;
-            self.json.close_array()?;
-            self.json.key("children").array(|_| Ok(()))?;
-            self.json.close_object()?;
-            self.context.in_text_block = false;
-            return Ok(());
+        if self.paragraph_is_list_item_child() && self.context.in_text_block {
+            return self.close_text_block();
         }
         if self.blockquote_depth.is_positive()
             && self.context.in_text_block
@@ -530,7 +496,7 @@ impl<W: Write> BlockNoteWriter<W> {
                 .last()
                 .is_some_and(|state| *state == BlockquoteContentState::InChildren)
         {
-            return close_text_block!(self);
+            return self.close_text_block();
         }
         if self.in_list_item_content() {
             if let Some(entry) = self.list_stack.last_mut() {
@@ -544,7 +510,7 @@ impl<W: Write> BlockNoteWriter<W> {
         {
             return Ok(());
         }
-        close_text_block!(self)
+        self.close_text_block()
     }
 
     fn handle_end_table(&mut self) -> Result<()> {
@@ -691,18 +657,10 @@ impl<W: Write> BlockNoteWriter<W> {
         if self.context.in_table_cell {
             return Ok(());
         }
-        let in_current_blockquote_list_item =
-            self.blockquote_depth.is_positive() && self.current_blockquote_contains_list_item();
         // Second and subsequent paragraphs inside a list item dispatch as child paragraph blocks
         // in the item's children[] array (T11). Must be checked before in_list_item_content()
         // because content may still be open when first_paragraph_consumed is set.
-        if !self.list_stack.is_empty()
-            && (self.blockquote_depth.is_zero() || in_current_blockquote_list_item)
-            && self
-                .list_stack
-                .last()
-                .is_some_and(|e| e.first_paragraph_consumed)
-        {
+        if self.paragraph_is_list_item_child() {
             if self
                 .list_stack
                 .last()
@@ -730,9 +688,7 @@ impl<W: Write> BlockNoteWriter<W> {
             self.context.in_text_block = true;
             return Ok(());
         }
-        if !self.list_stack.is_empty()
-            && (self.blockquote_depth.is_zero() || in_current_blockquote_list_item)
-        {
+        if self.paragraph_targets_list_item() {
             self.initialize_current_list_item_content(alignment)?;
             return Ok(());
         }
@@ -792,9 +748,7 @@ impl<W: Write> BlockNoteWriter<W> {
     ///
     /// Drops `title` and `id` — `BlockNote`'s inline link schema has no slot for these.
     fn handle_start_link(&mut self, href: &str) -> Result<()> {
-        if self.list_stack.last().is_some_and(|entry| {
-            entry.content_state == ListContentState::Pending && !entry.first_paragraph_consumed
-        }) {
+        if self.list_item_awaiting_first_content() {
             self.initialize_current_list_item_content(None)?;
         }
         if !self.context.in_text_block
@@ -832,6 +786,31 @@ impl<W: Write> BlockNoteWriter<W> {
             });
         }
         Ok(())
+    }
+
+    /// Whether paragraph events belong to the innermost open list item: a list item is open,
+    /// and either no blockquote is open or the innermost open blockquote holds an open list item.
+    fn paragraph_targets_list_item(&self) -> bool {
+        !self.list_stack.is_empty()
+            && (self.blockquote_depth.is_zero() || self.current_blockquote_contains_list_item())
+    }
+
+    /// Whether a paragraph in the innermost open list item comes after its first paragraph,
+    /// making it a child `paragraph` block in the item's `children[]` array.
+    fn paragraph_is_list_item_child(&self) -> bool {
+        self.paragraph_targets_list_item()
+            && self
+                .list_stack
+                .last()
+                .is_some_and(|entry| entry.first_paragraph_consumed)
+    }
+
+    /// Whether the innermost list item has neither opened its `content[]` array nor consumed
+    /// its first paragraph, so inline content arriving now must open `content[]` first.
+    fn list_item_awaiting_first_content(&self) -> bool {
+        self.list_stack.last().is_some_and(|entry| {
+            entry.content_state == ListContentState::Pending && !entry.first_paragraph_consumed
+        })
     }
 
     fn current_blockquote_contains_list_item(&self) -> bool {
@@ -939,7 +918,6 @@ impl<W: Write> BlockNoteWriter<W> {
                 colspan,
                 id,
                 rowspan,
-                ..
             }
             | Event::StartTableHeader {
                 colspan,
@@ -1055,9 +1033,7 @@ impl<W: Write> BlockNoteWriter<W> {
 
     fn handle_text_event(&mut self, content: &str) -> Result<()> {
         // Auto-open paragraph for orphan text (e.g., text after image closed paragraph)
-        if self.list_stack.last().is_some_and(|entry| {
-            entry.content_state == ListContentState::Pending && !entry.first_paragraph_consumed
-        }) {
+        if self.list_item_awaiting_first_content() {
             self.initialize_current_list_item_content(None)?;
         }
         if self.blockquote_depth.is_positive() && !self.context.in_text_block {
@@ -1104,12 +1080,9 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn current_drain_destination(&self) -> DrainDestination {
-        for (idx, kind) in self.open_block_ancestors.iter().enumerate().rev() {
+        for kind in self.open_block_ancestors.iter().rev() {
             if blocknote_accepts_child(Some(*kind), ChildKind::Container(BlockKind::Heading)) {
-                return DrainDestination::Ancestor {
-                    ancestor_index: idx,
-                    kind: *kind,
-                };
+                return DrainDestination::Ancestor { kind: *kind };
             }
         }
         DrainDestination::DocumentRoot
@@ -1180,13 +1153,7 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn open_current_list_item_children(&mut self) -> Result<()> {
-        if self
-            .list_stack
-            .last()
-            .is_some_and(|entry| entry.content_state == ListContentState::Pending)
-        {
-            self.initialize_current_list_item_content(None)?;
-        }
+        self.initialize_current_list_item_content(None)?;
         let content_array_open = self
             .list_stack
             .last()
@@ -1213,20 +1180,14 @@ impl<W: Write> BlockNoteWriter<W> {
         self.close_open_child_text_block()
     }
 
-    fn prepare_list_item_children(&mut self) -> Result<()> {
-        self.open_current_list_item_children()
-    }
-
     fn prepare_for_child_block(&mut self) -> Result<()> {
         match self.current_drain_destination() {
             DrainDestination::Ancestor {
                 kind: BlockKind::Blockquote,
-                ..
             } => self.prepare_blockquote_children(),
             DrainDestination::Ancestor {
                 kind: BlockKind::OrderedListItem | BlockKind::UnorderedListItem,
-                ..
-            } => self.prepare_list_item_children(),
+            } => self.open_current_list_item_children(),
             DrainDestination::Ancestor { .. } | DrainDestination::DocumentRoot => {
                 self.close_for_block_sibling()
             }
@@ -1269,9 +1230,7 @@ impl<W: Write> BlockNoteWriter<W> {
     }
 
     fn handle_end_document(&mut self) -> Result<()> {
-        while !self.list_stack.is_empty() {
-            self.close_current_list_item_object()?;
-        }
+        self.close_open_list_items()?;
         self.json.close_array()
     }
 
@@ -1332,33 +1291,10 @@ impl<W: Write> BlockNoteWriter<W> {
         if buffered.is_empty() {
             return Ok(());
         }
-        match self.current_drain_destination() {
-            DrainDestination::Ancestor {
-                ancestor_index,
-                kind: BlockKind::Blockquote,
-            } => {
-                let _ = ancestor_index;
-                self.prepare_blockquote_children()?;
-            }
-            DrainDestination::Ancestor {
-                ancestor_index,
-                kind: BlockKind::OrderedListItem | BlockKind::UnorderedListItem,
-            } => {
-                let _ = ancestor_index;
-                self.prepare_list_item_children()?;
-            }
-            DrainDestination::Ancestor { ancestor_index, .. } => {
-                let _ = ancestor_index;
-                self.close_for_block_sibling()?;
-            }
-            DrainDestination::DocumentRoot => {
-                self.close_for_block_sibling()?;
-            }
-        }
+        self.prepare_for_child_block()?;
         let rebase_offset = match self.current_drain_destination() {
             DrainDestination::Ancestor {
                 kind: BlockKind::OrderedListItem | BlockKind::UnorderedListItem,
-                ..
             } => self.compute_rebase_offset(&buffered),
             DrainDestination::Ancestor { .. } | DrainDestination::DocumentRoot => 0,
         };
@@ -1437,7 +1373,7 @@ impl<W: Write> EventSink for BlockNoteWriter<W> {
         let result = match event {
             Event::StartDocument { .. } => self.json.open_array(),
             Event::EndDocument => self.handle_end_document(),
-            Event::StartHeading { level, id, .. } => {
+            Event::StartHeading { level, id } => {
                 self.prepare_for_child_block()?;
                 self.handle_heading(level, id.as_deref())
             }
@@ -1445,22 +1381,22 @@ impl<W: Write> EventSink for BlockNoteWriter<W> {
                 if !self.context.in_text_block {
                     return Ok(());
                 }
-                close_text_block!(self)
+                self.close_text_block()
             }
             Event::StartParagraph { alignment, id } => {
                 self.handle_paragraph(id.as_deref(), alignment.as_ref())
             }
             Event::EndParagraph => self.handle_end_paragraph(),
-            Event::StartBlockQuote { id, .. } => {
+            Event::StartBlockQuote { id } => {
                 self.prepare_for_child_block()?;
                 self.handle_blockquote(id.as_deref())
             }
             Event::EndBlockQuote => self.handle_end_blockquote(),
-            Event::StartPreformatted { id, syntax, .. } => {
+            Event::StartPreformatted { id, syntax } => {
                 self.prepare_for_child_block()?;
                 self.handle_preformatted(id.as_deref(), syntax.as_deref())
             }
-            Event::ThematicBreak { id, .. } => {
+            Event::ThematicBreak { id } => {
                 self.prepare_for_child_block()?;
                 self.handle_divider(id.as_deref())
             }
@@ -1477,10 +1413,12 @@ impl<W: Write> EventSink for BlockNoteWriter<W> {
             Event::StartUnorderedListItem { level, .. } => {
                 self.handle_start_list_item(ListKind::Unordered, level, None)
             }
-            Event::EndOrderedListItem | Event::EndUnorderedListItem => self.handle_end_list_item(),
-            Event::StartTable { id, .. } => self.handle_start_table(id.as_deref()),
+            Event::EndOrderedListItem | Event::EndUnorderedListItem => {
+                self.close_current_list_item_object()
+            }
+            Event::StartTable { id } => self.handle_start_table(id.as_deref()),
             Event::EndTable => self.handle_end_table(),
-            Event::StartTableRow { id, .. } => self.handle_start_table_row(id.as_deref()),
+            Event::StartTableRow { id } => self.handle_start_table_row(id.as_deref()),
             Event::EndTableRow => self.handle_end_table_row(),
             event @ (Event::StartTableCell { .. } | Event::StartTableHeader { .. }) => {
                 self.handle_start_table_cell_event(event)
@@ -1517,14 +1455,14 @@ mod tests {
     fn list_stack_empty_after_new() {
         let mut buf = Vec::new();
         let writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.list_stack.is_empty());
+        assert_eq!(writer.list_stack, []);
     }
 
     #[test]
     fn blockquote_state_stack_empty_after_new() {
         let mut buf = Vec::new();
         let writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.blockquote_content_states.is_empty());
+        assert_eq!(writer.blockquote_content_states, []);
     }
 
     #[test]
@@ -1539,7 +1477,6 @@ mod tests {
         assert!(matches!(
             writer.current_drain_destination(),
             DrainDestination::Ancestor {
-                ancestor_index: 2,
                 kind: BlockKind::Blockquote,
             }
         ));
@@ -1664,9 +1601,9 @@ mod tests {
 
     #[test]
     fn close_for_block_sibling_with_nonempty_list_stack_closes_all_items() {
-        // Drives close_open_list_items call inside close_for_block_sibling (line 264).
+        // Drives the close_open_list_items call inside close_for_block_sibling.
         // After opening a list item, list_stack is non-empty; calling the private
-        // method directly exercises the !list_stack.is_empty() branch.
+        // method directly checks that every open item is closed.
         let mut buf = Vec::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
         assert!(writer

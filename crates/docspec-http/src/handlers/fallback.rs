@@ -3,8 +3,9 @@
 use axum::http::{Method, Uri};
 
 use crate::error::HttpError;
+use crate::format;
 
-/// Fallback handler that returns RFC 7807 Problem JSON for all unmatched routes.
+/// Fallback handler that returns RFC 9457 Problem JSON for all unmatched routes.
 ///
 /// Uses only [`Uri::path`] (not the full URI) to avoid leaking sensitive query
 /// parameters in error responses.
@@ -28,7 +29,7 @@ pub async fn not_found(request_uri: Uri, method: Method) -> HttpError {
 #[allow(clippy::unused_async)]
 pub async fn conversion_method_not_allowed() -> HttpError {
     HttpError::MethodNotAllowed {
-        allowed: "POST, OPTIONS",
+        allowed: format::ALLOW_CONVERSION,
     }
 }
 
@@ -41,6 +42,6 @@ pub async fn conversion_method_not_allowed() -> HttpError {
 #[allow(clippy::unused_async)]
 pub async fn health_method_not_allowed() -> HttpError {
     HttpError::MethodNotAllowed {
-        allowed: "GET, HEAD, OPTIONS",
+        allowed: format::ALLOW_HEALTH,
     }
 }

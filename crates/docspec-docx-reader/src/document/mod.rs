@@ -15,6 +15,7 @@ mod input;
 mod media;
 mod props;
 mod text;
+pub(crate) mod xml;
 
 pub use context::DocxData;
 use context::PackageContext;
@@ -25,6 +26,7 @@ use props::{
     ResolvedParagraphProperties, ResolvedRowProperties, ResolvedRunProperties,
 };
 use text::{collect_text_content, decode_general_ref, normalize_symbol_text, resolve_sym_char};
+use xml::parse_error;
 
 const MAX_LIST_LEVEL: u32 = 8;
 
@@ -88,7 +90,53 @@ struct ParagraphParseState {
 enum HyperlinkParseEnd {
     HyperlinkClosed,
     ParagraphClosed,
-    Eof,
+}
+
+/// Whether a `<w:tc>` is emitted as a table header cell or a table data cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CellKind {
+    /// Column header cell in the table's leading header-row band.
+    Header,
+    /// Ordinary data cell.
+    Data,
+}
+
+impl CellKind {
+    /// Kind of every cell in a row with `row_props`, while the header-row band
+    /// is `header_band_active`.
+    fn in_row(row_props: Option<&ResolvedRowProperties>, header_band_active: bool) -> Self {
+        if header_band_active && row_props.is_some_and(|props| props.is_header) {
+            Self::Header
+        } else {
+            Self::Data
+        }
+    }
+
+    /// The event that opens a cell of this kind.
+    fn start_event(self, colspan: Option<u32>) -> Event {
+        match self {
+            Self::Header => Event::StartTableHeader {
+                scope: Some(TableHeaderScope::Column),
+                abbr: None,
+                colspan,
+                rowspan: None,
+                id: None,
+            },
+            Self::Data => Event::StartTableCell {
+                colspan,
+                rowspan: None,
+                id: None,
+            },
+        }
+    }
+
+    /// The event that closes a cell of this kind.
+    fn end_event(self) -> Event {
+        match self {
+            Self::Header => Event::EndTableHeader,
+            Self::Data => Event::EndTableCell,
+        }
+    }
 }
 
 impl Default for ParagraphParseState {
@@ -111,6 +159,8 @@ pub struct DocumentReader {
     emit: EmitState,
     /// Deferred parser error returned after already-queued events are drained.
     pending_error: Option<Error>,
+    /// Whether a `<w:body>` start tag has been seen without its closing tag.
+    body_open: bool,
     /// Read-only package data (styles, numbering, relationships, archive).
     package: PackageContext,
     /// The XML token pump streaming from the document entry.
@@ -149,6 +199,7 @@ impl DocumentReader {
             phase: Phase::NotStarted,
             emit: EmitState::default(),
             pending_error: None,
+            body_open: false,
             package: PackageContext::new(data, archive, content_types),
             input: XmlCursor::new(stream),
             table_depth: 0,
@@ -317,10 +368,7 @@ impl DocumentReader {
                 | quick_xml::events::Event::PI(_)
                 | quick_xml::events::Event::DocType(_) => {}
                 quick_xml::events::Event::Eof => {
-                    if content_emitted {
-                        self.close_run_styles(props.as_ref());
-                    }
-                    return Ok(());
+                    return Err(unexpected_eof("r"));
                 }
             }
         }
@@ -474,6 +522,12 @@ impl DocumentReader {
         if state.paragraph_emitted {
             return;
         }
+        if !state.properties_seen {
+            // No `<w:pPr>`: resolve the default properties now so a deferred
+            // preformatted close is flushed before this paragraph starts.
+            state.properties_seen = true;
+            self.resolve_local_ppr(state);
+        }
         if !state.block_start_emitted {
             self.emit_paragraph_start_for_block(&state.props, &state.block_kind);
             state.block_start_emitted = true;
@@ -514,7 +568,7 @@ impl DocumentReader {
 
         let rid = read_attribute(tag, b"r:id");
         let anchor = read_attribute(tag, b"w:anchor");
-        let tooltip = read_attribute(tag, b"w:tooltip");
+        let title = read_decoded_attribute(tag, b"w:tooltip");
 
         let href = if let Some(rid_val) = rid {
             self.package.hyperlink_target(&rid_val)?
@@ -522,12 +576,6 @@ impl DocumentReader {
             let anchor_val = anchor.filter(|a| !a.is_empty())?;
             format!("#{anchor_val}")
         };
-
-        let title = tooltip.and_then(|t| {
-            quick_xml::escape::unescape(&t)
-                .ok()
-                .map(std::borrow::Cow::into_owned)
-        });
 
         Some((href, title))
     }
@@ -558,15 +606,9 @@ impl DocumentReader {
         &mut self,
         start: &BytesStart<'_>,
         is_preformatted: bool,
-        is_empty: bool,
     ) -> Result<HyperlinkParseEnd> {
         let resolved = self.resolved_hyperlink(start, is_preformatted);
         let mut buffered: Vec<Event> = Vec::new();
-
-        if is_empty {
-            self.emit_buffered_hyperlink(resolved, buffered);
-            return Ok(HyperlinkParseEnd::HyperlinkClosed);
-        }
 
         let mut nested_depth: u32 = 1;
         while nested_depth > 0 {
@@ -602,8 +644,7 @@ impl DocumentReader {
                 | quick_xml::events::Event::PI(_)
                 | quick_xml::events::Event::DocType(_) => {}
                 quick_xml::events::Event::Eof => {
-                    self.emit_buffered_hyperlink(resolved, buffered);
-                    return Ok(HyperlinkParseEnd::Eof);
+                    return Err(unexpected_eof("hyperlink"));
                 }
             }
         }
@@ -646,16 +687,10 @@ impl DocumentReader {
                 match self.parse_hyperlink(
                     start,
                     matches!(state.block_kind, ParagraphBlockKind::Preformatted),
-                    false,
                 )? {
                     HyperlinkParseEnd::HyperlinkClosed => {}
                     HyperlinkParseEnd::ParagraphClosed => {
                         self.finish_paragraph_parse(state);
-                        return Ok(true);
-                    }
-                    HyperlinkParseEnd::Eof => {
-                        self.finish_paragraph_parse(state);
-                        self.handle_eof();
                         return Ok(true);
                     }
                 }
@@ -687,14 +722,8 @@ impl DocumentReader {
             }
             b"tab" => self.emit_local_tab(state),
             b"br" => self.emit_local_line_break(state),
-            b"r" | b"drawing" | b"pict" => self.ensure_local_paragraph_started(state),
-            b"hyperlink" => {
+            b"r" | b"drawing" | b"pict" | b"hyperlink" => {
                 self.ensure_local_paragraph_started(state);
-                self.parse_hyperlink(
-                    empty,
-                    matches!(state.block_kind, ParagraphBlockKind::Preformatted),
-                    true,
-                )?;
             }
             _ => {}
         }
@@ -733,42 +762,50 @@ impl DocumentReader {
                 | quick_xml::events::Event::PI(_)
                 | quick_xml::events::Event::DocType(_) => {}
                 quick_xml::events::Event::Eof => {
-                    self.finish_paragraph_parse(&mut state);
-                    self.handle_eof();
-                    return Ok(());
+                    return Err(unexpected_eof("p"));
                 }
             }
         }
     }
 
-    fn emit_table_cell_start(&mut self, is_header: bool, colspan: Option<u32>) {
-        if is_header {
-            self.emit.push(Event::StartTableHeader {
-                scope: Some(TableHeaderScope::Column),
-                abbr: None,
-                colspan,
-                rowspan: None,
-                id: None,
-            });
-        } else {
-            self.emit.push(Event::StartTableCell {
-                colspan,
-                rowspan: None,
-                id: None,
-            });
+    fn emit_empty_table_cell(&mut self, kind: CellKind, colspan: Option<u32>) {
+        self.emit.push(kind.start_event(colspan));
+        self.emit.push(kind.end_event());
+    }
+
+    /// Emits the cell's start event once, before its first content.
+    fn ensure_cell_started(
+        &mut self,
+        kind: CellKind,
+        cell_props: Option<&ResolvedCellProperties>,
+        cell_started: &mut bool,
+    ) {
+        if !*cell_started {
+            let colspan = cell_props.and_then(|props| props.colspan);
+            self.emit.push(kind.start_event(colspan));
+            *cell_started = true;
         }
     }
 
-    fn emit_empty_table_cell(&mut self, is_header: bool, colspan: Option<u32>) {
-        self.emit_table_cell_start(is_header, colspan);
-        if is_header {
-            self.emit.push(Event::EndTableHeader);
-        } else {
-            self.emit.push(Event::EndTableCell);
+    /// Emits `StartTableRow` once, before the row's first cell.
+    ///
+    /// A row that is not a header row ends the table's header-row band.
+    fn ensure_row_started(
+        &mut self,
+        row_props: Option<&ResolvedRowProperties>,
+        row_started: &mut bool,
+        header_band_active: &mut bool,
+    ) {
+        if !*row_started {
+            if !row_props.is_some_and(|props| props.is_header) {
+                *header_band_active = false;
+            }
+            self.emit.push(Event::StartTableRow { id: None });
+            *row_started = true;
         }
     }
 
-    fn parse_tc(&mut self, _start: &BytesStart<'_>, is_header: bool) -> Result<()> {
+    fn parse_tc(&mut self, _start: &BytesStart<'_>, kind: CellKind) -> Result<()> {
         let mut cell_props: Option<ResolvedCellProperties> = None;
         let mut cell_started = false;
         loop {
@@ -783,19 +820,11 @@ impl DocumentReader {
                         self.input.skip_subtree(&start)?;
                     }
                     b"p" => {
-                        if !cell_started {
-                            let colspan = cell_props.as_ref().and_then(|props| props.colspan);
-                            self.emit_table_cell_start(is_header, colspan);
-                            cell_started = true;
-                        }
+                        self.ensure_cell_started(kind, cell_props.as_ref(), &mut cell_started);
                         self.parse_p(&start)?;
                     }
                     b"tbl" => {
-                        if !cell_started {
-                            let colspan = cell_props.as_ref().and_then(|props| props.colspan);
-                            self.emit_table_cell_start(is_header, colspan);
-                            cell_started = true;
-                        }
+                        self.ensure_cell_started(kind, cell_props.as_ref(), &mut cell_started);
                         self.parse_tbl(&start, false)?;
                     }
                     _ if is_denied_container(start.local_name().as_ref()) => {
@@ -808,36 +837,24 @@ impl DocumentReader {
                         cell_props = Some(ResolvedCellProperties::default());
                     }
                     b"p" => {
-                        if !cell_started {
-                            let colspan = cell_props.as_ref().and_then(|props| props.colspan);
-                            self.emit_table_cell_start(is_header, colspan);
-                            cell_started = true;
-                        }
-                        self.emit.push(Event::StartParagraph {
-                            alignment: None,
-                            id: None,
-                        });
-                        self.emit.push(Event::EndParagraph);
+                        self.ensure_cell_started(kind, cell_props.as_ref(), &mut cell_started);
+                        self.parse_empty_p();
                     }
                     _ => {}
                 },
                 quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"tc" => {
                     self.emit.flush_list_stack();
                     self.emit.flush_pending_preformatted_close();
-                    if !cell_started {
-                        let colspan = cell_props.as_ref().and_then(|props| props.colspan);
-                        self.emit_empty_table_cell(is_header, colspan);
-                    } else if is_header {
-                        self.emit.push(Event::EndTableHeader);
+                    if cell_started {
+                        self.emit.push(kind.end_event());
                     } else {
-                        self.emit.push(Event::EndTableCell);
+                        let colspan = cell_props.as_ref().and_then(|props| props.colspan);
+                        self.emit_empty_table_cell(kind, colspan);
                     }
                     return Ok(());
                 }
                 quick_xml::events::Event::Eof => {
-                    return Err(parse_error(
-                        "malformed document.xml: unexpected EOF inside <w:tc>".to_string(),
-                    ));
+                    return Err(unexpected_eof("tc"));
                 }
                 quick_xml::events::Event::End(_)
                 | quick_xml::events::Event::Text(_)
@@ -869,15 +886,13 @@ impl DocumentReader {
                         self.input.skip_subtree(&start)?;
                     }
                     b"tc" => {
-                        let row_is_header = row_props.as_ref().is_some_and(|props| props.is_header);
-                        if !row_started {
-                            if !row_is_header {
-                                *header_band_active = false;
-                            }
-                            self.emit.push(Event::StartTableRow { id: None });
-                            row_started = true;
-                        }
-                        self.parse_tc(&start, row_is_header && *header_band_active)?;
+                        self.ensure_row_started(
+                            row_props.as_ref(),
+                            &mut row_started,
+                            header_band_active,
+                        );
+                        let kind = CellKind::in_row(row_props.as_ref(), *header_band_active);
+                        self.parse_tc(&start, kind)?;
                     }
                     _ if is_denied_container(start.local_name().as_ref()) => {
                         self.input.skip_subtree(&start)?;
@@ -890,15 +905,13 @@ impl DocumentReader {
                         *header_band_active = false;
                     }
                     b"tc" => {
-                        let row_is_header = row_props.as_ref().is_some_and(|props| props.is_header);
-                        if !row_started {
-                            if !row_is_header {
-                                *header_band_active = false;
-                            }
-                            self.emit.push(Event::StartTableRow { id: None });
-                            row_started = true;
-                        }
-                        self.emit_empty_table_cell(row_is_header && *header_band_active, None);
+                        self.ensure_row_started(
+                            row_props.as_ref(),
+                            &mut row_started,
+                            header_band_active,
+                        );
+                        let kind = CellKind::in_row(row_props.as_ref(), *header_band_active);
+                        self.emit_empty_table_cell(kind, None);
                     }
                     _ => {}
                 },
@@ -910,9 +923,7 @@ impl DocumentReader {
                     return Ok(());
                 }
                 quick_xml::events::Event::Eof => {
-                    return Err(parse_error(
-                        "malformed document.xml: unexpected EOF inside <w:tr>".to_string(),
-                    ));
+                    return Err(unexpected_eof("tr"));
                 }
                 quick_xml::events::Event::End(_)
                 | quick_xml::events::Event::Text(_)
@@ -976,9 +987,7 @@ impl DocumentReader {
                     return Ok(());
                 }
                 quick_xml::events::Event::Eof => {
-                    return Err(parse_error(
-                        "malformed document.xml: unexpected EOF inside <w:tbl>".to_string(),
-                    ));
+                    return Err(unexpected_eof("tbl"));
                 }
                 quick_xml::events::Event::End(_)
                 | quick_xml::events::Event::Text(_)
@@ -1037,17 +1046,31 @@ impl DocumentReader {
         let event = self.input.read_owned()?;
 
         match event {
-            quick_xml::events::Event::Start(tag) => self.handle_start(&tag)?,
+            quick_xml::events::Event::Start(tag) => {
+                if tag.local_name().as_ref() == b"body" {
+                    self.body_open = true;
+                }
+                self.handle_start(&tag)?;
+            }
             quick_xml::events::Event::Empty(tag) => self.handle_empty_body_tag(&tag),
-            quick_xml::events::Event::End(_)
-            | quick_xml::events::Event::Text(_)
+            quick_xml::events::Event::End(tag) => {
+                if tag.local_name().as_ref() == b"body" {
+                    self.body_open = false;
+                }
+            }
+            quick_xml::events::Event::Text(_)
             | quick_xml::events::Event::GeneralRef(_)
             | quick_xml::events::Event::CData(_)
             | quick_xml::events::Event::Comment(_)
             | quick_xml::events::Event::Decl(_)
             | quick_xml::events::Event::PI(_)
             | quick_xml::events::Event::DocType(_) => {}
-            quick_xml::events::Event::Eof => self.handle_eof(),
+            quick_xml::events::Event::Eof => {
+                if self.body_open {
+                    return Err(unexpected_eof("body"));
+                }
+                self.handle_eof();
+            }
         }
 
         Ok(())
@@ -1104,13 +1127,6 @@ fn is_denied_container(local: &[u8]) -> bool {
     )
 }
 
-fn read_val_attribute(tag: &BytesStart<'_>) -> Option<String> {
-    let a = tag.try_get_attribute(b"w:val").ok().flatten()?;
-    core::str::from_utf8(a.value.as_ref())
-        .ok()
-        .map(str::to_owned)
-}
-
 fn read_attribute(tag: &BytesStart<'_>, name: &[u8]) -> Option<String> {
     let a = tag.try_get_attribute(name).ok().flatten()?;
     core::str::from_utf8(a.value.as_ref())
@@ -1141,15 +1157,15 @@ fn read_rfonts_symbol(tag: &BytesStart<'_>) -> Option<crate::symbol_fonts::Symbo
 }
 
 fn parse_on_off_attribute(tag: &BytesStart<'_>) -> bool {
-    let val = read_val_attribute(tag);
+    let val = read_attribute(tag, b"w:val");
     properties::parse_on_off(val.as_deref())
 }
 
-fn parse_error(message: String) -> Error {
-    Error::Parse {
-        message,
-        position: None,
-    }
+/// Builds the error for `document.xml` ending inside the open `<w:{element}>`.
+fn unexpected_eof(element: &str) -> Error {
+    parse_error(format!(
+        "malformed document.xml: unexpected EOF inside <w:{element}>"
+    ))
 }
 
 #[cfg(test)]
@@ -1854,7 +1870,7 @@ mod tests {
             r#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc>"#,
         );
         let start = read_first_start(&mut reader);
-        reader.parse_tc(&start, false).expect("tc parses");
+        reader.parse_tc(&start, CellKind::Data).expect("tc parses");
 
         assert_eq!(
             drain_queue(&mut reader),
@@ -1876,7 +1892,9 @@ mod tests {
             r#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>head</w:t></w:r></w:p></w:tc>"#,
         );
         let start = read_first_start(&mut reader);
-        reader.parse_tc(&start, true).expect("tc parses");
+        reader
+            .parse_tc(&start, CellKind::Header)
+            .expect("tc parses");
 
         assert_eq!(
             drain_queue(&mut reader),
@@ -1898,7 +1916,7 @@ mod tests {
             r#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p/></w:tc>"#,
         );
         let start = read_first_start(&mut reader);
-        reader.parse_tc(&start, false).expect("tc parses");
+        reader.parse_tc(&start, CellKind::Data).expect("tc parses");
 
         assert_eq!(
             drain_queue(&mut reader),
@@ -1917,7 +1935,7 @@ mod tests {
             r#"<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:tcPr><w:gridSpan w:val="1"/></w:tcPr><w:p/></w:tc>"#,
         );
         let start = read_first_start(&mut reader);
-        reader.parse_tc(&start, false).expect("tc parses");
+        reader.parse_tc(&start, CellKind::Data).expect("tc parses");
 
         assert_eq!(
             drain_queue(&mut reader),
@@ -2658,6 +2676,323 @@ mod tests {
         );
     }
 
+    const SOURCE_CODE_STYLE: &str = r#"<w:style w:type="paragraph" w:styleId="SourceCode">
+            <w:name w:val="Source Code"/>
+        </w:style>"#;
+
+    const VERBATIM_CHAR_STYLE: &str = r#"<w:style w:type="character" w:styleId="VerbatimChar">
+            <w:name w:val="Verbatim Char"/>
+        </w:style>"#;
+
+    fn source_code_paragraph(text: &str) -> String {
+        format!(
+            r#"<w:p><w:pPr><w:pStyle w:val="SourceCode"/></w:pPr><w:r><w:t>{text}</w:t></w:r></w:p>"#
+        )
+    }
+
+    fn events_for_body_with_source_code_style(body: &str) -> Vec<Event> {
+        let doc = document_with_body(body);
+        let styles = format!("{SOURCE_CODE_STYLE}{VERBATIM_CHAR_STYLE}");
+        let mut reader = make_reader_with_styles(&doc, &styles);
+        collect_events(&mut reader)
+    }
+
+    fn start_preformatted_event() -> Event {
+        Event::StartPreformatted {
+            id: None,
+            syntax: None,
+        }
+    }
+
+    fn text_event(content: &str) -> Event {
+        Event::Text {
+            content: content.to_string(),
+        }
+    }
+
+    #[test]
+    fn paragraph_without_ppr_after_source_code_closes_preformatted_first() {
+        let body = format!(
+            "{}{}",
+            source_code_paragraph("code"),
+            plain_paragraph("after")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                start_preformatted_event(),
+                text_event("code"),
+                Event::EndPreformatted,
+                start_para(),
+                text_event("after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn paragraph_without_ppr_starting_with_line_break_after_source_code_closes_preformatted_first()
+    {
+        let body = format!(
+            "{}<w:p><w:br/><w:r><w:t>after</w:t></w:r></w:p>",
+            source_code_paragraph("code")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                start_preformatted_event(),
+                text_event("code"),
+                Event::EndPreformatted,
+                start_para(),
+                Event::LineBreak,
+                text_event("after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn paragraph_without_ppr_starting_with_tab_after_source_code_closes_preformatted_first() {
+        let body = format!(
+            "{}<w:p><w:tab/><w:r><w:t>after</w:t></w:r></w:p>",
+            source_code_paragraph("code")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                start_preformatted_event(),
+                text_event("code"),
+                Event::EndPreformatted,
+                start_para(),
+                text_event("\t"),
+                text_event("after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn start_end_empty_paragraph_after_source_code_closes_preformatted_first() {
+        let body = format!("{}<w:p></w:p>", source_code_paragraph("code"));
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                start_preformatted_event(),
+                text_event("code"),
+                Event::EndPreformatted,
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn paragraph_without_ppr_between_source_code_paragraphs_splits_the_blocks() {
+        let body = format!(
+            "{}{}{}",
+            source_code_paragraph("first"),
+            plain_paragraph("regular"),
+            source_code_paragraph("second")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                start_preformatted_event(),
+                text_event("first"),
+                Event::EndPreformatted,
+                start_para(),
+                text_event("regular"),
+                Event::EndParagraph,
+                start_preformatted_event(),
+                text_event("second"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn consecutive_source_code_paragraphs_still_share_one_preformatted_block() {
+        let body = format!(
+            "{}{}",
+            source_code_paragraph("first"),
+            source_code_paragraph("second")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                start_preformatted_event(),
+                text_event("first"),
+                Event::LineBreak,
+                text_event("second"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn self_closing_paragraph_after_source_code_inside_table_cell_closes_preformatted_first() {
+        let body = format!(
+            "<w:tbl><w:tr><w:tc>{}<w:p/></w:tc></w:tr></w:tbl>",
+            source_code_paragraph("code")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                Event::StartTable { id: None },
+                Event::StartTableRow { id: None },
+                start_cell(None),
+                start_preformatted_event(),
+                text_event("code"),
+                Event::EndPreformatted,
+                start_para(),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn paragraph_without_ppr_after_source_code_inside_table_cell_closes_preformatted_first() {
+        let body = format!(
+            "<w:tbl><w:tr><w:tc>{}{}</w:tc></w:tr></w:tbl>",
+            source_code_paragraph("code"),
+            plain_paragraph("after")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                Event::StartTable { id: None },
+                Event::StartTableRow { id: None },
+                start_cell(None),
+                start_preformatted_event(),
+                text_event("code"),
+                Event::EndPreformatted,
+                start_para(),
+                text_event("after"),
+                Event::EndParagraph,
+                Event::EndTableCell,
+                Event::EndTableRow,
+                Event::EndTable,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn run_styles_inside_source_code_paragraph_are_not_emitted() {
+        let body = concat!(
+            r#"<w:p><w:pPr><w:pStyle w:val="SourceCode"/></w:pPr>"#,
+            r#"<w:r><w:rPr><w:b/><w:i/></w:rPr><w:t>bold italic</w:t></w:r>"#,
+            r#"<w:r><w:rPr><w:rStyle w:val="VerbatimChar"/></w:rPr><w:t>verbatim</w:t></w:r></w:p>"#,
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(body),
+            vec![
+                start_doc(),
+                start_preformatted_event(),
+                text_event("bold italic"),
+                text_event("verbatim"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn run_styles_inside_merged_source_code_paragraph_are_not_emitted() {
+        let body = format!(
+            "{}{}",
+            source_code_paragraph("first"),
+            concat!(
+                r#"<w:p><w:pPr><w:pStyle w:val="SourceCode"/></w:pPr>"#,
+                r#"<w:r><w:rPr><w:b/></w:rPr><w:t>second</w:t></w:r></w:p>"#,
+            )
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                start_preformatted_event(),
+                text_event("first"),
+                Event::LineBreak,
+                text_event("second"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn run_styles_after_source_code_block_are_emitted_again() {
+        let body = format!(
+            "{}{}",
+            source_code_paragraph("code"),
+            "<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>bold</w:t></w:r></w:p>"
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                start_preformatted_event(),
+                text_event("code"),
+                Event::EndPreformatted,
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                text_event("bold"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn run_styles_before_source_code_block_are_emitted() {
+        let body = format!(
+            "{}{}",
+            "<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>bold</w:t></w:r></w:p>",
+            source_code_paragraph("code")
+        );
+        assert_eq!(
+            events_for_body_with_source_code_style(&body),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                text_event("bold"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                start_preformatted_event(),
+                text_event("code"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]
+        );
+    }
+
     #[test]
     fn pstyle_heading_99_emits_level_99() {
         let styles = r#"<w:style w:type="paragraph" w:styleId="Heading99">
@@ -3248,8 +3583,8 @@ mod tests {
     fn document_end_flush_closes_open_list() {
         let doc = format!(
             r#"<?xml version="1.0" encoding="UTF-8"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{}"#,
-            r#"<w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>item</w:t></w:r>"#
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{}</w:body></w:document>"#,
+            r#"<w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>item</w:t></w:r></w:p>"#
         );
         let mut reader = make_reader_with_numbering(&doc, decimal_numbering());
         let events = collect_events(&mut reader);

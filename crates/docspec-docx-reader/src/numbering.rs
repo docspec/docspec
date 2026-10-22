@@ -3,9 +3,13 @@
 use core::fmt;
 use std::{collections::HashMap, io::Read};
 
+use crate::document::xml::{attr_string, parse_error};
 use crate::properties;
-use docspec_core::{Error, ListStyleType};
-use quick_xml::{events::Event, XmlVersion};
+use docspec_core::ListStyleType;
+use quick_xml::events::Event;
+
+/// Error prefix for malformed attributes in `numbering.xml`.
+const ATTRIBUTE_ERROR_CONTEXT: &str = "malformed numbering.xml attribute";
 
 /// Outcome of a list level definition: either a list with a style, or not a list.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -171,7 +175,9 @@ where
                         current_level_outcome = None;
                     }
                     b"numFmt" if current_abstract.is_some() && current_ilvl.is_some() => {
-                        if let Some(value) = attr_string(&xml_reader, &element, b"val")? {
+                        if let Some(value) =
+                            attr_string(&xml_reader, &element, b"val", ATTRIBUTE_ERROR_CONTEXT)?
+                        {
                             current_level_outcome = Some(properties::parse_num_fmt(&value));
                         }
                     }
@@ -190,7 +196,9 @@ where
             }
             Ok(Event::Empty(element)) => match element.local_name().as_ref() {
                 b"numFmt" if current_abstract.is_some() && current_ilvl.is_some() => {
-                    if let Some(value) = attr_string(&xml_reader, &element, b"val")? {
+                    if let Some(value) =
+                        attr_string(&xml_reader, &element, b"val", ATTRIBUTE_ERROR_CONTEXT)?
+                    {
                         current_level_outcome = Some(properties::parse_num_fmt(&value));
                     }
                 }
@@ -269,45 +277,17 @@ fn attr_u32<R>(
 where
     R: Read,
 {
-    let Some(value) = attr_string(reader, element, name)? else {
+    let Some(value) = attr_string(reader, element, name, ATTRIBUTE_ERROR_CONTEXT)? else {
         return Ok(None);
     };
 
     Ok(value.parse::<u32>().ok())
 }
 
-fn attr_string<R>(
-    reader: &quick_xml::Reader<R>,
-    element: &quick_xml::events::BytesStart<'_>,
-    name: &[u8],
-) -> docspec_core::Result<Option<String>>
-where
-    R: Read,
-{
-    for attribute_result in element.attributes() {
-        let attribute = attribute_result
-            .map_err(|err| parse_error(format!("malformed numbering.xml attribute: {err}")))?;
-        if attribute.key.local_name().as_ref() == name {
-            return attribute
-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                .map(|value| Some(value.into_owned()))
-                .map_err(|err| parse_error(format!("malformed numbering.xml attribute: {err}")));
-        }
-    }
-
-    Ok(None)
-}
-
-fn parse_error(message: String) -> Error {
-    Error::Parse {
-        message,
-        position: None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use docspec_core::Error;
 
     macro_rules! parse_ok {
         ($xml:expr) => {{

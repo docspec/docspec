@@ -2372,6 +2372,49 @@ mod tests {
     }
 
     #[test]
+    fn code_block_with_line_break_between_paragraphs_emits_sibling_blocks() {
+        let json = run_events(&[
+            start_document(),
+            start_paragraph(),
+            text("before"),
+            Event::EndParagraph,
+            start_preformatted(None),
+            text("alpha"),
+            Event::LineBreak,
+            text("beta"),
+            Event::EndPreformatted,
+            start_paragraph(),
+            text("after"),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "before", "styles": {}}],
+                    "children": []
+                },
+                {
+                    "type": "codeBlock",
+                    "content": [
+                        {"type": "text", "text": "alpha", "styles": {}},
+                        {"type": "text", "text": "\n", "styles": {}},
+                        {"type": "text", "text": "beta", "styles": {}}
+                    ],
+                    "children": []
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "after", "styles": {}}],
+                    "children": []
+                }
+            ]),
+        );
+    }
+
+    #[test]
     fn empty_code_block() {
         let json = run_events(&[
             start_document(),
@@ -6508,9 +6551,13 @@ mod tests {
             style_type: docspec_core::ListStyleType::Decimal,
         });
         let err = result.expect_err("start value exceeding u32::MAX must return an error");
+        // The suffix is std's TryFromIntError message, whose wording changed in Rust 1.99.
+        let std_message = u32::try_from(u64::from(u32::MAX) + 1)
+            .expect_err("u32::MAX + 1 does not fit in u32")
+            .to_string();
         assert_eq!(
             err.to_string(),
-            "ordered list start value out of range: 4294967296: out of range integral type conversion attempted"
+            format!("ordered list start value out of range: 4294967296: {std_message}")
         );
     }
 

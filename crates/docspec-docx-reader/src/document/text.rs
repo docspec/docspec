@@ -9,15 +9,14 @@ use docspec_core::Result;
 use quick_xml::events::{BytesRef, BytesStart};
 
 use super::input::XmlCursor;
-use super::{parse_error, read_attribute};
+use super::{parse_error, read_attribute, unexpected_eof};
 use crate::symbol_fonts::SymbolFont;
 
 /// Reads the character data of the currently open `<w:t>` element.
 ///
 /// Consumes the cursor through the matching `</w:t>`, concatenating text,
 /// CDATA, and resolved entity references. Nested elements are skipped whole.
-/// An early EOF yields the text gathered so far rather than an error, matching
-/// the reader's tolerance for truncated runs.
+/// EOF before `</w:t>` is a parse error.
 pub(super) fn collect_text_content(input: &mut XmlCursor) -> Result<String> {
     let mut content = String::new();
     loop {
@@ -52,7 +51,7 @@ pub(super) fn collect_text_content(input: &mut XmlCursor) -> Result<String> {
             | quick_xml::events::Event::Decl(_)
             | quick_xml::events::Event::PI(_)
             | quick_xml::events::Event::DocType(_) => {}
-            quick_xml::events::Event::Eof => return Ok(content),
+            quick_xml::events::Event::Eof => return Err(unexpected_eof("t")),
         }
     }
 }

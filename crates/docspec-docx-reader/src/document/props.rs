@@ -15,8 +15,7 @@ use quick_xml::events::BytesStart;
 use super::context::PackageContext;
 use super::input::XmlCursor;
 use super::{
-    parse_error, parse_on_off_attribute, parse_u32_attr, read_attribute, read_rfonts_symbol,
-    read_val_attribute,
+    parse_on_off_attribute, parse_u32_attr, read_attribute, read_rfonts_symbol, unexpected_eof,
 };
 use crate::properties;
 use crate::styles::StyleClassification;
@@ -109,7 +108,7 @@ fn apply_resolved_rpr_style(
     tag: &BytesStart<'_>,
     kinds: &mut Vec<TextStyleKind>,
 ) {
-    if let Some(StyleClassification::Code) = read_val_attribute(tag)
+    if let Some(StyleClassification::Code) = read_attribute(tag, b"w:val")
         .filter(|s| !s.is_empty())
         .and_then(|s| package.classify_style(&s))
     {
@@ -119,15 +118,13 @@ fn apply_resolved_rpr_style(
     }
 }
 
-/// Folds one `<w:rPr>` child into the accumulator.
-///
-/// Returns whether the element was recognized.
+/// Folds one `<w:rPr>` child into the accumulator; unrecognized children are ignored.
 fn apply_resolved_rpr_property(
     package: &PackageContext,
     local: &[u8],
     tag: &BytesStart<'_>,
     acc: &mut RunPropertyAccumulator,
-) -> bool {
+) {
     match local {
         b"b" => {
             set_resolved_run_kind(
@@ -143,11 +140,6 @@ fn apply_resolved_rpr_property(
                 parse_on_off_attribute(tag),
             );
         }
-        // <w:bCs> per ECMA-376 §17.3.2.2 and <w:iCs> per §17.3.2.21 apply only
-        // to complex-script runs. DocSpec runs are not complex-script, so these
-        // properties are silently ignored; §17.3.2.1 governs <w:b> and §17.3.2.20
-        // governs <w:i> for non-complex-script text.
-        b"bCs" | b"iCs" => {}
         b"strike" | b"dstrike" => {
             set_resolved_run_kind(
                 &mut acc.kinds,
@@ -156,7 +148,7 @@ fn apply_resolved_rpr_property(
             );
         }
         b"u" => {
-            let val = read_val_attribute(tag);
+            let val = read_attribute(tag, b"w:val");
             set_resolved_run_kind(
                 &mut acc.kinds,
                 TextStyleKind::Underline,
@@ -164,18 +156,18 @@ fn apply_resolved_rpr_property(
             );
         }
         b"vertAlign" => {
-            let val = read_val_attribute(tag);
+            let val = read_attribute(tag, b"w:val");
             set_resolved_vertical_alignment(
                 &mut acc.kinds,
                 properties::parse_vert_align(val.as_deref()),
             );
         }
         b"color" => {
-            let val = read_val_attribute(tag);
+            let val = read_attribute(tag, b"w:val");
             acc.text_color = properties::parse_color_val(val.as_deref());
         }
         b"highlight" => {
-            let val = read_val_attribute(tag);
+            let val = read_attribute(tag, b"w:val");
             acc.mark = properties::parse_highlight_val(val.as_deref());
         }
         b"shd" => {
@@ -188,9 +180,12 @@ fn apply_resolved_rpr_property(
             acc.font = read_rfonts_symbol(tag);
         }
         b"rStyle" => apply_resolved_rpr_style(package, tag, &mut acc.kinds),
-        _ => return false,
+        // Every other child is silently ignored. That includes <w:bCs> per
+        // ECMA-376 §17.3.2.2 and <w:iCs> per §17.3.2.21, which apply only to
+        // complex-script runs. DocSpec runs are not complex-script; §17.3.2.1
+        // governs <w:b> and §17.3.2.20 governs <w:i> for non-complex-script text.
+        _ => {}
     }
-    true
 }
 
 /// Reads the open `<w:rPr>` through its close, resolving run properties.
@@ -206,13 +201,13 @@ pub(super) fn parse_rpr(
             quick_xml::events::Event::Start(start) => {
                 let local_name = start.local_name();
                 let local = local_name.as_ref();
-                let _ = apply_resolved_rpr_property(package, local, &start, &mut acc);
+                apply_resolved_rpr_property(package, local, &start, &mut acc);
                 input.skip_subtree(&start)?;
             }
             quick_xml::events::Event::Empty(empty) => {
                 let local_name = empty.local_name();
                 let local = local_name.as_ref();
-                let _ = apply_resolved_rpr_property(package, local, &empty, &mut acc);
+                apply_resolved_rpr_property(package, local, &empty, &mut acc);
             }
             quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"rPr" => {
                 return Ok(acc.finish());
@@ -226,9 +221,7 @@ pub(super) fn parse_rpr(
             | quick_xml::events::Event::PI(_)
             | quick_xml::events::Event::DocType(_) => {}
             quick_xml::events::Event::Eof => {
-                return Err(parse_error(
-                    "malformed document.xml: unexpected EOF inside <w:rPr>".to_string(),
-                ));
+                return Err(unexpected_eof("rPr"));
             }
         }
     }
@@ -281,9 +274,7 @@ pub(super) fn parse_numpr(input: &mut XmlCursor) -> Result<Option<(u32, u32)>> {
             | quick_xml::events::Event::PI(_)
             | quick_xml::events::Event::DocType(_) => {}
             quick_xml::events::Event::Eof => {
-                return Err(parse_error(
-                    "malformed document.xml: unexpected EOF inside <w:numPr>".to_string(),
-                ));
+                return Err(unexpected_eof("numPr"));
             }
         }
     }
@@ -304,11 +295,11 @@ pub(super) fn parse_ppr(
         match event {
             quick_xml::events::Event::Empty(empty) => match empty.local_name().as_ref() {
                 b"jc" => {
-                    let val = read_val_attribute(&empty);
+                    let val = read_attribute(&empty, b"w:val");
                     props.alignment = val.as_deref().and_then(properties::parse_alignment);
                 }
                 b"pStyle" => {
-                    props.classification = read_val_attribute(&empty)
+                    props.classification = read_attribute(&empty, b"w:val")
                         .filter(|s| !s.is_empty())
                         .and_then(|s| package.classify_style(&s));
                 }
@@ -316,12 +307,12 @@ pub(super) fn parse_ppr(
             },
             quick_xml::events::Event::Start(start) => match start.local_name().as_ref() {
                 b"jc" => {
-                    let val = read_val_attribute(&start);
+                    let val = read_attribute(&start, b"w:val");
                     props.alignment = val.as_deref().and_then(properties::parse_alignment);
                     input.skip_subtree(&start)?;
                 }
                 b"pStyle" => {
-                    props.classification = read_val_attribute(&start)
+                    props.classification = read_attribute(&start, b"w:val")
                         .filter(|s| !s.is_empty())
                         .and_then(|s| package.classify_style(&s));
                     input.skip_subtree(&start)?;
@@ -346,9 +337,7 @@ pub(super) fn parse_ppr(
             | quick_xml::events::Event::PI(_)
             | quick_xml::events::Event::DocType(_) => {}
             quick_xml::events::Event::Eof => {
-                return Err(parse_error(
-                    "malformed document.xml: unexpected EOF inside <w:pPr>".to_string(),
-                ));
+                return Err(unexpected_eof("pPr"));
             }
         }
     }
@@ -363,13 +352,13 @@ pub(super) fn parse_tcpr(input: &mut XmlCursor) -> Result<ResolvedCellProperties
         match event {
             quick_xml::events::Event::Empty(empty) => {
                 if empty.local_name().as_ref() == b"gridSpan" {
-                    let val = read_val_attribute(&empty);
+                    let val = read_attribute(&empty, b"w:val");
                     colspan = properties::parse_grid_span_value(val.as_deref());
                 }
             }
             quick_xml::events::Event::Start(start) => {
                 if start.local_name().as_ref() == b"gridSpan" {
-                    let val = read_val_attribute(&start);
+                    let val = read_attribute(&start, b"w:val");
                     colspan = properties::parse_grid_span_value(val.as_deref());
                 }
                 input.skip_subtree(&start)?;
@@ -378,9 +367,7 @@ pub(super) fn parse_tcpr(input: &mut XmlCursor) -> Result<ResolvedCellProperties
                 return Ok(ResolvedCellProperties { colspan });
             }
             quick_xml::events::Event::Eof => {
-                return Err(parse_error(
-                    "malformed document.xml: unexpected EOF inside <w:tcPr>".to_string(),
-                ));
+                return Err(unexpected_eof("tcPr"));
             }
             quick_xml::events::Event::End(_)
             | quick_xml::events::Event::Text(_)
@@ -416,9 +403,7 @@ pub(super) fn parse_trpr(input: &mut XmlCursor) -> Result<ResolvedRowProperties>
                 return Ok(ResolvedRowProperties { is_header });
             }
             quick_xml::events::Event::Eof => {
-                return Err(parse_error(
-                    "malformed document.xml: unexpected EOF inside <w:trPr>".to_string(),
-                ));
+                return Err(unexpected_eof("trPr"));
             }
             quick_xml::events::Event::End(_)
             | quick_xml::events::Event::Text(_)
