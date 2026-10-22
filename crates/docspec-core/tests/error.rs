@@ -216,4 +216,16 @@ mod tests {
         }));
         drop::<Result<String>>(Ok("success".to_string()));
     }
+
+    #[test]
+    fn limit_error() {
+        let err = Error::Limit {
+            message: "package part word/styles.xml exceeds the 8-byte limit".to_string(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "package part word/styles.xml exceeds the 8-byte limit"
+        );
+        assert!(core::error::Error::source(&err).is_none());
+    }
 }
