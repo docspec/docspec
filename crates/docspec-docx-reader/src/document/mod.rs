@@ -947,9 +947,11 @@ impl DocumentReader {
         self.table_depth = self.table_depth.saturating_add(1);
         if self.table_depth > MAX_TABLE_NESTING_DEPTH {
             self.table_depth = self.table_depth.saturating_sub(1);
-            return Err(parse_error(format!(
-                "table nesting exceeds the depth limit of {MAX_TABLE_NESTING_DEPTH} (possible zip bomb)"
-            )));
+            return Err(docspec_core::Error::Limit {
+                message: format!(
+                    "table nesting exceeds the depth limit of {MAX_TABLE_NESTING_DEPTH} (possible zip bomb)"
+                ),
+            });
         }
         let result = self.parse_tbl_inner(start, is_outermost);
         self.table_depth = self.table_depth.saturating_sub(1);

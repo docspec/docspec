@@ -61,9 +61,13 @@ where
             .read_in_window
             .saturating_add(u64::try_from(n).unwrap_or(u64::MAX));
         if self.read_in_window > self.limit {
+            // The cap rides through quick-xml as an I/O error carrying the
+            // crate error itself, so the mapping can recover it by type.
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                NODE_LIMIT_MESSAGE,
+                Error::Limit {
+                    message: NODE_LIMIT_MESSAGE.to_owned(),
+                },
             ));
         }
         Ok(n)
@@ -131,9 +135,22 @@ impl core::fmt::Debug for XmlCursor {
     }
 }
 
+/// Whether an I/O error carries the per-node cap, recognised by payload type:
+/// the only crate error this reader stores inside an I/O error is [`Error::Limit`].
+fn is_node_limit(err: &std::io::Error) -> bool {
+    err.get_ref()
+        .is_some_and(<dyn core::error::Error + Send + Sync>::is::<Error>)
+}
+
 /// Converts a quick-xml failure into the crate error type, preserving I/O kind.
+///
+/// The per-node cap travels through quick-xml as an I/O error whose payload is
+/// [`Error::Limit`]; it is recognised by type, never by message text.
 fn map_quick_xml_error(err: quick_xml::Error) -> Error {
     match err {
+        quick_xml::Error::Io(source) if is_node_limit(&source) => Error::Limit {
+            message: NODE_LIMIT_MESSAGE.to_owned(),
+        },
         quick_xml::Error::Io(source) => Error::Io {
             source: std::io::Error::new(source.kind(), source.to_string()),
         },
@@ -164,6 +181,17 @@ mod tests {
         let err = over_limit.read(&mut sink).unwrap_err();
         assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
         assert_eq!(err.to_string(), NODE_LIMIT_MESSAGE);
+
+        // Through quick-xml the cap comes back as `Limit`, any other I/O error as `Io`.
+        match map_quick_xml_error(quick_xml::Error::Io(err.into())) {
+            Error::Limit { message } => assert_eq!(message, NODE_LIMIT_MESSAGE),
+            other => panic!("expected Limit, got {other:?}"),
+        }
+        let plain = std::io::Error::new(std::io::ErrorKind::InvalidData, NODE_LIMIT_MESSAGE);
+        match map_quick_xml_error(quick_xml::Error::Io(plain.into())) {
+            Error::Io { source } => assert_eq!(source.to_string(), NODE_LIMIT_MESSAGE),
+            other => panic!("expected Io, got {other:?}"),
+        }
     }
 
     #[test]

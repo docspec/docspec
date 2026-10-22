@@ -136,11 +136,10 @@ const EXPECTED_NODE_MESSAGE: &str = "document.xml node exceeds the size limit (p
 fn styles_bomb_is_rejected_at_construction_via_from_reader() {
     let bomb = styles_bomb_docx();
     match DocxReader::from_reader(Cursor::new(bomb)) {
-        Err(Error::Parse { message, position }) => {
+        Err(Error::Limit { message }) => {
             assert_eq!(message, expected_metadata_message("word/styles.xml"));
-            assert_eq!(position, None);
         }
-        other => panic!("expected Parse error, got {other:?}"),
+        other => panic!("expected Limit error, got {other:?}"),
     }
 }
 
@@ -152,11 +151,10 @@ fn styles_bomb_is_rejected_at_construction_via_from_path() {
     tmp.flush().unwrap();
 
     match DocxReader::from_path(tmp.path()) {
-        Err(Error::Parse { message, position }) => {
+        Err(Error::Limit { message }) => {
             assert_eq!(message, expected_metadata_message("word/styles.xml"));
-            assert_eq!(position, None);
         }
-        other => panic!("expected Parse error, got {other:?}"),
+        other => panic!("expected Limit error, got {other:?}"),
     }
 }
 
@@ -175,12 +173,12 @@ fn document_single_node_bomb_is_rejected_while_streaming_via_from_path() {
         match reader.next_event() {
             Ok(Some(_)) => {}
             Ok(None) => break,
-            Err(Error::Io { source }) => {
-                assert_eq!(source.to_string(), EXPECTED_NODE_MESSAGE);
+            Err(Error::Limit { message }) => {
+                assert_eq!(message, EXPECTED_NODE_MESSAGE);
                 saw_node_limit = true;
                 break;
             }
-            other => panic!("expected Io node-limit error, got {other:?}"),
+            other => panic!("expected Limit node-limit error, got {other:?}"),
         }
     }
     assert!(saw_node_limit, "streaming never hit the node-size limit");
@@ -197,16 +195,15 @@ fn deeply_nested_tables_fail_fast_instead_of_overflowing_the_stack() {
         match reader.next_event() {
             Ok(Some(_)) => {}
             Ok(None) => break,
-            Err(Error::Parse { message, position }) => {
+            Err(Error::Limit { message }) => {
                 assert_eq!(
                     message,
                     "table nesting exceeds the depth limit of 100 (possible zip bomb)"
                 );
-                assert_eq!(position, None);
                 saw_depth_limit = true;
                 break;
             }
-            other => panic!("expected Parse depth-limit error, got {other:?}"),
+            other => panic!("expected Limit depth-limit error, got {other:?}"),
         }
     }
     assert!(saw_depth_limit, "nesting never hit the depth limit");
