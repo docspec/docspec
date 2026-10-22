@@ -105,7 +105,7 @@ mod streaming_archive;
 mod styles;
 mod symbol_fonts;
 
-use std::io::{BufReader, Read, Seek};
+use std::io::{Read, Seek};
 use std::path::Path;
 
 pub use docspec_core::EventSource;
@@ -137,8 +137,9 @@ const _: for<'a> fn(&'a rels::ImageRel) -> (&'a str, bool) = _image_rel_fields;
 ///
 /// # Errors
 ///
-/// Returns [`docspec_core::Error::Io`] for I/O failures and [`docspec_core::Error::Parse`] for malformed
-/// archives or XML.
+/// Returns [`docspec_core::Error::Io`] for I/O failures, [`docspec_core::Error::Parse`] for malformed
+/// archives or XML, and [`docspec_core::Error::Limit`] when a package part, XML node or
+/// table nesting depth exceeds its cap.
 #[derive(Debug)]
 pub struct DocxReader {
     inner: document::DocumentReader,
@@ -161,7 +162,6 @@ impl DocxReader {
     {
         let (style_list, numbering, hyperlink_map, image_map, content_types, archive, stream) =
             package::open_package_from_path(path.as_ref())?;
-        let xml = quick_xml::Reader::from_reader(BufReader::new(stream));
         let data = document::DocxData {
             style_list,
             hyperlink_map,
@@ -170,7 +170,7 @@ impl DocxReader {
         };
         Ok(Self {
             inner: document::DocumentReader::from_xml_reader_and_archive(
-                xml,
+                stream,
                 data,
                 archive,
                 content_types,
@@ -198,7 +198,6 @@ impl DocxReader {
     {
         let (style_list, numbering, hyperlink_map, image_map, content_types, archive, stream) =
             package::open_package(reader)?;
-        let xml = quick_xml::Reader::from_reader(BufReader::new(stream));
         let data = document::DocxData {
             style_list,
             hyperlink_map,
@@ -207,7 +206,7 @@ impl DocxReader {
         };
         Ok(Self {
             inner: document::DocumentReader::from_xml_reader_and_archive(
-                xml,
+                stream,
                 data,
                 archive,
                 content_types,
