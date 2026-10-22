@@ -38,7 +38,7 @@ fn main() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
             write_error(&err, color);
-            ExitCode::FAILURE
+            ExitCode::from(err.exit_code())
         }
     }
 }
