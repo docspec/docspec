@@ -30,6 +30,16 @@ impl<T: Read + Seek + Send> ReadSeek for T {}
 /// attacker can force bounded and small.
 const MAX_METADATA_PART_BYTES: u64 = 64 * 1024 * 1024;
 
+/// Maximum decompressed size accepted for the main document part when it must
+/// be buffered whole, as `open_package` (`DocxReader::from_reader`) does because
+/// a generic reader has no file to stream from.
+///
+/// Larger than [`MAX_METADATA_PART_BYTES`] because real documents with long
+/// text or many tables can legitimately reach tens of MiB of XML. 256 MiB still
+/// bounds the memory an attacker can force from a few KB of input. The
+/// `from_path` route streams the part and is not subject to this cap.
+const MAX_MAIN_PART_BYTES: u64 = 256 * 1024 * 1024;
+
 /// Reads a ZIP entry fully into memory, failing if it decompresses beyond `cap`.
 ///
 /// Reads at most `cap + 1` bytes so an over-cap entry is detected without
@@ -72,6 +82,15 @@ pub fn open_package<R>(reader: R) -> Result<PackageContents>
 where
     R: Read + Seek + Send + 'static,
 {
+    open_package_with_main_part_cap(reader, MAX_MAIN_PART_BYTES)
+}
+
+/// [`open_package`] with an explicit cap on the buffered main document part,
+/// so tests can exercise the limit without inflating hundreds of MiB.
+fn open_package_with_main_part_cap<R>(reader: R, main_part_cap: u64) -> Result<PackageContents>
+where
+    R: Read + Seek + Send + 'static,
+{
     let boxed: Box<dyn ReadSeek + 'static> = Box::new(reader);
     let mut archive = ZipArchive::new(boxed).map_err(map_zip_open_error)?;
 
@@ -82,15 +101,15 @@ where
     let (style_list, numbering, hyperlink_map, image_map, content_types) =
         load_small_package_parts(&mut archive, &document_path)?;
 
-    let mut document_xml_bytes = Vec::new();
-    archive
-        .by_name(&document_path)
-        .map_err(|_err| Error::Parse {
-            message: format!("document target not found: {document_path}"),
-            position: None,
-        })?
-        .read_to_end(&mut document_xml_bytes)
-        .map_err(Error::from)?;
+    let document_xml_bytes = {
+        let mut entry = archive
+            .by_name(&document_path)
+            .map_err(|_err| Error::Parse {
+                message: format!("document target not found: {document_path}"),
+                position: None,
+            })?;
+        read_entry_capped(&mut entry, main_part_cap, &document_path)?
+    };
 
     let content_types_arc = Arc::new(content_types);
     let archive_arc = Arc::new(Mutex::new(archive));
@@ -310,7 +329,8 @@ mod tests {
     use zip::ZipWriter;
 
     use super::{
-        load_style_list_and_hyperlink_map, open_package, read_entry_capped, MAX_METADATA_PART_BYTES,
+        load_style_list_and_hyperlink_map, open_package, open_package_with_main_part_cap,
+        read_entry_capped, MAX_METADATA_PART_BYTES,
     };
     use crate::styles::StyleList;
     use docspec_core::Error;
@@ -969,6 +989,29 @@ mod tests {
             let n = remaining.min(chunk.len());
             writer.write_all(&chunk[..n]).unwrap();
             remaining -= n;
+        }
+    }
+
+    #[test]
+    fn main_part_exceeding_cap_is_rejected_when_buffered_from_reader() {
+        let document = vec![b'A'; 9];
+        let zip_bytes = synth_zip(&[
+            ("_rels/.rels", root_rels_xml("word/document.xml").as_bytes()),
+            ("word/document.xml", &document),
+        ])
+        .unwrap();
+
+        // Exactly at the cap: accepted.
+        assert!(open_package_with_main_part_cap(Cursor::new(zip_bytes.clone()), 9).is_ok());
+
+        // One byte over the cap: rejected with the exact zip-bomb error.
+        match open_package_with_main_part_cap(Cursor::new(zip_bytes), 8) {
+            Err(Error::Limit { message }) => assert_eq!(
+                message,
+                "package part word/document.xml exceeds the 8-byte limit (possible zip bomb)"
+            ),
+            Err(err) => panic!("expected Limit error, got {err:?}"),
+            Ok(_) => panic!("expected Limit error, got Ok"),
         }
     }
 
