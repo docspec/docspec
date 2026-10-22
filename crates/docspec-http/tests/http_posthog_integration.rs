@@ -149,6 +149,7 @@ async fn unprocessable_error_dual_fire_includes_sentry_event_id() {
     drop(
         docspec_http::error::HttpError::Unprocessable {
             detail: "test unprocessable error".to_owned(),
+            kind: docspec_http::error::InputProblem::Malformed,
         }
         .into_response(),
     );

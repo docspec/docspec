@@ -55,6 +55,7 @@ fn unprocessable_error_captured() {
         drop(
             docspec_http::error::HttpError::Unprocessable {
                 detail: "heading level jumped from 1 to 3".to_owned(),
+                kind: docspec_http::error::InputProblem::Malformed,
             }
             .into_response(),
         );

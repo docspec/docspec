@@ -11,7 +11,10 @@ use axum::{
 use docspec::{InputFormat, OutputFormat};
 use docspec_core::EventSource;
 
-use crate::{error::HttpError, mime_parser};
+use crate::{
+    error::{HttpError, InputProblem},
+    mime_parser,
+};
 
 enum Utf8Prevalidation {
     Required,
@@ -194,8 +197,15 @@ fn classify_conversion_error(error: docspec_core::Error) -> HttpError {
         return HttpError::internal(error);
     }
     tracing::debug!(error = %error, "conversion rejected the input");
+    let kind = match error {
+        docspec_core::Error::Parse { .. } | docspec_core::Error::Json { .. } => {
+            InputProblem::Malformed
+        }
+        _ => InputProblem::Unsupported,
+    };
     HttpError::Unprocessable {
         detail: error.to_string(),
+        kind,
     }
 }
 
@@ -306,7 +316,7 @@ mod tests {
     use docspec_core::{Error, Event, EventSource, Result};
 
     use super::{classify_conversion_error, run_conversion};
-    use crate::error::HttpError;
+    use crate::error::{HttpError, InputProblem};
     use docspec::{AnyWriter, OutputFormat};
 
     /// Yields the given events, then `terminal` (an `Ok(None)` end of stream or
@@ -363,9 +373,9 @@ mod tests {
         }
     }
 
-    fn unprocessable_detail(error: HttpError) -> String {
+    fn unprocessable(error: HttpError) -> (InputProblem, String) {
         match error {
-            HttpError::Unprocessable { detail } => detail,
+            HttpError::Unprocessable { detail, kind } => (kind, detail),
             other => panic!("expected Unprocessable, got {other:?}"),
         }
     }
@@ -385,8 +395,11 @@ mod tests {
             position: None,
         };
         assert_eq!(
-            unprocessable_detail(classify_conversion_error(error)),
-            "parse error: unexpected EOF inside <w:body>"
+            unprocessable(classify_conversion_error(error)),
+            (
+                InputProblem::Malformed,
+                "parse error: unexpected EOF inside <w:body>".to_owned()
+            )
         );
     }
 
@@ -397,8 +410,11 @@ mod tests {
             position: None,
         };
         assert_eq!(
-            unprocessable_detail(classify_conversion_error(error)),
-            "JSON error: cannot finish: open containers remain"
+            unprocessable(classify_conversion_error(error)),
+            (
+                InputProblem::Malformed,
+                "JSON error: cannot finish: open containers remain".to_owned()
+            )
         );
     }
 
@@ -408,8 +424,11 @@ mod tests {
             message: "asset not found: rId9".to_owned(),
         };
         assert_eq!(
-            unprocessable_detail(classify_conversion_error(error)),
-            "asset not found: rId9"
+            unprocessable(classify_conversion_error(error)),
+            (
+                InputProblem::Unsupported,
+                "asset not found: rId9".to_owned()
+            )
         );
     }
 
@@ -419,8 +438,11 @@ mod tests {
             source: std::io::Error::new(std::io::ErrorKind::NotFound, "media/image1.png"),
         };
         assert_eq!(
-            unprocessable_detail(classify_conversion_error(error)),
-            "I/O error: media/image1.png"
+            unprocessable(classify_conversion_error(error)),
+            (
+                InputProblem::Unsupported,
+                "I/O error: media/image1.png".to_owned()
+            )
         );
     }
 
@@ -444,8 +466,11 @@ mod tests {
         );
         let result = run_conversion(source, AnyWriter::new(OutputFormat::Blocknote, &mut out));
         assert_eq!(
-            unprocessable_detail(result.unwrap_err()),
-            "parse error: unexpected EOF inside <w:p>"
+            unprocessable(result.unwrap_err()),
+            (
+                InputProblem::Malformed,
+                "parse error: unexpected EOF inside <w:p>".to_owned()
+            )
         );
     }
 
@@ -467,8 +492,12 @@ mod tests {
         let source = FakeSource::new(vec![start_document(), start_paragraph(), text("x")], None);
         let result = run_conversion(source, AnyWriter::new(OutputFormat::Blocknote, &mut out));
         assert_eq!(
-            unprocessable_detail(result.unwrap_err()),
-            "JSON error: cannot finish: open containers remain or no root value written"
+            unprocessable(result.unwrap_err()),
+            (
+                InputProblem::Malformed,
+                "JSON error: cannot finish: open containers remain or no root value written"
+                    .to_owned()
+            )
         );
     }
 }
