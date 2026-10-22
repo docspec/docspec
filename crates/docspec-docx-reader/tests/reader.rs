@@ -406,7 +406,7 @@ mod constructor {
     }
 
     #[test]
-    fn from_reader_errors_on_rels_parent_reference() {
+    fn from_reader_errors_on_rels_target_escaping_package_root() {
         let bytes = fixture::synth_docx(
             r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="../foo/document.xml"/></Relationships>"#,
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body></w:body></w:document>"#,
@@ -416,7 +416,7 @@ mod constructor {
             Err(Error::Parse { message, position }) => {
                 assert_eq!(
                     message,
-                    "rels target contains parent reference: ../foo/document.xml"
+                    "rels target escapes package root: ../foo/document.xml"
                 );
                 assert_eq!(position, None);
             }
@@ -7631,5 +7631,176 @@ mod truncated_document {
                 "malformed document.xml: unexpected EOF inside <w:pict>".to_string(),
             )
         );
+    }
+}
+
+/// One path rule for every relationship target: `..` is collapsed inside the
+/// package and rejected only when it would leave the package root.
+mod rels_path_rule {
+    use std::io::Cursor;
+
+    use docspec_core::{Error, Event, ListStyleType};
+    use docspec_docx_reader::DocxReader;
+    use docspec_test_utils::builders::{start_document, start_paragraph, text};
+
+    use super::collect_events;
+    use crate::fixture;
+
+    const ROOT_RELS: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"#;
+
+    const STYLES_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/></w:style>
+</w:styles>"#;
+
+    const NUMBERING_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl></w:abstractNum>
+  <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>"#;
+
+    /// A heading paragraph and a numbered paragraph, both visible only when
+    /// `styles.xml` and `numbering.xml` were actually loaded.
+    const DOCUMENT_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Title</w:t></w:r></w:p>
+    <w:p><w:pPr><w:numPr><w:numId w:val="1"/><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>Item</w:t></w:r></w:p>
+  </w:body>
+</w:document>"#;
+
+    fn doc_rels(styles_target: &str, numbering_target: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="{styles_target}"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="{numbering_target}"/>
+</Relationships>"#
+        )
+    }
+
+    fn build_docx(doc_rels_xml: &str) -> Vec<u8> {
+        fixture::synth_docx_with_entries(&[
+            (
+                "_rels/.rels",
+                zip::CompressionMethod::Deflated,
+                ROOT_RELS.as_bytes(),
+            ),
+            (
+                "word/_rels/document.xml.rels",
+                zip::CompressionMethod::Deflated,
+                doc_rels_xml.as_bytes(),
+            ),
+            (
+                "word/document.xml",
+                zip::CompressionMethod::Deflated,
+                DOCUMENT_XML.as_bytes(),
+            ),
+            (
+                "word/styles.xml",
+                zip::CompressionMethod::Deflated,
+                STYLES_XML.as_bytes(),
+            ),
+            (
+                "word/numbering.xml",
+                zip::CompressionMethod::Deflated,
+                NUMBERING_XML.as_bytes(),
+            ),
+        ])
+    }
+
+    fn expected_with_parts_loaded() -> Vec<Event> {
+        vec![
+            start_document(),
+            Event::StartHeading { level: 1, id: None },
+            text("Title"),
+            Event::EndHeading,
+            Event::StartOrderedListItem {
+                id: Some("1".to_string()),
+                level: 0,
+                start: Some(1),
+                style_type: ListStyleType::Decimal,
+            },
+            start_paragraph(),
+            text("Item"),
+            Event::EndParagraph,
+            Event::EndOrderedListItem,
+            Event::EndDocument,
+        ]
+    }
+
+    #[test]
+    fn plain_targets_load_styles_and_numbering() {
+        let events = collect_events(build_docx(&doc_rels("styles.xml", "numbering.xml")));
+        assert_eq!(events, expected_with_parts_loaded());
+    }
+
+    #[test]
+    fn parent_segments_inside_the_package_resolve_for_styles_and_numbering() {
+        let events = collect_events(build_docx(&doc_rels(
+            "../word/styles.xml",
+            "./sub/../numbering.xml",
+        )));
+        assert_eq!(events, expected_with_parts_loaded());
+    }
+
+    #[test]
+    fn absolute_targets_resolve_from_the_package_root() {
+        let events = collect_events(build_docx(&doc_rels(
+            "/word/styles.xml",
+            "/word/numbering.xml",
+        )));
+        assert_eq!(events, expected_with_parts_loaded());
+    }
+
+    #[test]
+    fn dangling_targets_fall_back_to_plain_paragraphs() {
+        let events = collect_events(build_docx(&doc_rels("missing.xml", "missing.xml")));
+        assert_eq!(
+            events,
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("Title"),
+                Event::EndParagraph,
+                start_paragraph(),
+                text("Item"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn styles_target_escaping_the_package_root_is_rejected() {
+        let bytes = build_docx(&doc_rels("../../styles.xml", "numbering.xml"));
+        match DocxReader::from_reader(Cursor::new(bytes)) {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "rels target escapes package root: word/../../styles.xml"
+                );
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Error::Parse, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn numbering_target_escaping_the_package_root_is_rejected() {
+        let bytes = build_docx(&doc_rels("styles.xml", "../../numbering.xml"));
+        match DocxReader::from_reader(Cursor::new(bytes)) {
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(
+                    message,
+                    "rels target escapes package root: word/../../numbering.xml"
+                );
+                assert_eq!(position, None);
+            }
+            other => panic!("expected Error::Parse, got: {other:?}"),
+        }
     }
 }

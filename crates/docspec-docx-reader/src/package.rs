@@ -42,7 +42,7 @@ where
 
     let rels_bytes = read_root_rels_bytes(&mut archive)?;
 
-    let document_path = rels::find_document_target(std::io::Cursor::new(rels_bytes))?;
+    let document_path = rels::find_document_target(&rels_bytes)?;
 
     let (style_list, numbering, hyperlink_map, image_map, content_types) =
         load_small_package_parts(&mut archive, &document_path)?;
@@ -78,7 +78,7 @@ pub(crate) fn open_package_from_path(path: &Path) -> Result<PackageContents> {
 
     let rels_bytes = read_root_rels_bytes(&mut asset_archive)?;
 
-    let document_path = rels::find_document_target(std::io::Cursor::new(rels_bytes))?;
+    let document_path = rels::find_document_target(&rels_bytes)?;
 
     let (style_list, numbering, hyperlink_map, image_map, content_types) =
         load_small_package_parts(&mut asset_archive, &document_path)?;
@@ -145,9 +145,8 @@ fn load_small_package_parts<R>(
 where
     R: Read + Seek,
 {
-    let (style_list, hyperlink_map, image_map) =
-        load_style_list_and_hyperlink_map(archive, document_path)?;
-    let numbering = load_numbering(archive, document_path)?;
+    let (style_list, numbering, hyperlink_map, image_map) =
+        load_document_parts(archive, document_path)?;
     let content_types = match read_optional_entry(archive, "[Content_Types].xml")? {
         Some(bytes) => content_types::parse(&bytes)?,
         None => ContentTypes::default(),
@@ -161,58 +160,61 @@ where
     ))
 }
 
-fn load_style_list_and_hyperlink_map<R>(
+/// Loads everything `word/_rels/document.xml.rels` points at: the style list,
+/// the numbering definitions, and the hyperlink and image maps.
+///
+/// The rels part is read and parsed once. A missing rels part, a missing
+/// styles or numbering relationship, or a dangling target all fall back to
+/// empty defaults; only malformed XML or a target escaping the package fails.
+fn load_document_parts<R>(
     archive: &mut ZipArchive<R>,
     document_path: &str,
-) -> Result<(StyleList, HyperlinkMap, ImageMap)>
+) -> Result<(
+    StyleList,
+    crate::numbering::MinimalNumbering,
+    HyperlinkMap,
+    ImageMap,
+)>
 where
     R: Read + Seek,
 {
     let doc_rels_path = rels::derive_part_rels_path(document_path);
-    let maybe_doc_rels_bytes = if doc_rels_path == "word/_rels/document.xml.rels" {
-        match archive.by_name("word/_rels/document.xml.rels") {
-            Ok(mut entry) => {
-                let mut bytes = Vec::new();
-                entry.read_to_end(&mut bytes).map_err(Error::from)?;
-                Some(bytes)
-            }
-            Err(ZipError::FileNotFound) => None,
-            Err(err) => return Err(parse_error(format!("malformed ZIP: {err}"))),
-        }
-    } else {
-        read_optional_entry(archive, &doc_rels_path)?
-    };
-    let Some(doc_rels_bytes) = maybe_doc_rels_bytes else {
+    let Some(doc_rels_bytes) = read_optional_entry(archive, &doc_rels_path)? else {
         return Ok((
             StyleList::default(),
+            crate::numbering::MinimalNumbering::new(),
             HyperlinkMap::default(),
             ImageMap::default(),
         ));
     };
+    let part_rels = rels::PartRels::parse(&doc_rels_bytes, document_path)?;
 
-    let hyperlink_map =
-        rels::collect_hyperlink_map(std::io::Cursor::new(doc_rels_bytes.as_slice()))?;
-    let image_map = rels::collect_image_map(doc_rels_bytes.as_slice(), document_path)?;
-
-    let Some(styles_target) =
-        rels::find_styles_target(std::io::Cursor::new(doc_rels_bytes.as_slice()))?
-    else {
-        return Ok((StyleList::default(), hyperlink_map, image_map));
+    let style_list = match read_optional_target(archive, part_rels.styles_path.as_deref())? {
+        Some(bytes) => StyleList::parse(Cursor::new(bytes))?,
+        None => StyleList::default(),
     };
-
-    let styles_path = rels::resolve_relative_target(document_path, &styles_target);
-    let styles_bytes = match archive.by_name(&styles_path) {
-        Ok(mut entry) => {
-            let mut bytes = Vec::new();
-            entry.read_to_end(&mut bytes).map_err(Error::from)?;
-            bytes
-        }
-        Err(ZipError::FileNotFound) => return Ok((StyleList::default(), hyperlink_map, image_map)),
-        Err(err) => return Err(parse_error(format!("malformed ZIP: {err}"))),
+    let numbering = match read_optional_target(archive, part_rels.numbering_path.as_deref())? {
+        Some(bytes) => crate::numbering::parse_numbering(Cursor::new(bytes))?,
+        None => crate::numbering::MinimalNumbering::new(),
     };
+    Ok((
+        style_list,
+        numbering,
+        part_rels.hyperlinks,
+        part_rels.images,
+    ))
+}
 
-    let style_list = StyleList::parse(std::io::Cursor::new(styles_bytes))?;
-    Ok((style_list, hyperlink_map, image_map))
+/// Reads the entry a relationship points at; `None` when there is no
+/// relationship or the entry is missing from the archive.
+fn read_optional_target<R>(
+    archive: &mut ZipArchive<R>,
+    path: Option<&str>,
+) -> Result<Option<Vec<u8>>>
+where
+    R: Read + Seek,
+{
+    path.map_or(Ok(None), |path| read_optional_entry(archive, path))
 }
 
 fn read_optional_entry<R>(archive: &mut ZipArchive<R>, path: &str) -> Result<Option<Vec<u8>>>
@@ -228,43 +230,6 @@ where
         Err(ZipError::FileNotFound) => Ok(None),
         Err(err) => Err(parse_error(format!("malformed ZIP: {err}"))),
     }
-}
-
-fn load_numbering<R>(
-    archive: &mut ZipArchive<R>,
-    document_path: &str,
-) -> Result<crate::numbering::MinimalNumbering>
-where
-    R: Read + Seek,
-{
-    let doc_rels_path = rels::derive_part_rels_path(document_path);
-    let doc_rels_bytes = match archive.by_name(&doc_rels_path) {
-        Ok(mut entry) => {
-            let mut bytes = Vec::new();
-            entry.read_to_end(&mut bytes).map_err(Error::from)?;
-            bytes
-        }
-        Err(ZipError::FileNotFound) => return Ok(crate::numbering::MinimalNumbering::new()),
-        Err(err) => return Err(parse_error(format!("malformed ZIP: {err}"))),
-    };
-
-    let Some(numbering_target) = rels::find_numbering_target(std::io::Cursor::new(doc_rels_bytes))?
-    else {
-        return Ok(crate::numbering::MinimalNumbering::new());
-    };
-
-    let numbering_path = rels::resolve_relative_target(document_path, &numbering_target);
-    let numbering_bytes = match archive.by_name(&numbering_path) {
-        Ok(mut entry) => {
-            let mut bytes = Vec::new();
-            entry.read_to_end(&mut bytes).map_err(Error::from)?;
-            bytes
-        }
-        Err(ZipError::FileNotFound) => return Ok(crate::numbering::MinimalNumbering::new()),
-        Err(err) => return Err(parse_error(format!("malformed ZIP: {err}"))),
-    };
-
-    crate::numbering::parse_numbering(std::io::Cursor::new(numbering_bytes))
 }
 
 fn parse_error(message: String) -> Error {
@@ -283,7 +248,7 @@ mod tests {
     use std::io::{Cursor, Read as _, Write as _};
     use zip::ZipWriter;
 
-    use super::{load_style_list_and_hyperlink_map, open_package};
+    use super::{load_document_parts, open_package};
     use crate::styles::StyleList;
     use docspec_core::Error;
 
@@ -395,8 +360,8 @@ mod tests {
         let zip_bytes = synth_zip(entries)?;
         let mut reader = Cursor::new(zip_bytes);
         let mut archive = zip::ZipArchive::new(&mut reader)?;
-        load_style_list_and_hyperlink_map(&mut archive, "word/document.xml")
-            .map(|(style_list, hyperlink_map, _image_map)| (style_list, hyperlink_map))
+        load_document_parts(&mut archive, "word/document.xml")
+            .map(|(style_list, _numbering, hyperlink_map, _image_map)| (style_list, hyperlink_map))
             .map_err(|err| zip::result::ZipError::Io(std::io::Error::other(format!("{err:?}"))))
     }
 

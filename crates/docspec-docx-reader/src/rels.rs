@@ -1,17 +1,24 @@
+//! Relationship (`.rels`) part parsing.
+//!
+//! A rels part is read once into a list of [`Relationship`] values; the
+//! callers then pick what they need from that list. Every internal target is
+//! resolved the same way, through [`normalize_relative_target`]: joined with
+//! the owning part's directory, `.` and `..` segments collapsed, and only a
+//! `..` that would leave the package root is rejected.
+
 use std::collections::HashMap;
 use std::io::Read;
 
 use docspec_core::Error;
-use quick_xml::events::Event;
-use quick_xml::XmlVersion;
+use quick_xml::events::{BytesStart, Event};
 
-use crate::document::xml::parse_error;
+use crate::document::xml::{attr_string, parse_error};
+
+/// Error prefix for every malformed relationship part, root or document-level.
+const RELS_ERROR_CONTEXT: &str = "malformed _rels/.rels";
 
 /// Maps relationship Id (e.g., "rId7") to Target URL/path for every <Relationship> entry whose Type ends with "/hyperlink".
 pub(crate) type HyperlinkMap = HashMap<String, String>;
-
-const REL_TYPE_IMAGE: &str =
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
 
 /// Represents an image relationship in a DOCX package.
 #[derive(Debug)]
@@ -26,492 +33,159 @@ pub(crate) struct ImageRel {
 /// whose Type ends with "/image".
 pub(crate) type ImageMap = HashMap<String, ImageRel>;
 
-pub fn find_document_target<R>(reader: R) -> docspec_core::Result<String>
-where
-    R: Read,
-{
-    let mut xml_reader = quick_xml::Reader::from_reader(std::io::BufReader::new(reader));
-    let mut buf = Vec::new();
-    let mut element_depth: usize = 0;
+/// One `<Relationship>` element that carries both a `Type` and a `Target`.
+struct Relationship {
+    /// The `Id` attribute, absent on malformed-but-tolerated entries.
+    id: Option<String>,
+    /// The `Type` URI; only its last path segment is significant.
+    rel_type: String,
+    /// The raw `Target` attribute, before any path resolution.
+    target: String,
+    /// `true` when `TargetMode="External"`.
+    external: bool,
+}
 
-    loop {
-        match xml_reader.read_event_into(&mut buf) {
-            Ok(Event::Start(element)) => {
-                element_depth = element_depth.saturating_add(1);
-                if element.local_name().as_ref() == b"Relationship" {
-                    if let Some(target) = office_document_target(&xml_reader, &element)? {
-                        let document_path = target.strip_prefix('/').unwrap_or(&target).to_string();
-                        return validate_document_path(&document_path);
-                    }
+/// Everything the document part needs from `word/_rels/document.xml.rels`.
+///
+/// Built by a single pass over the part. Internal targets are already
+/// resolved to package paths; the first internal styles and numbering
+/// relationship wins, later hyperlinks and images with a repeated Id overwrite
+/// earlier ones.
+#[derive(Debug, Default)]
+pub(crate) struct PartRels {
+    /// Hyperlink Id → raw target.
+    pub hyperlinks: HyperlinkMap,
+    /// Image Id → resolved package path or external URL.
+    pub images: ImageMap,
+    /// Package path of `styles.xml`, when an internal styles relationship exists.
+    pub styles_path: Option<String>,
+    /// Package path of `numbering.xml`, when an internal numbering relationship exists.
+    pub numbering_path: Option<String>,
+}
+
+impl PartRels {
+    /// Parses a part relationships XML, resolving internal targets against `document_path`.
+    ///
+    /// Returns `Err` if the XML is malformed or an internal target escapes the package root.
+    pub(crate) fn parse(rels_xml: &[u8], document_path: &str) -> docspec_core::Result<Self> {
+        let mut rels = Self::default();
+        for Relationship {
+            id,
+            rel_type,
+            target,
+            external,
+        } in parse_relationships(rels_xml)?
+        {
+            let kind = rel_type.rsplit_once('/').map_or("", |(_, kind)| kind);
+            match (kind, id) {
+                ("hyperlink", Some(id)) => {
+                    rels.hyperlinks.insert(id, target);
                 }
-            }
-            Ok(Event::Empty(element)) if element.local_name().as_ref() == b"Relationship" => {
-                if let Some(target) = office_document_target(&xml_reader, &element)? {
-                    let document_path = target.strip_prefix('/').unwrap_or(&target).to_string();
-                    return validate_document_path(&document_path);
+                ("image", Some(id)) => {
+                    let target = if external {
+                        target
+                    } else {
+                        normalize_relative_target(document_path, &target)?
+                    };
+                    rels.images.insert(
+                        id,
+                        ImageRel {
+                            target,
+                            is_external: external,
+                        },
+                    );
                 }
-            }
-            Ok(Event::End(_)) => {
-                let Some(next_depth) = element_depth.checked_sub(1) else {
-                    return Err(parse_error("malformed _rels/.rels".to_string()));
-                };
-                element_depth = next_depth;
-            }
-            Ok(Event::Eof) => {
-                if element_depth != 0 {
-                    return Err(parse_error("malformed _rels/.rels".to_string()));
+                ("styles", _) if rels.styles_path.is_none() && !external => {
+                    rels.styles_path = Some(normalize_relative_target(document_path, &target)?);
                 }
-                return Err(Error::Parse {
+                ("numbering", _) if rels.numbering_path.is_none() && !external => {
+                    rels.numbering_path = Some(normalize_relative_target(document_path, &target)?);
+                }
+                _ => {}
+            }
+        }
+        Ok(rels)
+    }
+}
+
+/// Finds the main document part from the package relationships (`_rels/.rels`).
+///
+/// Returns the first `/officeDocument` target, resolved against the package root.
+pub(crate) fn find_document_target(rels_xml: &[u8]) -> docspec_core::Result<String> {
+    parse_relationships(rels_xml)?
+        .into_iter()
+        .find(|rel| rel.rel_type.ends_with("/officeDocument"))
+        .map_or_else(
+            || {
+                Err(Error::Parse {
                     message: "no officeDocument relationship".to_string(),
                     position: None,
-                });
-            }
-            Err(_err) => {
-                return Err(parse_error("malformed _rels/.rels".to_string()));
-            }
-            Ok(_) => {}
-        }
-        buf.clear();
-    }
+                })
+            },
+            |rel| normalize_relative_target("", &rel.target),
+        )
 }
 
-/// Finds the styles part target from a part relationships file.
+/// Every `<Relationship>` with a `Type` and a `Target`, in document order.
 ///
-/// Returns `Ok(None)` if no `/styles` relationship is present (legal per ECMA-376 §11.3.12).
-/// Returns `Err` if the target contains a path-traversal (`..`) segment.
-/// Ignores relationships with `TargetMode="External"`.
-pub fn find_styles_target<R>(reader: R) -> docspec_core::Result<Option<String>>
-where
-    R: Read,
-{
-    let mut xml_reader = quick_xml::Reader::from_reader(std::io::BufReader::new(reader));
+/// Any XML error, unbalanced element or malformed attribute fails with
+/// [`RELS_ERROR_CONTEXT`], as every rels consumer has always reported it.
+fn parse_relationships(rels_xml: &[u8]) -> docspec_core::Result<Vec<Relationship>> {
+    let mut reader = quick_xml::Reader::from_reader(rels_xml);
     let mut buf = Vec::new();
     let mut element_depth: usize = 0;
+    let mut relationships = Vec::new();
 
     loop {
-        match xml_reader.read_event_into(&mut buf) {
+        match reader.read_event_into(&mut buf) {
             Ok(Event::Start(element)) => {
                 element_depth = element_depth.saturating_add(1);
                 if element.local_name().as_ref() == b"Relationship" {
-                    if let Some(target) = styles_target(&xml_reader, &element)? {
-                        let styles_path = target.strip_prefix('/').unwrap_or(&target).to_string();
-                        return validate_document_path(&styles_path).map(Some);
-                    }
+                    relationships.extend(relationship(&reader, &element)?);
                 }
             }
             Ok(Event::Empty(element)) if element.local_name().as_ref() == b"Relationship" => {
-                if let Some(target) = styles_target(&xml_reader, &element)? {
-                    let styles_path = target.strip_prefix('/').unwrap_or(&target).to_string();
-                    return validate_document_path(&styles_path).map(Some);
-                }
+                relationships.extend(relationship(&reader, &element)?);
             }
             Ok(Event::End(_)) => {
                 let Some(next_depth) = element_depth.checked_sub(1) else {
-                    return Err(parse_error("malformed _rels/.rels".to_string()));
+                    return Err(parse_error(RELS_ERROR_CONTEXT.to_string()));
                 };
                 element_depth = next_depth;
             }
             Ok(Event::Eof) => {
                 if element_depth != 0 {
-                    return Err(parse_error("malformed _rels/.rels".to_string()));
+                    return Err(parse_error(RELS_ERROR_CONTEXT.to_string()));
                 }
-                return Ok(None);
+                return Ok(relationships);
             }
-            Err(_err) => {
-                return Err(parse_error("malformed _rels/.rels".to_string()));
-            }
+            Err(_err) => return Err(parse_error(RELS_ERROR_CONTEXT.to_string())),
             Ok(_) => {}
         }
         buf.clear();
     }
 }
 
-pub(crate) fn collect_hyperlink_map<R>(reader: R) -> Result<HyperlinkMap, Error>
-where
-    R: Read,
-{
-    let mut xml_reader = quick_xml::Reader::from_reader(std::io::BufReader::new(reader));
-    let mut buf = Vec::new();
-    let mut element_depth: usize = 0;
-    let mut hyperlinks = HashMap::new();
-
-    loop {
-        match xml_reader.read_event_into(&mut buf) {
-            Ok(Event::Start(element)) => {
-                element_depth = element_depth.saturating_add(1);
-                if element.local_name().as_ref() == b"Relationship" {
-                    if let Some((id, target)) = hyperlink_entry(&xml_reader, &element)? {
-                        hyperlinks.insert(id, target);
-                    }
-                }
-            }
-            Ok(Event::Empty(element)) if element.local_name().as_ref() == b"Relationship" => {
-                if let Some((id, target)) = hyperlink_entry(&xml_reader, &element)? {
-                    hyperlinks.insert(id, target);
-                }
-            }
-            Ok(Event::End(_)) => {
-                let Some(next_depth) = element_depth.checked_sub(1) else {
-                    return Err(parse_error("malformed _rels/.rels".to_string()));
-                };
-                element_depth = next_depth;
-            }
-            Ok(Event::Eof) => {
-                if element_depth != 0 {
-                    return Err(parse_error("malformed _rels/.rels".to_string()));
-                }
-                return Ok(hyperlinks);
-            }
-            Err(_err) => {
-                return Err(parse_error("malformed _rels/.rels".to_string()));
-            }
-            Ok(_) => {}
-        }
-        buf.clear();
-    }
-}
-
-/// Parses a DOCX part relationships XML and returns every image relationship.
-///
-/// For internal images, resolves the target path relative to `document_path` and
-/// validates it contains no `..` traversal segments. For external images
-/// (`TargetMode="External"`), stores the raw URL without path resolution.
-///
-/// Returns `Err` if the XML is malformed or an internal target contains a `..` segment.
-pub(crate) fn collect_image_map(rels_xml: &[u8], document_path: &str) -> Result<ImageMap, Error> {
-    let mut xml_reader = quick_xml::Reader::from_reader(std::io::BufReader::new(rels_xml));
-    let mut buf = Vec::new();
-    let mut element_depth: usize = 0;
-    let mut images = HashMap::new();
-
-    loop {
-        match xml_reader.read_event_into(&mut buf) {
-            Ok(Event::Start(element)) => {
-                element_depth = element_depth.saturating_add(1);
-                if element.local_name().as_ref() == b"Relationship" {
-                    if let Some((id, rel)) = image_entry(&xml_reader, &element, document_path)? {
-                        images.insert(id, rel);
-                    }
-                }
-            }
-            Ok(Event::Empty(element)) if element.local_name().as_ref() == b"Relationship" => {
-                if let Some((id, rel)) = image_entry(&xml_reader, &element, document_path)? {
-                    images.insert(id, rel);
-                }
-            }
-            Ok(Event::End(_)) => {
-                let Some(next_depth) = element_depth.checked_sub(1) else {
-                    return Err(parse_error("malformed _rels/.rels".to_string()));
-                };
-                element_depth = next_depth;
-            }
-            Ok(Event::Eof) => {
-                if element_depth != 0 {
-                    return Err(parse_error("malformed _rels/.rels".to_string()));
-                }
-                return Ok(images);
-            }
-            Err(_err) => {
-                return Err(parse_error("malformed _rels/.rels".to_string()));
-            }
-            Ok(_) => {}
-        }
-        buf.clear();
-    }
-}
-
-/// Finds the numbering part target from a part relationships file.
-///
-/// Returns `Ok(None)` if no `/numbering` relationship is present (legal per ECMA-376 §17.9).
-/// Returns `Err` if the target contains a path-traversal (`..`) segment.
-/// Ignores relationships with `TargetMode="External"`.
-pub fn find_numbering_target<R>(reader: R) -> docspec_core::Result<Option<String>>
-where
-    R: Read,
-{
-    let mut xml_reader = quick_xml::Reader::from_reader(std::io::BufReader::new(reader));
-    let mut buf = Vec::new();
-    let mut element_depth: usize = 0;
-
-    loop {
-        match xml_reader.read_event_into(&mut buf) {
-            Ok(Event::Start(element)) => {
-                element_depth = element_depth.saturating_add(1);
-                if element.local_name().as_ref() == b"Relationship" {
-                    if let Some(target) = numbering_target(&xml_reader, &element)? {
-                        let numbering_path =
-                            target.strip_prefix('/').unwrap_or(&target).to_string();
-                        return validate_document_path(&numbering_path).map(Some);
-                    }
-                }
-            }
-            Ok(Event::Empty(element)) if element.local_name().as_ref() == b"Relationship" => {
-                if let Some(target) = numbering_target(&xml_reader, &element)? {
-                    let numbering_path = target.strip_prefix('/').unwrap_or(&target).to_string();
-                    return validate_document_path(&numbering_path).map(Some);
-                }
-            }
-            Ok(Event::End(_)) => {
-                let Some(next_depth) = element_depth.checked_sub(1) else {
-                    return Err(parse_error("malformed _rels/.rels".to_string()));
-                };
-                element_depth = next_depth;
-            }
-            Ok(Event::Eof) => {
-                if element_depth != 0 {
-                    return Err(parse_error("malformed _rels/.rels".to_string()));
-                }
-                return Ok(None);
-            }
-            Err(_err) => {
-                return Err(parse_error("malformed _rels/.rels".to_string()));
-            }
-            Ok(_) => {}
-        }
-        buf.clear();
-    }
-}
-
-fn validate_document_path(document_path: &str) -> docspec_core::Result<String> {
-    if document_path.split('/').any(|component| component == "..") {
-        return Err(Error::Parse {
-            message: format!("rels target contains parent reference: {document_path}"),
-            position: None,
-        });
-    }
-
-    Ok(document_path.to_string())
-}
-
-fn office_document_target<R>(
+/// Reads one `<Relationship>` element; `None` when it lacks a `Type` or `Target`.
+fn relationship<R>(
     reader: &quick_xml::Reader<R>,
-    element: &quick_xml::events::BytesStart<'_>,
-) -> docspec_core::Result<Option<String>>
+    element: &BytesStart<'_>,
+) -> docspec_core::Result<Option<Relationship>>
 where
     R: Read,
 {
-    let mut rel_type = None;
-    let mut target = None;
-
-    for attribute_result in element.attributes() {
-        let attribute = attribute_result.map_err(|err| Error::Parse {
-            message: format!("malformed _rels/.rels: {err}"),
-            position: None,
-        })?;
-        let value = attribute
-            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|err| Error::Parse {
-                message: format!("malformed _rels/.rels: {err}"),
-                position: None,
-            })?
-            .into_owned();
-
-        match attribute.key.local_name().as_ref() {
-            b"Type" => rel_type = Some(value),
-            b"Target" => target = Some(value),
-            _ => {}
-        }
-    }
-
+    let id = attr_string(reader, element, b"Id", RELS_ERROR_CONTEXT)?;
+    let rel_type = attr_string(reader, element, b"Type", RELS_ERROR_CONTEXT)?;
+    let target = attr_string(reader, element, b"Target", RELS_ERROR_CONTEXT)?;
+    let external = attr_string(reader, element, b"TargetMode", RELS_ERROR_CONTEXT)?.as_deref()
+        == Some("External");
     Ok(match (rel_type, target) {
-        (Some(found_type), Some(found_target)) if found_type.ends_with("/officeDocument") => {
-            Some(found_target)
-        }
-        _ => None,
-    })
-}
-
-fn styles_target<R>(
-    reader: &quick_xml::Reader<R>,
-    element: &quick_xml::events::BytesStart<'_>,
-) -> docspec_core::Result<Option<String>>
-where
-    R: Read,
-{
-    let mut rel_type = None;
-    let mut target = None;
-    let mut target_mode = None;
-
-    for attribute_result in element.attributes() {
-        let attribute = attribute_result.map_err(|err| Error::Parse {
-            message: format!("malformed _rels/.rels: {err}"),
-            position: None,
-        })?;
-        let value = attribute
-            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|err| Error::Parse {
-                message: format!("malformed _rels/.rels: {err}"),
-                position: None,
-            })?
-            .into_owned();
-
-        match attribute.key.local_name().as_ref() {
-            b"Type" => rel_type = Some(value),
-            b"Target" => target = Some(value),
-            b"TargetMode" => target_mode = Some(value),
-            _ => {}
-        }
-    }
-
-    Ok(match (rel_type, target, target_mode) {
-        (Some(found_type), Some(_), Some(mode))
-            if found_type.ends_with("/styles") && mode == "External" =>
-        {
-            None
-        }
-        (Some(found_type), Some(found_target), _) if found_type.ends_with("/styles") => {
-            Some(found_target)
-        }
-        _ => None,
-    })
-}
-
-fn hyperlink_entry<R>(
-    reader: &quick_xml::Reader<R>,
-    element: &quick_xml::events::BytesStart<'_>,
-) -> Result<Option<(String, String)>, Error>
-where
-    R: Read,
-{
-    let mut id = None;
-    let mut rel_type = None;
-    let mut target = None;
-
-    for attribute_result in element.attributes() {
-        let attribute = attribute_result.map_err(|err| Error::Parse {
-            message: format!("malformed _rels/.rels: {err}"),
-            position: None,
-        })?;
-        let value = attribute
-            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|err| Error::Parse {
-                message: format!("malformed _rels/.rels: {err}"),
-                position: None,
-            })?
-            .into_owned();
-
-        match attribute.key.local_name().as_ref() {
-            b"Id" => id = Some(value),
-            b"Type" => rel_type = Some(value),
-            b"Target" => target = Some(value),
-            _ => {}
-        }
-    }
-
-    Ok(match (id, rel_type, target) {
-        (Some(found_id), Some(found_type), Some(found_target))
-            if found_type.ends_with("/hyperlink") =>
-        {
-            Some((found_id, found_target))
-        }
-        _ => None,
-    })
-}
-
-fn image_entry<R>(
-    reader: &quick_xml::Reader<R>,
-    element: &quick_xml::events::BytesStart<'_>,
-    document_path: &str,
-) -> Result<Option<(String, ImageRel)>, Error>
-where
-    R: Read,
-{
-    let mut id = None;
-    let mut rel_type = None;
-    let mut target = None;
-    let mut target_mode = None;
-
-    for attribute_result in element.attributes() {
-        let attribute = attribute_result.map_err(|err| Error::Parse {
-            message: format!("malformed _rels/.rels: {err}"),
-            position: None,
-        })?;
-        let value = attribute
-            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|err| Error::Parse {
-                message: format!("malformed _rels/.rels: {err}"),
-                position: None,
-            })?
-            .into_owned();
-
-        match attribute.key.local_name().as_ref() {
-            b"Id" => id = Some(value),
-            b"Type" => rel_type = Some(value),
-            b"Target" => target = Some(value),
-            b"TargetMode" => target_mode = Some(value),
-            _ => {}
-        }
-    }
-
-    match (id, rel_type, target) {
-        (Some(found_id), Some(found_type), Some(found_target))
-            if found_type == REL_TYPE_IMAGE || found_type.ends_with("/image") =>
-        {
-            let is_external = target_mode.as_deref() == Some("External");
-            if is_external {
-                Ok(Some((
-                    found_id,
-                    ImageRel {
-                        target: found_target,
-                        is_external: true,
-                    },
-                )))
-            } else {
-                let validated = normalize_relative_target(document_path, &found_target)?;
-                Ok(Some((
-                    found_id,
-                    ImageRel {
-                        target: validated,
-                        is_external: false,
-                    },
-                )))
-            }
-        }
-        _ => Ok(None),
-    }
-}
-
-fn numbering_target<R>(
-    reader: &quick_xml::Reader<R>,
-    element: &quick_xml::events::BytesStart<'_>,
-) -> docspec_core::Result<Option<String>>
-where
-    R: Read,
-{
-    let mut rel_type = None;
-    let mut target = None;
-    let mut target_mode = None;
-
-    for attribute_result in element.attributes() {
-        let attribute = attribute_result.map_err(|err| Error::Parse {
-            message: format!("malformed _rels/.rels: {err}"),
-            position: None,
-        })?;
-        let value = attribute
-            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|err| Error::Parse {
-                message: format!("malformed _rels/.rels: {err}"),
-                position: None,
-            })?
-            .into_owned();
-
-        match attribute.key.local_name().as_ref() {
-            b"Type" => rel_type = Some(value),
-            b"Target" => target = Some(value),
-            b"TargetMode" => target_mode = Some(value),
-            _ => {}
-        }
-    }
-
-    Ok(match (rel_type, target, target_mode) {
-        (Some(found_type), Some(_), Some(mode))
-            if found_type.ends_with("/numbering") && mode == "External" =>
-        {
-            None
-        }
-        (Some(found_type), Some(found_target), _) if found_type.ends_with("/numbering") => {
-            Some(found_target)
-        }
+        (Some(rel_type), Some(target)) => Some(Relationship {
+            id,
+            rel_type,
+            target,
+            external,
+        }),
         _ => None,
     })
 }
@@ -537,7 +211,7 @@ pub fn derive_part_rels_path(part_path: &str) -> String {
 /// Per ECMA-376 Part 2 §6.5.3.4: strip the filename from `base_part`,
 /// then join with `target`. Leading `/` in `target` is stripped (absolute paths
 /// within the package are treated as relative to the root).
-pub fn resolve_relative_target(base_part: &str, target: &str) -> String {
+fn resolve_relative_target(base_part: &str, target: &str) -> String {
     let target_stripped = target.strip_prefix('/').unwrap_or(target);
 
     if target.starts_with('/') {
@@ -554,11 +228,9 @@ pub fn resolve_relative_target(base_part: &str, target: &str) -> String {
 /// segments per ECMA-376 Part 2 §6.5.3 / RFC 3986 §5.2.
 ///
 /// Word and other DOCX writers routinely emit `Target="../media/image1.png"`
-/// or `Target="../customXml/item1.xml"` from `word/_rels/document.xml.rels`;
-/// rejecting `..` outright (the old behavior of [`validate_document_path`])
-/// breaks reading those files. This helper collapses the segments instead,
-/// while still refusing references that escape the package root — a `..`
-/// segment that pops past the start of the resolved path returns
+/// or `Target="../customXml/item1.xml"` from `word/_rels/document.xml.rels`,
+/// so `..` is collapsed rather than rejected. A `..` segment that pops past
+/// the start of the resolved path escapes the package and returns
 /// [`docspec_core::Error::Parse`].
 fn normalize_relative_target(base_part: &str, target: &str) -> docspec_core::Result<String> {
     let joined = resolve_relative_target(base_part, target);
@@ -584,643 +256,297 @@ fn normalize_relative_target(base_part: &str, target: &str) -> docspec_core::Res
 mod tests {
     #![allow(clippy::expect_used, clippy::panic)]
     use super::*;
-    use std::io::Cursor;
 
-    fn minimal_rels(target: &str) -> String {
+    const DOC: &str = "word/document.xml";
+
+    fn rels_with(body: &str) -> String {
         format!(
             r#"<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{target}"/>
+{body}
 </Relationships>"#
         )
     }
 
-    fn assert_document_path(result: docspec_core::Result<String>, expected: &str) {
-        match result {
-            Ok(path) => assert_eq!(path, expected),
-            Err(err) => assert_eq!(format!("{err:?}"), "expected document path"),
-        }
+    fn office_document_rels(target: &str) -> String {
+        rels_with(&format!(
+            r#"  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{target}"/>"#
+        ))
     }
 
-    #[test]
-    fn find_document_target_returns_target_for_simple_rels() {
-        let rels_xml = minimal_rels("word/document.xml");
-
-        let result = find_document_target(Cursor::new(rels_xml.as_bytes()));
-
-        assert_document_path(result, "word/document.xml");
-    }
-
-    #[test]
-    fn find_document_target_errors_when_no_office_document_relationship() {
-        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://example.com/not-office" Target="word/document.xml"/>
-</Relationships>"#;
-
-        let result = find_document_target(Cursor::new(rels_xml.as_bytes()));
-
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(message, "no officeDocument relationship");
-                assert_eq!(position, None);
-            }
-            other => assert_eq!(
-                format!("{other:?}"),
-                "expected no officeDocument parse error"
-            ),
-        }
-    }
-
-    #[test]
-    fn find_document_target_errors_after_balanced_nested_non_matching_rels() {
-        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Group><Relationship Id="rId1" Type="http://example.com/not-office" Target="word/document.xml"></Relationship></Group>
-</Relationships>"#;
-
-        let result = find_document_target(Cursor::new(rels_xml.as_bytes()));
-
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(message, "no officeDocument relationship");
-                assert_eq!(position, None);
-            }
-            other => assert_eq!(
-                format!("{other:?}"),
-                "expected balanced traversal parse error"
-            ),
-        }
-    }
-
-    #[test]
-    fn find_document_target_errors_on_unexpected_closing_element() {
-        let result = find_document_target(Cursor::new("</Relationships>".as_bytes()));
-
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(message, "malformed _rels/.rels");
-                assert_eq!(position, None);
-            }
-            other => assert_eq!(
-                format!("{other:?}"),
-                "expected unexpected closing element parse error"
-            ),
-        }
-    }
-
-    #[test]
-    fn find_document_target_errors_on_rels_xml_parser_error() {
-        let result = find_document_target(Cursor::new("<Relationships><".as_bytes()));
-
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(message, "malformed _rels/.rels");
-                assert_eq!(position, None);
-            }
-            other => assert_eq!(format!("{other:?}"), "expected rels parser error"),
-        }
-    }
-
-    #[test]
-    fn find_document_target_strips_leading_slash() {
-        let rels_xml = minimal_rels("/word/document.xml");
-
-        let result = find_document_target(Cursor::new(rels_xml.as_bytes()));
-
-        assert_document_path(result, "word/document.xml");
-    }
-
-    #[test]
-    fn find_document_target_picks_office_document_among_multiple_relationships() {
-        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://example.com/metadata" Target="docProps/core.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-  <Relationship Id="rId3" Type="http://example.com/theme" Target="word/theme/theme1.xml"/>
-</Relationships>"#;
-
-        let result = find_document_target(Cursor::new(rels_xml.as_bytes()));
-
-        assert_document_path(result, "word/document.xml");
-    }
-
-    #[test]
-    fn find_document_target_accepts_non_empty_relationship_element() {
-        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"></Relationship>
-</Relationships>"#;
-
-        let result = find_document_target(Cursor::new(rels_xml.as_bytes()));
-
-        assert_document_path(result, "word/document.xml");
-    }
-
-    #[test]
-    fn find_document_target_errors_on_malformed_relationship_attribute() {
-        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target=word/document.xml/>
-</Relationships>"#;
-
-        let result = find_document_target(Cursor::new(rels_xml.as_bytes()));
-
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(
-                    message,
-                    "malformed _rels/.rels: position 120: attribute value must be enclosed in `\"` or `'`"
-                );
-                assert_eq!(position, None);
-            }
-            other => assert_eq!(format!("{other:?}"), "expected attribute parse error"),
-        }
-    }
-
-    #[test]
-    fn find_document_target_errors_on_bad_attribute_entity() {
-        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/&bogus;.xml"/>
-</Relationships>"#;
-
-        let result = find_document_target(Cursor::new(rels_xml.as_bytes()));
-
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(
-                    message,
-                    "malformed _rels/.rels: at 6..11: unrecognized entity `bogus`"
-                );
-                assert_eq!(position, None);
-            }
-            other => assert_eq!(format!("{other:?}"), "expected entity parse error"),
-        }
-    }
-
-    #[test]
-    fn find_document_target_tolerates_namespaced_relationship_element() {
-        let rels_xml = r#"<r:Relationships xmlns:r="http://schemas.openxmlformats.org/package/2006/relationships">
-  <r:Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</r:Relationships>"#;
-
-        let result = find_document_target(Cursor::new(rels_xml.as_bytes()));
-
-        assert_document_path(result, "word/document.xml");
-    }
-
-    #[test]
-    fn find_document_target_errors_on_malformed_rels_xml() {
-        let result = find_document_target(Cursor::new("<broken>".as_bytes()));
-
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(message, "malformed _rels/.rels");
-                assert_eq!(position, None);
-            }
-            other => assert_eq!(format!("{other:?}"), "expected malformed rels parse error"),
-        }
-    }
-
-    #[test]
-    fn find_document_target_rejects_target_with_dotdot_segment() {
-        let rels_xml = minimal_rels("../foo/document.xml");
-
-        let result = find_document_target(Cursor::new(rels_xml.as_bytes()));
-
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(
-                    message,
-                    "rels target contains parent reference: ../foo/document.xml"
-                );
-                assert_eq!(position, None);
-            }
-            other => assert_eq!(format!("{other:?}"), "expected dotdot parse error"),
-        }
-    }
-
-    #[test]
-    fn find_document_target_handles_target_with_entities() {
-        let rels_xml = minimal_rels("word/doc&amp;ument.xml");
-
-        let result = find_document_target(Cursor::new(rels_xml.as_bytes()));
-        assert_document_path(result, "word/doc&ument.xml");
-    }
-
-    fn minimal_styles_rels(target: &str) -> String {
+    fn typed_rel(id: &str, kind: &str, target: &str, mode: Option<&str>) -> String {
+        let mode_attr = mode.map_or(String::new(), |m| format!(r#" TargetMode="{m}""#));
         format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="{target}"/>
-</Relationships>"#
+            r#"  <Relationship Id="{id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/{kind}" Target="{target}"{mode_attr}/>"#
         )
     }
 
-    fn assert_hyperlink_map(result: docspec_core::Result<HyperlinkMap>, expected: &[(&str, &str)]) {
-        let expected_map = expected
-            .iter()
-            .map(|(id, target)| ((*id).to_string(), (*target).to_string()))
-            .collect::<HyperlinkMap>();
-
+    fn parse_error_message(result: docspec_core::Result<impl core::fmt::Debug>) -> String {
         match result {
-            Ok(map) => assert_eq!(map, expected_map),
-            Err(err) => assert_eq!(format!("{err:?}"), "expected hyperlink map"),
+            Err(Error::Parse { message, position }) => {
+                assert_eq!(position, None);
+                message
+            }
+            other => panic!("expected Error::Parse, got {other:?}"),
         }
     }
 
     #[test]
-    fn collect_hyperlink_map_returns_empty_for_empty_relationships() {
-        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#;
-
-        let result = collect_hyperlink_map(Cursor::new(rels_xml.as_bytes()));
-
-        assert_hyperlink_map(result, &[]);
-    }
-
-    #[test]
-    fn collect_hyperlink_map_finds_strict_uri_hyperlink() {
-        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://purl.oclc.org/ooxml/officeDocument/relationships/hyperlink" Target="https://example.com"/>
-</Relationships>"#;
-
-        let result = collect_hyperlink_map(Cursor::new(rels_xml.as_bytes()));
-
-        assert_hyperlink_map(result, &[("rId1", "https://example.com")]);
-    }
-
-    #[test]
-    fn collect_hyperlink_map_finds_transitional_uri_hyperlink() {
-        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com"/>
-</Relationships>"#;
-
-        let result = collect_hyperlink_map(Cursor::new(rels_xml.as_bytes()));
-
-        assert_hyperlink_map(result, &[("rId1", "https://example.com")]);
-    }
-
-    #[test]
-    fn collect_hyperlink_map_skips_non_hyperlink_relationships() {
-        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="word/styles.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>
-  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>"#;
-
-        let result = collect_hyperlink_map(Cursor::new(rels_xml.as_bytes()));
-
-        assert_hyperlink_map(result, &[]);
-    }
-
-    #[test]
-    fn collect_hyperlink_map_collects_multiple_hyperlinks() {
-        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/one"/>
-  <Relationship Id="rId2" Type="http://purl.oclc.org/ooxml/officeDocument/relationships/hyperlink" Target="https://example.com/two"/>
-  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/three"/>
-</Relationships>"#;
-
-        let result = collect_hyperlink_map(Cursor::new(rels_xml.as_bytes()));
-
-        assert_hyperlink_map(
-            result,
-            &[
-                ("rId1", "https://example.com/one"),
-                ("rId2", "https://example.com/two"),
-                ("rId3", "https://example.com/three"),
-            ],
+    fn find_document_target_returns_first_office_document_relationship() {
+        let rels_xml = rels_with(&format!(
+            "{}\n{}\n{}",
+            typed_rel("rId1", "metadata", "docProps/core.xml", None),
+            typed_rel("rId2", "officeDocument", "word/document.xml", None),
+            typed_rel("rId3", "officeDocument", "word/other.xml", None),
+        ));
+        assert_eq!(
+            find_document_target(rels_xml.as_bytes()).expect("document path"),
+            "word/document.xml"
         );
     }
 
     #[test]
-    fn collect_hyperlink_map_preserves_id_to_target_mapping() {
-        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://rust-lang.org"/>
-</Relationships>"#;
-
-        let result = collect_hyperlink_map(Cursor::new(rels_xml.as_bytes()));
-
-        assert_hyperlink_map(result, &[("rId7", "https://rust-lang.org")]);
-    }
-
-    #[test]
-    fn collect_hyperlink_map_handles_internal_target_mode() {
-        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="other.docx" TargetMode="Internal"/>
-</Relationships>"#;
-
-        let result = collect_hyperlink_map(Cursor::new(rels_xml.as_bytes()));
-
-        assert_hyperlink_map(result, &[("rId1", "other.docx")]);
-    }
-
-    #[test]
-    fn collect_hyperlink_map_handles_external_target_mode() {
-        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com" TargetMode="External"/>
-</Relationships>"#;
-
-        let result = collect_hyperlink_map(Cursor::new(rels_xml.as_bytes()));
-
-        assert_hyperlink_map(result, &[("rId1", "https://example.com")]);
-    }
-
-    #[test]
-    fn collect_hyperlink_map_handles_missing_target_mode() {
-        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com"/>
-</Relationships>"#;
-
-        let result = collect_hyperlink_map(Cursor::new(rels_xml.as_bytes()));
-
-        assert_hyperlink_map(result, &[("rId1", "https://example.com")]);
-    }
-
-    #[test]
-    fn collect_hyperlink_map_returns_err_on_malformed_xml() {
-        let result = collect_hyperlink_map(Cursor::new("<broken>".as_bytes()));
-
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(message, "malformed _rels/.rels");
-                assert_eq!(position, None);
-            }
-            other => assert_eq!(format!("{other:?}"), "expected malformed rels parse error"),
+    fn find_document_target_resolves_against_package_root() {
+        for (target, expected) in [
+            ("/word/document.xml", "word/document.xml"),
+            ("./word/./document.xml", "word/document.xml"),
+            ("word/sub/../document.xml", "word/document.xml"),
+            ("word/doc&amp;ument.xml", "word/doc&ument.xml"),
+        ] {
+            let rels_xml = office_document_rels(target);
+            assert_eq!(
+                find_document_target(rels_xml.as_bytes()).expect("document path"),
+                expected,
+                "target {target}"
+            );
         }
     }
 
     #[test]
-    fn find_styles_returns_target_when_present() {
-        let rels_xml = minimal_styles_rels("word/styles.xml");
+    fn find_document_target_rejects_target_escaping_package_root() {
+        let rels_xml = office_document_rels("../foo/document.xml");
+        assert_eq!(
+            parse_error_message(find_document_target(rels_xml.as_bytes())),
+            "rels target escapes package root: ../foo/document.xml"
+        );
+    }
 
-        let result = find_styles_target(Cursor::new(rels_xml.as_bytes()));
-
-        match result {
-            Ok(Some(path)) => assert_eq!(path, "word/styles.xml"),
-            other => assert_eq!(format!("{other:?}"), "expected Some(word/styles.xml)"),
+    #[test]
+    fn find_document_target_errors_when_no_office_document_relationship() {
+        for body in [
+            "",
+            r#"  <Relationship Id="rId1" Type="http://example.com/not-office" Target="word/document.xml"/>"#,
+            r#"  <Group><Relationship Id="rId1" Type="http://example.com/not-office" Target="word/document.xml"></Relationship></Group>"#,
+            // A Relationship without a Target is skipped.
+            r#"  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"/>"#,
+        ] {
+            let rels_xml = rels_with(body);
+            assert_eq!(
+                parse_error_message(find_document_target(rels_xml.as_bytes())),
+                "no officeDocument relationship",
+                "body {body}"
+            );
         }
     }
 
     #[test]
-    fn find_styles_returns_none_when_absent() {
-        let rels_xml = minimal_rels("word/document.xml");
+    fn find_document_target_accepts_non_empty_and_namespaced_elements() {
+        let rels_xml = r#"<r:Relationships xmlns:r="http://schemas.openxmlformats.org/package/2006/relationships">
+  <r:Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"></r:Relationship>
+</r:Relationships>"#;
+        assert_eq!(
+            find_document_target(rels_xml.as_bytes()).expect("document path"),
+            "word/document.xml"
+        );
+    }
 
-        let result = find_styles_target(Cursor::new(rels_xml.as_bytes()));
-
-        match result {
-            Ok(None) => {}
-            other => assert_eq!(format!("{other:?}"), "expected Ok(None)"),
+    #[test]
+    fn malformed_rels_xml_is_rejected() {
+        for rels_xml in ["</Relationships>", "<Relationships><", "<broken>"] {
+            assert_eq!(
+                parse_error_message(find_document_target(rels_xml.as_bytes())),
+                "malformed _rels/.rels",
+                "input {rels_xml}"
+            );
+            assert_eq!(
+                parse_error_message(PartRels::parse(rels_xml.as_bytes(), DOC)),
+                "malformed _rels/.rels",
+                "input {rels_xml}"
+            );
         }
     }
 
     #[test]
-    fn find_styles_rejects_dotdot() {
-        let rels_xml = minimal_styles_rels("../etc/passwd");
+    fn malformed_relationship_attribute_is_rejected_with_position() {
+        let rels_xml = rels_with(
+            r#"  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target=word/document.xml/>"#,
+        );
+        assert_eq!(
+            parse_error_message(find_document_target(rels_xml.as_bytes())),
+            "malformed _rels/.rels: position 120: attribute value must be enclosed in `\"` or `'`"
+        );
+    }
 
-        let result = find_styles_target(Cursor::new(rels_xml.as_bytes()));
+    #[test]
+    fn bad_attribute_entity_is_rejected() {
+        let rels_xml = office_document_rels("word/&bogus;.xml");
+        assert_eq!(
+            parse_error_message(find_document_target(rels_xml.as_bytes())),
+            "malformed _rels/.rels: at 6..11: unrecognized entity `bogus`"
+        );
+    }
 
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(
-                    message,
-                    "rels target contains parent reference: ../etc/passwd"
-                );
-                assert_eq!(position, None);
-            }
-            other => assert_eq!(format!("{other:?}"), "expected dotdot parse error"),
+    #[test]
+    fn part_rels_parse_of_empty_relationships_is_empty() {
+        let rels_xml = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#;
+        let rels = PartRels::parse(rels_xml.as_bytes(), DOC).expect("part rels");
+        assert!(rels.hyperlinks.is_empty());
+        assert!(rels.images.is_empty());
+        assert_eq!(rels.styles_path, None);
+        assert_eq!(rels.numbering_path, None);
+    }
+
+    #[test]
+    fn part_rels_collects_hyperlinks_of_both_namespaces_and_any_target_mode() {
+        let rels_xml = rels_with(&format!(
+            "{}\n{}\n{}\n{}\n{}",
+            typed_rel("rId1", "hyperlink", "https://example.com/one", None),
+            r#"  <Relationship Id="rId2" Type="http://purl.oclc.org/ooxml/officeDocument/relationships/hyperlink" Target="https://example.com/two"/>"#,
+            typed_rel(
+                "rId3",
+                "hyperlink",
+                "https://example.com/three",
+                Some("External")
+            ),
+            typed_rel("rId4", "hyperlink", "other.docx", Some("Internal")),
+            typed_rel("rId5", "styles", "styles.xml", None),
+        ));
+        let rels = PartRels::parse(rels_xml.as_bytes(), DOC).expect("part rels");
+        let expected: HyperlinkMap = [
+            ("rId1", "https://example.com/one"),
+            ("rId2", "https://example.com/two"),
+            ("rId3", "https://example.com/three"),
+            ("rId4", "other.docx"),
+        ]
+        .into_iter()
+        .map(|(id, target)| (id.to_string(), target.to_string()))
+        .collect();
+        assert_eq!(rels.hyperlinks, expected);
+    }
+
+    #[test]
+    fn part_rels_skips_hyperlinks_and_images_without_id() {
+        let rels_xml = rels_with(
+            r#"  <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com"/>
+  <Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>"#,
+        );
+        let rels = PartRels::parse(rels_xml.as_bytes(), DOC).expect("part rels");
+        assert!(rels.hyperlinks.is_empty());
+        assert!(rels.images.is_empty());
+    }
+
+    #[test]
+    fn part_rels_resolves_internal_images_and_keeps_external_urls() {
+        let rels_xml = rels_with(&format!(
+            "{}\n{}\n{}\n{}",
+            typed_rel("rId5", "image", "media/image1.png", None),
+            typed_rel("rId6", "image", "../media/image2.png", None),
+            typed_rel("rId7", "image", "./media/sub/../image3.png", None),
+            typed_rel(
+                "rId8",
+                "image",
+                "https://example.com/img.png",
+                Some("External")
+            ),
+        ));
+        let rels = PartRels::parse(rels_xml.as_bytes(), DOC).expect("part rels");
+        let image = |id: &str| {
+            let rel = rels.images.get(id).expect("image present");
+            (rel.target.as_str(), rel.is_external)
+        };
+        assert_eq!(rels.images.len(), 4);
+        assert_eq!(image("rId5"), ("word/media/image1.png", false));
+        assert_eq!(image("rId6"), ("media/image2.png", false));
+        assert_eq!(image("rId7"), ("word/media/image3.png", false));
+        assert_eq!(image("rId8"), ("https://example.com/img.png", true));
+    }
+
+    #[test]
+    fn part_rels_rejects_image_escaping_package_root() {
+        let rels_xml = rels_with(&typed_rel("rId5", "image", "../../../etc/passwd", None));
+        assert_eq!(
+            parse_error_message(PartRels::parse(rels_xml.as_bytes(), DOC)),
+            "rels target escapes package root: word/../../../etc/passwd"
+        );
+    }
+
+    #[test]
+    fn part_rels_resolves_first_internal_styles_and_numbering_targets() {
+        let rels_xml = rels_with(&format!(
+            "{}\n{}\n{}\n{}\n{}\n{}",
+            typed_rel(
+                "rId1",
+                "styles",
+                "https://example.com/styles.xml",
+                Some("External")
+            ),
+            typed_rel("rId2", "styles", "styles.xml", None),
+            typed_rel("rId3", "styles", "styles2.xml", None),
+            typed_rel("rId4", "numbering", "../word/numbering.xml", None),
+            typed_rel("rId5", "numbering", "numbering2.xml", None),
+            typed_rel("rId6", "fontTable", "fontTable.xml", None),
+        ));
+        let rels = PartRels::parse(rels_xml.as_bytes(), DOC).expect("part rels");
+        assert_eq!(rels.styles_path.as_deref(), Some("word/styles.xml"));
+        assert_eq!(rels.numbering_path.as_deref(), Some("word/numbering.xml"));
+    }
+
+    #[test]
+    fn part_rels_ignores_external_only_styles_and_numbering() {
+        let rels_xml = rels_with(&format!(
+            "{}\n{}",
+            typed_rel("rId1", "styles", "styles.xml", Some("External")),
+            typed_rel("rId2", "numbering", "numbering.xml", Some("External")),
+        ));
+        let rels = PartRels::parse(rels_xml.as_bytes(), DOC).expect("part rels");
+        assert_eq!(rels.styles_path, None);
+        assert_eq!(rels.numbering_path, None);
+    }
+
+    #[test]
+    fn part_rels_rejects_styles_and_numbering_escaping_package_root() {
+        for kind in ["styles", "numbering"] {
+            let rels_xml = rels_with(&typed_rel("rId1", kind, "../../etc/passwd", None));
+            assert_eq!(
+                parse_error_message(PartRels::parse(rels_xml.as_bytes(), DOC)),
+                "rels target escapes package root: word/../../etc/passwd",
+                "kind {kind}"
+            );
         }
     }
 
     #[test]
-    fn find_styles_ignores_external_target_mode() {
-        let rels_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="word/styles.xml" TargetMode="External"/>
-</Relationships>"#;
-
-        let result = find_styles_target(Cursor::new(rels_xml.as_bytes()));
-
-        match result {
-            Ok(None) => {}
-            other => assert_eq!(format!("{other:?}"), "expected Ok(None) for external"),
-        }
+    fn derive_part_rels_path_with_and_without_directory() {
+        assert_eq!(
+            derive_part_rels_path("word/document.xml"),
+            "word/_rels/document.xml.rels"
+        );
+        assert_eq!(derive_part_rels_path("foo"), "_rels/foo.rels");
     }
 
     #[test]
-    fn find_styles_returns_first_styles_match() {
-        let rels_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="word/styles.xml"/>
-   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="word/styles2.xml"/>
-</Relationships>"#;
-
-        let result = find_styles_target(Cursor::new(rels_xml.as_bytes()));
-
-        match result {
-            Ok(Some(path)) => assert_eq!(path, "word/styles.xml"),
-            other => assert_eq!(format!("{other:?}"), "expected first match"),
-        }
-    }
-
-    fn minimal_numbering_rels(target: &str) -> String {
-        format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="{target}"/>
-</Relationships>"#
-        )
-    }
-
-    #[test]
-    fn find_numbering_target_returns_target_when_present() {
-        let rels_xml = minimal_numbering_rels("word/numbering.xml");
-
-        let result = find_numbering_target(Cursor::new(rels_xml.as_bytes()));
-
-        assert_eq!(result.ok(), Some(Some("word/numbering.xml".to_string())));
-    }
-
-    #[test]
-    fn find_numbering_target_returns_none_when_absent() {
-        let rels_xml = minimal_rels("word/document.xml");
-
-        let result = find_numbering_target(Cursor::new(rels_xml.as_bytes()));
-
-        assert_eq!(result.ok(), Some(None));
-    }
-
-    #[test]
-    fn find_numbering_target_picks_numbering_among_multiple_relationships() {
-        let rels_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="word/styles.xml"/>
-   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="word/numbering.xml"/>
-   <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="word/fontTable.xml"/>
-</Relationships>"#;
-
-        let result = find_numbering_target(Cursor::new(rels_xml.as_bytes()));
-
-        assert_eq!(result.ok(), Some(Some("word/numbering.xml".to_string())));
-    }
-
-    #[test]
-    fn find_numbering_target_rejects_target_with_dotdot_segment() {
-        let rels_xml = minimal_numbering_rels("../etc/passwd");
-
-        let result = find_numbering_target(Cursor::new(rels_xml.as_bytes()));
-
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(
-                    message,
-                    "rels target contains parent reference: ../etc/passwd"
-                );
-                assert_eq!(position, None);
-            }
-            other => assert_eq!(format!("{other:?}"), "expected dotdot parse error"),
-        }
-    }
-
-    #[test]
-    fn find_numbering_target_returns_none_on_empty_rels() {
-        let rels_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-</Relationships>"#;
-
-        let result = find_numbering_target(Cursor::new(rels_xml.as_bytes()));
-
-        assert_eq!(result.ok(), Some(None));
-    }
-
-    #[test]
-    fn derive_part_rels_path_with_directory() {
-        let result = derive_part_rels_path("word/document.xml");
-        assert_eq!(result, "word/_rels/document.xml.rels");
-    }
-
-    #[test]
-    fn derive_part_rels_path_without_directory() {
-        let result = derive_part_rels_path("foo");
-        assert_eq!(result, "_rels/foo.rels");
-    }
-
-    #[test]
-    fn resolve_relative_target_with_directory() {
-        let result = resolve_relative_target("word/document.xml", "styles.xml");
-        assert_eq!(result, "word/styles.xml");
-    }
-
-    #[test]
-    fn resolve_relative_target_strips_leading_slash() {
-        let result = resolve_relative_target("word/document.xml", "/word/styles.xml");
-        assert_eq!(result, "word/styles.xml");
-    }
-
-    #[test]
-    fn resolve_relative_target_without_directory() {
-        let result = resolve_relative_target("document.xml", "styles.xml");
-        assert_eq!(result, "styles.xml");
-    }
-
-    fn minimal_image_rels(target: &str) -> String {
-        format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="{target}"/>
-</Relationships>"#
-        )
-    }
-
-    #[test]
-    fn collect_image_map_internal() {
-        let rels_xml = minimal_image_rels("media/image1.png");
-
-        let result = collect_image_map(rels_xml.as_bytes(), "word/document.xml");
-
-        match result {
-            Ok(map) => {
-                assert_eq!(map.len(), 1);
-                let rel = map.get("rId5").expect("rId5 must be present");
-                assert_eq!(rel.target, "word/media/image1.png");
-                assert!(!rel.is_external);
-            }
-            Err(err) => panic!("expected Ok, got {err:?}"),
-        }
-    }
-
-    #[test]
-    fn collect_image_map_external() {
-        let rels_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="https://example.com/img.png" TargetMode="External"/>
-</Relationships>"#;
-
-        let result = collect_image_map(rels_xml.as_bytes(), "word/document.xml");
-
-        match result {
-            Ok(map) => {
-                assert_eq!(map.len(), 1);
-                let rel = map.get("rId5").expect("rId5 must be present");
-                assert_eq!(rel.target, "https://example.com/img.png");
-                assert!(rel.is_external);
-            }
-            Err(err) => panic!("expected Ok, got {err:?}"),
-        }
-    }
-
-    #[test]
-    fn collect_image_map_rejects_dotdot_escaping_root() {
-        let rels_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../../../etc/passwd"/>
-</Relationships>"#;
-
-        let result = collect_image_map(rels_xml.as_bytes(), "word/document.xml");
-
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(
-                    message,
-                    "rels target escapes package root: word/../../../etc/passwd"
-                );
-                assert_eq!(position, None);
-            }
-            other => panic!("expected Err(Parse), got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn collect_image_map_normalizes_parent_segment_into_package_root() {
-        let rels_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/>
-</Relationships>"#;
-
-        let result = collect_image_map(rels_xml.as_bytes(), "word/document.xml");
-
-        match result {
-            Ok(map) => {
-                assert_eq!(map.len(), 1);
-                let rel = map.get("rId5").expect("rId5 must be present");
-                assert_eq!(rel.target, "media/image1.png");
-                assert!(!rel.is_external);
-            }
-            Err(err) => panic!("expected Ok, got {err:?}"),
-        }
-    }
-
-    #[test]
-    fn collect_image_map_collapses_dot_and_double_dot_segments() {
-        let rels_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="./media/sub/../image1.png"/>
-</Relationships>"#;
-
-        let result = collect_image_map(rels_xml.as_bytes(), "word/document.xml");
-
-        match result {
-            Ok(map) => {
-                let rel = map.get("rId5").expect("rId5 must be present");
-                assert_eq!(rel.target, "word/media/image1.png");
-                assert!(!rel.is_external);
-            }
-            Err(err) => panic!("expected Ok, got {err:?}"),
-        }
+    fn resolve_relative_target_joins_strips_and_handles_root_parts() {
+        assert_eq!(
+            resolve_relative_target("word/document.xml", "styles.xml"),
+            "word/styles.xml"
+        );
+        assert_eq!(
+            resolve_relative_target("word/document.xml", "/word/styles.xml"),
+            "word/styles.xml"
+        );
+        assert_eq!(
+            resolve_relative_target("document.xml", "styles.xml"),
+            "styles.xml"
+        );
     }
 }
