@@ -45,9 +45,11 @@ where
         .read_to_end(&mut bytes)
         .map_err(Error::from)?;
     if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > cap {
-        return Err(parse_error(format!(
-            "package part {part_name} exceeds the {cap}-byte limit (possible zip bomb)"
-        )));
+        return Err(Error::Limit {
+            message: format!(
+                "package part {part_name} exceeds the {cap}-byte limit (possible zip bomb)"
+            ),
+        });
     }
     Ok(bytes)
 }
@@ -940,14 +942,13 @@ mod tests {
         // One byte over the cap: rejected with the exact zip-bomb error.
         let over_cap = vec![b'A'; 9];
         match read_entry_capped(&mut Cursor::new(over_cap), 8, "word/styles.xml") {
-            Err(Error::Parse { message, position }) => {
+            Err(Error::Limit { message }) => {
                 assert_eq!(
                     message,
                     "package part word/styles.xml exceeds the 8-byte limit (possible zip bomb)"
                 );
-                assert_eq!(position, None);
             }
-            other => panic!("expected Parse error, got {other:?}"),
+            other => panic!("expected Limit error, got {other:?}"),
         }
     }
 
@@ -991,16 +992,15 @@ mod tests {
         let mut reader = Cursor::new(zip_bytes);
         let mut archive = zip::ZipArchive::new(&mut reader).unwrap();
         match load_style_list_and_hyperlink_map(&mut archive, "word/document.xml") {
-            Err(Error::Parse { message, position }) => {
+            Err(Error::Limit { message }) => {
                 assert_eq!(
                     message,
                     format!(
                         "package part word/styles.xml exceeds the {MAX_METADATA_PART_BYTES}-byte limit (possible zip bomb)"
                     )
                 );
-                assert_eq!(position, None);
             }
-            other => panic!("expected Parse error for zip-bomb styles.xml, got {other:?}"),
+            other => panic!("expected Limit error for zip-bomb styles.xml, got {other:?}"),
         }
     }
 }

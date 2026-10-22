@@ -137,8 +137,9 @@ const _: for<'a> fn(&'a rels::ImageRel) -> (&'a str, bool) = _image_rel_fields;
 ///
 /// # Errors
 ///
-/// Returns [`docspec_core::Error::Io`] for I/O failures and [`docspec_core::Error::Parse`] for malformed
-/// archives or XML.
+/// Returns [`docspec_core::Error::Io`] for I/O failures, [`docspec_core::Error::Parse`] for malformed
+/// archives or XML, and [`docspec_core::Error::Limit`] when a package part, XML node or
+/// table nesting depth exceeds its cap.
 #[derive(Debug)]
 pub struct DocxReader {
     inner: document::DocumentReader,
