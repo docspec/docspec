@@ -216,6 +216,8 @@ async fn error_class_cardinality_bounded() {
     let allowed = allowed_set(&[
         "empty_body",
         "body_not_utf8",
+        "content_too_large",
+        "conversion_timeout",
         "internal",
         "method_not_allowed",
         "not_acceptable",

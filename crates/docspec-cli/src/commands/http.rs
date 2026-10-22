@@ -11,7 +11,7 @@ use docspec_http::{cli::Args as DocspecHttpArgs, run_server};
 impl From<HttpArgs> for DocspecHttpArgs {
     #[inline]
     fn from(args: HttpArgs) -> Self {
-        Self::new(args.host, args.port)
+        Self::new(args.host, args.port).with_limits(args.max_body_size, args.conversion_timeout)
     }
 }
 

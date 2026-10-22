@@ -813,6 +813,7 @@ dependencies = [
  "docspec-core",
  "docspec-json",
  "docspec-test-utils",
+ "http-body-util",
  "metrics",
  "metrics-exporter-prometheus",
  "mime",

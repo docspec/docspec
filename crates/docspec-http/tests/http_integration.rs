@@ -439,6 +439,169 @@ async fn non_uuid_request_id_yields_no_instance() {
     );
 }
 
+mod limits {
+    use super::*;
+    use docspec_http::server::Limits;
+    use std::time::Duration;
+
+    fn limited(max_body_bytes: Option<u64>, conversion_timeout: Option<Duration>) -> Router {
+        docspec_http::router::router_with_limits(Limits {
+            max_body_bytes,
+            conversion_timeout,
+        })
+    }
+
+    fn markdown_with_length(body: &'static str) -> axum::http::Request<Body> {
+        common::request(
+            "POST",
+            "/conversion",
+            &[
+                ("content-type", "text/markdown"),
+                ("content-length", &body.len().to_string()),
+            ],
+            Body::from(body),
+        )
+    }
+
+    #[tokio::test]
+    async fn declared_length_over_the_limit_is_413_with_exact_body() {
+        let response = limited(Some(8), None)
+            .oneshot(markdown_with_length("# twelve bytes"))
+            .await
+            .expect("request succeeds");
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            PROBLEM_JSON_CT
+        );
+        let instance = instance_of(&response);
+        let body = response_body_json(response.into_body()).await;
+        assert_eq!(
+            body,
+            json!({
+                "type": "about:blank",
+                "title": "Content Too Large",
+                "status": 413,
+                "detail": "Request body exceeds the 8-byte limit",
+                "instance": instance,
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn undeclared_length_over_the_limit_is_413_while_streaming() {
+        // No Content-Length header: the body is refused as it crosses the limit.
+        let response = limited(Some(8), None)
+            .oneshot(post_markdown("# twelve bytes"))
+            .await
+            .expect("request succeeds");
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        let instance = instance_of(&response);
+        let body = response_body_json(response.into_body()).await;
+        assert_eq!(
+            body,
+            json!({
+                "type": "about:blank",
+                "title": "Content Too Large",
+                "status": 413,
+                "detail": "Request body exceeds the 8-byte limit",
+                "instance": instance,
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn body_at_the_limit_converts() {
+        let response = limited(Some(7), None)
+            .oneshot(markdown_with_length("# Hello"))
+            .await
+            .expect("request succeeds");
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn no_limit_accepts_a_large_body() {
+        let large = "# Hello\n\n".repeat(50_000);
+        let response = limited(None, None)
+            .oneshot(post_markdown(large))
+            .await
+            .expect("request succeeds");
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn zero_timeout_is_503_with_retry_after_and_exact_body() {
+        let response = limited(None, Some(Duration::ZERO))
+            .oneshot(post_markdown("# Hello"))
+            .await
+            .expect("request succeeds");
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers().get(header::RETRY_AFTER).unwrap(), "1");
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            PROBLEM_JSON_CT
+        );
+        let instance = instance_of(&response);
+        let body = response_body_json(response.into_body()).await;
+        assert_eq!(
+            body,
+            json!({
+                "type": "https://problems.docspec.dev/conversion-timeout",
+                "title": "Service Unavailable",
+                "status": 503,
+                "detail": "Conversion exceeded the 1-second limit and was abandoned",
+                "instance": instance,
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn generous_timeout_converts() {
+        let response = limited(None, Some(Duration::from_secs(3600)))
+            .oneshot(post_markdown("# Hello"))
+            .await
+            .expect("request succeeds");
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// A DOCX whose body is `depth` nested tables, one past the reader's cap.
+    fn nested_tables_docx(depth: usize) -> Vec<u8> {
+        let mut body = String::new();
+        for _ in 0..depth {
+            body.push_str("<w:tbl><w:tr><w:tc>");
+        }
+        body.push_str("<w:p><w:r><w:t>deep</w:t></w:r></w:p>");
+        for _ in 0..depth {
+            body.push_str("</w:tc></w:tr></w:tbl>");
+        }
+        let doc_xml = format!(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{body}</w:body></w:document>"#
+        );
+        common::synth_docx(common::SIMPLE_RELS, &doc_xml)
+    }
+
+    #[tokio::test]
+    async fn reader_cap_is_422_resource_limit() {
+        let response = app()
+            .oneshot(common::docx_request(nested_tables_docx(101)))
+            .await
+            .expect("request succeeds");
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let instance = instance_of(&response);
+        let body = response_body_json(response.into_body()).await;
+        assert_eq!(
+            body,
+            json!({
+                "type": "https://problems.docspec.dev/resource-limit",
+                "title": "Unprocessable Content",
+                "status": 422,
+                "detail": "table nesting exceeds the depth limit of 100 (possible zip bomb)",
+                "instance": instance,
+            })
+        );
+    }
+}
+
 #[tokio::test]
 async fn post_conversion_docx_empty_body_returns_400() {
     let request = common::request(

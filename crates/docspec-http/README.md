@@ -103,9 +103,11 @@ All errors use [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Detail
 | 404  | Unknown path                                             |
 | 405  | Wrong method (response includes `Allow` header)          |
 | 406  | `Accept` header excludes all supported output types      |
+| 413  | Request body exceeds the configured `--max-body-size` (refused before buffering when `Content-Length` says so) |
 | 415  | `Content-Type` must be `text/markdown`, `text/html`, or `application/vnd.openxmlformats-officedocument.wordprocessingml.document` |
-| 422  | The input could not be converted: parse error, truncated document, dangling reference, or a value the output format cannot hold |
+| 422  | The input could not be converted: parse error, truncated document, dangling reference, a value the output format cannot hold, or a resource cap of the reader |
 | 500  | DocSpec defect or infrastructure failure, never caused by the document |
+| 503  | Conversion exceeded the configured `--conversion-timeout` and was abandoned; carries `Retry-After` |
 
 The split is decided by error kind, not by the stage that failed: a writer that cannot finish because the document ended early is `422`; an event stream that violates DocSpec's own well-formedness rules is `500`. The `422` `detail` is the reader or writer error message verbatim (for example ``malformed _rels/.rels: at 6..11: unrecognized entity `bogus` ``). It describes the submitted document so the caller can fix it, per [RFC 9457 §3.1.4](https://www.rfc-editor.org/rfc/rfc9457#section-3.1.4), and is not meant to carry server paths, stack traces or configuration ([§5](https://www.rfc-editor.org/rfc/rfc9457#section-5)). Today this holds because the readers and writers work on the in-memory request body; the message is forwarded unfiltered, so a new reader or writer must not put paths or OS errors in its error text. The `500` `detail` is a fixed string; the cause goes to logs and Sentry only.
 
@@ -117,7 +119,9 @@ The `type` member identifies the class of failure ([RFC 9457 §3.1.1](https://ww
 | --- | --- | --- |
 | `https://problems.docspec.dev/malformed-input` | 422 | The parser or emitter rejected the document's structure: a syntax error, or a document that ends before its structure closes (core `Parse` and `Json` errors). |
 | `https://problems.docspec.dev/unsupported-content` | 422 | The document is well-formed but holds a dangling reference, a missing media part, or a value the output format cannot represent (core `Other`, `Io` and any future error kind). |
-| `about:blank` | 400, 404, 405, 406, 415, 500 | The status code is the whole meaning. |
+| `https://problems.docspec.dev/resource-limit` | 422 | The document exceeds a resource cap of the reader: a package part or XML node over 64 MiB, or tables nested deeper than 100 (core `Limit`). |
+| `https://problems.docspec.dev/conversion-timeout` | 503 | The conversion ran past `--conversion-timeout` and was abandoned at the next event; `Retry-After` carries the limit in seconds. |
+| `about:blank` | 400, 404, 405, 406, 413, 415, 500 | The status code is the whole meaning. |
 
 Each type URI is a path on one host. `https://problems.docspec.dev/` serves a single document with an anchor per type and redirects each path to its anchor. This table is that document's source; the page itself lives in [docspec/problems.docspec.dev](https://github.com/docspec/problems.docspec.dev).
 
@@ -133,9 +137,11 @@ Accepted `Accept` values for `/conversion`: `text/html` (HTML), `application/vnd
 
 **Auth**: Use a reverse proxy or upstream gateway.
 
-**Body size**: No limit. Large documents are accepted. DoS risk is accepted. Both the request body and the conversion output are held in memory for the duration of the request.
+**Body size**: Unlimited unless `docspec http --max-body-size <BYTES>` is set; then larger uploads get `413` (before any byte is buffered when `Content-Length` is declared, otherwise as soon as the limit is crossed). Both the accepted request body and the conversion output are held in memory for the duration of the request.
 
-**Request timeout**: No timeout. Slow clients can hang a connection indefinitely.
+**Conversion time**: Unlimited unless `docspec http --conversion-timeout <SECONDS>` is set; then a conversion past the limit is stopped at its next event, in the worker thread, and answered `503` with `Retry-After`. Reader construction (opening the package and its style and numbering parts) runs before the first event and is bounded by the reader's 64 MiB part cap instead.
+
+**Request timeout**: No idle or read timeout at the HTTP layer. Slow clients can hold a connection open; put a reverse proxy in front for that.
 
 ## Logging
 

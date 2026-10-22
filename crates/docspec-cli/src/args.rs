@@ -67,6 +67,12 @@ pub struct HttpArgs {
     /// Port to bind to.
     #[arg(long, default_value_t = 3000)]
     pub port: u16,
+    /// Largest request body accepted, in bytes; larger uploads get 413. 0 means unlimited.
+    #[arg(long, default_value_t = 0, value_name = "BYTES")]
+    pub max_body_size: u64,
+    /// Longest a single conversion may run, in seconds; slower ones get 503. 0 means unlimited.
+    #[arg(long, default_value_t = 0, value_name = "SECONDS")]
+    pub conversion_timeout: u64,
 }
 
 /// Color output choice.

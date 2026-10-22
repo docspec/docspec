@@ -4,6 +4,8 @@ use axum::{http::Request, Router};
 use metrics_exporter_prometheus::PrometheusHandle;
 use tower_http::request_id::{MakeRequestId, RequestId};
 
+use crate::server::Limits;
+
 use crate::format;
 use crate::metrics::{
     metrics_handler,
@@ -28,7 +30,18 @@ impl MakeRequestId for EchoOnly {
 /// Build the HTTP API router with all routes and middleware.
 #[inline]
 pub fn router() -> Router {
-    use axum::extract::DefaultBodyLimit;
+    router_with_limits(Limits::default())
+}
+
+/// Builds the public router with the given resource limits.
+///
+/// The limits reach `POST /conversion` as a request extension. No
+/// `DefaultBodyLimit` layer is installed: the handler reads the raw body
+/// itself and applies `max_body_bytes` with a problem response, so axum's
+/// extractor-level cap (which only governs `Bytes`-style extractors) would
+/// neither apply nor answer in the right format.
+#[inline]
+pub fn router_with_limits(limits: Limits) -> Router {
     use axum::http::header::HeaderName;
     use axum::middleware;
     use axum::routing::{get, post};
@@ -100,12 +113,6 @@ pub fn router() -> Router {
     // ServiceBuilder type due to different layer counts.
     #[cfg(feature = "sentry")]
     let middleware_stack = ServiceBuilder::new()
-        // Reason: axum's `Bytes`/`String`/`Json` extractors silently
-        // cap request bodies at 2 MiB by default. The README pledges
-        // `Body size: No limit ... DoS risk is accepted.`, so we
-        // disable the cap globally. Without this layer the
-        // `/conversion` handler would 413 on bodies >2 MiB.
-        .layer(DefaultBodyLimit::disable())
         .layer(SetRequestIdLayer::new(
             x_request_id.clone(),
             MakeRequestUuid,
@@ -126,12 +133,6 @@ pub fn router() -> Router {
 
     #[cfg(not(feature = "sentry"))]
     let middleware_stack = ServiceBuilder::new()
-        // Reason: axum's `Bytes`/`String`/`Json` extractors silently
-        // cap request bodies at 2 MiB by default. The README pledges
-        // `Body size: No limit ... DoS risk is accepted.`, so we
-        // disable the cap globally. Without this layer the
-        // `/conversion` handler would 413 on bodies >2 MiB.
-        .layer(DefaultBodyLimit::disable())
         .layer(SetRequestIdLayer::new(
             x_request_id.clone(),
             MakeRequestUuid,
@@ -152,6 +153,7 @@ pub fn router() -> Router {
         .route("/health", health_route)
         .fallback(not_found)
         .layer(middleware_stack)
+        .layer(axum::Extension(limits))
 }
 
 /// Builds the public router and additionally registers `GET /metrics`
@@ -169,7 +171,13 @@ pub fn router() -> Router {
 ///     scrape from incrementing counters).
 #[inline]
 pub fn router_with_metrics(handle: PrometheusHandle) -> Router {
-    router().route(
+    router_with_metrics_and_limits(handle, Limits::default())
+}
+
+/// [`router_with_metrics`] with the given resource limits.
+#[inline]
+pub fn router_with_metrics_and_limits(handle: PrometheusHandle, limits: Limits) -> Router {
+    router_with_limits(limits).route(
         METRICS_ROUTE_PATH,
         axum::routing::get(metrics_handler(handle)),
     )

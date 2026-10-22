@@ -27,6 +27,19 @@ const MAX_XML_NODE_BYTES: u64 = 64 * 1024 * 1024;
 /// Error message surfaced when a single node exceeds [`MAX_XML_NODE_BYTES`].
 const NODE_LIMIT_MESSAGE: &str = "document.xml node exceeds the size limit (possible zip bomb)";
 
+/// Payload of the I/O error [`NodeCappedReader`] raises, so the cap can be
+/// recognised by type when quick-xml hands the error back, not by its text.
+#[derive(Debug)]
+struct NodeLimitExceeded;
+
+impl core::fmt::Display for NodeLimitExceeded {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(NODE_LIMIT_MESSAGE)
+    }
+}
+
+impl core::error::Error for NodeLimitExceeded {}
+
 /// A [`Read`] adapter that fails once more than `limit` bytes are read within the
 /// current window. [`reset_window`](Self::reset_window) is called before each XML
 /// token, so the limit applies *per node* rather than per document: a huge
@@ -63,7 +76,7 @@ where
         if self.read_in_window > self.limit {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                NODE_LIMIT_MESSAGE,
+                NodeLimitExceeded,
             ));
         }
         Ok(n)
@@ -131,9 +144,21 @@ impl core::fmt::Debug for XmlCursor {
     }
 }
 
+/// Whether an I/O error is the per-node cap, recognised by its payload type.
+fn is_node_limit(err: &std::io::Error) -> bool {
+    err.get_ref()
+        .is_some_and(<dyn core::error::Error + Send + Sync>::is::<NodeLimitExceeded>)
+}
+
 /// Converts a quick-xml failure into the crate error type, preserving I/O kind.
+///
+/// The per-node cap travels through quick-xml as an I/O error carrying a
+/// [`NodeLimitExceeded`] payload; it comes out as [`Error::Limit`].
 fn map_quick_xml_error(err: quick_xml::Error) -> Error {
     match err {
+        quick_xml::Error::Io(source) if is_node_limit(&source) => Error::Limit {
+            message: NODE_LIMIT_MESSAGE.to_owned(),
+        },
         quick_xml::Error::Io(source) => Error::Io {
             source: std::io::Error::new(source.kind(), source.to_string()),
         },

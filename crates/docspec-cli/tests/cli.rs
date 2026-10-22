@@ -885,6 +885,44 @@ mod tests {
         }
 
         #[test]
+        fn reader_cap_exits_65() {
+            let mut body = String::new();
+            for _ in 0..101 {
+                body.push_str("<w:tbl><w:tr><w:tc>");
+            }
+            body.push_str("<w:p><w:r><w:t>deep</w:t></w:r></w:p>");
+            for _ in 0..101 {
+                body.push_str("</w:tc></w:tr></w:tbl>");
+            }
+            let doc_xml = format!(
+                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{body}</w:body></w:document>"#
+            );
+            let docx = synth_docx(
+                r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+                &doc_xml,
+            );
+            let input = markdown_tempfile(&docx, ".docx");
+            docspec_cmd()
+                .args(["convert", input.path().to_str().unwrap()])
+                .assert()
+                .code(65)
+                .stderr(contains(
+                    "error: table nesting exceeds the depth limit of 100 (possible zip bomb)",
+                ));
+        }
+
+        #[cfg(feature = "http")]
+        #[test]
+        fn http_help_lists_the_limit_flags() {
+            docspec_cmd()
+                .args(["http", "--help"])
+                .assert()
+                .success()
+                .stdout(contains("--max-body-size <BYTES>"))
+                .stdout(contains("--conversion-timeout <SECONDS>"));
+        }
+
+        #[test]
         fn uncreatable_output_exits_73() {
             let input = markdown_tempfile(b"# Hi\n", ".md");
             docspec_cmd()

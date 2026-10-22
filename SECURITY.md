@@ -52,19 +52,35 @@ Document formats are attack surfaces. A malicious DOCX could try to exploit a ZI
 
 ## 4. Resource Limits
 
-Parsers and converters enforce resource bounds. Memory caps prevent a single large document from exhausting the process. Time limits prevent denial of service through documents designed to be slow to process.
+Limits exist where a document can make the process grow without bound. Each one fails fast with an error that names the limit, answers a specific HTTP status, and exits with a specific code on the command line. Nothing here is a suggestion: every row is enforced in code and pinned by a test.
 
-Specific bounds depend on the integration surface:
+### Always on
 
-- Inline assets (embedded images) are capped at a maximum size before streaming to output
-- Nested structure depth is limited (e.g., maximum table nesting, list nesting) to prevent stack exhaustion
-- Integrators can configure per-conversion timeouts and maximum input sizes
+| Limit | Value | Where | HTTP | CLI exit |
+| --- | --- | --- | --- | --- |
+| DOCX package part size (`_rels`, `styles.xml`, `numbering.xml`, `document.xml.rels`) | 64 MiB decompressed | `docspec-docx-reader` | `422` `resource-limit` | 65 |
+| DOCX `document.xml` single-node size | 64 MiB per node | `docspec-docx-reader` | `422` `resource-limit` | 65 |
+| DOCX table nesting depth | 100 | `docspec-docx-reader` | `422` `resource-limit` | 65 |
+| List nesting level | clamped to 8 (deeper levels are flattened, not rejected) | `docspec-docx-reader` | — | — |
 
-These limits exist in the implementation. They are not suggestions. They are enforced at the appropriate layer. The parser enforces nesting limits during processing. The converter tracks resource usage.
+The part and node caps stop compressed-size attacks (a 2 MB "zip bomb" that inflates to gigabytes) before the inflated bytes are held. The depth cap stops a 6 KB file from overflowing the stack.
 
-Resource limits protect against denial of service. A malicious user could upload a document designed to consume excessive memory or CPU. The limits prevent this. A document that exceeds limits fails fast with a clear error message. The server remains stable. Other requests are not affected.
+### Opt-in, configured per server
 
-The streaming architecture helps here. Because we process documents as streams rather than loading them whole, we can handle documents larger than available memory. But we still enforce limits. A document with a billion nested tables will hit the nesting limit and fail. This protects the stack and prevents infinite loops.
+| Limit | Flag | HTTP |
+| --- | --- | --- |
+| Request body size | `docspec http --max-body-size <BYTES>` | `413 Content Too Large`, before the body is buffered when `Content-Length` says so |
+| Conversion time | `docspec http --conversion-timeout <SECONDS>` | `503 Service Unavailable` with `Retry-After`; the conversion is stopped at its next event, in the worker thread, not merely abandoned |
+
+Both default to unlimited. An operator who exposes the server to untrusted callers should set both; the README's deployment notes say so.
+
+### Not bounded
+
+- The HTTP server holds the accepted request body and the whole conversion output in memory for the duration of a request. Memory per request is proportional to input plus output size.
+- A single wide DOCX table is read into the reader's event queue before its first event is yielded, so memory is proportional to the largest table (tracked as issue #415). The caps above bound its parts and depth, not its width.
+- There is no idle or read timeout at the HTTP layer; use a reverse proxy.
+
+The streaming architecture is what makes the rest of a document cost constant memory: events flow one at a time from reader to writer. The limits above exist for the places where a format lets one node, one part, one nesting chain or one table defeat that.
 
 ---
 

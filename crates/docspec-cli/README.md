@@ -62,6 +62,8 @@ Starts the HTTP API server. Listens on `127.0.0.1:3000` by default.
 
 - `--host <HOST>` — Address to bind the server to (default: `127.0.0.1`)
 - `--port <PORT>` — Port to listen on. Use `0` for OS-assigned (default: `3000`)
+- `--max-body-size <BYTES>` — Largest request body accepted; larger uploads get `413` (default: `0`, unlimited)
+- `--conversion-timeout <SECONDS>` — Longest a single conversion may run; slower ones get `503` (default: `0`, unlimited)
 - `-h, --help` — Print help
 
 ### Feature flags

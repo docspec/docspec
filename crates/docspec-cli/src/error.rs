@@ -197,6 +197,9 @@ mod tests {
             "io" => docspec_core::Error::Io {
                 source: io(ErrorKind::UnexpectedEof),
             },
+            "limit" => docspec_core::Error::Limit {
+                message: "too deep".to_owned(),
+            },
             _ => docspec_core::Error::InvalidSequence {
                 expected: "a".to_owned(),
                 found: "b".to_owned(),
@@ -211,6 +214,7 @@ mod tests {
         assert_eq!(CliError::Conversion(core_error("json")).exit_code(), 65);
         assert_eq!(CliError::Conversion(core_error("other")).exit_code(), 65);
         assert_eq!(CliError::Conversion(core_error("io")).exit_code(), 74);
+        assert_eq!(CliError::Conversion(core_error("limit")).exit_code(), 65);
         assert_eq!(
             CliError::Conversion(core_error("invalid_sequence")).exit_code(),
             70

@@ -3,13 +3,20 @@
 #[cfg(feature = "posthog")]
 mod analytics;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
 use axum::{
     body::{Body, Bytes},
+    extract::Extension,
     http::{header, HeaderMap, HeaderValue, Response, StatusCode},
     response::IntoResponse,
 };
 use docspec::{InputFormat, OutputFormat};
 use docspec_core::EventSource;
+
+use crate::server::Limits;
 
 use crate::{
     error::{HttpError, InputProblem},
@@ -70,19 +77,29 @@ pub async fn options_conversion() -> impl IntoResponse {
 /// conversion fails, or the response cannot be constructed.
 #[inline]
 pub async fn post_conversion(
-    request_id: Option<axum::extract::Extension<tower_http::request_id::RequestId>>,
+    request_id: Option<Extension<tower_http::request_id::RequestId>>,
+    limits: Option<Extension<Limits>>,
     headers: HeaderMap,
-    body: Bytes,
+    body: Body,
 ) -> Result<Response<Body>, HttpError> {
+    let limits = limits.map_or_else(Limits::default, |Extension(limits)| limits);
     let input_mime_label = crate::mime_parser::bucket_input_mime(headers.get(header::CONTENT_TYPE));
     let trace_id_owned: Option<String> = headers
         .get(axum::http::HeaderName::from_static("x-trace-id"))
         .and_then(|header_value| header_value.to_str().ok())
         .map(str::to_owned);
-    let body_len_for_logging = body.len();
 
-    let conversion_start = std::time::Instant::now();
-    let outcome = do_conversion(input_mime_label, headers, body).await;
+    let conversion_start = Instant::now();
+    let (outcome, body_len_for_logging) =
+        match read_body(&headers, body, limits.max_body_bytes).await {
+            Ok(body) => {
+                let body_len = body.len();
+                let outcome =
+                    do_conversion(input_mime_label, headers, body, limits.conversion_timeout).await;
+                (outcome, body_len)
+            }
+            Err(error) => (Err(error), 0),
+        };
     let conversion_duration = conversion_start.elapsed();
     let conversion_duration_secs = conversion_duration.as_secs_f64();
     let conversion_duration_ms =
@@ -169,15 +186,72 @@ pub async fn post_conversion(
 /// [`docspec_core::pipe`], which also finishes the sink, and classifies any
 /// failure by error kind.
 ///
+/// With a `timeout`, the stream is cut at the first event past the deadline
+/// and the failure is reported as [`HttpError::Timeout`] rather than
+/// classified: the document may be fine. Cutting inside the blocking thread
+/// is what actually stops the work; a timeout around the join handle would
+/// only abandon the result while the thread kept converting.
+///
 /// Generic over the source so tests can inject a stream the real readers never
 /// produce.
-fn run_conversion<R, W>(reader: R, sink: docspec::AnyWriter<W>) -> Result<(), HttpError>
+fn run_conversion<R, W>(
+    reader: R,
+    sink: docspec::AnyWriter<W>,
+    timeout: Option<Duration>,
+) -> Result<(), HttpError>
 where
     R: EventSource,
     W: std::io::Write,
 {
-    docspec_core::pipe(docspec_core::SkipEmptyBlocks::new(reader), sink)
-        .map_err(classify_conversion_error)
+    let expired = Arc::new(AtomicBool::new(false));
+    let reader = Deadline::new(reader, timeout, Arc::clone(&expired));
+    match docspec_core::pipe(docspec_core::SkipEmptyBlocks::new(reader), sink) {
+        Ok(()) => Ok(()),
+        Err(_) if expired.load(Ordering::Relaxed) => {
+            let limit = timeout.unwrap_or_default();
+            tracing::warn!(?limit, "conversion abandoned at the time limit");
+            Err(HttpError::Timeout { limit })
+        }
+        Err(error) => Err(classify_conversion_error(error)),
+    }
+}
+
+/// An [`EventSource`] that stops yielding once a deadline has passed.
+///
+/// Checked on every event, so a runaway conversion is cut at event
+/// granularity. Reader construction (package parts, styles, numbering) runs
+/// before the first event and is bounded by the reader's own caps instead.
+struct Deadline<S> {
+    inner: S,
+    cutoff: Option<Instant>,
+    expired: Arc<AtomicBool>,
+}
+
+impl<S> Deadline<S> {
+    fn new(inner: S, timeout: Option<Duration>, expired: Arc<AtomicBool>) -> Self {
+        let cutoff = timeout.map(|limit| {
+            Instant::now()
+                .checked_add(limit)
+                .unwrap_or_else(Instant::now)
+        });
+        Self {
+            inner,
+            cutoff,
+            expired,
+        }
+    }
+}
+
+impl<S: EventSource> EventSource for Deadline<S> {
+    fn next_event(&mut self) -> docspec_core::Result<Option<docspec_core::Event>> {
+        if self.cutoff.is_some_and(|cutoff| Instant::now() >= cutoff) {
+            self.expired.store(true, Ordering::Relaxed);
+            return Err(docspec_core::Error::Other {
+                message: "conversion exceeded the time limit".to_owned(),
+            });
+        }
+        self.inner.next_event()
+    }
 }
 
 /// Maps a conversion failure to an HTTP status by *what* failed, not by
@@ -201,6 +275,7 @@ fn classify_conversion_error(error: docspec_core::Error) -> HttpError {
         docspec_core::Error::Parse { .. } | docspec_core::Error::Json { .. } => {
             InputProblem::Malformed
         }
+        docspec_core::Error::Limit { .. } => InputProblem::Limit,
         _ => InputProblem::Unsupported,
     };
     HttpError::Unprocessable {
@@ -208,6 +283,55 @@ fn classify_conversion_error(error: docspec_core::Error) -> HttpError {
         kind,
     }
 }
+
+/// Buffers the request body, applying the configured size limit.
+///
+/// With a limit, a `Content-Length` over it is refused before any byte is
+/// read, and a chunked body is refused the moment it crosses the limit.
+/// Without one the whole body is buffered, as the README documents.
+async fn read_body(
+    headers: &HeaderMap,
+    body: Body,
+    max_body_bytes: Option<u64>,
+) -> Result<Bytes, HttpError> {
+    let declared = headers
+        .get(header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok());
+    if let (Some(limit), Some(length)) = (max_body_bytes, declared) {
+        if length > limit {
+            tracing::debug!(length, limit, "request body refused by Content-Length");
+            return Err(HttpError::ContentTooLarge { limit });
+        }
+    }
+    let cap = max_body_bytes.map_or(usize::MAX, |limit| {
+        usize::try_from(limit).unwrap_or(usize::MAX)
+    });
+    axum::body::to_bytes(body, cap).await.map_err(|error| {
+        let over_limit = error
+            .into_inner()
+            .downcast::<http_body_util::LengthLimitError>()
+            .is_ok();
+        if let (true, Some(limit)) = (over_limit, max_body_bytes) {
+            tracing::debug!(limit, "request body refused while streaming");
+            return HttpError::ContentTooLarge { limit };
+        }
+        tracing::warn!("request body could not be read");
+        HttpError::internal(BodyReadError)
+    })
+}
+
+/// The transport failed while the request body was being read.
+#[derive(Debug)]
+struct BodyReadError;
+
+impl core::fmt::Display for BodyReadError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("request body could not be read")
+    }
+}
+
+impl core::error::Error for BodyReadError {}
 
 /// Perform the actual validation and conversion without recording outcome metrics.
 ///
@@ -217,6 +341,7 @@ async fn do_conversion(
     input_mime_label: &'static str,
     headers: HeaderMap,
     body: Bytes,
+    conversion_timeout: Option<Duration>,
 ) -> Result<(Response<Body>, u64, OutputFormat), HttpError> {
     let input_format = mime_parser::validate_content_type(headers.get(header::CONTENT_TYPE))?;
     let output_format = mime_parser::negotiate_accept(headers.get(header::ACCEPT))?;
@@ -267,6 +392,7 @@ async fn do_conversion(
         run_conversion(
             reader,
             docspec::AnyWriter::new(output_format, &mut output_buffer),
+            conversion_timeout,
         )?;
 
         // Capture byte count before output_buffer is consumed by Body::from.
@@ -419,6 +545,20 @@ mod tests {
     }
 
     #[test]
+    fn limit_error_is_unprocessable_with_limit_kind() {
+        let error = Error::Limit {
+            message: "table nesting exceeds the depth limit of 100".to_owned(),
+        };
+        assert_eq!(
+            unprocessable(classify_conversion_error(error)),
+            (
+                InputProblem::Limit,
+                "table nesting exceeds the depth limit of 100".to_owned()
+            )
+        );
+    }
+
+    #[test]
     fn other_error_is_unprocessable_verbatim() {
         let error = Error::Other {
             message: "asset not found: rId9".to_owned(),
@@ -450,7 +590,11 @@ mod tests {
     fn reader_contract_violation_is_internal() {
         let mut out = Vec::new();
         let source = FakeSource::new(vec![start_document()], Some(invalid_sequence()));
-        let result = run_conversion(source, AnyWriter::new(OutputFormat::Blocknote, &mut out));
+        let result = run_conversion(
+            source,
+            AnyWriter::new(OutputFormat::Blocknote, &mut out),
+            None,
+        );
         assert!(matches!(result, Err(HttpError::Internal { .. })));
     }
 
@@ -464,7 +608,11 @@ mod tests {
                 position: None,
             }),
         );
-        let result = run_conversion(source, AnyWriter::new(OutputFormat::Blocknote, &mut out));
+        let result = run_conversion(
+            source,
+            AnyWriter::new(OutputFormat::Blocknote, &mut out),
+            None,
+        );
         assert_eq!(
             unprocessable(result.unwrap_err()),
             (
@@ -480,8 +628,48 @@ mod tests {
         // tracker inside AnyWriter is what detects the violation.
         let mut out = Vec::new();
         let source = FakeSource::new(vec![Event::EndParagraph], None);
-        let result = run_conversion(source, AnyWriter::new(OutputFormat::Blocknote, &mut out));
+        let result = run_conversion(
+            source,
+            AnyWriter::new(OutputFormat::Blocknote, &mut out),
+            None,
+        );
         assert!(matches!(result, Err(HttpError::Internal { .. })));
+    }
+
+    #[test]
+    fn zero_timeout_cuts_the_stream_at_the_first_event() {
+        let mut out = Vec::new();
+        let source = FakeSource::new(vec![start_document(), start_paragraph(), text("x")], None);
+        let result = run_conversion(
+            source,
+            AnyWriter::new(OutputFormat::Blocknote, &mut out),
+            Some(std::time::Duration::ZERO),
+        );
+        assert!(matches!(
+            result,
+            Err(HttpError::Timeout { limit }) if limit == std::time::Duration::ZERO
+        ));
+    }
+
+    #[test]
+    fn generous_timeout_leaves_a_valid_conversion_alone() {
+        let mut out = Vec::new();
+        let source = FakeSource::new(
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("x"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ],
+            None,
+        );
+        let result = run_conversion(
+            source,
+            AnyWriter::new(OutputFormat::Blocknote, &mut out),
+            Some(std::time::Duration::from_secs(3600)),
+        );
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -490,7 +678,11 @@ mod tests {
         // so the JSON emitter cannot finish. That is the input's fault.
         let mut out = Vec::new();
         let source = FakeSource::new(vec![start_document(), start_paragraph(), text("x")], None);
-        let result = run_conversion(source, AnyWriter::new(OutputFormat::Blocknote, &mut out));
+        let result = run_conversion(
+            source,
+            AnyWriter::new(OutputFormat::Blocknote, &mut out),
+            None,
+        );
         assert_eq!(
             unprocessable(result.unwrap_err()),
             (

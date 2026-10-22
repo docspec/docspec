@@ -1,13 +1,14 @@
 //! Error types for the HTTP server.
 
 use std::borrow::Cow;
+use std::time::Duration;
 
 use axum::{
     body::Body,
     extract::Request,
     http::{
-        header::{ALLOW, CONTENT_LENGTH, CONTENT_TYPE},
-        HeaderValue, StatusCode,
+        header::{ALLOW, CONTENT_LENGTH, CONTENT_TYPE, RETRY_AFTER},
+        HeaderName, HeaderValue, StatusCode,
     },
     middleware::Next,
     response::{IntoResponse, Response},
@@ -31,6 +32,12 @@ pub const PROBLEM_TYPE_MALFORMED_INPUT: &str = "https://problems.docspec.dev/mal
 pub const PROBLEM_TYPE_UNSUPPORTED_CONTENT: &str =
     "https://problems.docspec.dev/unsupported-content";
 
+/// `type` of a `422` whose document exceeds a resource bound of this build.
+pub const PROBLEM_TYPE_RESOURCE_LIMIT: &str = "https://problems.docspec.dev/resource-limit";
+
+/// `type` of a `503` whose conversion ran past the configured time limit.
+pub const PROBLEM_TYPE_CONVERSION_TIMEOUT: &str = "https://problems.docspec.dev/conversion-timeout";
+
 /// Why a document could not be converted; selects the `type` of a `422`.
 ///
 /// Chosen by `docspec_core::Error` kind, never by message text:
@@ -38,6 +45,7 @@ pub const PROBLEM_TYPE_UNSUPPORTED_CONTENT: &str =
 /// | Variant | Core error kinds | `type` |
 /// | --- | --- | --- |
 /// | [`Malformed`](Self::Malformed) | `Parse`, `Json` | [`PROBLEM_TYPE_MALFORMED_INPUT`] |
+/// | [`Limit`](Self::Limit) | `Limit` | [`PROBLEM_TYPE_RESOURCE_LIMIT`] |
 /// | [`Unsupported`](Self::Unsupported) | `Other`, `Io`, any future kind | [`PROBLEM_TYPE_UNSUPPORTED_CONTENT`] |
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -48,6 +56,9 @@ pub enum InputProblem {
     /// The document is well-formed but holds a dangling reference, a missing
     /// media part, or a value the output format cannot represent.
     Unsupported,
+    /// The document exceeds a resource bound of this build: a part, node or
+    /// nesting depth over its cap.
+    Limit,
 }
 
 impl InputProblem {
@@ -58,6 +69,7 @@ impl InputProblem {
         match self {
             Self::Malformed => PROBLEM_TYPE_MALFORMED_INPUT,
             Self::Unsupported => PROBLEM_TYPE_UNSUPPORTED_CONTENT,
+            Self::Limit => PROBLEM_TYPE_RESOURCE_LIMIT,
         }
     }
 }
@@ -160,9 +172,9 @@ impl ProblemJson {
 fn problem_response(
     problem: &ProblemJson,
     status: StatusCode,
-    allow: Option<&'static str>,
+    extra_header: Option<(HeaderName, HeaderValue)>,
 ) -> Response {
-    problem_response_from(problem.try_to_json_bytes(), status, allow)
+    problem_response_from(problem.try_to_json_bytes(), status, extra_header)
 }
 
 /// Builds the RFC 9457 response from an already-attempted serialization.
@@ -173,15 +185,13 @@ fn problem_response(
 fn problem_response_from(
     serialized: docspec_core::Result<Vec<u8>>,
     status: StatusCode,
-    allow: Option<&'static str>,
+    extra_header: Option<(HeaderName, HeaderValue)>,
 ) -> Response {
     let mut response = match serialized {
         Ok(body) => {
             let mut ok_response = (status, body).into_response();
-            if let Some(allowed) = allow {
-                ok_response
-                    .headers_mut()
-                    .insert(ALLOW, HeaderValue::from_static(allowed));
+            if let Some((name, value)) = extra_header {
+                ok_response.headers_mut().insert(name, value);
             }
             ok_response
         }
@@ -212,6 +222,16 @@ pub enum HttpError {
     ///
     /// → HTTP 400 Bad Request.
     BodyNotUtf8,
+    /// The request body exceeds the configured size limit.
+    ///
+    /// Raised before the body is buffered when `Content-Length` says so, and
+    /// as soon as the limit is crossed otherwise.
+    ///
+    /// → HTTP 413 Content Too Large.
+    ContentTooLarge {
+        /// The configured limit, in bytes.
+        limit: u64,
+    },
     /// The request body was empty (`Content-Length: 0` or no body).
     ///
     /// → HTTP 400 Bad Request.
@@ -244,6 +264,16 @@ pub enum HttpError {
     ///
     /// → HTTP 406 Not Acceptable.
     NotAcceptable,
+    /// The conversion ran past the configured time limit and was abandoned.
+    ///
+    /// The server stopped the conversion at the next event; the document may
+    /// well be valid. The response carries `Retry-After` (RFC 9110 §10.2.3).
+    ///
+    /// → HTTP 503 Service Unavailable.
+    Timeout {
+        /// The configured limit.
+        limit: Duration,
+    },
     /// No route matches the requested method + path.
     ///
     /// → HTTP 404 Not Found.
@@ -324,7 +354,12 @@ fn capture_error_telemetry(
     detail: &str,
     source: Option<&(dyn core::error::Error + Send + Sync + 'static)>,
 ) {
-    if status != StatusCode::INTERNAL_SERVER_ERROR && status != StatusCode::UNPROCESSABLE_ENTITY {
+    if !matches!(
+        status,
+        StatusCode::INTERNAL_SERVER_ERROR
+            | StatusCode::UNPROCESSABLE_ENTITY
+            | StatusCode::SERVICE_UNAVAILABLE
+    ) {
         return;
     }
 
@@ -370,14 +405,15 @@ impl IntoResponse for HttpError {
 
         let type_uri = match &self {
             Self::Unprocessable { kind, .. } => kind.type_uri(),
+            Self::Timeout { .. } => PROBLEM_TYPE_CONVERSION_TIMEOUT,
             _ => "about:blank",
         };
 
-        let (status, title, detail, allow): (
+        let (status, title, detail, extra_header): (
             StatusCode,
             &'static str,
             Cow<'static, str>,
-            Option<&'static str>,
+            Option<(HeaderName, HeaderValue)>,
         ) = match self {
             Self::EmptyBody => (
                 StatusCode::BAD_REQUEST,
@@ -401,7 +437,19 @@ impl IntoResponse for HttpError {
                 StatusCode::METHOD_NOT_ALLOWED,
                 "Method Not Allowed",
                 Cow::Owned(format!("Method not allowed. Allowed methods: {allowed}.")),
-                Some(allowed),
+                Some((ALLOW, HeaderValue::from_static(allowed))),
+            ),
+            Self::ContentTooLarge { limit } => (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "Content Too Large",
+                Cow::Owned(format!("Request body exceeds the {limit}-byte limit")),
+                None,
+            ),
+            Self::Timeout { limit } => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Service Unavailable",
+                Cow::Owned(timeout_detail(limit)),
+                Some((RETRY_AFTER, HeaderValue::from(retry_after_seconds(limit)))),
             ),
             Self::NotAcceptable => (
                 StatusCode::NOT_ACCEPTABLE,
@@ -450,11 +498,30 @@ impl IntoResponse for HttpError {
             title,
             type_uri,
         };
-        let mut response = problem_response(&problem, status, allow);
+        let mut response = problem_response(&problem, status, extra_header);
         // Kept for `attach_problem_instance`, which knows the request id.
         response.extensions_mut().insert(problem);
         response
     }
+}
+
+/// The `detail` of a conversion timeout, shared by the response and telemetry.
+fn timeout_detail(limit: Duration) -> String {
+    let seconds = retry_after_seconds(limit);
+    format!("Conversion exceeded the {seconds}-second limit and was abandoned")
+}
+
+/// `Retry-After` delay-seconds for a conversion timeout: the limit rounded up
+/// to whole seconds, at least 1 (RFC 9110 §10.2.3 takes a non-negative
+/// integer, and `0` would tell the client to hammer the server).
+fn retry_after_seconds(limit: Duration) -> u64 {
+    let whole = limit.as_secs();
+    let rounded = if limit.subsec_nanos() > 0 {
+        whole.saturating_add(1)
+    } else {
+        whole
+    };
+    rounded.max(1)
 }
 
 /// Router middleware that fills `instance` on problem responses.
@@ -506,8 +573,10 @@ impl HttpError {
     pub fn error_class(&self) -> &'static str {
         match self {
             Self::BodyNotUtf8 => "body_not_utf8",
+            Self::ContentTooLarge { .. } => "content_too_large",
             Self::EmptyBody => "empty_body",
             Self::Internal { .. } => "internal",
+            Self::Timeout { .. } => "conversion_timeout",
             Self::MethodNotAllowed { .. } => "method_not_allowed",
             Self::NotAcceptable => "not_acceptable",
             Self::NotFound { .. } => "not_found",
@@ -523,13 +592,14 @@ impl HttpError {
         use crate::metrics::{RESULT_CLIENT_ERROR, RESULT_SERVER_ERROR};
         match self {
             Self::BodyNotUtf8
+            | Self::ContentTooLarge { .. }
             | Self::EmptyBody
             | Self::MethodNotAllowed { .. }
             | Self::NotAcceptable
             | Self::NotFound { .. }
             | Self::Unprocessable { .. }
             | Self::UnsupportedMediaType { .. } => RESULT_CLIENT_ERROR,
-            Self::Internal { .. } => RESULT_SERVER_ERROR,
+            Self::Internal { .. } | Self::Timeout { .. } => RESULT_SERVER_ERROR,
         }
     }
 
@@ -564,7 +634,15 @@ impl HttpError {
             Self::Unprocessable { detail, .. } => {
                 capture_error_telemetry(StatusCode::UNPROCESSABLE_ENTITY, detail.as_str(), None);
             }
+            Self::Timeout { limit } => {
+                capture_error_telemetry(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    &timeout_detail(*limit),
+                    None,
+                );
+            }
             Self::BodyNotUtf8
+            | Self::ContentTooLarge { .. }
             | Self::EmptyBody
             | Self::MethodNotAllowed { .. }
             | Self::NotAcceptable
@@ -646,7 +724,7 @@ mod tests {
         let response = problem_response_from(
             Err(serialization_error()),
             StatusCode::METHOD_NOT_ALLOWED,
-            Some("POST, OPTIONS"),
+            Some((ALLOW, HeaderValue::from_static("POST, OPTIONS"))),
         );
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
@@ -817,8 +895,13 @@ mod tests {
             InputProblem::Unsupported.type_uri(),
             "https://problems.docspec.dev/unsupported-content"
         );
+        assert_eq!(
+            InputProblem::Limit.type_uri(),
+            "https://problems.docspec.dev/resource-limit"
+        );
         assert!(PROBLEM_TYPE_MALFORMED_INPUT.starts_with(PROBLEM_TYPE_BASE));
         assert!(PROBLEM_TYPE_UNSUPPORTED_CONTENT.starts_with(PROBLEM_TYPE_BASE));
+        assert!(PROBLEM_TYPE_RESOURCE_LIMIT.starts_with(PROBLEM_TYPE_BASE));
     }
 
     #[tokio::test]
@@ -992,6 +1075,49 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(bytes.as_ref(), b"fine");
+    }
+
+    #[tokio::test]
+    async fn content_too_large_problem_body_is_exact() {
+        let error = HttpError::ContentTooLarge { limit: 1024 };
+        assert_eq!(error.error_class(), "content_too_large");
+        assert_eq!(error.result_class(), "client_error");
+        let response = error.into_response();
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(
+            bytes.as_ref(),
+            br#"{"type":"about:blank","title":"Content Too Large","status":413,"detail":"Request body exceeds the 1024-byte limit"}"#
+        );
+    }
+
+    #[tokio::test]
+    async fn timeout_problem_body_has_retry_after_and_type() {
+        let error = HttpError::Timeout {
+            limit: Duration::from_millis(1500),
+        };
+        assert_eq!(error.error_class(), "conversion_timeout");
+        assert_eq!(error.result_class(), "server_error");
+        let response = error.into_response();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers().get(RETRY_AFTER).unwrap(), "2");
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(
+            bytes.as_ref(),
+            br#"{"type":"https://problems.docspec.dev/conversion-timeout","title":"Service Unavailable","status":503,"detail":"Conversion exceeded the 2-second limit and was abandoned"}"#
+        );
+    }
+
+    #[test]
+    fn retry_after_rounds_up_and_is_at_least_one_second() {
+        assert_eq!(retry_after_seconds(Duration::ZERO), 1);
+        assert_eq!(retry_after_seconds(Duration::from_millis(1)), 1);
+        assert_eq!(retry_after_seconds(Duration::from_secs(5)), 5);
+        assert_eq!(retry_after_seconds(Duration::from_millis(5001)), 6);
     }
 
     #[tokio::test]
