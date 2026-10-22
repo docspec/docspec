@@ -265,6 +265,45 @@ fn embed_wins_over_link() {
 }
 
 #[test]
+fn embed_with_parent_segment_resolves_into_package_root() {
+    let rels = doc_rels(&format!(
+        r#"<Relationship Id="rId4" Type="{IMAGE_REL_TYPE}" Target="../media/embed.png"/>"#
+    ));
+    let drawing = inline_pic(r#"<a:blip r:embed="rId4"/>"#);
+    let doc = drawing_doc(&drawing);
+    let bytes = build_docx(&rels, &doc);
+    let mut reader = DocxReader::from_reader(Cursor::new(bytes)).expect("from_reader");
+    assert_eq!(
+        drive(&mut reader),
+        vec![
+            start_doc(),
+            start_para(),
+            image_event(asset_source("zip://media/embed.png"), None),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]
+    );
+}
+
+#[test]
+fn embed_escaping_package_root_is_rejected() {
+    let rels = doc_rels(&format!(
+        r#"<Relationship Id="rId4" Type="{IMAGE_REL_TYPE}" Target="../../../etc/passwd"/>"#
+    ));
+    let doc = drawing_doc(&inline_pic(r#"<a:blip r:embed="rId4"/>"#));
+    match DocxReader::from_reader(Cursor::new(build_docx(&rels, &doc))) {
+        Err(docspec_core::Error::Parse { message, position }) => {
+            assert_eq!(
+                message,
+                "rels target escapes package root: word/../../../etc/passwd"
+            );
+            assert_eq!(position, None);
+        }
+        other => panic!("expected Error::Parse, got: {other:?}"),
+    }
+}
+
+#[test]
 fn pict_without_imagedata_emits_nothing() {
     let rels = doc_rels("");
     let doc = r#"<?xml version="1.0" encoding="UTF-8"?>

@@ -5,9 +5,9 @@ expression: from_reader_snapshot
 ReaderFixtureSnapshot {
   events: [
     StartDocument { id: None, language: None, metadata: None },
-    StartParagraph { alignment: None, id: None },
+    StartHeading { id: None, level: 1 },
     Text { content: "Test" },
-    EndParagraph,
+    EndHeading,
     StartParagraph { alignment: None, id: None },
     EndParagraph,
     StartParagraph { alignment: None, id: None },
