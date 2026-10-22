@@ -472,6 +472,9 @@ pub(crate) async fn attach_problem_instance(request: Request, next: Next) -> Res
         .extensions()
         .get::<RequestId>()
         .and_then(|id| id.header_value().to_str().ok())
+        // `parse_str` also takes simple, braced and URN forms. Only the
+        // 36-character hyphenated form names the same id as the header.
+        .filter(|id| id.len() == 36)
         .and_then(|id| uuid::Uuid::parse_str(id).ok())
         .map(|uuid| format!("urn:uuid:{}", uuid.hyphenated()));
 
@@ -944,6 +947,23 @@ mod tests {
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(json["instance"], format!("urn:uuid:{header}"));
+    }
+
+    #[tokio::test]
+    async fn middleware_omits_instance_for_a_non_hyphenated_uuid_request_id() {
+        for id in [
+            "0f8fad5bd9cb469fa16570867728950e",
+            "{0f8fad5b-d9cb-469f-a165-70867728950e}",
+            "urn:uuid:0f8fad5b-d9cb-469f-a165-70867728950e",
+        ] {
+            let response = send(instance_router(), "/problem", Some(id)).await;
+            assert_eq!(response.headers().get("x-request-id").unwrap(), id);
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            assert!(json.get("instance").is_none(), "instance set for {id}");
+        }
     }
 
     #[tokio::test]
