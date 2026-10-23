@@ -47,7 +47,7 @@ docspec convert [OPTIONS] [INPUT]
 - `-o, --output <FILE>` — Output file (stdout if omitted)
 - `-f, --from <FORMAT>` — Input format (auto-detected from extension if omitted). Valid values: `markdown`, `html`, `docx`
 - `-t, --to <FORMAT>` — Output format (auto-detected from extension if omitted). Valid values: `blocknote`, `html`, `markdown`, `oxa`, `pandoc-native`
-- `--color <WHEN>` — When to use colors: `auto`, `always`, `never` (default: `auto`)
+- `--color <WHEN>` — When to use colors: `auto`, `always`, `never` (default: `auto`). `always` and `never` override `NO_COLOR`; `auto` disables color when `NO_COLOR` is set to a non-empty value or stderr is not a terminal
 - `-h, --help` — Print help
 
 ### `http` subcommand
