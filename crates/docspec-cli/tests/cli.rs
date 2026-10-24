@@ -123,7 +123,7 @@ mod tests {
                 "blocknote",
             ])
             .assert()
-            .failure()
+            .code(66)
             .stderr(contains("\x1b["));
     }
 
@@ -139,7 +139,7 @@ mod tests {
                 "blocknote",
             ])
             .assert()
-            .failure()
+            .code(66)
             .stderr(contains("\x1b[").not());
     }
 
@@ -350,7 +350,7 @@ mod tests {
     }
 
     #[test]
-    fn missing_input_file_exits_1() {
+    fn missing_input_file_exits_66() {
         docspec_cmd()
             .args([
                 "convert",
@@ -359,9 +359,10 @@ mod tests {
                 "blocknote",
             ])
             .assert()
-            .failure()
-            .code(1)
-            .stderr(contains("error:"));
+            .code(66)
+            .stderr(contains(
+                "error: cannot read input `/tmp/nonexistent-docspec-test-file-xyz.md`: ",
+            ));
     }
 
     #[test]
@@ -375,7 +376,7 @@ mod tests {
                 "blocknote",
             ])
             .assert()
-            .failure()
+            .code(66)
             .stderr(contains("\x1b[").not());
     }
 
@@ -448,16 +449,17 @@ mod tests {
     }
 
     #[test]
-    fn same_input_output_exits_1() {
+    fn same_input_output_exits_2() {
         let input = markdown_tempfile(b"# Test\n", ".md");
         let path_str = input.path().to_str().unwrap_or("");
 
         docspec_cmd()
             .args(["convert", path_str, "-o", path_str])
             .assert()
-            .failure()
-            .code(1)
-            .stderr(contains("error:"));
+            .code(2)
+            .stderr(contains(
+                "error: input and output paths refer to the same file",
+            ));
     }
 
     #[test]
@@ -474,7 +476,7 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_input_format_exits_1() {
+    fn unsupported_input_format_exits_2() {
         let input = markdown_tempfile(b"[]", ".json");
 
         docspec_cmd()
@@ -482,9 +484,8 @@ mod tests {
             .arg(input.path())
             .args(["-t", "blocknote"])
             .assert()
-            .failure()
-            .code(1)
-            .stderr(contains("error:"));
+            .code(2)
+            .stderr(contains("error: cannot detect input format: use --from"));
     }
 
     #[test]
@@ -590,8 +591,7 @@ mod tests {
         docspec_cmd()
             .args(["convert", "--to", "markdown", "x.md"])
             .assert()
-            .failure()
-            .code(1)
+            .code(66)
             .stderr(contains("No such file or directory"));
     }
 
@@ -863,5 +863,89 @@ mod tests {
             url.starts_with("data:image/png;base64,"),
             "expected data URI starting with 'data:image/png;base64,', got: {url:?}"
         );
+    }
+
+    mod exit_codes {
+        use super::*;
+
+        #[test]
+        fn malformed_input_exits_65() {
+            let truncated = synth_docx(
+                r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+                r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>whole</w:t></w:r></w:p>"#,
+            );
+            let input = markdown_tempfile(&truncated, ".docx");
+            docspec_cmd()
+                .args(["convert", input.path().to_str().unwrap()])
+                .assert()
+                .code(65)
+                .stderr(contains(
+                    "error: parse error: malformed document.xml: unexpected EOF inside <w:body>",
+                ));
+        }
+
+        #[test]
+        fn uncreatable_output_exits_73() {
+            let input = markdown_tempfile(b"# Hi\n", ".md");
+            docspec_cmd()
+                .args([
+                    "convert",
+                    input.path().to_str().unwrap(),
+                    "-o",
+                    "/nonexistent-docspec-dir/out.json",
+                ])
+                .assert()
+                .code(73)
+                .stderr(contains(
+                    "error: cannot create output `/nonexistent-docspec-dir/out.json`: ",
+                ));
+        }
+
+        #[cfg(target_os = "linux")]
+        #[test]
+        fn write_failure_exits_74() {
+            let input = markdown_tempfile(b"# Hi\n", ".md");
+            docspec_cmd()
+                .args(["convert", input.path().to_str().unwrap(), "-o", "/dev/full"])
+                .assert()
+                .code(74);
+        }
+
+        #[test]
+        fn undetectable_format_from_stdin_exits_2() {
+            docspec_cmd()
+                .args(["convert", "-"])
+                .write_stdin("# Hi\n")
+                .assert()
+                .code(2)
+                .stderr(contains("error: cannot detect input format: use --from"));
+        }
+
+        #[test]
+        fn clap_usage_error_exits_2() {
+            docspec_cmd().args(["convert", "--bogus"]).assert().code(2);
+        }
+
+        #[test]
+        fn help_exits_0_and_lists_exit_codes() {
+            docspec_cmd()
+                .arg("--help")
+                .assert()
+                .success()
+                .stdout(contains("Exit status:"))
+                .stdout(contains("66  the input file does not exist"));
+        }
+
+        #[cfg(feature = "http")]
+        #[test]
+        fn http_address_in_use_exits_69() {
+            let holder = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let port = holder.local_addr().unwrap().port().to_string();
+            docspec_cmd()
+                .args(["http", "--host", "127.0.0.1", "--port", &port])
+                .assert()
+                .code(69);
+            drop(holder);
+        }
     }
 }

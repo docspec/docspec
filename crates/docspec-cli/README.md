@@ -162,9 +162,22 @@ by `--to markdown` or auto-detected from `.md` output paths.
 
 ## Exit status
 
-- `0` — command completed successfully
-- `1` — conversion, I/O, or server runtime failure
-- `2` — command-line usage or argument parsing error
+One code has one meaning, so a script can branch on `$?` without parsing stderr. Codes above 2 are from `<sysexits.h>`; 2 is kept for usage errors because that is what clap and most shells use, so clap's own parse errors and DocSpec's share a code.
+
+| Code | Name | Meaning |
+| --- | --- | --- |
+| 0 | `EX_OK` | Command completed successfully |
+| 2 | usage | Command used incorrectly: unknown flag or value, missing subcommand, input format not given and not detectable, input and output are the same file |
+| 65 | `EX_DATAERR` | The input document is malformed or holds something that cannot be converted (the HTTP server answers 422 for the same cases) |
+| 66 | `EX_NOINPUT` | The input file does not exist |
+| 69 | `EX_UNAVAILABLE` | `docspec http` cannot listen: address already in use or not available |
+| 70 | `EX_SOFTWARE` | Internal DocSpec error, such as a reader violating the event contract (the HTTP server answers 500) |
+| 71 | `EX_OSERR` | The operating system refused a resource: runtime or socket creation failed |
+| 73 | `EX_CANTCREAT` | The output file cannot be created |
+| 74 | `EX_IOERR` | I/O failed while reading the input or writing the output |
+| 77 | `EX_NOPERM` | Permission denied on the input, the output, or the listen port |
+
+Rust panics exit with 101, as every Rust program does.
 
 ## Related
 

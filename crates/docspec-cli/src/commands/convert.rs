@@ -48,7 +48,15 @@ pub fn run(args: ConvertArgs) -> Result<()> {
     let output_format = format::resolve_output_format(to, output_path.as_deref());
 
     let reader: AnyReader = match input_path.as_ref() {
-        Some(path) if path.as_os_str() != "-" => AnyReader::from_path(input_format, path)?,
+        Some(path) if path.as_os_str() != "-" => {
+            // The reader reports an unopenable file as a generic I/O error;
+            // check first so a missing input exits with EX_NOINPUT.
+            std::fs::metadata(path).map_err(|source| CliError::InputUnreadable {
+                path: path.clone(),
+                source,
+            })?;
+            AnyReader::from_path(input_format, path)?
+        }
         _ => {
             let mut buf = Vec::new();
             std::io::stdin().lock().read_to_end(&mut buf)?;
@@ -63,7 +71,11 @@ pub fn run(args: ConvertArgs) -> Result<()> {
             write_cli_terminating_newline(&mut stdout)
         }
         Some(path) => {
-            let mut writer = BufWriter::new(File::create(path)?);
+            let file = File::create(path).map_err(|source| CliError::OutputUnwritable {
+                path: path.clone(),
+                source,
+            })?;
+            let mut writer = BufWriter::new(file);
             run_pipeline(reader, output_format, &mut writer)?;
             write_cli_terminating_newline(&mut writer)?;
             writer.flush()?;
