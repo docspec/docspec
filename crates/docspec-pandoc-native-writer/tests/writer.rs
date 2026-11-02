@@ -1583,4 +1583,215 @@ mod tests {
             "[Para [Code (\"\",[],[]) \"a\\nb c\"]]"
         );
     }
+
+    /// A `Write` whose bytes stay readable while the writer under test owns a
+    /// clone, so a test can see what was written before a block ends.
+    #[derive(Clone, Default)]
+    struct SharedBuffer(std::rc::Rc<std::cell::RefCell<Vec<u8>>>);
+
+    impl std::io::Write for SharedBuffer {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.borrow_mut().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl SharedBuffer {
+        fn contents(&self) -> String {
+            String::from_utf8(self.0.borrow().clone()).unwrap()
+        }
+    }
+
+    #[test]
+    fn code_block_is_written_before_end_preformatted() {
+        let out = SharedBuffer::default();
+        let mut writer = PandocNativeWriter::new(out.clone());
+        for event in [
+            start_document(),
+            start_pre(Some("c1"), Some("rust")),
+            text("fn main() {"),
+            Event::LineBreak,
+        ] {
+            writer.handle_event(event).unwrap();
+        }
+        assert_eq!(
+            out.contents(),
+            "[CodeBlock (\"c1\",[\"rust\"],[]) \"fn main() {\\n"
+        );
+        for event in [text("}"), Event::EndPreformatted, Event::EndDocument] {
+            writer.handle_event(event).unwrap();
+        }
+        writer.finish().unwrap();
+        assert_eq!(
+            out.contents(),
+            "[CodeBlock (\"c1\",[\"rust\"],[]) \"fn main() {\\n}\"]"
+        );
+    }
+
+    #[test]
+    fn inline_code_is_written_before_its_end_text_style() {
+        let out = SharedBuffer::default();
+        let mut writer = PandocNativeWriter::new(out.clone());
+        for event in [
+            start_document(),
+            start_paragraph(),
+            text("run "),
+            start_style(docspec_core::TextStyleKind::Code),
+            text("cargo"),
+        ] {
+            writer.handle_event(event).unwrap();
+        }
+        assert_eq!(
+            out.contents(),
+            "[Para [Str \"run \",Code (\"\",[],[]) \"cargo"
+        );
+        for event in [
+            text(" test"),
+            Event::EndTextStyle,
+            Event::EndParagraph,
+            Event::EndDocument,
+        ] {
+            writer.handle_event(event).unwrap();
+        }
+        writer.finish().unwrap();
+        assert_eq!(
+            out.contents(),
+            "[Para [Str \"run \",Code (\"\",[],[]) \"cargo test\"]]"
+        );
+    }
+
+    #[test]
+    fn large_code_block_streams_every_chunk_as_it_arrives() {
+        const CHUNK: &str = "0123456789abcdef";
+        const CHUNKS: usize = 4096;
+        const HEADER: &str = "[CodeBlock (\"\",[],[]) \"";
+        let out = SharedBuffer::default();
+        let mut writer = PandocNativeWriter::new(out.clone());
+        writer.handle_event(start_document()).unwrap();
+        writer.handle_event(start_pre(None, None)).unwrap();
+        for _ in 0..CHUNKS {
+            writer.handle_event(text(CHUNK)).unwrap();
+        }
+        // Every byte of the 64 KiB block is already out before the block ends.
+        assert_eq!(out.contents().len(), HEADER.len() + CHUNK.len() * CHUNKS);
+        writer.handle_event(Event::EndPreformatted).unwrap();
+        writer.handle_event(Event::EndDocument).unwrap();
+        writer.finish().unwrap();
+        assert_eq!(
+            out.contents(),
+            format!("{HEADER}{}\"]", CHUNK.repeat(CHUNKS))
+        );
+    }
+
+    #[test]
+    fn gap_escape_so_carries_across_text_events_in_code_block() {
+        assert_eq!(
+            run([
+                start_document(),
+                start_pre(None, None),
+                text("\x0E"),
+                text("H"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"\",[],[]) \"\\SO\\&H\"]"
+        );
+    }
+
+    #[test]
+    fn gap_escape_decimal_carries_across_text_events_in_code_block() {
+        assert_eq!(
+            run([
+                start_document(),
+                start_pre(None, None),
+                text("\x16"),
+                text("9"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"\",[],[]) \"\\22\\&9\"]"
+        );
+    }
+
+    #[test]
+    fn gap_escape_decimal_carries_across_text_events_in_inline_code() {
+        assert_eq!(
+            run([
+                start_document(),
+                start_paragraph(),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("\x01"),
+                text("5"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Code (\"\",[],[]) \"\\1\\&5\"]]"
+        );
+    }
+
+    #[test]
+    fn no_gap_escape_when_break_follows_so_in_code_block() {
+        assert_eq!(
+            run([
+                start_document(),
+                start_pre(None, None),
+                text("\x0E"),
+                Event::LineBreak,
+                text("H"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"\",[],[]) \"\\SO\\nH\"]"
+        );
+    }
+
+    #[test]
+    fn no_gap_escape_when_code_block_ends_after_so() {
+        assert_eq!(
+            run([
+                start_document(),
+                start_pre(None, None),
+                text("\x0E"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"\",[],[]) \"\\SO\"]"
+        );
+    }
+
+    #[test]
+    fn write_error_surfaces_at_start_preformatted() {
+        // One write succeeds (the document's "["); opening the code block fails.
+        let mut writer = PandocNativeWriter::new(FailingWriter::new(1));
+        writer.handle_event(start_document()).unwrap();
+        match writer.handle_event(start_pre(None, None)) {
+            Err(docspec_core::Error::Io { source }) => {
+                assert_eq!(source.kind(), std::io::ErrorKind::Other);
+                assert_eq!(source.to_string(), "simulated write failure");
+            }
+            other => panic!("expected Error::Io, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn write_error_surfaces_at_start_of_inline_code() {
+        // Six writes succeed: "[", "Para [", then `Str `, `"`, `a`, `"`. Opening
+        // the inline code (its "," separator first) fails.
+        let mut writer = PandocNativeWriter::new(FailingWriter::new(6));
+        for event in [start_document(), start_paragraph(), text("a")] {
+            writer.handle_event(event).unwrap();
+        }
+        match writer.handle_event(start_style(docspec_core::TextStyleKind::Code)) {
+            Err(docspec_core::Error::Io { source }) => {
+                assert_eq!(source.kind(), std::io::ErrorKind::Other);
+                assert_eq!(source.to_string(), "simulated write failure");
+            }
+            other => panic!("expected Error::Io, got: {other:?}"),
+        }
+    }
 }
