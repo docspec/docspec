@@ -95,7 +95,7 @@ Formats carry one of two statuses:
 | **Writes** | BlockNote JSON   | **Supported**    | Headings, lists, tables, links, images, styles, quotes, code       |
 | **Writes** | Pandoc native    | *Experimental*   | Paragraphs, headings, styles, code; no lists, tables, links, images |
 | **Writes** | Markdown         | *Experimental*   | Paragraphs and headings, text only                                 |
-| **Writes** | HTML             | *Experimental*   | Paragraphs and text only                                           |
+| **Writes** | HTML             | *Experimental*   | Paragraphs, code blocks and text                                   |
 | **Writes** | oxa.dev JSON     | *Experimental*   | Paragraphs and text only                                           |
 
 This table is the canonical statement of format maturity. Each crate's README remains the

@@ -47,16 +47,23 @@ rather than hand-writing events.
 
 ## What it handles today
 
-Handled: `StartDocument`, `EndDocument`, `StartParagraph`, `EndParagraph`, and `Text`
-while a paragraph is open. Text is escaped for `&`, `<`, and `>`.
+Handled: `StartDocument`, `EndDocument`, `StartParagraph`, `EndParagraph`,
+`StartPreformatted`, `EndPreformatted`, and `Text` while a paragraph or preformatted
+block is open. Text is escaped for `&`, `<`, and `>`.
+
+A preformatted block becomes `<pre><code>…</code></pre>`. When `StartPreformatted`
+carries a `syntax`, `<code>` gets `class="language-{syntax}"` (the attribute value is
+escaped). Inside the block, text keeps its whitespace and newlines, and `LineBreak` and
+`SoftBreak` each become a newline. The code is written as it arrives, never held back.
+Block ids are not written, for code blocks as for paragraphs.
 
 Silently ignored: `StartBlockQuote`/`EndBlockQuote`, `StartCaption`/`EndCaption`, every
 definition-list event, `StartFootnote`/`EndFootnote`/`FootnoteRef`,
-`StartHeading`/`EndHeading`, `StartLink`/`EndLink`, both list-item pairs,
-`StartPreformatted`/`EndPreformatted`, every table event,
-`StartTextStyle`/`EndTextStyle`, `Image`, `LineBreak`, `SoftBreak`, and
-`ThematicBreak`. `Text` outside a paragraph is also ignored. An open paragraph is closed
-automatically on `EndDocument`.
+`StartHeading`/`EndHeading`, `StartLink`/`EndLink`, both list-item pairs, every table
+event, `StartTextStyle`/`EndTextStyle`, `Image`, `ThematicBreak`, and `LineBreak` and
+`SoftBreak` outside a preformatted block. `Text` outside a paragraph or preformatted
+block is also ignored, as is a block that starts while another is still open. An open
+paragraph or preformatted block is closed automatically on `EndDocument`.
 
 ## Related
 

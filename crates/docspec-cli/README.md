@@ -94,12 +94,12 @@ content is missing from the output.
 - `blocknote` — **Supported.** Headings, lists, tables, links, images, styles, block quotes, code
 - `pandoc-native` — *Experimental.* Paragraphs, headings, text styles and code blocks; lists, tables, links and images are dropped
 - `markdown` — *Experimental.* Paragraphs and headings only, text only
-- `html` — *Experimental.* Paragraphs and text only; headings, lists, tables, links and images are dropped
+- `html` — *Experimental.* Paragraphs, code blocks and text; headings, lists, tables, links and images are dropped
 - `oxa` — *Experimental.* Paragraphs and text only; headings, lists, tables, links and images are dropped
 
 > **Worked example.** `echo '# Foo' | docspec convert --from markdown --to html` prints
 > `<html><body></body></html>` — the heading is dropped, and its text with it, because the
-> HTML writer only emits text inside a paragraph.
+> HTML writer only emits text inside a paragraph or code block.
 
 See the [format matrix](https://github.com/docspec/docspec/blob/main/README.md#what-it-reads-and-writes)
 for the canonical status of every format.
