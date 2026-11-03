@@ -12,6 +12,27 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [2.0.0-rc.1](https://github.com/docspec/docspec/compare/v1.21.11...v2.0.0-rc.1) - 2026-11-03
+
+### Added
+
+- *(http)* [**breaking**] add RFC 9457 problem types and the request id as instance
+- *(cli)* [**breaking**] map errors to sysexits exit codes
+
+### Fixed
+
+- *(docx-reader)* one path rule for rels targets, parsed in a single pass
+- *(pandoc-native-writer)* keep line breaks inside code blocks
+- *(http)* set problem instance only for hyphenated UUID request ids
+- *(http)* drop redundant variant from wildcard match arm
+- *(http)* [**breaking**] use RFC 9110 phrase for 422 and drop charset from JSON media types
+- *(cli)* exit by I/O kind for unreadable input and list codes in convert --help
+
+### Other
+
+- *(security)* list exactly the resource limits that exist
+- Merge pull request #494 from docspec/feat/487-cli-exit-codes
+
 ## [1.21.11](https://github.com/docspec/docspec/compare/v1.21.10...v1.21.11) - 2026-10-21
 
 ### Fixed
