@@ -673,6 +673,25 @@ mod tests {
     }
 
     #[test]
+    fn convert_docx_code_block_to_pandoc_native_keeps_line_breaks() {
+        // Same code string as Pandoc's own DOCX reader on this fixture (#476).
+        let fixture = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/docx/pandoc/codeblock.docx"
+        );
+        docspec_cmd()
+            .args(["convert", "--from", "docx", "--to", "pandoc-native", fixture])
+            .assert()
+            .success()
+            .stdout(concat!(
+                r#"[Para [Str "This is some code:"],"#,
+                r#"CodeBlock ("",[],[]) "readDocx :: ReaderOptions\n         -> B.ByteString\n         -> Pandoc","#,
+                r#"Para [Str "from the beginning of the docx reader."]]"#,
+                "\n"
+            ));
+    }
+
+    #[test]
     fn json_extension_without_to_flag_still_picks_blocknote() {
         // Regression guard: .json is ambiguous; auto-detection must NOT pick oxa.
         let input = markdown_tempfile(b"Hello\n", ".md");
