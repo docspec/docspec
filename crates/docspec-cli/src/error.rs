@@ -62,7 +62,8 @@ pub enum CliError {
     #[error("HTTP server error: {0}")]
     Http(#[from] ServerError),
 
-    /// The input path cannot be read: missing, not permitted, or not a file.
+    /// The input path cannot be read: missing or a directory, not permitted,
+    /// not valid text, or another read failure.
     #[error("cannot read input `{}`: {source}", path.display())]
     InputUnreadable {
         /// The input path as given on the command line.
@@ -96,17 +97,25 @@ impl CliError {
     /// `InvalidSequence` can only be a `DocSpec` defect, so it is
     /// [`exit::SOFTWARE`]; every other conversion error describes the input
     /// and is [`exit::DATAERR`], except a core `Io`, which on the CLI is a
-    /// real read or write failure and so [`exit::IOERR`].
+    /// real read or write failure and so [`exit::IOERR`]. The one `Io` that
+    /// describes the input is `InvalidData` (text input that is not UTF-8):
+    /// that is [`exit::DATAERR`], as the HTTP server answers 422 for it.
     #[must_use]
     pub fn exit_code(&self) -> u8 {
         match self {
             Self::Conversion(docspec_core::Error::InvalidSequence { .. }) => exit::SOFTWARE,
+            Self::Conversion(docspec_core::Error::Io { source })
+                if source.kind() == ErrorKind::InvalidData =>
+            {
+                exit::DATAERR
+            }
             Self::Conversion(docspec_core::Error::Io { .. }) | Self::Io(_) => exit::IOERR,
             Self::Conversion(_) => exit::DATAERR,
             Self::FormatDetection { .. } | Self::SameInputOutput => exit::USAGE,
             Self::InputUnreadable { source, .. } => match source.kind() {
-                ErrorKind::NotFound => exit::NOINPUT,
+                ErrorKind::NotFound | ErrorKind::IsADirectory => exit::NOINPUT,
                 ErrorKind::PermissionDenied => exit::NOPERM,
+                ErrorKind::InvalidData => exit::DATAERR,
                 _ => exit::IOERR,
             },
             Self::OutputUnwritable { source, .. } => match source.kind() {
@@ -197,6 +206,9 @@ mod tests {
             "io" => docspec_core::Error::Io {
                 source: io(ErrorKind::UnexpectedEof),
             },
+            "invalid_data" => docspec_core::Error::Io {
+                source: io(ErrorKind::InvalidData),
+            },
             _ => docspec_core::Error::InvalidSequence {
                 expected: "a".to_owned(),
                 found: "b".to_owned(),
@@ -211,6 +223,10 @@ mod tests {
         assert_eq!(CliError::Conversion(core_error("json")).exit_code(), 65);
         assert_eq!(CliError::Conversion(core_error("other")).exit_code(), 65);
         assert_eq!(CliError::Conversion(core_error("io")).exit_code(), 74);
+        assert_eq!(
+            CliError::Conversion(core_error("invalid_data")).exit_code(),
+            65
+        );
         assert_eq!(
             CliError::Conversion(core_error("invalid_sequence")).exit_code(),
             70
@@ -241,7 +257,9 @@ mod tests {
             source: io(kind),
         };
         assert_eq!(unreadable(ErrorKind::NotFound).exit_code(), 66);
+        assert_eq!(unreadable(ErrorKind::IsADirectory).exit_code(), 66);
         assert_eq!(unreadable(ErrorKind::PermissionDenied).exit_code(), 77);
+        assert_eq!(unreadable(ErrorKind::InvalidData).exit_code(), 65);
         assert_eq!(unreadable(ErrorKind::Other).exit_code(), 74);
         assert_eq!(
             unreadable(ErrorKind::NotFound).to_string(),
@@ -274,6 +292,13 @@ mod tests {
         assert_eq!(
             CliError::Http(ServerError::RuntimeBuild(io(ErrorKind::Other))).exit_code(),
             71
+        );
+        assert_eq!(
+            CliError::Http(ServerError::MetricsInit(
+                metrics_exporter_prometheus::BuildError::MissingExporterConfiguration
+            ))
+            .exit_code(),
+            70
         );
     }
 }

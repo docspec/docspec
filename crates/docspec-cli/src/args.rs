@@ -2,6 +2,10 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
 
+/// Exit-status list for `--help`. Keep in step with `EXIT_STATUS_ROFF` in
+/// `build.rs` and the README's "Exit status" table.
+const EXIT_STATUS_HELP: &str = "Exit status:\n  0   success\n  2   command used incorrectly (usage, bad flag or value, format not given)\n  65  the input document is malformed or cannot be converted\n  66  the input file does not exist or is a directory\n  69  the HTTP server cannot listen on the given address\n  70  internal DocSpec error\n  71  the operating system refused a resource\n  73  the output file cannot be created\n  74  I/O failed while reading or writing\n  77  permission denied\n\nCodes above 2 follow <sysexits.h>.";
+
 /// `DocSpec`: streaming document conversion.
 #[derive(Parser, Debug)]
 #[command(
@@ -10,7 +14,7 @@ use clap::{Parser, Subcommand, ValueEnum};
     about = "Streaming document conversion CLI",
     subcommand_required = true,
     arg_required_else_help = true,
-    after_long_help = "Exit status:\n  0   success\n  2   command used incorrectly (usage, bad flag or value, format not given)\n  65  the input document is malformed or cannot be converted\n  66  the input file does not exist\n  69  the HTTP server cannot listen on the given address\n  70  internal DocSpec error\n  71  the operating system refused a resource\n  73  the output file cannot be created\n  74  I/O failed while reading or writing\n  77  permission denied\n\nCodes above 2 follow <sysexits.h>."
+    after_long_help = EXIT_STATUS_HELP
 )]
 pub struct Cli {
     /// Selected top-level subcommand.
@@ -24,7 +28,8 @@ pub struct Cli {
 pub enum Commands {
     /// Convert documents between formats.
     #[command(
-        long_about = "Convert documents between formats using a streaming event pipeline.\n\nInput: Markdown and DOCX are supported. DOCX preserves headings, tables, lists, hyperlinks, images, run styles, and colors. Known DOCX losses include vertical cell merges, comments, footnotes, headers and footers, document metadata, tracked deletions, and field-code hyperlinks. HTML input is experimental and preserves only <p> elements and their text; all other tags are dropped.\n\nOutput: BlockNote JSON is supported. HTML, oxa.dev JSON, Pandoc native, and Markdown outputs are experimental and silently drop structure they cannot express."
+        long_about = "Convert documents between formats using a streaming event pipeline.\n\nInput: Markdown and DOCX are supported. DOCX preserves headings, tables, lists, hyperlinks, images, run styles, and colors. Known DOCX losses include vertical cell merges, comments, footnotes, headers and footers, document metadata, tracked deletions, and field-code hyperlinks. HTML input is experimental and preserves only <p> elements and their text; all other tags are dropped.\n\nOutput: BlockNote JSON is supported. HTML, oxa.dev JSON, Pandoc native, and Markdown outputs are experimental and silently drop structure they cannot express.",
+        after_long_help = EXIT_STATUS_HELP
     )]
     Convert(ConvertArgs),
     /// Run the HTTP API server.

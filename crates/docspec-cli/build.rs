@@ -8,7 +8,7 @@ use std::fs;
 include!("src/args.rs");
 
 /// The EXIT STATUS section of the man page. Keep in step with
-/// `Cli::after_long_help` in `src/args.rs` and the README's "Exit status" table.
+/// `EXIT_STATUS_HELP` in `src/args.rs` and the README's "Exit status" table.
 const EXIT_STATUS_ROFF: &str = r#".SH "EXIT STATUS"
 .TP
 .B 0
@@ -21,7 +21,7 @@ Command used incorrectly: unknown flag or value, missing subcommand, input forma
 The input document is malformed or holds something that cannot be converted (EX_DATAERR).
 .TP
 .B 66
-The input file does not exist (EX_NOINPUT).
+The input file does not exist or is a directory (EX_NOINPUT).
 .TP
 .B 69
 The HTTP server cannot listen on the given address (EX_UNAVAILABLE).

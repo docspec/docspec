@@ -1,7 +1,7 @@
 //! `docspec convert` subcommand: convert documents between formats.
 
 use std::fs::File;
-use std::io::{BufWriter, Cursor, Read as _, Write};
+use std::io::{BufWriter, Cursor, ErrorKind, Read as _, Write};
 
 use docspec::{AnyReader, AnyWriter};
 
@@ -49,13 +49,23 @@ pub fn run(args: ConvertArgs) -> Result<()> {
 
     let reader: AnyReader = match input_path.as_ref() {
         Some(path) if path.as_os_str() != "-" => {
+            // Readers fail on a directory with format-specific kinds (EISDIR,
+            // EINVAL); refuse it up front so every format exits EX_NOINPUT.
+            if path.is_dir() {
+                return Err(CliError::InputUnreadable {
+                    path: path.clone(),
+                    source: ErrorKind::IsADirectory.into(),
+                });
+            }
             // The reader reports an unopenable file as a generic I/O error;
-            // check first so a missing input exits with EX_NOINPUT.
-            std::fs::metadata(path).map_err(|source| CliError::InputUnreadable {
-                path: path.clone(),
-                source,
-            })?;
-            AnyReader::from_path(input_format, path)?
+            // keep the path so the exit code can follow the I/O kind.
+            AnyReader::from_path(input_format, path).map_err(|error| match error {
+                docspec_core::Error::Io { source } => CliError::InputUnreadable {
+                    path: path.clone(),
+                    source,
+                },
+                error => CliError::Conversion(error),
+            })?
         }
         _ => {
             let mut buf = Vec::new();

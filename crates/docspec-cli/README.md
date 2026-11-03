@@ -169,7 +169,7 @@ One code has one meaning, so a script can branch on `$?` without parsing stderr.
 | 0 | `EX_OK` | Command completed successfully |
 | 2 | usage | Command used incorrectly: unknown flag or value, missing subcommand, input format not given and not detectable, input and output are the same file |
 | 65 | `EX_DATAERR` | The input document is malformed or holds something that cannot be converted (the HTTP server answers 422 for the same cases) |
-| 66 | `EX_NOINPUT` | The input file does not exist |
+| 66 | `EX_NOINPUT` | The input file does not exist or is a directory |
 | 69 | `EX_UNAVAILABLE` | `docspec http` cannot listen: address already in use or not available |
 | 70 | `EX_SOFTWARE` | Internal DocSpec error, such as a reader violating the event contract (the HTTP server answers 500) |
 | 71 | `EX_OSERR` | The operating system refused a resource: runtime or socket creation failed |
@@ -177,7 +177,7 @@ One code has one meaning, so a script can branch on `$?` without parsing stderr.
 | 74 | `EX_IOERR` | I/O failed while reading the input or writing the output |
 | 77 | `EX_NOPERM` | Permission denied on the input, the output, or the listen port |
 
-Rust panics exit with 101, as every Rust program does.
+There is no generic exit 1: an error DocSpec cannot classify is still a conversion failure and exits 65, as the HTTP server answers 422 for it. A Rust panic exits with 101 under the default `panic = "unwind"` profile; a `panic = "abort"` build dies with `SIGABRT` instead.
 
 ## Related
 

@@ -756,6 +756,7 @@ dependencies = [
  "docspec-core",
  "docspec-http",
  "docspec-test-utils",
+ "metrics-exporter-prometheus",
  "predicates",
  "reqwest",
  "serde_json",

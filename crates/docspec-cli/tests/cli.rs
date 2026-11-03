@@ -887,17 +887,75 @@ mod tests {
         #[test]
         fn uncreatable_output_exits_73() {
             let input = markdown_tempfile(b"# Hi\n", ".md");
+            let dir = tempfile::tempdir().unwrap();
+            let output = dir.path().join("missing").join("out.json");
             docspec_cmd()
                 .args([
                     "convert",
                     input.path().to_str().unwrap(),
                     "-o",
-                    "/nonexistent-docspec-dir/out.json",
+                    output.to_str().unwrap(),
                 ])
                 .assert()
                 .code(73)
+                .stderr(contains(format!(
+                    "error: cannot create output `{}`: ",
+                    output.display()
+                )));
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn unreadable_input_exits_77() {
+            use std::os::unix::fs::PermissionsExt as _;
+            let input = markdown_tempfile(b"# Hi\n", ".md");
+            std::fs::set_permissions(input.path(), std::fs::Permissions::from_mode(0o000)).unwrap();
+            if std::fs::File::open(input.path()).is_ok() {
+                return; // root ignores mode bits; nothing to assert
+            }
+            docspec_cmd()
+                .args(["convert", input.path().to_str().unwrap()])
+                .assert()
+                .code(77)
+                .stderr(contains(format!(
+                    "error: cannot read input `{}`: Permission denied",
+                    input.path().display()
+                )));
+        }
+
+        #[test]
+        fn directory_input_exits_66() {
+            let dir = tempfile::tempdir().unwrap();
+            for format in ["markdown", "docx"] {
+                docspec_cmd()
+                    .args(["convert", "--from", format, dir.path().to_str().unwrap()])
+                    .assert()
+                    .code(66)
+                    .stderr(contains(format!(
+                        "error: cannot read input `{}`: is a directory",
+                        dir.path().display()
+                    )));
+            }
+        }
+
+        #[test]
+        fn invalid_utf8_input_exits_65() {
+            let input = markdown_tempfile(b"\xff\xfe# bad", ".md");
+            docspec_cmd()
+                .args(["convert", input.path().to_str().unwrap()])
+                .assert()
+                .code(65)
+                .stderr(contains(format!(
+                    "error: cannot read input `{}`: stream did not contain valid UTF-8",
+                    input.path().display()
+                )));
+            docspec_cmd()
+                .args(["convert", "--from", "markdown", "-"])
+                .write_stdin(&b"\xff\xfe# bad"[..])
+                .assert()
+                .code(65)
                 .stderr(contains(
-                    "error: cannot create output `/nonexistent-docspec-dir/out.json`: ",
+                    "error: I/O error: stream did not contain valid UTF-8",
                 ));
         }
 
@@ -928,12 +986,16 @@ mod tests {
 
         #[test]
         fn help_exits_0_and_lists_exit_codes() {
-            docspec_cmd()
-                .arg("--help")
-                .assert()
-                .success()
-                .stdout(contains("Exit status:"))
-                .stdout(contains("66  the input file does not exist"));
+            for args in [&["--help"][..], &["convert", "--help"][..]] {
+                docspec_cmd()
+                    .args(args)
+                    .assert()
+                    .success()
+                    .stdout(contains("Exit status:"))
+                    .stdout(contains(
+                        "66  the input file does not exist or is a directory",
+                    ));
+            }
         }
 
         #[cfg(feature = "http")]
