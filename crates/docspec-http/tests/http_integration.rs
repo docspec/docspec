@@ -343,6 +343,10 @@ async fn post_conversion_docx_over_reader_cap_returns_422_resource_limit() {
         .await
         .expect("request succeeds");
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        response.headers().get(header::CONTENT_TYPE).unwrap(),
+        PROBLEM_JSON_CT
+    );
     let instance = instance_of(&response);
     let body = response_body_json(response.into_body()).await;
     assert_eq!(
