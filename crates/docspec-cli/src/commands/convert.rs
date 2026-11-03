@@ -1,7 +1,7 @@
 //! `docspec convert` subcommand: convert documents between formats.
 
 use std::fs::File;
-use std::io::{BufWriter, Cursor, Read as _, Write};
+use std::io::{BufWriter, Cursor, ErrorKind, Read as _, Write};
 
 use docspec::{AnyReader, AnyWriter};
 
@@ -48,7 +48,25 @@ pub fn run(args: ConvertArgs) -> Result<()> {
     let output_format = format::resolve_output_format(to, output_path.as_deref());
 
     let reader: AnyReader = match input_path.as_ref() {
-        Some(path) if path.as_os_str() != "-" => AnyReader::from_path(input_format, path)?,
+        Some(path) if path.as_os_str() != "-" => {
+            // Readers fail on a directory with format-specific kinds (EISDIR,
+            // EINVAL); refuse it up front so every format exits EX_NOINPUT.
+            if path.is_dir() {
+                return Err(CliError::InputUnreadable {
+                    path: path.clone(),
+                    source: ErrorKind::IsADirectory.into(),
+                });
+            }
+            // The reader reports an unopenable file as a generic I/O error;
+            // keep the path so the exit code can follow the I/O kind.
+            AnyReader::from_path(input_format, path).map_err(|error| match error {
+                docspec_core::Error::Io { source } => CliError::InputUnreadable {
+                    path: path.clone(),
+                    source,
+                },
+                error => CliError::Conversion(error),
+            })?
+        }
         _ => {
             let mut buf = Vec::new();
             std::io::stdin().lock().read_to_end(&mut buf)?;
@@ -63,7 +81,11 @@ pub fn run(args: ConvertArgs) -> Result<()> {
             write_cli_terminating_newline(&mut stdout)
         }
         Some(path) => {
-            let mut writer = BufWriter::new(File::create(path)?);
+            let file = File::create(path).map_err(|source| CliError::OutputUnwritable {
+                path: path.clone(),
+                source,
+            })?;
+            let mut writer = BufWriter::new(file);
             run_pipeline(reader, output_format, &mut writer)?;
             write_cli_terminating_newline(&mut writer)?;
             writer.flush()?;
