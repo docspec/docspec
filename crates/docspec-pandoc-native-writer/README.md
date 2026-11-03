@@ -54,8 +54,8 @@ let output = String::from_utf8(buf)?;
 | `StartTextStyle { kind: Underline }` / `EndTextStyle` | `Underline [` / `]` |
 | `StartTextStyle { kind: Subscript }` / `EndTextStyle` | `Subscript [` / `]` |
 | `StartTextStyle { kind: Superscript }` / `EndTextStyle` | `Superscript [` / `]` |
-| `StartTextStyle { kind: Code, id }` / `EndTextStyle` | `Code ("id",[],[]) "..."` (Text payload buffered between Start and End) |
-| `StartPreformatted { id, syntax }` / `EndPreformatted` | `CodeBlock ("id",["syntax"],[]) "..."` (Text payload buffered; literal newlines preserved) |
+| `StartTextStyle { kind: Code, id }` / `EndTextStyle` | `Code ("id",[],[]) "..."` (Text payload buffered between Start and End; `LineBreak` becomes `\n`, `SoftBreak` a space) |
+| `StartPreformatted { id, syntax }` / `EndPreformatted` | `CodeBlock ("id",["syntax"],[]) "..."` (Text payload buffered; literal newlines preserved; `LineBreak` and `SoftBreak` become `\n`) |
 
 The following are silently ignored: block quotes, images, tables, lists, links, footnotes, definition lists, and captions. `StartTextStyle { kind: Mark | TextColor }` are accepted but silently flattened — the text inside is preserved without a wrapper.
 
