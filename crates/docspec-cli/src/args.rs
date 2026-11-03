@@ -28,7 +28,7 @@ pub struct Cli {
 pub enum Commands {
     /// Convert documents between formats.
     #[command(
-        long_about = "Convert documents between formats using a streaming event pipeline.\n\nInput: Markdown and DOCX are supported. DOCX preserves headings, tables, lists, hyperlinks, images, run styles, and colors. Known DOCX losses include vertical cell merges, comments, footnotes, headers and footers, document metadata, tracked deletions, and field-code hyperlinks. HTML input is experimental and preserves only <p> elements and their text; all other tags are dropped.\n\nOutput: BlockNote JSON is supported. HTML, oxa.dev JSON, Pandoc native, and Markdown outputs are experimental and silently drop structure they cannot express.",
+        long_about = "Convert documents between formats using a streaming event pipeline.\n\nInput: Markdown and DOCX are supported. DOCX preserves headings, tables, lists, hyperlinks, images, run styles, and colors. Known DOCX losses include vertical cell merges, comments, footnotes, headers and footers, document metadata, tracked deletions, and field-code hyperlinks. HTML input is experimental and preserves only <p> elements and their text; all other tags are dropped. ODT input is a placeholder: the file is ignored and the output is an empty document.\n\nOutput: BlockNote JSON is supported. HTML, oxa.dev JSON, Pandoc native, and Markdown outputs are experimental and silently drop structure they cannot express.",
         after_long_help = EXIT_STATUS_HELP
     )]
     Convert(ConvertArgs),
@@ -104,6 +104,9 @@ pub enum CliInputFormat {
     /// Markdown — supported: `CommonMark` plus GFM tables and strikethrough.
     #[value(name = "markdown")]
     Markdown,
+    /// ODT — PLACEHOLDER: the input is ignored and the output is an empty document.
+    #[value(name = "odt")]
+    Odt,
 }
 
 /// Output format for document conversion.

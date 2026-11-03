@@ -17,6 +17,7 @@
 //! | `markdown`     | Markdown (`CommonMark` + GFM tables/strikethrough)  | [`readers::MarkdownReader`] |
 //! | `html`         | HTML (paragraphs only)                              | `readers::HtmlReader`       |
 //! | `docx`         | DOCX (paragraphs, headings, tables, lists, hyperlinks, images, run styles)  | `readers::DocxReader`       |
+//! | `odt`          | ODT — placeholder: input is ignored, emits an empty document | `readers::OdtReader`        |
 //!
 //! [`readers::DocxReader`] is dispatched through [`AnyReader::from_reader`] and
 //! [`AnyReader::from_path`]. Use `AnyReader::from_path(InputFormat::Docx, path)` to
@@ -130,6 +131,13 @@ pub mod readers {
     #[cfg(feature = "docx")]
     #[cfg_attr(docsrs, doc(cfg(feature = "docx")))]
     pub use docspec_docx_reader::DocxReader;
+
+    /// Placeholder ODT reader. Available when the `odt` feature is enabled.
+    /// ODT is not parsed yet: the input is ignored and the reader emits an empty
+    /// document (`StartDocument`, `EndDocument`).
+    #[cfg(feature = "odt")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "odt")))]
+    pub use docspec_odt_reader::OdtReader;
 }
 
 /// Document writers (event sinks).

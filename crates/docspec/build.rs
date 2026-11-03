@@ -15,9 +15,9 @@ use std::env;
 /// environment: `CARGO_FEATURE_` plus the feature name uppercased, `-` as `_`.
 ///
 /// `text_reader` is a subset of `reader`, not a shorter spelling of it: the BOM-stripping
-/// reader wraps the text formats, and DOCX is binary.
+/// reader wraps the text formats, and DOCX and ODT are binary.
 const DERIVED_CFGS: [(&str, &[&str]); 3] = [
-    ("reader", &["MARKDOWN", "HTML", "DOCX"]),
+    ("reader", &["MARKDOWN", "HTML", "DOCX", "ODT"]),
     ("text_reader", &["MARKDOWN", "HTML"]),
     (
         "writer",

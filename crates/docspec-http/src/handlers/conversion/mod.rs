@@ -240,7 +240,7 @@ async fn do_conversion(
 
     let utf8_prevalidation = match input_format {
         InputFormat::Markdown | InputFormat::Html => Utf8Prevalidation::Required,
-        InputFormat::Docx => {
+        InputFormat::Docx | InputFormat::Odt => {
             // Binary format; UTF-8 prevalidation does not apply.
             Utf8Prevalidation::SkippedBinary
         }

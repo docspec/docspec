@@ -17,6 +17,8 @@ default = ["markdown", "blocknote", "pandoc-native"]
 markdown = ["dep:docspec-markdown-reader"]
 html = ["dep:docspec-html-reader"]
 docx = ["dep:docspec-docx-reader"]
+# Placeholder: accepts ODT input and emits an empty document.
+odt = ["dep:docspec-odt-reader"]
 
 # Format writers (event sinks).
 blocknote-writer = ["dep:docspec-blocknote-writer"]
@@ -37,7 +39,7 @@ json = ["dep:docspec-json"]
 blocknote = ["blocknote-writer"]
 oxa = ["oxa-writer"]
 pandoc-native = ["pandoc-native-writer"]
-all-readers = ["markdown", "html", "docx"]
+all-readers = ["markdown", "html", "docx", "odt"]
 all-writers = [
   "blocknote-writer",
   "oxa-writer",
@@ -55,6 +57,7 @@ docspec-markdown-reader = { workspace = true, optional = true }
 docspec-blocknote-writer = { workspace = true, optional = true }
 docspec-html-reader = { workspace = true, optional = true }
 docspec-docx-reader = { workspace = true, optional = true }
+docspec-odt-reader = { workspace = true, optional = true }
 docspec-oxa-writer = { workspace = true, optional = true }
 docspec-html-writer = { workspace = true, optional = true }
 docspec-pandoc-native-writer = { workspace = true, optional = true }

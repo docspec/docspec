@@ -11,6 +11,7 @@ impl From<CliInputFormat> for InputFormat {
             CliInputFormat::Markdown => Self::Markdown,
             CliInputFormat::Html => Self::Html,
             CliInputFormat::Docx => Self::Docx,
+            CliInputFormat::Odt => Self::Odt,
         }
     }
 }
@@ -48,6 +49,11 @@ mod tests {
     #[test]
     fn from_docx_converts_to_facade_docx() {
         assert_eq!(InputFormat::from(CliInputFormat::Docx), InputFormat::Docx);
+    }
+
+    #[test]
+    fn from_odt_converts_to_facade_odt() {
+        assert_eq!(InputFormat::from(CliInputFormat::Odt), InputFormat::Odt);
     }
 
     #[test]

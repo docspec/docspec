@@ -63,7 +63,7 @@ Exactly one severity per bug. When a bug spans tiers, take the higher one — a 
 
 Route each bug to the crate that owns the behaviour, so the label points at the code:
 
-- A reader bug (input parsing) → `docspec-docx-reader`, `docspec-html-reader`, or `docspec-markdown-reader`.
+- A reader bug (input parsing) → `docspec-docx-reader`, `docspec-html-reader`, `docspec-markdown-reader`, or `docspec-odt-reader`.
 - A writer bug (output generation) → `docspec-html-writer`, `docspec-markdown-writer`, `docspec-blocknote-writer`, `docspec-oxa-writer`, or `docspec-pandoc-native-writer`.
 - Pipeline, event model, or trait behaviour → `docspec-core`.
 - The `docspec convert` command → `docspec-cli`; the HTTP surface → `docspec-http`; WASM bindings → `docspec-wasm`.

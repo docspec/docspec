@@ -40,7 +40,7 @@ jobs:
         run: |
           set -euo pipefail
           for features in \
-            "" markdown html docx json \
+            "" markdown html docx odt json \
             blocknote-writer oxa-writer html-writer pandoc-native-writer markdown-writer \
             docx,markdown-writer all-readers all-writers full
           do

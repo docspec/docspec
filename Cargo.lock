@@ -724,6 +724,7 @@ dependencies = [
  "docspec-json",
  "docspec-markdown-reader",
  "docspec-markdown-writer",
+ "docspec-odt-reader",
  "docspec-oxa-writer",
  "docspec-pandoc-native-writer",
  "docspec-test-utils",
@@ -855,6 +856,15 @@ name = "docspec-markdown-writer"
 version = "2.0.0-rc.1"
 dependencies = [
  "docspec-core",
+]
+
+[[package]]
+name = "docspec-odt-reader"
+version = "2.0.0-rc.1"
+dependencies = [
+ "docspec-core",
+ "docspec-test-utils",
+ "tempfile",
 ]
 
 [[package]]

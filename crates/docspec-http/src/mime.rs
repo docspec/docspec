@@ -33,6 +33,10 @@ pub const MIME_BLOCKNOTE_ALIAS: &str = "application/vnd.blocknote+json";
 pub const MIME_DOCX: &str =
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
+/// MIME type for ODT input (placeholder reader: the body is ignored and an
+/// empty document is produced). Strict like [`MIME_DOCX`] — no parameters.
+pub const MIME_ODT: &str = "application/vnd.oasis.opendocument.text";
+
 /// MIME type for HTML. Accepted as both input `Content-Type` and output
 /// `Accept`; emitted as the response `Content-Type` when the HTML writer
 /// is selected.
@@ -60,6 +64,7 @@ const INPUT_MIMES: &[(&str, InputFormat)] = &[
     (MIME_MARKDOWN, InputFormat::Markdown),
     (MIME_HTML, InputFormat::Html),
     (MIME_DOCX, InputFormat::Docx),
+    (MIME_ODT, InputFormat::Odt),
 ];
 
 /// Output MIME types recognised on `Accept`, paired with the writer format
@@ -128,6 +133,11 @@ mod tests {
     #[test]
     fn input_mime_returns_docx_constant() {
         assert_eq!(input_mime(InputFormat::Docx), Some(MIME_DOCX));
+    }
+
+    #[test]
+    fn input_mime_returns_odt_constant() {
+        assert_eq!(input_mime(InputFormat::Odt), Some(MIME_ODT));
     }
 
     #[test]

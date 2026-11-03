@@ -1,6 +1,6 @@
 //! Reader factory for creating readers from input formats.
 
-#[cfg(feature = "docx")]
+#[cfg(any(feature = "docx", feature = "odt"))]
 use std::io::Cursor;
 use std::io::{Read, Seek};
 
@@ -12,6 +12,8 @@ use docspec_docx_reader::DocxReader;
 use docspec_html_reader::HtmlReader;
 #[cfg(feature = "markdown")]
 use docspec_markdown_reader::MarkdownReader;
+#[cfg(feature = "odt")]
+use docspec_odt_reader::OdtReader;
 
 use crate::format::InputFormat;
 
@@ -21,7 +23,7 @@ use crate::format::InputFormat;
 /// [`AnyReader::from_path`]. Implements [`EventSource`] by delegating `next_event`
 /// to the inner concrete reader. Zero heap allocation, zero virtual-dispatch overhead.
 ///
-/// `MarkdownReader`, `HtmlReader`, and `DocxReader` are all `Send + 'static`, so
+/// `MarkdownReader`, `HtmlReader`, `DocxReader`, and `OdtReader` are all `Send + 'static`, so
 /// `AnyReader` is also `Send + 'static` — suitable for use across
 /// `tokio::task::spawn_blocking` boundaries.
 #[non_exhaustive]
@@ -35,6 +37,9 @@ pub enum AnyReader {
     /// DOCX reader from [`docspec_docx_reader`].
     #[cfg(feature = "docx")]
     Docx(DocxReader),
+    /// Placeholder ODT reader from [`docspec_odt_reader`]; ignores its input.
+    #[cfg(feature = "odt")]
+    Odt(OdtReader),
 }
 
 impl AnyReader {
@@ -94,6 +99,8 @@ impl AnyReader {
                     .map_err(|source| docspec_core::Error::Io { source })?;
                 Self::from_reader(format, file)
             }
+            #[cfg(feature = "odt")]
+            InputFormat::Odt => Ok(Self::Odt(OdtReader::from_path(path)?)),
         }
     }
 
@@ -150,13 +157,15 @@ impl AnyReader {
             }
             #[cfg(feature = "docx")]
             InputFormat::Docx => Ok(Self::Docx(DocxReader::from_reader(reader)?)),
+            #[cfg(feature = "odt")]
+            InputFormat::Odt => Ok(Self::Odt(OdtReader::from_reader(reader)?)),
         }
     }
 
     /// Construct a reader for the given format from an in-memory string slice.
     ///
     /// For text formats (`Markdown`, `Html`), strips a leading UTF-8 BOM (U+FEFF)
-    /// before constructing the reader. For binary formats (`Docx`), the string
+    /// before constructing the reader. For binary formats (`Docx`, `Odt`), the string
     /// bytes are passed directly to [`from_reader`](Self::from_reader) via a
     /// `Cursor`.
     ///
@@ -203,6 +212,11 @@ impl AnyReader {
                 // DOCX is a binary format; dispatch via from_reader with the raw bytes.
                 Self::from_reader(format, Cursor::new(input.as_bytes().to_vec()))
             }
+            #[cfg(feature = "odt")]
+            InputFormat::Odt => {
+                // ODT is a binary format; dispatch via from_reader with the raw bytes.
+                Self::from_reader(format, Cursor::new(input.as_bytes().to_vec()))
+            }
         }
     }
 }
@@ -222,6 +236,8 @@ impl EventSource for AnyReader {
             Self::Markdown(r) => r.next_event(),
             #[cfg(feature = "docx")]
             Self::Docx(r) => r.next_event(),
+            #[cfg(feature = "odt")]
+            Self::Odt(r) => r.next_event(),
         }
     }
 }

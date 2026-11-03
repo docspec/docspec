@@ -759,6 +759,19 @@ mod tests {
     }
 
     #[test]
+    fn convert_odt_file_yields_empty_blocknote_document() {
+        let input = markdown_tempfile(b"not parsed yet", ".odt");
+
+        docspec_cmd()
+            .arg("convert")
+            .arg(input.path())
+            .args(["--to", "blocknote"])
+            .assert()
+            .success()
+            .stdout("[]\n");
+    }
+
+    #[test]
     fn convert_docx_stdin_to_blocknote_stdout() {
         let doc_xml = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>hello</w:t></w:r></w:p></w:body></w:document>"#;
         let bytes = synth_docx(SIMPLE_RELS, doc_xml);

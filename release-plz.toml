@@ -66,6 +66,7 @@ changelog_include = [
   "docspec-html-reader",
   "docspec-html-writer",
   "docspec-markdown-reader",
+  "docspec-odt-reader",
   "docspec-oxa-writer",
   "docspec-pandoc-native-writer",
   "docspec-http",

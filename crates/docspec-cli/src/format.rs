@@ -65,6 +65,12 @@ mod tests {
     }
 
     #[test]
+    fn detect_odt_from_odt() {
+        let result = resolve_input_format(None, Some(Path::new("doc.odt")), "err");
+        assert!(matches!(result, Ok(docspec::InputFormat::Odt)));
+    }
+
+    #[test]
     fn case_insensitive_extension_input() {
         let result = resolve_input_format(None, Some(Path::new("doc.HTML")), "err");
         assert!(matches!(result, Ok(docspec::InputFormat::Html)));
