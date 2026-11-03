@@ -61,15 +61,15 @@ DocSpec can ship release candidates (`X.Y.Z-rc.N`) ahead of a stable release, so
 
 ### Entering rc Mode
 
-Open an ordinary PR to `main` that sets the version to `X.Y.Z-rc.0`, one below the first candidate. release-plz always bumps the version it finds, so `rc.0` makes the first release PR propose `rc.1`:
+Open an ordinary PR to `main` that sets the version to the first candidate, e.g. `2.0.0-rc.1`. release-plz keeps a version that is already ahead of crates.io, so the first release PR proposes exactly that version:
 
-1. Set `[workspace.package].version` and every internal pin in `[workspace.dependencies]` of the root `Cargo.toml` to `X.Y.Z-rc.0`.
+1. Set `[workspace.package].version` and every internal pin in `[workspace.dependencies]` of the root `Cargo.toml` to `X.Y.Z-rc.1`.
 2. Run `cargo update --workspace` so `Cargo.lock` follows. Only the workspace crates should change.
 3. Leave `CHANGELOG.md` alone. release-plz writes it.
 
 Do not make this change inside an open release PR. release-plz rewrites or replaces its release PR whenever `main` moves, which discards manual edits.
 
-Merging this PR publishes nothing, because it is not a release PR. release-plz opens a release PR titled `chore: release vX.Y.Z-rc.1` with the changelog. Its compare link runs from `vX.Y.Z-rc.0`, a tag that never exists; the link is wrong for this one section only. Review and merge that PR as usual to publish the first candidate.
+Merging this PR publishes nothing, because it is not a release PR. release-plz opens a release PR titled `chore: release vX.Y.Z-rc.1` with the changelog. Review and merge that PR as usual to publish the first candidate.
 
 ### Promoting a Candidate to Stable
 
