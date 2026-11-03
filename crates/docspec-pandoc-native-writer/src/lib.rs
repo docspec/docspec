@@ -107,6 +107,25 @@ impl<W: Write> PandocNativeWriter<W> {
                     buffer.push_str(&content);
                 }
             }
+            // A break inside code is part of the code string. In a code block both
+            // kinds end a line, as in the BlockNote writer. In inline code a hard
+            // break is a newline (Pandoc's DOCX reader does the same) and a soft
+            // break is a space (CommonMark §6.1: line endings in code spans).
+            Event::LineBreak => {
+                if let Some(CodeFrame::Block { buffer, .. } | CodeFrame::Inline { buffer, .. }) =
+                    self.code_frame.as_mut()
+                {
+                    buffer.push('\n');
+                }
+            }
+            Event::SoftBreak => {
+                if let Some(frame) = self.code_frame.as_mut() {
+                    match frame {
+                        CodeFrame::Block { buffer, .. } => buffer.push('\n'),
+                        CodeFrame::Inline { buffer, .. } => buffer.push(' '),
+                    }
+                }
+            }
             Event::StartTextStyle { .. } => {
                 if let Some(CodeFrame::Inline {
                     nested_style_depth, ..
@@ -319,6 +338,10 @@ impl<W: Write> EventSink for PandocNativeWriter<W> {
     /// - `StartTextStyle` / `EndTextStyle` — `Strong`/`Emph`/`Strikeout`/`Underline`/`Subscript`/`Superscript` wrappers,
     ///   and `Code Attr Text` for the `Code` kind (kinds `Mark`, `TextColor` are silently flattened)
     /// - `StartPreformatted` / `EndPreformatted` — `CodeBlock ("id",["syntax"],[]) "..."`
+    ///
+    /// Inside a code block, `LineBreak` and `SoftBreak` each add a newline to the
+    /// code string. Inside inline code, `LineBreak` adds a newline and `SoftBreak`
+    /// a space.
     ///
     /// All other events are silently ignored.
     #[inline]

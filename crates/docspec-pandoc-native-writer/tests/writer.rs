@@ -1464,7 +1464,7 @@ mod tests {
     }
 
     #[test]
-    fn nested_inline_events_inside_preformatted_are_ignored() {
+    fn line_and_soft_breaks_inside_preformatted_each_emit_a_newline() {
         assert_eq!(
             run([
                 start_document(),
@@ -1476,7 +1476,111 @@ mod tests {
                 Event::EndPreformatted,
                 Event::EndDocument,
             ]),
-            "[CodeBlock (\"\",[],[]) \"ab\"]"
+            "[CodeBlock (\"\",[],[]) \"a\\n\\nb\"]"
+        );
+    }
+
+    #[test]
+    fn line_break_inside_preformatted_emits_newline() {
+        assert_eq!(
+            run([
+                start_document(),
+                start_pre(None, Some("haskell")),
+                text("readDocx :: ReaderOptions"),
+                Event::LineBreak,
+                text("         -> Pandoc"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"\",[\"haskell\"],[]) \"readDocx :: ReaderOptions\\n         -> Pandoc\"]"
+        );
+    }
+
+    #[test]
+    fn soft_break_inside_preformatted_emits_newline() {
+        assert_eq!(
+            run([
+                start_document(),
+                start_pre(None, None),
+                text("a"),
+                Event::SoftBreak,
+                text("b"),
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"\",[],[]) \"a\\nb\"]"
+        );
+    }
+
+    #[test]
+    fn break_as_only_content_of_preformatted_emits_newline() {
+        assert_eq!(
+            run([
+                start_document(),
+                start_pre(None, None),
+                Event::LineBreak,
+                Event::EndPreformatted,
+                Event::EndDocument,
+            ]),
+            "[CodeBlock (\"\",[],[]) \"\\n\"]"
+        );
+    }
+
+    #[test]
+    fn line_break_inside_inline_code_emits_newline() {
+        assert_eq!(
+            run([
+                start_document(),
+                start_paragraph(),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("a"),
+                Event::LineBreak,
+                text("b"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Code (\"\",[],[]) \"a\\nb\"]]"
+        );
+    }
+
+    #[test]
+    fn soft_break_inside_inline_code_emits_space() {
+        assert_eq!(
+            run([
+                start_document(),
+                start_paragraph(),
+                start_style(docspec_core::TextStyleKind::Code),
+                text("a"),
+                Event::SoftBreak,
+                text("b"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Code (\"\",[],[]) \"a b\"]]"
+        );
+    }
+
+    #[test]
+    fn breaks_inside_style_nested_in_inline_code_stay_in_code_string() {
+        assert_eq!(
+            run([
+                start_document(),
+                start_paragraph(),
+                start_style(docspec_core::TextStyleKind::Code),
+                start_style(docspec_core::TextStyleKind::Bold),
+                text("a"),
+                Event::LineBreak,
+                text("b"),
+                Event::SoftBreak,
+                text("c"),
+                Event::EndTextStyle,
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]),
+            "[Para [Code (\"\",[],[]) \"a\\nb c\"]]"
         );
     }
 }
