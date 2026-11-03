@@ -51,6 +51,11 @@ name = "docspec"
 git_tag_name = "v{{ version }}"
 git_tag_enable = true
 git_release_enable = true
+# A version with a SemVer pre-release part (e.g. 2.0.0-rc.1) becomes a GitHub
+# pre-release, never "Latest"; a plain X.Y.Z stays a normal release. The
+# default ("prod") would publish release candidates as the latest release.
+# See RELEASING.md > Release Candidates.
+git_release_type = "auto"
 changelog_update = true
 changelog_path = "./CHANGELOG.md"
 changelog_include = [

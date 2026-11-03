@@ -259,6 +259,7 @@ For the full maintainer runbook (Trusted Publishing setup, recovery procedures, 
 - `feat` commits trigger a minor version bump
 - `fix` commits trigger a patch version bump
 - Commits with `BREAKING CHANGE` in the footer trigger a major version bump
+- While the workspace version ends in `-rc.N` (rc mode), every release only increments the rc number until a maintainer promotes a candidate to stable; see [RELEASING.md §Release Candidates](RELEASING.md#release-candidates)
 
 ### Crates.io Publishing
 

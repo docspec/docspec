@@ -18,6 +18,8 @@ The tradeoff is that ecosystem coherence takes priority over per-crate precision
 
 In practice: `feat` commits trigger a minor bump, `fix` commits trigger a patch bump, and any commit with `BREAKING CHANGE` in the footer triggers a major bump. release-plz reads these signals and proposes the correct version in the release PR.
 
+The exception is rc mode: while the workspace version ends in `-rc.N`, every release only increments the rc number until a candidate is promoted. See [Release Candidates](#release-candidates).
+
 ## The Release Cycle (Happy Path)
 
 The typical release flows like this:
@@ -42,6 +44,44 @@ Before merging a release PR, check:
 - **`docspec-wasm` shows a version bump but no publish line.** The wasm crate is `publish = false`. release-plz will still bump its version in `Cargo.toml` to keep it in sync, but it won't attempt to publish it. Confirm this is the case.
 
 If anything looks off, close the release PR, fix the underlying issue (usually a malformed commit message or a release-plz config problem), and let release-plz open a fresh PR.
+
+## Release Candidates
+
+DocSpec can ship release candidates (`X.Y.Z-rc.N`) ahead of a stable release, so a version can be deployed and tested before it becomes the one users get by default. While `[workspace.package].version` carries an `-rc.N` suffix, the repository is in **rc mode**: every release is a release candidate until a maintainer promotes one to stable.
+
+### What Changes in rc Mode
+
+- **Versioning.** release-plz only increments the rc number. Whatever landed since the last candidate (`fix`, `feat` or a breaking change), the next release PR proposes `X.Y.Z-rc.N+1`. The stable target `X.Y.Z` stays fixed until promotion, so choose one that covers whatever may land during the rc period. A major target covers everything.
+- **crates.io.** Every publishable crate is published at the rc version. Cargo never selects a pre-release for an ordinary requirement such as `docspec = "1"` or `docspec = "2"`, and `cargo install` without `--version` skips pre-releases, so only users who ask for a candidate get it: `docspec = "=2.0.0-rc.1"` or `cargo install docspec-cli --version 2.0.0-rc.1`.
+- **GitHub.** The release is marked as a pre-release and never as Latest (`git_release_type = "auto"` in `release-plz.toml`).
+- **Docker.** Only the exact tag is pushed, e.g. `ghcr.io/docspec/api:2.0.0-rc.1`. `latest`, `X` and `X.Y` keep pointing at the last stable release, so deploy a candidate by its exact tag.
+- **Binaries.** No release gets `docspec-cli` binary assets today, candidate or stable: release-plz creates the tag with `GITHUB_TOKEN`, and GitHub never starts a tag-triggered workflow (`release.yml`) for events made with that token.
+- **No stable patches.** `main` already carries the next version and releases only run from `main`, so no `X.Y.Z` fix for the previous line can ship during rc mode. Keep rc periods short.
+- **Permanent versions.** Each candidate adds a section to `CHANGELOG.md` and a version of every publishable crate to crates.io, which can be yanked but never deleted. The release PR is still the gate: merge it when you want a candidate to deploy, not on every update.
+
+### Entering rc Mode
+
+Open an ordinary PR to `main` that sets the version to `X.Y.Z-rc.0`, one below the first candidate. release-plz always bumps the version it finds, so `rc.0` makes the first release PR propose `rc.1`:
+
+1. Set `[workspace.package].version` and every internal pin in `[workspace.dependencies]` of the root `Cargo.toml` to `X.Y.Z-rc.0`.
+2. Run `cargo update --workspace` so `Cargo.lock` follows. Only the workspace crates should change.
+3. Leave `CHANGELOG.md` alone. release-plz writes it.
+
+Do not make this change inside an open release PR. release-plz rewrites or replaces its release PR whenever `main` moves, which discards manual edits.
+
+Merging this PR publishes nothing, because it is not a release PR. release-plz opens a release PR titled `chore: release vX.Y.Z-rc.1` with the changelog. Its compare link runs from `vX.Y.Z-rc.0`, a tag that never exists; the link is wrong for this one section only. Review and merge that PR as usual to publish the first candidate.
+
+### Promoting a Candidate to Stable
+
+Promote a candidate that has been deployed and tested, and only when `main` holds nothing unreleased since it (no open release PR). If `main` has moved on, cut and test the next candidate first, so the stable release is exactly what was tested.
+
+1. Create a branch from `main` whose name starts with `release-plz-`, e.g. `release-plz-promote-v2.0.0`. The prefix matters: with `release_always = false`, release-plz publishes only when the merged PR comes from a `release-plz-` branch.
+2. Set the stable version by hand, the same way as when entering rc mode: `[workspace.package].version` and every internal pin to `X.Y.Z`, then `cargo update --workspace`. Do not use `release-plz set-version`: it refuses a bare version in a multi-package workspace, and the `docspec@X.Y.Z` form replaces `version.workspace = true` in that one crate and leaves the other pins at the rc version.
+3. In the newest `CHANGELOG.md` section, replace the candidate version with the stable one in both the heading and the end of its compare link, so `[2.0.0-rc.3](.../v2.0.0-rc.2...v2.0.0-rc.3)` becomes `[2.0.0](.../v2.0.0-rc.2...v2.0.0)`. The code is identical, so the notes stay accurate. This is the one case where `CHANGELOG.md` is edited by hand; release-plz reads that section for the GitHub release body.
+4. Open a PR, review it like a release PR, and merge it. The `release-plz-release` job publishes `X.Y.Z` to crates.io, tags `vX.Y.Z`, and creates a normal GitHub release marked Latest. The Docker image gets `X.Y.Z`, `X.Y`, `X` and `latest`.
+5. The GitHub release body holds only the last candidate's notes. Edit the GitHub release (not `CHANGELOG.md`) to add upgrade notes that cover the whole rc period.
+
+rc mode ends with the promotion: from the next commit on, release-plz proposes ordinary `patch`, `minor` and `major` bumps again.
 
 ## Trusted Publishing Setup (One-Time Per Crate)
 
