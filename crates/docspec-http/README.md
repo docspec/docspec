@@ -137,6 +137,8 @@ Accepted `Accept` values for `/conversion`: `text/html` (HTML), `application/vnd
 
 **Request timeout**: No timeout. Slow clients can hang a connection indefinitely.
 
+The full list of what is and is not bounded, with tracking issues, is in [SECURITY.md §4](../../SECURITY.md#4-resource-limits).
+
 ## Logging
 
 Logs go to stderr at INFO level in pretty format. There are no flags to change the log level or format.
