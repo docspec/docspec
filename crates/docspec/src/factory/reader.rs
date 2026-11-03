@@ -1,6 +1,6 @@
 //! Reader factory for creating readers from input formats.
 
-#[cfg(feature = "docx")]
+#[cfg(any(feature = "docx", feature = "odt"))]
 use std::io::Cursor;
 use std::io::{Read, Seek};
 
@@ -23,7 +23,7 @@ use crate::format::InputFormat;
 /// [`AnyReader::from_path`]. Implements [`EventSource`] by delegating `next_event`
 /// to the inner concrete reader. Zero heap allocation, zero virtual-dispatch overhead.
 ///
-/// `MarkdownReader`, `HtmlReader`, and `DocxReader` are all `Send + 'static`, so
+/// `MarkdownReader`, `HtmlReader`, `DocxReader`, and `OdtReader` are all `Send + 'static`, so
 /// `AnyReader` is also `Send + 'static` — suitable for use across
 /// `tokio::task::spawn_blocking` boundaries.
 #[non_exhaustive]
@@ -100,12 +100,7 @@ impl AnyReader {
                 Self::from_reader(format, file)
             }
             #[cfg(feature = "odt")]
-            InputFormat::Odt => {
-                // Placeholder ignores the content, but a missing or unreadable file still fails.
-                std::fs::File::open(path.as_ref())
-                    .map_err(|source| docspec_core::Error::Io { source })?;
-                Ok(Self::Odt(OdtReader::new()))
-            }
+            InputFormat::Odt => Ok(Self::Odt(OdtReader::from_path(path)?)),
         }
     }
 
@@ -163,17 +158,14 @@ impl AnyReader {
             #[cfg(feature = "docx")]
             InputFormat::Docx => Ok(Self::Docx(DocxReader::from_reader(reader)?)),
             #[cfg(feature = "odt")]
-            InputFormat::Odt => {
-                drop(reader);
-                Ok(Self::Odt(OdtReader::new()))
-            }
+            InputFormat::Odt => Ok(Self::Odt(OdtReader::from_reader(reader)?)),
         }
     }
 
     /// Construct a reader for the given format from an in-memory string slice.
     ///
     /// For text formats (`Markdown`, `Html`), strips a leading UTF-8 BOM (U+FEFF)
-    /// before constructing the reader. For binary formats (`Docx`), the string
+    /// before constructing the reader. For binary formats (`Docx`, `Odt`), the string
     /// bytes are passed directly to [`from_reader`](Self::from_reader) via a
     /// `Cursor`.
     ///
@@ -222,9 +214,8 @@ impl AnyReader {
             }
             #[cfg(feature = "odt")]
             InputFormat::Odt => {
-                // Placeholder: the input is not read.
-                let _ = input;
-                Ok(Self::Odt(OdtReader::new()))
+                // ODT is a binary format; dispatch via from_reader with the raw bytes.
+                Self::from_reader(format, Cursor::new(input.as_bytes().to_vec()))
             }
         }
     }

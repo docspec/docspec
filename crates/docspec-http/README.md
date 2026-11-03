@@ -342,7 +342,7 @@ docspec-http = { version = "1", default-features = false }
 
 ### Cardinality Guarantees
 
-`path` is bounded to `{"/conversion", "/health", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 5 values (`text/markdown`, `text/html`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `unsupported`, `none`). `output_mime_type` is bounded to 5 values (`application/vnd.docspec.blocknote+json`, `text/html`, `application/vnd.oxa+json`, `application/vnd.pandoc.native`, `none`). Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
+`path` is bounded to `{"/conversion", "/health", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 6 values (`text/markdown`, `text/html`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.oasis.opendocument.text`, `unsupported`, `none`). `output_mime_type` is bounded to 5 values (`application/vnd.docspec.blocknote+json`, `text/html`, `application/vnd.oxa+json`, `application/vnd.pandoc.native`, `none`). Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
 
 ### Scrape Model
 

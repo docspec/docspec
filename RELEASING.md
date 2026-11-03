@@ -106,7 +106,7 @@ For each of the 11 publishable crates, add two Trusted Publishing entries:
    - **Environment**: `release`
 8. Save.
 
-The 11 publishable crates are: `docspec-core`, `docspec-json`, `docspec-markdown-reader`, `docspec-html-reader`, `docspec-docx-reader`, `docspec-odt-reader`, `docspec-blocknote-writer`, `docspec-oxa-writer`, `docspec-html-writer`, `docspec`, `docspec-cli`, and `docspec-http`.
+The 12 publishable crates are: `docspec-core`, `docspec-json`, `docspec-markdown-reader`, `docspec-html-reader`, `docspec-docx-reader`, `docspec-odt-reader`, `docspec-blocknote-writer`, `docspec-oxa-writer`, `docspec-html-writer`, `docspec`, `docspec-cli`, and `docspec-http`.
 
 `docspec-wasm` is **not** configured for Trusted Publishing. It has `publish = false` and never reaches crates.io.
 

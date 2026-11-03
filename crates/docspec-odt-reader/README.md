@@ -14,9 +14,10 @@ docspec-odt-reader = "2"
 ## Use it
 
 ```rust
+use std::io::Cursor;
 use docspec_odt_reader::{EventSource, OdtReader};
 
-let mut reader = OdtReader::new();
+let mut reader = OdtReader::from_reader(Cursor::new(b"PK..."))?;
 while let Some(event) = reader.next_event()? {
     println!("{event:?}");
 }
