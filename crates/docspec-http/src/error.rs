@@ -279,7 +279,7 @@ pub enum HttpError {
         /// Which kind of input problem; selects the problem `type` URI.
         kind: InputProblem,
     },
-    /// The `Content-Type` header is not one of the supported types: `text/markdown`, `text/html`, or `application/vnd.openxmlformats-officedocument.wordprocessingml.document`.
+    /// The `Content-Type` header is not one of the supported types: `text/markdown`, `text/html`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, or `application/vnd.oasis.opendocument.text`.
     ///
     /// → HTTP 415 Unsupported Media Type.
     UnsupportedMediaType {
@@ -416,7 +416,7 @@ impl IntoResponse for HttpError {
             Self::UnsupportedMediaType { received: None } => (
                 StatusCode::UNSUPPORTED_MEDIA_TYPE,
                 "Unsupported Media Type",
-                Cow::Borrowed("Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+                Cow::Borrowed("Content-Type must be text/markdown, text/html, application/vnd.openxmlformats-officedocument.wordprocessingml.document, or application/vnd.oasis.opendocument.text"),
                 None,
             ),
             Self::UnsupportedMediaType {
@@ -425,7 +425,7 @@ impl IntoResponse for HttpError {
                 StatusCode::UNSUPPORTED_MEDIA_TYPE,
                 "Unsupported Media Type",
                 Cow::Owned(format!(
-                    "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document, got {content_type}"
+                    "Content-Type must be text/markdown, text/html, application/vnd.openxmlformats-officedocument.wordprocessingml.document, or application/vnd.oasis.opendocument.text, got {content_type}"
                 )),
                 None,
             ),
@@ -1036,7 +1036,7 @@ mod tests {
                 "type": "about:blank",
                 "title": "Unsupported Media Type",
                 "status": 415,
-                "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document, got application/json",
+                "detail": "Content-Type must be text/markdown, text/html, application/vnd.openxmlformats-officedocument.wordprocessingml.document, or application/vnd.oasis.opendocument.text, got application/json",
             })
         );
     }

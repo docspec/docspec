@@ -252,7 +252,7 @@ async fn post_conversion_missing_content_type() {
             "type": "about:blank",
             "title": "Unsupported Media Type",
             "status": 415,
-            "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "detail": "Content-Type must be text/markdown, text/html, application/vnd.openxmlformats-officedocument.wordprocessingml.document, or application/vnd.oasis.opendocument.text",
             "instance": instance,
         })
     );
@@ -318,6 +318,20 @@ async fn post_conversion_docx_happy_path() {
         body_str.contains("paragraph"),
         "expected paragraph in: {body_str}"
     );
+}
+
+#[tokio::test]
+async fn post_conversion_odt_placeholder_returns_empty_document() {
+    let request = common::request(
+        "POST",
+        "/conversion",
+        &[("content-type", "application/vnd.oasis.opendocument.text")],
+        b"not parsed yet".to_vec(),
+    );
+    let response = app().oneshot(request).await.expect("request succeeds");
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(body, serde_json::json!([]));
 }
 
 #[tokio::test]
@@ -472,7 +486,7 @@ async fn post_conversion_wrong_content_type() {
             "type": "about:blank",
             "title": "Unsupported Media Type",
             "status": 415,
-            "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document, got application/json",
+            "detail": "Content-Type must be text/markdown, text/html, application/vnd.openxmlformats-officedocument.wordprocessingml.document, or application/vnd.oasis.opendocument.text, got application/json",
             "instance": instance,
         })
     );
@@ -499,7 +513,7 @@ async fn post_conversion_multipart_content_type() {
             "type": "about:blank",
             "title": "Unsupported Media Type",
             "status": 415,
-            "detail": "Content-Type must be text/markdown, text/html, or application/vnd.openxmlformats-officedocument.wordprocessingml.document, got multipart/form-data; boundary=x",
+            "detail": "Content-Type must be text/markdown, text/html, application/vnd.openxmlformats-officedocument.wordprocessingml.document, or application/vnd.oasis.opendocument.text, got multipart/form-data; boundary=x",
             "instance": instance,
         })
     );

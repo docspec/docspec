@@ -106,7 +106,7 @@ For each of the 11 publishable crates, add two Trusted Publishing entries:
    - **Environment**: `release`
 8. Save.
 
-The 11 publishable crates are: `docspec-core`, `docspec-json`, `docspec-markdown-reader`, `docspec-html-reader`, `docspec-docx-reader`, `docspec-blocknote-writer`, `docspec-oxa-writer`, `docspec-html-writer`, `docspec`, `docspec-cli`, and `docspec-http`.
+The 11 publishable crates are: `docspec-core`, `docspec-json`, `docspec-markdown-reader`, `docspec-html-reader`, `docspec-docx-reader`, `docspec-odt-reader`, `docspec-blocknote-writer`, `docspec-oxa-writer`, `docspec-html-writer`, `docspec`, `docspec-cli`, and `docspec-http`.
 
 `docspec-wasm` is **not** configured for Trusted Publishing. It has `publish = false` and never reaches crates.io.
 
@@ -165,7 +165,7 @@ The `.pem` and `.sig` files are attached to the GitHub Release alongside the tar
 release-plz publishes crates in topological dependency order so that each crate's dependencies are already on crates.io before it publishes. The order is:
 
 1. `docspec-core` (leaf, no internal dependencies)
-2. `docspec-json`, `docspec-markdown-reader`, `docspec-html-reader`, `docspec-docx-reader` (depend only on `docspec-core`)
+2. `docspec-json`, `docspec-markdown-reader`, `docspec-html-reader`, `docspec-docx-reader`, `docspec-odt-reader` (depend only on `docspec-core`)
 3. `docspec-blocknote-writer`, `docspec-oxa-writer`, `docspec-html-writer` (depend on `docspec-core` and `docspec-json`)
 4. `docspec` (the facade, depends on readers and writers)
 5. `docspec-cli` and `docspec-http` (depend on the facade and core crates)
@@ -221,7 +221,7 @@ To yank all crates at a version:
 
 ```bash
 for crate in docspec-core docspec-json docspec-markdown-reader docspec-html-reader \
-  docspec-docx-reader docspec-blocknote-writer docspec-oxa-writer \
+  docspec-docx-reader docspec-odt-reader docspec-blocknote-writer docspec-oxa-writer \
   docspec-html-writer docspec docspec-cli docspec-http; do
   cargo yank --version 1.5.0 "$crate"
 done

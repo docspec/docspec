@@ -1,10 +1,10 @@
 //! Integration tests for the enum-dispatch reader factory.
 
-#![allow(clippy::expect_used, clippy::unwrap_used)]
+#![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
 
 #[cfg(test)]
 mod tests {
-    #[cfg(any(feature = "markdown", feature = "html"))]
+    #[cfg(any(feature = "markdown", feature = "html", feature = "odt"))]
     use docspec::{AnyReader, InputFormat};
     #[cfg(any(feature = "markdown", feature = "html"))]
     use docspec_core::EventSource;
@@ -117,7 +117,9 @@ mod tests {
         let mut reader = AnyReader::from_reader(InputFormat::Markdown, Cursor::new(input))
             .expect("from_reader succeeds");
 
-        let events: Vec<_> = core::iter::from_fn(|| reader.next_event().unwrap()).collect();
+        let events: Vec<_> =
+            core::iter::from_fn(|| docspec_core::EventSource::next_event(&mut reader).unwrap())
+                .collect();
         let has_heading = events
             .iter()
             .any(|event| matches!(event, Event::StartHeading { .. }));
@@ -148,5 +150,58 @@ mod tests {
         let events1: Vec<_> = core::iter::from_fn(|| r1.next_event().unwrap()).collect();
         let events2: Vec<_> = core::iter::from_fn(|| r2.next_event().unwrap()).collect();
         assert_eq!(events1, events2);
+    }
+
+    #[cfg(feature = "odt")]
+    fn odt_events(mut reader: AnyReader) -> Vec<docspec_core::Event> {
+        core::iter::from_fn(|| docspec_core::EventSource::next_event(&mut reader).unwrap())
+            .collect()
+    }
+
+    #[cfg(feature = "odt")]
+    fn empty_document() -> Vec<docspec_core::Event> {
+        vec![
+            docspec_core::Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            docspec_core::Event::EndDocument,
+        ]
+    }
+
+    #[cfg(feature = "odt")]
+    #[test]
+    fn odt_placeholder_ignores_input_from_reader() {
+        let reader =
+            AnyReader::from_reader(InputFormat::Odt, std::io::Cursor::new(b"anything")).unwrap();
+        assert_eq!(odt_events(reader), empty_document());
+    }
+
+    #[cfg(feature = "odt")]
+    #[test]
+    fn odt_placeholder_ignores_input_from_str() {
+        let reader = AnyReader::from_str(InputFormat::Odt, "anything").unwrap();
+        assert_eq!(odt_events(reader), empty_document());
+    }
+
+    #[cfg(feature = "odt")]
+    #[test]
+    fn odt_placeholder_ignores_input_from_path() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), b"anything").unwrap();
+        let reader = AnyReader::from_path(InputFormat::Odt, file.path()).unwrap();
+        assert_eq!(odt_events(reader), empty_document());
+    }
+
+    #[cfg(feature = "odt")]
+    #[test]
+    fn odt_placeholder_from_missing_path_is_io_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = AnyReader::from_path(InputFormat::Odt, dir.path().join("missing.odt"));
+        let Err(docspec_core::Error::Io { source }) = result else {
+            panic!("expected an I/O error");
+        };
+        assert_eq!(source.kind(), std::io::ErrorKind::NotFound);
     }
 }

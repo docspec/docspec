@@ -4,7 +4,7 @@
 
 Send a document, receive a converted one. `docspec-http` is an Axum-based library that wraps the full DocSpec conversion pipeline behind a small HTTP surface — designed for embedding in custom binaries or running via the unified `docspec http` subcommand. Streaming, like the rest of DocSpec. (See the [Manifesto](https://github.com/docspec/docspec/blob/main/MANIFESTO.md) for why.)
 
-Send markdown (`Content-Type: text/markdown`), HTML (`Content-Type: text/html`), or DOCX (`Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document`), receive BlockNote JSON (default), HTML (`Accept: text/html`), oxa.dev JSON (`Accept: application/vnd.oxa+json`), or Pandoc native (`Accept: application/vnd.pandoc.native`). The underlying DocSpec pipeline is streaming, but this v1 HTTP wrapper **buffers the request body and the conversion output in memory** before responding. End-to-end streaming over HTTP is planned for a future version. For now, request size scales with available memory.
+Send markdown (`Content-Type: text/markdown`), HTML (`Content-Type: text/html`), DOCX (`Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document`), or ODT (`Content-Type: application/vnd.oasis.opendocument.text`; placeholder — the body is ignored and the output is an empty document), receive BlockNote JSON (default), HTML (`Accept: text/html`), oxa.dev JSON (`Accept: application/vnd.oxa+json`), or Pandoc native (`Accept: application/vnd.pandoc.native`). The underlying DocSpec pipeline is streaming, but this v1 HTTP wrapper **buffers the request body and the conversion output in memory** before responding. End-to-end streaming over HTTP is planned for a future version. For now, request size scales with available memory.
 
 > **Only BlockNote output is production-ready.** `text/html`, `application/vnd.oxa+json` and `application/vnd.pandoc.native` are **experimental**: the server returns `200` while silently dropping structure those writers cannot express.
 >
@@ -103,7 +103,7 @@ All errors use [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Detail
 | 404  | Unknown path                                             |
 | 405  | Wrong method (response includes `Allow` header)          |
 | 406  | `Accept` header excludes all supported output types      |
-| 415  | `Content-Type` must be `text/markdown`, `text/html`, or `application/vnd.openxmlformats-officedocument.wordprocessingml.document` |
+| 415  | `Content-Type` must be `text/markdown`, `text/html`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, or `application/vnd.oasis.opendocument.text` |
 | 422  | The input could not be converted: parse error, truncated document, dangling reference, or a value the output format cannot hold |
 | 500  | DocSpec defect or infrastructure failure, never caused by the document |
 
@@ -330,7 +330,7 @@ docspec-http = { version = "1", default-features = false }
 
 **`error_class`**: `body_not_utf8`, `empty_body`, `internal`, `method_not_allowed`, `not_acceptable`, `not_found`, `unprocessable`, `unsupported_media_type`, `none` (only when `result=success`)
 
-**`input_mime_type`**: `text/markdown` (the request's Content-Type matched the markdown reader), `text/html` (the request's Content-Type matched the HTML reader), `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (the request's Content-Type matched the DOCX reader), `unsupported` (Content-Type header present but not a supported input format), `none` (Content-Type header absent).
+**`input_mime_type`**: `text/markdown` (the request's Content-Type matched the markdown reader), `text/html` (the request's Content-Type matched the HTML reader), `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (the request's Content-Type matched the DOCX reader), `application/vnd.oasis.opendocument.text` (the request's Content-Type matched the placeholder ODT reader), `unsupported` (Content-Type header present but not a supported input format), `none` (Content-Type header absent).
 
 **`output_mime_type`**: `application/vnd.docspec.blocknote+json` (conversion succeeded; output produced by the BlockNote writer), `text/html` (conversion succeeded; output produced by the HTML writer), `application/vnd.oxa+json` (conversion succeeded; output produced by the oxa.dev writer), `application/vnd.pandoc.native` (conversion succeeded; output produced by the Pandoc native writer), `none` (no output produced — any error path).
 

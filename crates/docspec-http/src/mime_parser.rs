@@ -55,14 +55,15 @@ pub fn negotiate_accept(header_value: Option<&HeaderValue>) -> Result<OutputForm
 /// resolves it to the matching reader format.
 ///
 /// Accepts `text/markdown` ([`InputFormat::Markdown`]), `text/html`
-/// ([`InputFormat::Html`]), and
+/// ([`InputFormat::Html`]),
 /// `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
-/// ([`InputFormat::Docx`]). Text types accept no charset, or `charset=utf-8`
-/// (case-insensitive). DOCX is a binary format — no parameters are allowed at
+/// ([`InputFormat::Docx`]), and `application/vnd.oasis.opendocument.text`
+/// ([`InputFormat::Odt`]). Text types accept no charset, or `charset=utf-8`
+/// (case-insensitive). DOCX and ODT are binary formats — no parameters are allowed at
 /// all. Any other charset is rejected — the handler always decodes the body as
 /// UTF-8, so a non-UTF-8 charset is unsupportable. Returns `Err` if the header
 /// is missing, malformed, the MIME type is unsupported, the charset is anything
-/// other than `utf-8` for text types, or any parameter is present on DOCX.
+/// other than `utf-8` for text types, or any parameter is present on DOCX or ODT.
 ///
 /// # Errors
 ///
@@ -90,14 +91,14 @@ pub fn validate_content_type(header_value: Option<&HeaderValue>) -> Result<Input
             received: Some(header_str.to_owned()),
         });
     };
-    // DOCX: strict — no parameters allowed (binary format; charset is meaningless)
-    if format == InputFormat::Docx {
+    // DOCX, ODT: strict — no parameters allowed (binary formats; charset is meaningless)
+    if matches!(format, InputFormat::Docx | InputFormat::Odt) {
         if parsed.params().next().is_some() {
             return Err(HttpError::UnsupportedMediaType {
                 received: Some(header_str.to_owned()),
             });
         }
-        return Ok(InputFormat::Docx);
+        return Ok(format);
     }
     if let Some(charset) = parsed.get_param(mime::CHARSET) {
         if !charset.as_str().eq_ignore_ascii_case("utf-8") {
@@ -122,7 +123,7 @@ pub fn validate_content_type(header_value: Option<&HeaderValue>) -> Result<Input
 /// Returns the bounded `input_mime_type` label value for a `Content-Type` header.
 ///
 /// This function is intentionally MORE permissive than [`validate_content_type`]:
-/// it returns the matching label for any `text/markdown`, `text/html`, or DOCX
+/// it returns the matching label for any `text/markdown`, `text/html`, DOCX, or ODT
 /// value regardless of charset or other parameters, because the label answers
 /// "what did the client try to send?" rather than "is it valid?".
 ///
@@ -132,6 +133,7 @@ pub fn validate_content_type(header_value: Option<&HeaderValue>) -> Result<Input
 /// - [`crate::mime::MIME_MARKDOWN`] — `text/markdown` (any params)
 /// - [`crate::mime::MIME_HTML`] — `text/html` (any params)
 /// - [`crate::mime::MIME_DOCX`] — `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (any params)
+/// - [`crate::mime::MIME_ODT`] — `application/vnd.oasis.opendocument.text` (any params)
 /// - [`crate::metrics::INPUT_MIME_UNSUPPORTED`] — anything else
 #[must_use]
 #[inline]

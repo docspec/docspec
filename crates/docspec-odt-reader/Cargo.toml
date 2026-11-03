@@ -1,0 +1,19 @@
+[package]
+name = "docspec-odt-reader"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+description = "ODT to DocSpec event stream reader (placeholder: emits an empty document)"
+keywords = ["document", "conversion", "streaming", "odt", "opendocument"]
+categories = ["parsing"]
+
+[dependencies]
+docspec-core = { workspace = true }
+
+[dev-dependencies]
+docspec-test-utils = { workspace = true }
+
+[lints]
+workspace = true

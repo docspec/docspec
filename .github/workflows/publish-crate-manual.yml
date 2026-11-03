@@ -14,6 +14,7 @@ on:
           - docspec-markdown-reader
           - docspec-html-reader
           - docspec-docx-reader
+          - docspec-odt-reader
           - docspec-blocknote-writer
           - docspec-html-writer
           - docspec-oxa-writer

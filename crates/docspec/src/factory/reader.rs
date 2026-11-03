@@ -12,6 +12,8 @@ use docspec_docx_reader::DocxReader;
 use docspec_html_reader::HtmlReader;
 #[cfg(feature = "markdown")]
 use docspec_markdown_reader::MarkdownReader;
+#[cfg(feature = "odt")]
+use docspec_odt_reader::OdtReader;
 
 use crate::format::InputFormat;
 
@@ -35,6 +37,9 @@ pub enum AnyReader {
     /// DOCX reader from [`docspec_docx_reader`].
     #[cfg(feature = "docx")]
     Docx(DocxReader),
+    /// Placeholder ODT reader from [`docspec_odt_reader`]; ignores its input.
+    #[cfg(feature = "odt")]
+    Odt(OdtReader),
 }
 
 impl AnyReader {
@@ -94,6 +99,13 @@ impl AnyReader {
                     .map_err(|source| docspec_core::Error::Io { source })?;
                 Self::from_reader(format, file)
             }
+            #[cfg(feature = "odt")]
+            InputFormat::Odt => {
+                // Placeholder ignores the content, but a missing or unreadable file still fails.
+                std::fs::File::open(path.as_ref())
+                    .map_err(|source| docspec_core::Error::Io { source })?;
+                Ok(Self::Odt(OdtReader::new()))
+            }
         }
     }
 
@@ -150,6 +162,11 @@ impl AnyReader {
             }
             #[cfg(feature = "docx")]
             InputFormat::Docx => Ok(Self::Docx(DocxReader::from_reader(reader)?)),
+            #[cfg(feature = "odt")]
+            InputFormat::Odt => {
+                drop(reader);
+                Ok(Self::Odt(OdtReader::new()))
+            }
         }
     }
 
@@ -203,6 +220,12 @@ impl AnyReader {
                 // DOCX is a binary format; dispatch via from_reader with the raw bytes.
                 Self::from_reader(format, Cursor::new(input.as_bytes().to_vec()))
             }
+            #[cfg(feature = "odt")]
+            InputFormat::Odt => {
+                // Placeholder: the input is not read.
+                let _ = input;
+                Ok(Self::Odt(OdtReader::new()))
+            }
         }
     }
 }
@@ -222,6 +245,8 @@ impl EventSource for AnyReader {
             Self::Markdown(r) => r.next_event(),
             #[cfg(feature = "docx")]
             Self::Docx(r) => r.next_event(),
+            #[cfg(feature = "odt")]
+            Self::Odt(r) => r.next_event(),
         }
     }
 }

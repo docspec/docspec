@@ -19,6 +19,10 @@ pub enum InputFormat {
     /// Available when the `docx` feature is enabled.
     #[cfg(feature = "docx")]
     Docx,
+    /// ODT — placeholder: the input is ignored and an empty document is emitted.
+    /// Available when the `odt` feature is enabled.
+    #[cfg(feature = "odt")]
+    Odt,
 }
 
 /// Output format for document conversion.
@@ -59,6 +63,8 @@ pub fn detect_input_format(path: &Path) -> Option<InputFormat> {
         "html" | "htm" => Some(InputFormat::Html),
         #[cfg(feature = "markdown")]
         "md" | "markdown" => Some(InputFormat::Markdown),
+        #[cfg(feature = "odt")]
+        "odt" => Some(InputFormat::Odt),
         _ => None,
     }
 }
@@ -137,6 +143,15 @@ mod tests {
         assert_eq!(
             detect_input_format(Path::new("a.DocX")),
             Some(InputFormat::Docx)
+        );
+    }
+
+    #[cfg(feature = "odt")]
+    #[test]
+    fn detect_input_format_recognizes_odt() {
+        assert_eq!(
+            detect_input_format(Path::new("a.ODT")),
+            Some(InputFormat::Odt)
         );
     }
 

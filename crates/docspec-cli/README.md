@@ -75,6 +75,7 @@ see the [`docspec-http` README](https://docs.rs/docspec-http) for the full list.
 - `markdown` — Full Markdown support including headings, lists, tables, and inline formatting
 - `html` — HTML input (see note below)
 - `docx` — DOCX input including paragraphs, tables, ordered/unordered lists, hyperlinks, embedded images, line breaks, tabs, and run styles (bold, italic, underline, strikethrough, sub/superscript, color, highlight). Embedded images stream as base64 data URLs in BlockNote output. See [`docspec-docx-reader`](https://docs.rs/docspec-docx-reader) for the authoritative list of supported and out-of-scope OOXML elements.
+- `odt` — placeholder: the input file is ignored and the output is an empty document. Real ODT parsing comes later.
 
 > **HTML note:** HTML input is paragraph-only. The reader recognizes `<p>` elements,
 > preserves text inside inline elements within those paragraphs, and silently drops all

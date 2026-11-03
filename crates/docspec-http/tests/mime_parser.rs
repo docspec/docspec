@@ -1,6 +1,6 @@
 //! Unit tests for the `mime_parser` module.
 
-#![allow(clippy::tests_outside_test_module, clippy::unwrap_used)]
+#![allow(clippy::panic, clippy::tests_outside_test_module, clippy::unwrap_used)]
 
 use axum::http::HeaderValue;
 use docspec::{InputFormat, OutputFormat};
@@ -304,6 +304,37 @@ fn content_type_docx_with_arbitrary_param_rejects() {
         validate_content_type(Some(&header)),
         Err(HttpError::UnsupportedMediaType { received: Some(_) })
     ));
+}
+
+#[test]
+fn content_type_odt_returns_odt_format() {
+    let header = HeaderValue::from_static("application/vnd.oasis.opendocument.text");
+    assert_eq!(
+        validate_content_type(Some(&header)).unwrap(),
+        InputFormat::Odt
+    );
+}
+
+#[test]
+fn content_type_odt_with_param_rejects() {
+    let header = HeaderValue::from_static("application/vnd.oasis.opendocument.text; charset=utf-8");
+    let Err(HttpError::UnsupportedMediaType { received }) = validate_content_type(Some(&header))
+    else {
+        panic!("expected UnsupportedMediaType");
+    };
+    assert_eq!(
+        received.as_deref(),
+        Some("application/vnd.oasis.opendocument.text; charset=utf-8")
+    );
+}
+
+#[test]
+fn bucket_input_mime_odt_returns_odt_label() {
+    let header = HeaderValue::from_static("application/vnd.oasis.opendocument.text");
+    assert_eq!(
+        docspec_http::mime_parser::bucket_input_mime(Some(&header)),
+        docspec_http::mime::MIME_ODT
+    );
 }
 
 #[test]
