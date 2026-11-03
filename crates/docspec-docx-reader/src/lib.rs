@@ -183,14 +183,16 @@ impl DocxReader {
     /// The reader must be positioned at the start of a valid DOCX (ZIP) archive.
     ///
     /// **Memory note**: this constructor buffers `word/document.xml` into memory
-    /// (O(N) in document size). Use [`from_path`](Self::from_path) for O(1)
-    /// constant-memory streaming.
+    /// (O(N) in document size, bounded by a 256 MiB cap on the decompressed part).
+    /// Use [`from_path`](Self::from_path) for O(1) constant-memory streaming.
     ///
     /// # Errors
     ///
     /// Returns [`docspec_core::Error::Parse`] if the input is not a valid ZIP archive, if
     /// `_rels/.rels` is missing or malformed, or if the document target entry
-    /// cannot be opened. Returns [`docspec_core::Error::Io`] for I/O failures.
+    /// cannot be opened. Returns [`docspec_core::Error::Limit`] when `word/document.xml`
+    /// or a metadata part decompresses beyond its cap. Returns
+    /// [`docspec_core::Error::Io`] for I/O failures.
     #[inline]
     pub fn from_reader<R>(reader: R) -> Result<Self>
     where
