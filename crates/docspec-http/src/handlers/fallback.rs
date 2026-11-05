@@ -22,7 +22,7 @@ pub async fn not_found(request_uri: Uri, method: Method) -> HttpError {
 
 /// Fallback handler for wrong HTTP methods on `/conversion`.
 ///
-/// Returns 405 Method Not Allowed with `Allow: POST, OPTIONS`.
+/// Returns 405 Method Not Allowed with `Allow: GET, HEAD, POST, OPTIONS`.
 #[inline]
 #[must_use]
 // Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.

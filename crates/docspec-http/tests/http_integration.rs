@@ -629,6 +629,67 @@ async fn post_conversion_invalid_utf8() {
 }
 
 #[tokio::test]
+async fn get_conversion_returns_supported_media_types() {
+    let request = common::empty_request("GET", "/conversion");
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content-type present"),
+        "application/json"
+    );
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .expect("cache-control present"),
+        CACHE_CONTROL
+    );
+
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        json!({
+            "version": env!("CARGO_PKG_VERSION"),
+            "inputs": [
+                "text/markdown",
+                "text/html",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.oasis.opendocument.text",
+            ],
+            "outputs": [
+                "application/vnd.docspec.blocknote+json",
+                "application/vnd.blocknote+json",
+                "application/vnd.oxa+json",
+                "application/vnd.pandoc.native",
+                "text/html",
+            ],
+        })
+    );
+}
+
+#[tokio::test]
+async fn head_conversion_returns_200_without_body() {
+    let request = common::empty_request("HEAD", "/conversion");
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content-type present"),
+        "application/json"
+    );
+    assert_eq!(response_body_text(response.into_body()).await, "");
+}
+
+#[tokio::test]
 async fn options_conversion_returns_204() {
     let request = common::empty_request("OPTIONS", "/conversion");
 
@@ -640,7 +701,7 @@ async fn options_conversion_returns_204() {
             .headers()
             .get(header::ALLOW)
             .expect("allow header present"),
-        "POST, OPTIONS"
+        "GET, HEAD, POST, OPTIONS"
     );
     assert_eq!(
         response
@@ -663,7 +724,7 @@ async fn put_conversion_returns_405() {
             .headers()
             .get(header::ALLOW)
             .expect("allow header present"),
-        "POST, OPTIONS"
+        "GET, HEAD, POST, OPTIONS"
     );
     assert_eq!(
         response
@@ -688,7 +749,7 @@ async fn put_conversion_returns_405() {
             "type": "about:blank",
             "title": "Method Not Allowed",
             "status": 405,
-            "detail": "Method not allowed. Allowed methods: POST, OPTIONS.",
+            "detail": "Method not allowed. Allowed methods: GET, HEAD, POST, OPTIONS.",
             "instance": instance,
         })
     );
@@ -706,7 +767,7 @@ async fn delete_conversion_returns_405() {
             .headers()
             .get(header::ALLOW)
             .expect("allow header present"),
-        "POST, OPTIONS"
+        "GET, HEAD, POST, OPTIONS"
     );
 
     let instance = instance_of(&response);
@@ -717,7 +778,7 @@ async fn delete_conversion_returns_405() {
             "type": "about:blank",
             "title": "Method Not Allowed",
             "status": 405,
-            "detail": "Method not allowed. Allowed methods: POST, OPTIONS.",
+            "detail": "Method not allowed. Allowed methods: GET, HEAD, POST, OPTIONS.",
             "instance": instance,
         })
     );

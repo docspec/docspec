@@ -10,7 +10,7 @@ pub const CACHE_CONTROL_VALUE: &str = "max-age=0, private, must-revalidate";
 pub(crate) const X_TRACE_ID_HEADER: &str = "x-trace-id";
 
 /// `Allow` header value for `/conversion`.
-pub(crate) const ALLOW_CONVERSION: &str = "POST, OPTIONS";
+pub(crate) const ALLOW_CONVERSION: &str = "GET, HEAD, POST, OPTIONS";
 
 /// `Allow` header value for `/health`.
 pub(crate) const ALLOW_HEALTH: &str = "GET, HEAD, OPTIONS";
