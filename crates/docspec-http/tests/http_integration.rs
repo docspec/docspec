@@ -337,6 +337,15 @@ fn nested_tables_docx(depth: usize) -> Vec<u8> {
 }
 
 #[tokio::test]
+async fn post_conversion_docx_at_reader_cap_returns_200() {
+    let response = app()
+        .oneshot(common::docx_request(nested_tables_docx(100)))
+        .await
+        .expect("request succeeds");
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
 async fn post_conversion_docx_over_reader_cap_returns_422_resource_limit() {
     let response = app()
         .oneshot(common::docx_request(nested_tables_docx(101)))

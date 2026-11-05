@@ -949,6 +949,41 @@ mod tests {
         }
     }
 
+    #[test]
+    fn read_entry_capped_reads_at_most_cap_plus_one_bytes() {
+        struct Counting<R> {
+            inner: R,
+            yielded: usize,
+        }
+        impl<R: std::io::Read> std::io::Read for Counting<R> {
+            fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+                let n = self.inner.read(buf)?;
+                self.yielded += n;
+                Ok(n)
+            }
+        }
+
+        let mut entry = Counting {
+            inner: Cursor::new(vec![b'A'; 1024]),
+            yielded: 0,
+        };
+        match read_entry_capped(&mut entry, 8, "word/styles.xml") {
+            Err(Error::Limit { message }) => assert_eq!(
+                message,
+                "package part word/styles.xml exceeds the 8-byte limit (possible zip bomb)"
+            ),
+            other => panic!("expected Limit error, got {other:?}"),
+        }
+        assert_eq!(entry.yielded, 9);
+    }
+
+    #[test]
+    fn part_caps_match_documented_limits() {
+        // SECURITY.md documents these values; changing them must update it too.
+        assert_eq!(super::MAX_MAIN_PART_BYTES, 256 * 1024 * 1024);
+        assert_eq!(MAX_METADATA_PART_BYTES, 64 * 1024 * 1024);
+    }
+
     /// Writes a deflated ZIP entry filled with `len` copies of `byte`, streamed in
     /// chunks so the fixture never materializes the full decompressed payload.
     fn add_deflated_filled_entry(
