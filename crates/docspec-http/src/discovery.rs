@@ -179,8 +179,11 @@ pub(crate) struct LinkContext {
 /// `GET /.well-known/api-catalog` body: an RFC 9727 API catalog, as an
 /// RFC 9264 JSON linkset.
 ///
-/// Links are relative to the catalog's URL (RFC 9264 §4.2), so `../` reaches
-/// the server root.
+/// Links are relative to the catalog's URL, so `../` reaches the server root
+/// both at the origin root and under a path prefix. This deliberately deviates
+/// from RFC 9264 §4.2.2 and §4.2.3, which say `anchor` and `href` SHOULD NOT be
+/// relative: the server has no configured public base URL, and building one
+/// from the `Host` header would trust client input.
 #[derive(ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ApiCatalog {

@@ -791,7 +791,7 @@ async fn well_known_docspec_links_resolve_at_root_and_under_prefix() {
 
 const API_CATALOG_CT: &str =
     r#"application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727""#;
-const API_CATALOG_LINK: &str = r#"</.well-known/api-catalog>; rel="api-catalog""#;
+const API_CATALOG_LINK: &str = r#"<api-catalog>; rel="api-catalog""#;
 
 #[tokio::test]
 async fn get_api_catalog_returns_rfc9727_linkset() {
@@ -841,26 +841,50 @@ async fn head_api_catalog_returns_link_header_without_body() {
 }
 
 #[tokio::test]
-async fn api_catalog_links_resolve_to_conversion_and_openapi() {
+async fn api_catalog_links_resolve_at_root_and_under_prefix() {
     let request = common::empty_request("GET", "/.well-known/api-catalog");
     let response = app().oneshot(request).await.expect("request succeeds");
+    let link = response
+        .headers()
+        .get(header::LINK)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix('<'))
+        .and_then(|value| value.split_once('>'))
+        .map(|(target, _)| target.to_owned())
+        .expect("link header has a target");
     let body = response_body_json(response.into_body()).await;
-    let base = url::Url::parse("http://localhost:3000/.well-known/api-catalog").expect("url");
-    let resolve = |pointer: &str| {
-        let href = body
-            .pointer(pointer)
-            .and_then(Value::as_str)
-            .expect("link present");
-        base.join(href).expect("link resolves").to_string()
+    let resolve = |catalog: &str| -> [String; 3] {
+        let base = url::Url::parse(catalog).expect("valid catalog url");
+        let join = |href: &str| base.join(href).expect("link resolves").to_string();
+        let field = |pointer: &str| {
+            join(
+                body.pointer(pointer)
+                    .and_then(Value::as_str)
+                    .expect("link present"),
+            )
+        };
+        [
+            join(&link),
+            field("/linkset/0/anchor"),
+            field("/linkset/0/service-desc/0/href"),
+        ]
     };
 
     assert_eq!(
-        resolve("/linkset/0/anchor"),
-        "http://localhost:3000/conversion"
+        resolve("http://localhost:3000/.well-known/api-catalog"),
+        [
+            "http://localhost:3000/.well-known/api-catalog".to_owned(),
+            "http://localhost:3000/conversion".to_owned(),
+            "http://localhost:3000/openapi.json".to_owned(),
+        ]
     );
     assert_eq!(
-        resolve("/linkset/0/service-desc/0/href"),
-        "http://localhost:3000/openapi.json"
+        resolve("https://example.com/docspec/.well-known/api-catalog"),
+        [
+            "https://example.com/docspec/.well-known/api-catalog".to_owned(),
+            "https://example.com/docspec/conversion".to_owned(),
+            "https://example.com/docspec/openapi.json".to_owned(),
+        ]
     );
 }
 

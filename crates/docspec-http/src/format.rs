@@ -23,7 +23,10 @@ pub(crate) const API_CATALOG_CONTENT_TYPE: &str =
     r#"application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727""#;
 
 /// `Link` header value that points at the API catalog (RFC 9727 §2).
-pub(crate) const API_CATALOG_LINK: &str = r#"</.well-known/api-catalog>; rel="api-catalog""#;
+///
+/// Sent only on the catalog's own responses, so the relative `api-catalog`
+/// resolves to the catalog both at the origin root and under a path prefix.
+pub(crate) const API_CATALOG_LINK: &str = r#"<api-catalog>; rel="api-catalog""#;
 
 /// Health endpoint response body.
 pub const HEALTH_BODY: &str = "Healthy.";

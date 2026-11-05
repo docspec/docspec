@@ -58,7 +58,7 @@ pub async fn get_well_known() -> Result<impl IntoResponse, HttpError> {
             description = "The API catalog.",
             body = ApiCatalog,
             content_type = format::API_CATALOG_CONTENT_TYPE,
-            headers(("Link" = String, description = "`</.well-known/api-catalog>; rel=\"api-catalog\"`")),
+            headers(("Link" = String, description = "`<api-catalog>; rel=\"api-catalog\"`, relative to this document's URL")),
         ),
         (status = 500, description = "The response could not be built.", body = Problem, content_type = "application/problem+json"),
     ),
