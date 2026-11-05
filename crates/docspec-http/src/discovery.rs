@@ -103,6 +103,9 @@ pub(crate) struct Links {
     /// The liveness check.
     #[schema(format = "uri-reference")]
     health: &'static str,
+    /// The `OpenAPI` description of this server.
+    #[schema(format = "uri-reference")]
+    openapi: &'static str,
 }
 
 /// `GET /.well-known/docspec` body: the version, links to the server's
@@ -126,6 +129,7 @@ impl WellKnown {
             links: Links {
                 conversion: "../conversion",
                 health: "../health",
+                openapi: "../openapi.json",
             },
             conversion: MediaTypes::current(),
         }
@@ -138,7 +142,8 @@ impl WellKnown {
             object.key("version").value(self.version)?;
             object.key("links").object(|links| {
                 links.key("conversion").value(self.links.conversion)?;
-                links.key("health").value(self.links.health)
+                links.key("health").value(self.links.health)?;
+                links.key("openapi").value(self.links.openapi)
             })?;
             object.key("conversion").object(|conversion| {
                 write_media_types(

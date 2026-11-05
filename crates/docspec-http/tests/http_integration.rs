@@ -719,6 +719,7 @@ async fn get_well_known_docspec_returns_discovery_document() {
             "links": {
                 "conversion": "../conversion",
                 "health": "../health",
+                "openapi": "../openapi.json",
             },
             "conversion": {
                 "inputs": [
@@ -772,6 +773,10 @@ async fn well_known_docspec_links_resolve_at_root_and_under_prefix() {
                 "health".to_owned(),
                 "http://localhost:3000/health".to_owned()
             ),
+            (
+                "openapi".to_owned(),
+                "http://localhost:3000/openapi.json".to_owned()
+            ),
         ]
     );
     assert_eq!(
@@ -784,6 +789,10 @@ async fn well_known_docspec_links_resolve_at_root_and_under_prefix() {
             (
                 "health".to_owned(),
                 "https://example.com/docspec/health".to_owned()
+            ),
+            (
+                "openapi".to_owned(),
+                "https://example.com/docspec/openapi.json".to_owned()
             ),
         ]
     );

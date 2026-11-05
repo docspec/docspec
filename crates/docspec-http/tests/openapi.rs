@@ -307,3 +307,47 @@ async fn problem_body_matches_its_schema() {
         members(document.pointer("/components/schemas/Problem/properties"))
     );
 }
+
+#[tokio::test]
+async fn well_known_docspec_openapi_link_leads_to_the_openapi_document() {
+    let discovery = get_json("/.well-known/docspec").await;
+    let href = discovery
+        .pointer("/links/openapi")
+        .and_then(Value::as_str)
+        .expect("links.openapi present");
+    let base = url::Url::parse("http://localhost:3000/.well-known/docspec").expect("url");
+    let target = base.join(href).expect("link resolves");
+
+    let response = app()
+        .oneshot(common::empty_request("GET", target.path()))
+        .await
+        .expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content-type present"),
+        MIME_OPENAPI
+    );
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body read");
+    let document: Value = serde_json::from_slice(&bytes).expect("valid JSON");
+    assert_eq!(document.get("openapi"), Some(&json!("3.1.0")));
+}
+
+#[tokio::test]
+async fn well_known_links_schema_describes_openapi() {
+    let document = openapi().await;
+
+    assert_eq!(
+        document.pointer("/components/schemas/Links/properties/openapi"),
+        Some(&json!({
+            "type": "string",
+            "format": "uri-reference",
+            "description": "The `OpenAPI` description of this server.",
+        }))
+    );
+}
