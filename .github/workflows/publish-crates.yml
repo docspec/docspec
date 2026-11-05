@@ -23,7 +23,7 @@ permissions:
 jobs:
   publish:
     name: cargo publish -p ${{ inputs.crate }}
-    runs-on: ubuntu-latest
+    runs-on: 9xx
     environment: release
     steps:
       - uses: actions/checkout@v7

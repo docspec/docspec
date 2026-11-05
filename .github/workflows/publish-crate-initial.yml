@@ -55,7 +55,7 @@ permissions:
 jobs:
   publish:
     name: 'Initial publish: ${{ inputs.crate }}'
-    runs-on: ubuntu-latest
+    runs-on: 9xx
     # Bind to the `release` GitHub environment (shared with the automated
     # release pipeline). The environment can later gate this workflow with
     # required reviewers without touching the workflow file.
