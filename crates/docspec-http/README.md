@@ -80,6 +80,7 @@ curl -X POST \
 | ------- | ----------- | ---------------------------------------------------------------- |
 | POST    | /conversion | Convert markdown, HTML, or DOCX to BlockNote (default), HTML, oxa.dev JSON, or Pandoc native |
 | GET     | /conversion | Supported input/output media types and server version (JSON)     |
+| HEAD    | /conversion | Supported media types (no body)                                  |
 | OPTIONS | /conversion | Preflight / allowed methods                                      |
 | GET     | /health     | Liveness check                                                   |
 | HEAD    | /health     | Liveness check (no body)                                         |
