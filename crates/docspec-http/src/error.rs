@@ -15,6 +15,9 @@ use axum::{
 use docspec_json::{JsonEmitter, StrusonBackend};
 use tower_http::request_id::RequestId;
 
+use crate::mime;
+use crate::mime_parser::BLOCKNOTE_WILDCARDS;
+
 /// Base of every problem `type` URI this server defines
 /// ([RFC 9457 §4](https://www.rfc-editor.org/rfc/rfc9457#section-4)).
 ///
@@ -406,17 +409,19 @@ impl IntoResponse for HttpError {
             Self::NotAcceptable => (
                 StatusCode::NOT_ACCEPTABLE,
                 "Not Acceptable",
-                Cow::Borrowed(
-                    "Accept header must include application/vnd.docspec.blocknote+json, \
-                     application/vnd.blocknote+json, application/vnd.oxa+json, \
-                     application/vnd.pandoc.native, text/html, application/*, or */*",
-                ),
+                Cow::Owned(format!(
+                    "Accept header must include {}",
+                    mime::english_or_list(mime::output_mimes().chain(BLOCKNOTE_WILDCARDS))
+                )),
                 None,
             ),
             Self::UnsupportedMediaType { received: None } => (
                 StatusCode::UNSUPPORTED_MEDIA_TYPE,
                 "Unsupported Media Type",
-                Cow::Borrowed("Content-Type must be text/markdown, text/html, application/vnd.openxmlformats-officedocument.wordprocessingml.document, or application/vnd.oasis.opendocument.text"),
+                Cow::Owned(format!(
+                    "Content-Type must be {}",
+                    mime::english_or_list(mime::input_mimes())
+                )),
                 None,
             ),
             Self::UnsupportedMediaType {
@@ -425,7 +430,8 @@ impl IntoResponse for HttpError {
                 StatusCode::UNSUPPORTED_MEDIA_TYPE,
                 "Unsupported Media Type",
                 Cow::Owned(format!(
-                    "Content-Type must be text/markdown, text/html, application/vnd.openxmlformats-officedocument.wordprocessingml.document, or application/vnd.oasis.opendocument.text, got {content_type}"
+                    "Content-Type must be {}, got {content_type}",
+                    mime::english_or_list(mime::input_mimes())
                 )),
                 None,
             ),

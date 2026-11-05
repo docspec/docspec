@@ -75,10 +75,31 @@ const INPUT_MIMES: &[(&str, InputFormat)] = &[
 pub(crate) const OUTPUT_MIMES: &[(&str, OutputFormat)] = &[
     (MIME_BLOCKNOTE, OutputFormat::Blocknote),
     (MIME_BLOCKNOTE_ALIAS, OutputFormat::Blocknote),
-    (MIME_HTML, OutputFormat::Html),
     (MIME_OXA, OutputFormat::Oxa),
     (MIME_PANDOC_NATIVE, OutputFormat::PandocNative),
+    (MIME_HTML, OutputFormat::Html),
 ];
+
+/// Input MIME types accepted on `Content-Type`, in table order.
+pub(crate) fn input_mimes() -> impl Iterator<Item = &'static str> {
+    INPUT_MIMES.iter().map(|&(input_mime, _)| input_mime)
+}
+
+/// Output MIME types recognised on `Accept`, aliases included, in table order.
+pub(crate) fn output_mimes() -> impl Iterator<Item = &'static str> {
+    OUTPUT_MIMES.iter().map(|&(output_mime, _)| output_mime)
+}
+
+/// Joins items as an English "or" list with a serial comma: `a, b, or c`.
+pub(crate) fn english_or_list<'item>(items: impl IntoIterator<Item = &'item str>) -> String {
+    let items: Vec<&str> = items.into_iter().collect();
+    match items.split_last() {
+        None => String::new(),
+        Some((last, [])) => (*last).to_owned(),
+        Some((last, [first])) => format!("{first} or {last}"),
+        Some((last, rest)) => format!("{}, or {last}", rest.join(", ")),
+    }
+}
 
 /// Resolves a parsed `Content-Type` to the reader format whose MIME has the
 /// same type and subtype, ignoring parameters and any suffix.
@@ -143,6 +164,36 @@ mod tests {
     #[test]
     fn output_mime_returns_canonical_blocknote_not_alias() {
         assert_eq!(output_mime(OutputFormat::Blocknote), Some(MIME_BLOCKNOTE));
+    }
+
+    #[test]
+    fn english_or_list_joins_zero_one_two_and_many() {
+        assert_eq!(english_or_list([]), "");
+        assert_eq!(english_or_list(["a"]), "a");
+        assert_eq!(english_or_list(["a", "b"]), "a or b");
+        assert_eq!(english_or_list(["a", "b", "c"]), "a, b, or c");
+    }
+
+    #[test]
+    fn input_mimes_lists_table_in_order() {
+        assert_eq!(
+            input_mimes().collect::<Vec<_>>(),
+            [MIME_MARKDOWN, MIME_HTML, MIME_DOCX, MIME_ODT]
+        );
+    }
+
+    #[test]
+    fn output_mimes_lists_table_in_order_with_alias() {
+        assert_eq!(
+            output_mimes().collect::<Vec<_>>(),
+            [
+                MIME_BLOCKNOTE,
+                MIME_BLOCKNOTE_ALIAS,
+                MIME_OXA,
+                MIME_PANDOC_NATIVE,
+                MIME_HTML
+            ]
+        );
     }
 
     #[test]

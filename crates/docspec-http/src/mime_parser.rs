@@ -8,7 +8,7 @@ use crate::mime::{classify_input, input_mime, output_mime, OUTPUT_MIMES};
 
 /// `Accept` wildcards that select the default output, [`OutputFormat::Blocknote`],
 /// for back-compat with clients that predate the other writers.
-const BLOCKNOTE_WILDCARDS: [&str; 2] = ["*/*", "application/*"];
+pub(crate) const BLOCKNOTE_WILDCARDS: [&str; 2] = ["application/*", "*/*"];
 
 /// Negotiates the `Accept` header for the `/conversion` endpoint.
 ///
