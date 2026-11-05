@@ -114,7 +114,7 @@ curl -X POST \
 How a client finds it:
 
 - **Host and port**: fetch `http://<host>:<port>/.well-known/docspec`.
-- **Base URL** (DocSpec mounted under a reverse-proxy prefix such as `https://example.com/docspec/`): fetch `{base}/.well-known/docspec`. RFC 8615 places well-known URIs at the origin root; looking one up under a base URL is a pragmatic convention for prefixed deployments, not part of the RFC.
+- **Base URL** (DocSpec mounted under a reverse-proxy prefix such as `https://example.com/docspec`): fetch `{base}/.well-known/docspec`. RFC 8615 places well-known URIs at the origin root; looking one up under a base URL is a pragmatic convention for prefixed deployments, not part of the RFC.
 
 Either way, resolve each link against the URL the document was fetched from, as any URL library does ([RFC 3986 §5](https://www.rfc-editor.org/rfc/rfc3986#section-5)). Links start with `../`, so `../conversion` from `https://example.com/docspec/.well-known/docspec` is `https://example.com/docspec/conversion`, and from `http://localhost:3000/.well-known/docspec` it is `http://localhost:3000/conversion`.
 
