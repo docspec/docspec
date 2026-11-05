@@ -28,7 +28,7 @@ pub enum OutputFormat {
     /// `BlockNote` JSON. Available when the `blocknote` feature is enabled.
     #[cfg(feature = "blocknote-writer")]
     Blocknote,
-    /// HTML5 (paragraph-only; `<p>` elements and text within them only).
+    /// HTML5 (paragraphs, code blocks and text; `<p>` and `<pre><code>` elements only).
     /// Available when the `html-writer` feature is enabled.
     #[cfg(feature = "html-writer")]
     Html,

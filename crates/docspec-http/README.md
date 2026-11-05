@@ -8,7 +8,7 @@ Send markdown (`Content-Type: text/markdown`), HTML (`Content-Type: text/html`),
 
 > **Only BlockNote output is production-ready.** `text/html`, `application/vnd.oxa+json` and `application/vnd.pandoc.native` are **experimental**: the server returns `200` while silently dropping structure those writers cannot express.
 >
-> - `text/html` — paragraphs and text only; headings, lists, tables, links and images are dropped
+> - `text/html` — paragraphs, code blocks and text; headings, lists, tables, links and images are dropped
 > - `application/vnd.oxa+json` — paragraphs and text only; same omissions
 > - `application/vnd.pandoc.native` — paragraphs, headings, styles and code; lists, tables, links and images are dropped
 >
