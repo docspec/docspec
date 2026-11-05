@@ -35,13 +35,16 @@ pub(crate) fn conversion_formats_json() -> docspec_core::Result<Vec<u8>> {
 
 /// Serializes the `GET /.well-known/docspec` body: the version, links to the
 /// server's resources and the media types `/conversion` supports.
+///
+/// Links are relative to the document's own URL (RFC 3986 §5), so `../`
+/// reaches the server root and they still resolve behind a path prefix.
 pub(crate) fn well_known_json() -> docspec_core::Result<Vec<u8>> {
     let mut emitter = JsonEmitter::new(StrusonBackend::new(Vec::new()));
     emitter.object(|object| {
         object.key("version").value(VERSION)?;
         object.key("links").object(|links| {
-            links.key("conversion").value("/conversion")?;
-            links.key("health").value("/health")
+            links.key("conversion").value("../conversion")?;
+            links.key("health").value("../health")
         })?;
         object.key("conversion").object(write_media_types)
     })?;
