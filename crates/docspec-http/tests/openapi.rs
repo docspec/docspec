@@ -232,6 +232,21 @@ async fn problem_body_matches_its_schema() {
         .await
         .expect("body read");
     let problem: Value = serde_json::from_slice(&bytes).expect("valid JSON");
+    // The schema is open for RFC 9457 extensions, so compare member names too.
+    let members = |value: Option<&Value>| -> Vec<String> {
+        let mut keys: Vec<String> = value
+            .and_then(Value::as_object)
+            .expect("object")
+            .keys()
+            .cloned()
+            .collect();
+        keys.sort();
+        keys
+    };
 
     assert_eq!(errors(&schema, &problem), Vec::<String>::new());
+    assert_eq!(
+        members(Some(&problem)),
+        members(document.pointer("/components/schemas/Problem/properties"))
+    );
 }
