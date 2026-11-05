@@ -130,7 +130,7 @@ Convert Markdown from stdin to BlockNote JSON on stdout:
 echo "# Hello" | docspec convert --from markdown --to blocknote
 ```
 
-Convert Markdown to HTML (experimental — paragraphs and text only):
+Convert Markdown to HTML (experimental — paragraphs, code blocks and text):
 
 ```bash
 echo "Hello" | docspec convert --from markdown --to html
