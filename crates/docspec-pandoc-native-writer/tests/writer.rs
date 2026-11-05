@@ -1677,7 +1677,7 @@ mod tests {
             writer.handle_event(text(CHUNK)).unwrap();
         }
         // Every byte of the 64 KiB block is already out before the block ends.
-        assert_eq!(out.contents().len(), HEADER.len() + CHUNK.len() * CHUNKS);
+        assert_eq!(out.contents(), format!("{HEADER}{}", CHUNK.repeat(CHUNKS)));
         writer.handle_event(Event::EndPreformatted).unwrap();
         writer.handle_event(Event::EndDocument).unwrap();
         writer.finish().unwrap();
