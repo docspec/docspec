@@ -29,7 +29,7 @@
 //! |---------------------|-------------------------|-------------------------------|
 //! | `blocknote-writer`  | `BlockNote` JSON        | [`writers::BlockNoteWriter`]  |
 //! | `oxa-writer`        | `oxa.dev` JSON          | `writers::OxaWriter`          |
-//! | `html-writer`       | HTML (paragraphs only)  | `writers::HtmlWriter`         |
+//! | `html-writer`       | HTML (paragraphs and code blocks only) | `writers::HtmlWriter`         |
 //! | `pandoc-native-writer` | Pandoc native block list | `writers::PandocNativeWriter` |
 //! | `markdown-writer`   | Markdown (paragraphs and headings only) | `writers::MarkdownWriter` |
 //!
