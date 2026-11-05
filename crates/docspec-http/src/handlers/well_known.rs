@@ -5,7 +5,7 @@ use axum::response::IntoResponse;
 
 use crate::{
     discovery::WellKnown,
-    error::{HttpError, ProblemJson},
+    error::{HttpError, Problem},
 };
 
 /// Handle `GET /.well-known/docspec` — describe this server and link to its resources.
@@ -26,7 +26,7 @@ use crate::{
                    and the media types `/conversion` supports.",
     responses(
         (status = 200, description = "The discovery document.", body = WellKnown, content_type = "application/json"),
-        (status = 500, description = "The response could not be built.", body = ProblemJson, content_type = "application/problem+json"),
+        (status = 500, description = "The response could not be built.", body = Problem, content_type = "application/problem+json"),
     ),
 )]
 #[inline]

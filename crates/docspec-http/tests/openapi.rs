@@ -74,11 +74,28 @@ async fn get_openapi_returns_openapi_document() {
         Some(&json!({
             "title": "DocSpec HTTP API",
             "description": "Streaming document conversion. Errors are RFC 9457 problem details. \
-                            Undocumented paths answer 404 and undocumented methods 405, both as \
-                            problem details. `GET /metrics` is served only when metrics are \
+                            `HEAD` is served wherever `GET` is. Undocumented paths answer 404 and \
+                            other undocumented methods 405, both as problem details. `GET /metrics` is served only when metrics are \
                             enabled and is not described here.",
             "version": env!("CARGO_PKG_VERSION"),
         }))
+    );
+}
+
+#[tokio::test]
+async fn head_openapi_is_served_like_get() {
+    let response = app()
+        .oneshot(common::empty_request("HEAD", "/openapi.json"))
+        .await
+        .expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content-type present"),
+        MIME_OPENAPI
     );
 }
 

@@ -9,13 +9,13 @@
 use std::sync::LazyLock;
 
 use utoipa::openapi::{
-    path::{Operation, ParameterBuilder, ParameterIn},
+    path::Operation,
     request_body::RequestBodyBuilder,
     schema::{ObjectBuilder, Type},
     ContentBuilder, InfoBuilder, OpenApi, OpenApiBuilder, RefOr, Required, Schema,
 };
 
-use crate::{discovery::VERSION, error::HttpError, mime, mime_parser::BLOCKNOTE_WILDCARDS};
+use crate::{discovery::VERSION, error::HttpError, mime};
 
 /// Media type of the `OpenAPI` document.
 pub(crate) const MIME_OPENAPI: &str = "application/vnd.oai.openapi+json;version=3.1";
@@ -38,8 +38,8 @@ pub(crate) fn base() -> OpenApi {
                 .version(VERSION)
                 .description(Some(
                     "Streaming document conversion. Errors are RFC 9457 problem details. \
-                     Undocumented paths answer 404 and undocumented methods 405, both as \
-                     problem details. `GET /metrics` is served only when metrics are enabled \
+                     `HEAD` is served wherever `GET` is. Undocumented paths answer 404 and \
+                     other undocumented methods 405, both as problem details. `GET /metrics` is served only when metrics are enabled \
                      and is not described here.",
                 )),
         )
@@ -70,8 +70,12 @@ fn build() -> Result<Vec<u8>, Box<dyn core::error::Error + Send + Sync>> {
     Ok(serde_json::to_vec(&api)?)
 }
 
-/// Fills in the request media types, the `Accept` header, and the success
-/// media types of `POST /conversion` from the MIME tables.
+/// Fills in the request and success media types of `POST /conversion` from
+/// the MIME tables.
+///
+/// `Accept` is not declared as a parameter: `OpenAPI` 3.1 says header
+/// parameters named `Accept` are ignored, so the operation description says
+/// how it selects the writer instead.
 fn describe_conversion_media(post: &mut Operation) -> Result<(), MissingOperation> {
     let request = mime::input_mimes().fold(
         RequestBodyBuilder::new()
@@ -87,22 +91,6 @@ fn describe_conversion_media(post: &mut Operation) -> Result<(), MissingOperatio
         },
     );
     post.request_body = Some(RefOr::T(request.build()));
-
-    let accept = ParameterBuilder::new()
-        .name("Accept")
-        .parameter_in(ParameterIn::Header)
-        .required(Required::False)
-        .description(Some(
-            "Selects the writer. Missing, `*/*` and `application/*` select BlockNote JSON.",
-        ))
-        .schema(Some(
-            ObjectBuilder::new()
-                .schema_type(Type::String)
-                .enum_values(Some(mime::output_mimes().chain(BLOCKNOTE_WILDCARDS))),
-        ));
-    post.parameters
-        .get_or_insert_with(Vec::new)
-        .push(RefOr::T(accept.build()));
 
     let Some(RefOr::T(ok)) = post.responses.responses.get_mut("200") else {
         return Err(MissingOperation("POST /conversion 200 response"));
@@ -179,15 +167,8 @@ mod tests {
     }
 
     #[test]
-    fn accept_values_are_the_output_table_and_wildcards() {
-        let expected: Vec<Value> = mime::output_mimes()
-            .chain(BLOCKNOTE_WILDCARDS)
-            .map(Value::from)
-            .collect();
-        assert_eq!(
-            post_conversion().pointer("/parameters/0/schema/enum"),
-            Some(&Value::Array(expected))
-        );
+    fn accept_is_not_declared_as_a_parameter() {
+        assert_eq!(post_conversion().get("parameters"), None);
     }
 
     #[test]

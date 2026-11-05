@@ -13,7 +13,7 @@ use docspec_core::EventSource;
 
 use crate::{
     discovery::ConversionFormats,
-    error::{HttpError, InputProblem, ProblemJson},
+    error::{HttpError, InputProblem, Problem},
     format, mime_parser,
 };
 
@@ -67,7 +67,7 @@ pub async fn options_conversion() -> impl IntoResponse {
                    `Accept` (`outputs`), and the server version.",
     responses(
         (status = 200, description = "Supported media types.", body = ConversionFormats, content_type = "application/json"),
-        (status = 500, description = "The response could not be built.", body = ProblemJson, content_type = "application/problem+json"),
+        (status = 500, description = "The response could not be built.", body = Problem, content_type = "application/problem+json"),
     ),
 )]
 #[allow(clippy::unused_async)]
@@ -129,15 +129,17 @@ pub async fn get_conversion() -> Result<impl IntoResponse, HttpError> {
     path = "/conversion",
     tag = "conversion",
     summary = "Convert a document",
-    description = "`Content-Type` selects the reader and `Accept` selects the writer. A missing \
-                   `Accept`, `*/*` or `application/*` selects BlockNote JSON.",
+    description = "`Content-Type` selects the reader and `Accept` selects the writer, from the \
+                   media types of the 200 response or their aliases. The first listed type the \
+                   server can write wins and q-values are ignored. A missing `Accept`, `*/*` or \
+                   `application/*` selects BlockNote JSON.",
     responses(
         (status = 200, description = "The converted document, in the negotiated output format."),
-        (status = 400, description = "The body is empty, or is not valid UTF-8 for a text input.", body = ProblemJson, content_type = "application/problem+json"),
-        (status = 406, description = "No acceptable output format in `Accept`.", body = ProblemJson, content_type = "application/problem+json"),
-        (status = 415, description = "Missing or unsupported `Content-Type`.", body = ProblemJson, content_type = "application/problem+json"),
-        (status = 422, description = "The document could not be converted; `type` says why.", body = ProblemJson, content_type = "application/problem+json"),
-        (status = 500, description = "Unexpected server error.", body = ProblemJson, content_type = "application/problem+json"),
+        (status = 400, description = "The body is empty, or is not valid UTF-8 for a text input.", body = Problem, content_type = "application/problem+json"),
+        (status = 406, description = "No acceptable output format in `Accept`.", body = Problem, content_type = "application/problem+json"),
+        (status = 415, description = "Missing or unsupported `Content-Type`.", body = Problem, content_type = "application/problem+json"),
+        (status = 422, description = "The document could not be converted; `type` says why.", body = Problem, content_type = "application/problem+json"),
+        (status = 500, description = "Unexpected server error.", body = Problem, content_type = "application/problem+json"),
     ),
 )]
 #[inline]

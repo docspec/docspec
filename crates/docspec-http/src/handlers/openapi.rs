@@ -4,7 +4,7 @@ use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 
 use crate::{
-    error::{HttpError, ProblemJson},
+    error::{HttpError, Problem},
     openapi::{self, MIME_OPENAPI},
 };
 
@@ -21,7 +21,7 @@ use crate::{
     description = "This document.",
     responses(
         (status = 200, description = "The OpenAPI 3.1 document.", body = serde_json::Value, content_type = MIME_OPENAPI),
-        (status = 500, description = "The document could not be built.", body = ProblemJson, content_type = "application/problem+json"),
+        (status = 500, description = "The document could not be built.", body = Problem, content_type = "application/problem+json"),
     ),
 )]
 #[inline]
