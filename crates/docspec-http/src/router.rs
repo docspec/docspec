@@ -189,6 +189,10 @@ pub(crate) fn routes() -> OpenApiRouter {
             "/openapi.json",
             get(crate::handlers::openapi::get_openapi).fallback(read_only_method_not_allowed),
         )
+        .routes(with_fallback(
+            routes!(crate::handlers::well_known::get_api_catalog),
+            read_only_method_not_allowed,
+        ))
         .fallback(not_found)
 }
 

@@ -87,6 +87,7 @@ curl -X POST \
 | OPTIONS | /health     | Allowed methods                                                  |
 | GET     | /.well-known/docspec | Discovery document: version, links, and conversion media types |
 | GET     | /openapi.json | OpenAPI 3.1 description of this API                             |
+| GET     | /.well-known/api-catalog | RFC 9727 API catalog linking `/conversion` to `/openapi.json` |
 | GET     | /metrics    | Prometheus metrics in exposition format 0.0.4                    |
 
 `GET /conversion` lets a client discover what the deployed server supports. `inputs` are the values accepted on `Content-Type`, `outputs` the values accepted on `Accept` (aliases included). The lists are built from the same tables that validate `POST /conversion`:
@@ -122,6 +123,8 @@ Either way, resolve each link against the URL the document was fetched from, as 
 ### API description
 
 `GET /openapi.json` serves an [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0) description of every route above except `/metrics` and the discovery endpoints (`/.well-known/docspec` and `/openapi.json` itself, which are served but not described), as `application/vnd.oai.openapi+json;version=3.1`. It is generated from the handlers' annotations (built once, on first request), so no other route can be served without being described. The `POST /conversion` media types come from the same tables that validate requests. Feed it to Swagger UI, Redocly or a client generator.
+
+Generic API tooling finds it through the standard [RFC 9727](https://www.rfc-editor.org/rfc/rfc9727) API catalog at `GET /.well-known/api-catalog`: an [RFC 9264](https://www.rfc-editor.org/rfc/rfc9264) linkset, served as `application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"`, whose `service-desc` link points from `../conversion` to `../openapi.json` (relative to the catalog's URL). `HEAD` answers with `Link: </.well-known/api-catalog>; rel="api-catalog"`.
 
 ## Request / Response Headers
 
@@ -372,7 +375,7 @@ docspec-http = { version = "1", default-features = false }
 
 **`output_mime_type`**: `application/vnd.docspec.blocknote+json` (conversion succeeded; output produced by the BlockNote writer), `text/html` (conversion succeeded; output produced by the HTML writer), `application/vnd.oxa+json` (conversion succeeded; output produced by the oxa.dev writer), `application/vnd.pandoc.native` (conversion succeeded; output produced by the Pandoc native writer), `none` (no output produced — any error path).
 
-**`path`**: matched route template (`/conversion`, `/health`, `/.well-known/docspec`, `/openapi.json`) or `unknown` for fallback handlers
+**`path`**: matched route template (`/conversion`, `/health`, `/.well-known/docspec`, `/.well-known/api-catalog`, `/openapi.json`) or `unknown` for fallback handlers
 
 **`status`**: numeric HTTP status code as a string (e.g., `"200"`, `"422"`)
 
@@ -380,7 +383,7 @@ docspec-http = { version = "1", default-features = false }
 
 ### Cardinality Guarantees
 
-`path` is bounded to `{"/conversion", "/health", "/.well-known/docspec", "/openapi.json", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 6 values (`text/markdown`, `text/html`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.oasis.opendocument.text`, `unsupported`, `none`). `output_mime_type` is bounded to 5 values (`application/vnd.docspec.blocknote+json`, `text/html`, `application/vnd.oxa+json`, `application/vnd.pandoc.native`, `none`). Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
+`path` is bounded to `{"/conversion", "/health", "/.well-known/docspec", "/.well-known/api-catalog", "/openapi.json", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 6 values (`text/markdown`, `text/html`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.oasis.opendocument.text`, `unsupported`, `none`). `output_mime_type` is bounded to 5 values (`application/vnd.docspec.blocknote+json`, `text/html`, `application/vnd.oxa+json`, `application/vnd.pandoc.native`, `none`). Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
 
 ### Scrape Model
 

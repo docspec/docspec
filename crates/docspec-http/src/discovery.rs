@@ -152,6 +152,80 @@ impl WellKnown {
     }
 }
 
+/// A link target: where it points and the media type found there.
+#[derive(ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TargetLink {
+    /// Target URI, relative to the catalog's URL.
+    #[schema(format = "uri-reference")]
+    href: &'static str,
+    /// Media type of the target.
+    #[serde(rename = "type")]
+    media_type: &'static str,
+}
+
+/// The links of one API: its endpoint and the description of it.
+#[derive(ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct LinkContext {
+    /// The API endpoint, relative to the catalog's URL.
+    #[schema(format = "uri-reference")]
+    anchor: &'static str,
+    /// Machine-readable descriptions of the API.
+    #[serde(rename = "service-desc")]
+    service_desc: Vec<TargetLink>,
+}
+
+/// `GET /.well-known/api-catalog` body: an RFC 9727 API catalog, as an
+/// RFC 9264 JSON linkset.
+///
+/// Links are relative to the catalog's URL (RFC 9264 §4.2), so `../` reaches
+/// the server root.
+#[derive(ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ApiCatalog {
+    /// One link context per API.
+    linkset: Vec<LinkContext>,
+}
+
+impl ApiCatalog {
+    /// The catalog of this build: the conversion API and its `OpenAPI` description.
+    pub(crate) fn current() -> Self {
+        Self {
+            linkset: vec![LinkContext {
+                anchor: "../conversion",
+                service_desc: vec![TargetLink {
+                    href: "../openapi.json",
+                    media_type: crate::openapi::MIME_OPENAPI,
+                }],
+            }],
+        }
+    }
+
+    /// Serializes this body as JSON.
+    pub(crate) fn to_json(&self) -> docspec_core::Result<Vec<u8>> {
+        let mut emitter = JsonEmitter::new(StrusonBackend::new(Vec::new()));
+        emitter.object(|object| {
+            object.key("linkset").array(|linkset| {
+                self.linkset.iter().try_for_each(|context| {
+                    linkset.object(|entry| {
+                        entry.key("anchor").value(context.anchor)?;
+                        entry.key("service-desc").array(|targets| {
+                            context.service_desc.iter().try_for_each(|target| {
+                                targets.object(|link| {
+                                    link.key("href").value(target.href)?;
+                                    link.key("type").value(target.media_type)
+                                })
+                            })
+                        })
+                    })
+                })
+            })
+        })?;
+        emitter.finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::expect_used, clippy::tests_outside_test_module)]

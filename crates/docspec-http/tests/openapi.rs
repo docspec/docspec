@@ -203,6 +203,7 @@ async fn openapi_documents_exactly_the_served_operations() {
     assert_eq!(
         documented,
         [
+            ("/.well-known/api-catalog", "get"),
             ("/conversion", "get"),
             ("/conversion", "options"),
             ("/conversion", "post"),
@@ -262,6 +263,11 @@ async fn assert_matches_component(uri: &str, component: &str) {
 #[tokio::test]
 async fn get_conversion_body_matches_its_schema() {
     assert_matches_component("/conversion", "ConversionFormats").await;
+}
+
+#[tokio::test]
+async fn api_catalog_body_matches_its_schema() {
+    assert_matches_component("/.well-known/api-catalog", "ApiCatalog").await;
 }
 
 #[tokio::test]
