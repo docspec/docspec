@@ -10,7 +10,7 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: 9xx
     permissions:
       contents: read
     steps:
@@ -23,7 +23,7 @@ jobs:
       - run: cargo test --workspace
 
   features:
-    runs-on: ubuntu-latest
+    runs-on: 9xx
     permissions:
       contents: read
     steps:
@@ -51,7 +51,7 @@ jobs:
           done
 
   clippy:
-    runs-on: ubuntu-latest
+    runs-on: 9xx
     permissions:
       contents: read
     steps:
@@ -66,7 +66,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
   fmt:
-    runs-on: ubuntu-latest
+    runs-on: 9xx
     permissions:
       contents: read
     steps:
@@ -107,7 +107,7 @@ jobs:
       github.event_name == 'push'
       && github.ref == 'refs/heads/main'
       && github.repository == 'docspec/docspec'
-    runs-on: ubuntu-latest
+    runs-on: 9xx
     permissions:
       contents: write       # push to the release-plz branch
       pull-requests: write  # open / update the release PR
@@ -139,7 +139,7 @@ jobs:
       github.event_name == 'push'
       && github.ref == 'refs/heads/main'
       && github.repository == 'docspec/docspec'
-    runs-on: ubuntu-latest
+    runs-on: 9xx
     # Bind to the `release` GitHub environment (created by maintainers).
     # This allows future addition of secrets / branch protection without
     # changing the workflow. No approval gate is configured (per plan §6).
