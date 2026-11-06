@@ -2,6 +2,7 @@
 
 use crate::numbering::LevelOutcome;
 use docspec_core::{Color, ListStyleType, TextAlignment};
+use std::ops::Range;
 
 /// Parses an `ST_OnOff` value (ECMA-376 §22.9.2.7).
 ///
@@ -55,36 +56,20 @@ pub fn parse_alignment(val: &str) -> Option<TextAlignment> {
 /// Returns `None` for `"auto"`, empty strings, non-hex input, or lengths other than 3 or 6.
 pub fn parse_hex_color(val: &str) -> Option<Color> {
     let s = val.strip_prefix('#').unwrap_or(val);
+    // `get` returns `None` off a char boundary, so non-ASCII input falls out as `None` too.
+    let chan = |r: Range<usize>| u8::from_str_radix(s.get(r)?, 16).ok();
     match s.len() {
-        3 => {
-            let mut chars = s.chars();
-            let r_char = chars.next()?;
-            let g_char = chars.next()?;
-            let b_char = chars.next()?;
-            let r_str = format!("{r_char}{r_char}");
-            let g_str = format!("{g_char}{g_char}");
-            let b_str = format!("{b_char}{b_char}");
-            let r = u8::from_str_radix(&r_str, 16).ok()?;
-            let g = u8::from_str_radix(&g_str, 16).ok()?;
-            let b = u8::from_str_radix(&b_str, 16).ok()?;
-            Some(Color::Rgb { r, g, b })
-        }
-        6 => {
-            let mut chars = s.chars();
-            let r1 = chars.next()?;
-            let r2 = chars.next()?;
-            let g1 = chars.next()?;
-            let g2 = chars.next()?;
-            let b1 = chars.next()?;
-            let b2 = chars.next()?;
-            let r_str = format!("{r1}{r2}");
-            let g_str = format!("{g1}{g2}");
-            let b_str = format!("{b1}{b2}");
-            let r = u8::from_str_radix(&r_str, 16).ok()?;
-            let g = u8::from_str_radix(&g_str, 16).ok()?;
-            let b = u8::from_str_radix(&b_str, 16).ok()?;
-            Some(Color::Rgb { r, g, b })
-        }
+        6 => Some(Color::Rgb {
+            r: chan(0..2)?,
+            g: chan(2..4)?,
+            b: chan(4..6)?,
+        }),
+        // Shorthand digit `X` expands to `XX`, i.e. X * 0x11.
+        3 => Some(Color::Rgb {
+            r: chan(0..1)?.saturating_mul(17),
+            g: chan(1..2)?.saturating_mul(17),
+            b: chan(2..3)?.saturating_mul(17),
+        }),
         _ => None,
     }
 }
