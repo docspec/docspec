@@ -251,10 +251,11 @@ mod tests {
     use super::{Event, EventSink as _, MarkdownWriter};
 
     /// Drives one paragraph and returns the output and the largest `pending`
-    /// capacity seen after any event.
-    fn paragraph(texts: &[&str]) -> (String, usize) {
+    /// length and capacity seen after any event.
+    fn paragraph(texts: &[&str]) -> (String, usize, usize) {
         let mut buf = Vec::new();
         let mut writer = MarkdownWriter::new(&mut buf);
+        let mut max_len = 0;
         let mut max_capacity = 0;
         let events = [
             Event::StartDocument {
@@ -274,25 +275,29 @@ mod tests {
         .chain([Event::EndParagraph, Event::EndDocument]);
         for event in events {
             writer.handle_event(event).unwrap();
+            max_len = max_len.max(writer.pending.len());
             max_capacity = max_capacity.max(writer.pending.capacity());
         }
         writer.finish().unwrap();
-        (String::from_utf8(buf).unwrap(), max_capacity)
+        (String::from_utf8(buf).unwrap(), max_len, max_capacity)
     }
 
     #[test]
     fn large_first_text_is_not_copied_into_pending() {
         let body = "x".repeat(1 << 20);
-        let (output, max_capacity) = paragraph(&[&format!("  12. {body}")]);
+        let (output, max_len, max_capacity) = paragraph(&[&format!("  12. {body}")]);
         assert_eq!(output, format!("12\\. {body}\n\n"));
+        assert_eq!(max_len, 0);
         assert_eq!(max_capacity, 0);
     }
 
     #[test]
     fn large_text_after_held_prefix_is_not_copied_into_pending() {
         let body = "x".repeat(1 << 20);
-        let (output, max_capacity) = paragraph(&["12", &format!(". {body}")]);
+        let (output, max_len, max_capacity) = paragraph(&["12", &format!(". {body}")]);
         assert_eq!(output, format!("12\\. {body}\n\n"));
+        assert_eq!(max_len, 2);
+        // Reason: String growth is defined by std, so the exact capacity is not ours to pin.
         assert!(max_capacity <= 16, "pending grew to {max_capacity}");
     }
 }
