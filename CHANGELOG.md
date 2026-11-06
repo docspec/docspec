@@ -12,6 +12,33 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [2.0.0-rc.2](https://github.com/docspec/docspec/compare/v2.0.0-rc.1...v2.0.0-rc.2) - 2026-11-06
+
+### Added
+
+- *(odt-reader)* add placeholder ODT input that yields an empty document
+- *(http)* serve an RFC 9727 API catalog at /.well-known/api-catalog
+- *(http)* publish an OpenAPI 3.1 document at /openapi.json
+- *(http)* serve /.well-known/docspec discovery document
+- *(http)* list supported media types on GET /conversion ([#518](https://github.com/docspec/docspec/pull/518))
+
+### Fixed
+
+- *(odt-reader)* take the input in constructors and reject directories
+- *(http)* leave the API catalog out of the OpenAPI document
+- *(http)* make the api-catalog Link header resolve under a path prefix
+- *(http)* leave the discovery endpoints out of the OpenAPI document
+- *(http)* describe Accept in prose and keep utoipa out of the public API
+- *(http)* make discovery links resolve under a path prefix
+
+### Other
+
+- *(http)* give the real reason discovery endpoints are not described
+- *(http)* download the OAS 3.1 meta-schema on demand instead of vendoring it
+- *(http)* check problem body members match the Problem schema
+- *(http)* drop trailing slash from discovery base URL example
+- *(http)* build 406 and 415 details from the MIME tables ([#517](https://github.com/docspec/docspec/pull/517))
+
 ## [2.0.0-rc.1](https://github.com/docspec/docspec/compare/v1.21.11...v2.0.0-rc.1) - 2026-11-03
 
 ### Added
