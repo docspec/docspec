@@ -13,13 +13,13 @@ exclude = ["tests/fixtures/**", "tests/snapshots/**"]
 [dependencies]
 docspec-core = { workspace = true }
 quick-xml = "0.41"
-zip = { version = "8", default-features = false, features = ["deflate"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
 flate2 = "1"
 
 [dev-dependencies]
 docspec-blocknote-writer = { workspace = true }
 serde_json = "1"
-zip = { version = "8", default-features = false, features = [
+zip = { version = "9", default-features = false, features = [
   "deflate",
   "bzip2",
 ] }
