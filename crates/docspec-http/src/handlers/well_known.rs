@@ -19,8 +19,6 @@ use crate::{
 ///
 /// Returns [`HttpError::Internal`] if the body cannot be serialized.
 #[inline]
-// Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.
-#[allow(clippy::unused_async)]
 pub async fn get_well_known() -> Result<impl IntoResponse, HttpError> {
     let body = WellKnown::current()
         .to_json()
@@ -45,8 +43,6 @@ pub async fn get_well_known() -> Result<impl IntoResponse, HttpError> {
 ///
 /// Returns [`HttpError::Internal`] if the body cannot be serialized.
 #[inline]
-// Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.
-#[allow(clippy::unused_async)]
 pub async fn get_api_catalog() -> Result<impl IntoResponse, HttpError> {
     let body = ApiCatalog::current()
         .to_json()

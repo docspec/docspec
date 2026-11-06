@@ -11,8 +11,6 @@ use crate::format;
 /// parameters in error responses.
 #[inline]
 #[must_use]
-// Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.
-#[allow(clippy::unused_async)]
 pub async fn not_found(request_uri: Uri, method: Method) -> HttpError {
     HttpError::NotFound {
         method: method.to_string(),
@@ -25,8 +23,6 @@ pub async fn not_found(request_uri: Uri, method: Method) -> HttpError {
 /// Returns 405 Method Not Allowed with `Allow: GET, HEAD, POST, OPTIONS`.
 #[inline]
 #[must_use]
-// Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.
-#[allow(clippy::unused_async)]
 pub async fn conversion_method_not_allowed() -> HttpError {
     HttpError::MethodNotAllowed {
         allowed: format::ALLOW_CONVERSION,
@@ -38,8 +34,6 @@ pub async fn conversion_method_not_allowed() -> HttpError {
 /// Returns 405 Method Not Allowed with `Allow: GET, HEAD, OPTIONS`.
 #[inline]
 #[must_use]
-// Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.
-#[allow(clippy::unused_async)]
 pub async fn health_method_not_allowed() -> HttpError {
     HttpError::MethodNotAllowed {
         allowed: format::ALLOW_HEALTH,
@@ -52,8 +46,6 @@ pub async fn health_method_not_allowed() -> HttpError {
 /// Returns 405 Method Not Allowed with `Allow: GET, HEAD`.
 #[inline]
 #[must_use]
-// Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.
-#[allow(clippy::unused_async)]
 pub async fn read_only_method_not_allowed() -> HttpError {
     HttpError::MethodNotAllowed {
         allowed: format::ALLOW_GET_HEAD,
