@@ -4,8 +4,8 @@
 //! responses cannot disagree with what `POST /conversion` accepts. Each body
 //! is a struct with a `ToSchema` derive: the `OpenAPI` document publishes the
 //! one of `GET /conversion`, so a field added here shows up there too. The
-//! `/.well-known/docspec` schema is not published; tests check the body
-//! against it.
+//! `/.well-known/*` schemas are not published; tests check the bodies
+//! against them.
 
 use docspec_json::{JsonBackend, JsonEmitter, StrusonBackend};
 use utoipa::ToSchema;
@@ -152,37 +152,127 @@ impl WellKnown {
     }
 }
 
+/// A link target: where it points and the media type found there.
+#[derive(ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TargetLink {
+    /// Target URI, relative to the catalog's URL.
+    #[schema(format = "uri-reference")]
+    href: &'static str,
+    /// Media type of the target.
+    #[serde(rename = "type")]
+    media_type: &'static str,
+}
+
+/// The links of one API: its endpoint and the description of it.
+#[derive(ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct LinkContext {
+    /// The API endpoint, relative to the catalog's URL.
+    #[schema(format = "uri-reference")]
+    anchor: &'static str,
+    /// Machine-readable descriptions of the API.
+    #[serde(rename = "service-desc")]
+    service_desc: Vec<TargetLink>,
+}
+
+/// `GET /.well-known/api-catalog` body: an RFC 9727 API catalog, as an
+/// RFC 9264 JSON linkset.
+///
+/// Links are relative to the catalog's URL, so `../` reaches the server root
+/// both at the origin root and under a path prefix. This deliberately deviates
+/// from RFC 9264 §4.2.2 and §4.2.3, which say `anchor` and `href` SHOULD NOT be
+/// relative: the server has no configured public base URL, and building one
+/// from the `Host` header would trust client input.
+#[derive(ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ApiCatalog {
+    /// One link context per API.
+    linkset: Vec<LinkContext>,
+}
+
+impl ApiCatalog {
+    /// The catalog of this build: the conversion API and its `OpenAPI` description.
+    pub(crate) fn current() -> Self {
+        Self {
+            linkset: vec![LinkContext {
+                anchor: "../conversion",
+                service_desc: vec![TargetLink {
+                    href: "../openapi.json",
+                    media_type: crate::openapi::MIME_OPENAPI,
+                }],
+            }],
+        }
+    }
+
+    /// Serializes this body as JSON.
+    pub(crate) fn to_json(&self) -> docspec_core::Result<Vec<u8>> {
+        let mut emitter = JsonEmitter::new(StrusonBackend::new(Vec::new()));
+        emitter.object(|object| {
+            object.key("linkset").array(|linkset| {
+                self.linkset.iter().try_for_each(|context| {
+                    linkset.object(|entry| {
+                        entry.key("anchor").value(context.anchor)?;
+                        entry.key("service-desc").array(|targets| {
+                            context.service_desc.iter().try_for_each(|target| {
+                                targets.object(|link| {
+                                    link.key("href").value(target.href)?;
+                                    link.key("type").value(target.media_type)
+                                })
+                            })
+                        })
+                    })
+                })
+            })
+        })?;
+        emitter.finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::expect_used, clippy::tests_outside_test_module)]
 
     use serde_json::{json, Value};
-    use utoipa::{openapi::ComponentsBuilder, PartialSchema as _};
+    use utoipa::openapi::ComponentsBuilder;
 
     use super::*;
 
-    #[test]
-    fn well_known_body_matches_its_schema() {
+    /// Validation errors of `body` against `T`'s own schema.
+    fn schema_errors<T>(body: &[u8]) -> Vec<String>
+    where
+        T: ToSchema,
+    {
         let mut nested = Vec::new();
-        WellKnown::schemas(&mut nested);
+        T::schemas(&mut nested);
         let components = ComponentsBuilder::new()
-            .schema(WellKnown::name(), WellKnown::schema())
+            .schema(T::name(), T::schema())
             .schemas_from_iter(nested)
             .build();
         let schema = json!({
             "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "$ref": "#/components/schemas/WellKnown",
+            "$ref": format!("#/components/schemas/{}", T::name()),
             "components": components,
         });
-        let body: Value =
-            serde_json::from_slice(&WellKnown::current().to_json().expect("serializes"))
-                .expect("valid JSON");
+        let body: Value = serde_json::from_slice(body).expect("valid JSON");
         let validator = jsonschema::validator_for(&schema).expect("valid JSON Schema");
-
-        let errors: Vec<String> = validator
+        validator
             .iter_errors(&body)
             .map(|error| format!("{error} at {}", error.instance_path()))
-            .collect();
-        assert_eq!(errors, Vec::<String>::new());
+            .collect()
+    }
+
+    #[test]
+    fn well_known_body_matches_its_schema() {
+        let body = WellKnown::current().to_json().expect("serializes");
+
+        assert_eq!(schema_errors::<WellKnown>(&body), Vec::<String>::new());
+    }
+
+    #[test]
+    fn api_catalog_body_matches_its_schema() {
+        let body = ApiCatalog::current().to_json().expect("serializes");
+
+        assert_eq!(schema_errors::<ApiCatalog>(&body), Vec::<String>::new());
     }
 }

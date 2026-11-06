@@ -47,7 +47,7 @@ pub async fn health_method_not_allowed() -> HttpError {
 }
 
 /// Fallback handler for wrong HTTP methods on read-only resources
-/// (`/.well-known/docspec`, `/openapi.json`).
+/// (`/.well-known/docspec`, `/.well-known/api-catalog`, `/openapi.json`).
 ///
 /// Returns 405 Method Not Allowed with `Allow: GET, HEAD`.
 #[inline]

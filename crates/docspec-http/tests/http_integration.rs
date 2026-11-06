@@ -789,6 +789,121 @@ async fn well_known_docspec_links_resolve_at_root_and_under_prefix() {
     );
 }
 
+const API_CATALOG_CT: &str =
+    r#"application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727""#;
+const API_CATALOG_LINK: &str = r#"<api-catalog>; rel="api-catalog""#;
+
+#[tokio::test]
+async fn get_api_catalog_returns_rfc9727_linkset() {
+    let request = common::empty_request("GET", "/.well-known/api-catalog");
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content-type present"),
+        API_CATALOG_CT
+    );
+    assert_eq!(
+        response.headers().get(header::LINK).expect("link present"),
+        API_CATALOG_LINK
+    );
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        json!({
+            "linkset": [{
+                "anchor": "../conversion",
+                "service-desc": [{
+                    "href": "../openapi.json",
+                    "type": "application/vnd.oai.openapi+json;version=3.1",
+                }],
+            }],
+        })
+    );
+}
+
+#[tokio::test]
+async fn head_api_catalog_returns_link_header_without_body() {
+    let request = common::empty_request("HEAD", "/.well-known/api-catalog");
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers().get(header::LINK).expect("link present"),
+        API_CATALOG_LINK
+    );
+    assert_eq!(response_body_text(response.into_body()).await, "");
+}
+
+#[tokio::test]
+async fn api_catalog_links_resolve_at_root_and_under_prefix() {
+    let request = common::empty_request("GET", "/.well-known/api-catalog");
+    let response = app().oneshot(request).await.expect("request succeeds");
+    let link = response
+        .headers()
+        .get(header::LINK)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix('<'))
+        .and_then(|value| value.split_once('>'))
+        .map(|(target, _)| target.to_owned())
+        .expect("link header has a target");
+    let body = response_body_json(response.into_body()).await;
+    let resolve = |catalog: &str| -> [String; 3] {
+        let base = url::Url::parse(catalog).expect("valid catalog url");
+        let join = |href: &str| base.join(href).expect("link resolves").to_string();
+        let field = |pointer: &str| {
+            join(
+                body.pointer(pointer)
+                    .and_then(Value::as_str)
+                    .expect("link present"),
+            )
+        };
+        [
+            join(&link),
+            field("/linkset/0/anchor"),
+            field("/linkset/0/service-desc/0/href"),
+        ]
+    };
+
+    assert_eq!(
+        resolve("http://localhost:3000/.well-known/api-catalog"),
+        [
+            "http://localhost:3000/.well-known/api-catalog".to_owned(),
+            "http://localhost:3000/conversion".to_owned(),
+            "http://localhost:3000/openapi.json".to_owned(),
+        ]
+    );
+    assert_eq!(
+        resolve("https://example.com/docspec/.well-known/api-catalog"),
+        [
+            "https://example.com/docspec/.well-known/api-catalog".to_owned(),
+            "https://example.com/docspec/conversion".to_owned(),
+            "https://example.com/docspec/openapi.json".to_owned(),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn post_api_catalog_returns_405() {
+    let request = common::empty_request("POST", "/.well-known/api-catalog");
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::ALLOW)
+            .expect("allow header present"),
+        "GET, HEAD"
+    );
+}
+
 #[tokio::test]
 async fn post_well_known_docspec_returns_405() {
     let request = common::empty_request("POST", "/.well-known/docspec");
