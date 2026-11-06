@@ -20,11 +20,7 @@ use serde_json::{json, Value};
 use tower::ServiceExt as _;
 
 /// Served paths the document leaves out on purpose.
-const DISCOVERY_PATHS: [&str; 3] = [
-    "/.well-known/api-catalog",
-    "/.well-known/docspec",
-    "/openapi.json",
-];
+const DISCOVERY_PATHS: [&str; 2] = ["/.well-known/api-catalog", "/openapi.json"];
 
 const MIME_OPENAPI: &str = "application/vnd.oai.openapi+json;version=3.1";
 

@@ -15,7 +15,7 @@ pub(crate) const ALLOW_CONVERSION: &str = "GET, HEAD, POST, OPTIONS";
 /// `Allow` header value for `/health`.
 pub(crate) const ALLOW_HEALTH: &str = "GET, HEAD, OPTIONS";
 
-/// `Allow` header value for read-only resources such as `/.well-known/docspec`.
+/// `Allow` header value for read-only resources such as `/openapi.json`.
 pub(crate) const ALLOW_GET_HEAD: &str = "GET, HEAD";
 
 /// `Content-Type` of the API catalog: an RFC 9264 linkset with the RFC 9727 profile.
