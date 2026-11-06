@@ -105,8 +105,7 @@ authoritative reference for exactly which events it handles and drops.
 [^markdown-memory]: The Markdown reader holds the whole source in memory while it parses
     (`pulldown-cmark` is borrow-based), so peak memory is about 3× the input size. Events
     still flow one at a time. DOCX (by path) and HTML stream in constant memory apart from
-    the per-table and per-node cases listed under [Not bounded](SECURITY.md#not-bounded)
-    in SECURITY.md.
+    the cases under [Not bounded](SECURITY.md#not-bounded).
 
 ## Why DocSpec?
 
@@ -115,7 +114,7 @@ Most document converters load the whole file into memory, build a tree, and hope
 Streaming event by event is the one decision everything else follows from:
 
 - **It runs where your editor runs.** The same Rust compiles to a native server, a WebAssembly module in the browser, or an embedded target — one codebase, every surface, no separate front-end and back-end converters drifting apart.
-- **Its memory stays flat.** Constant memory for DOCX (by path) and HTML: a 1 KB note and a 500 MB document cost about the same to convert. Markdown is bounded by its input size, and the per-table and per-node exceptions are listed under [Not bounded](SECURITY.md#not-bounded).
+- **Its memory stays flat.** For DOCX (by path) and HTML, a 1 KB note and a 500 MB document cost about the same to convert, apart from the cases under [Not bounded](SECURITY.md#not-bounded). Markdown is bounded by its input size.
 - **It stays honest.** On corrupt input it stops and says so — no half-converted output quietly reaching your database.
 
 DocSpec is the Rust successor to [NLdoc](https://gitlab.com/logius/nldoc), rebuilt for public-sector digital sovereignty: funded by [NLnet](https://nlnet.nl) and the Dutch Ministry of the Interior, and used in production by [La Suite](https://lasuite.numerique.gouv.fr) to import documents into its collaborative editor. The [Manifesto](MANIFESTO.md) is the long version of why.
