@@ -367,32 +367,22 @@ fn build_posthog_error_event(detail: &str, sentry_event_id: Option<String>) -> p
     event
 }
 
-#[cfg(feature = "sentry")]
-#[inline]
-fn capture_sentry(
-    detail: &str,
-    source: Option<&(dyn core::error::Error + Send + Sync + 'static)>,
-) -> sentry::types::Uuid {
-    source.map_or_else(
-        || sentry::capture_message(detail, sentry::Level::Error),
-        sentry::capture_error,
-    )
-}
-
 #[cfg(any(feature = "sentry", feature = "posthog"))]
 fn capture_error_telemetry(
     detail: &str,
-    source: Option<&(dyn core::error::Error + Send + Sync + 'static)>,
+    source: &(dyn core::error::Error + Send + Sync + 'static),
 ) {
     #[cfg(not(feature = "sentry"))]
     let _ = source;
+    #[cfg(not(feature = "posthog"))]
+    let _ = detail;
 
     #[cfg(all(feature = "sentry", not(feature = "posthog")))]
     {
-        let _ = capture_sentry(detail, source);
+        let _ = sentry::capture_error(source);
     }
     #[cfg(all(feature = "sentry", feature = "posthog"))]
-    let sentry_id_string: Option<String> = Some(capture_sentry(detail, source).to_string());
+    let sentry_id_string: Option<String> = Some(sentry::capture_error(source).to_string());
     #[cfg(all(not(feature = "sentry"), feature = "posthog"))]
     let sentry_id_string: Option<String> = None;
     #[cfg(feature = "posthog")]
@@ -620,7 +610,7 @@ impl HttpError {
             Self::Internal { source } => {
                 capture_error_telemetry(
                     "An unexpected error occurred during conversion",
-                    Some(source.as_ref()),
+                    source.as_ref(),
                 );
             }
             Self::BodyNotUtf8
