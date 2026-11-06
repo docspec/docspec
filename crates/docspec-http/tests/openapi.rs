@@ -20,7 +20,11 @@ use serde_json::{json, Value};
 use tower::ServiceExt as _;
 
 /// Served paths the document leaves out on purpose.
-const DISCOVERY_PATHS: [&str; 2] = ["/.well-known/docspec", "/openapi.json"];
+const DISCOVERY_PATHS: [&str; 3] = [
+    "/.well-known/api-catalog",
+    "/.well-known/docspec",
+    "/openapi.json",
+];
 
 const MIME_OPENAPI: &str = "application/vnd.oai.openapi+json;version=3.1";
 
@@ -203,7 +207,6 @@ async fn openapi_documents_exactly_the_served_operations() {
     assert_eq!(
         documented,
         [
-            ("/.well-known/api-catalog", "get"),
             ("/conversion", "get"),
             ("/conversion", "options"),
             ("/conversion", "post"),
@@ -263,11 +266,6 @@ async fn assert_matches_component(uri: &str, component: &str) {
 #[tokio::test]
 async fn get_conversion_body_matches_its_schema() {
     assert_matches_component("/conversion", "ConversionFormats").await;
-}
-
-#[tokio::test]
-async fn api_catalog_body_matches_its_schema() {
-    assert_matches_component("/.well-known/api-catalog", "ApiCatalog").await;
 }
 
 #[tokio::test]

@@ -5,7 +5,7 @@ use axum::response::IntoResponse;
 
 use crate::{
     discovery::{ApiCatalog, WellKnown},
-    error::{HttpError, Problem},
+    error::HttpError,
     format,
 };
 
@@ -44,25 +44,6 @@ pub async fn get_well_known() -> Result<impl IntoResponse, HttpError> {
 /// # Errors
 ///
 /// Returns [`HttpError::Internal`] if the body cannot be serialized.
-#[utoipa::path(
-    get,
-    path = "/.well-known/api-catalog",
-    tag = "discovery",
-    summary = "API catalog (RFC 9727)",
-    description = "A linkset (RFC 9264) from the conversion API to its OpenAPI description. \
-                   Links are relative to this document's URL. `HEAD` returns the \
-                   `Link: rel=\"api-catalog\"` header without a body.",
-    responses(
-        (
-            status = 200,
-            description = "The API catalog.",
-            body = ApiCatalog,
-            content_type = format::API_CATALOG_CONTENT_TYPE,
-            headers(("Link" = String, description = "`<api-catalog>; rel=\"api-catalog\"`, relative to this document's URL")),
-        ),
-        (status = 500, description = "The response could not be built.", body = Problem, content_type = "application/problem+json"),
-    ),
-)]
 #[inline]
 // Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.
 #[allow(clippy::unused_async)]

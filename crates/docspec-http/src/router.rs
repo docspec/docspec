@@ -180,7 +180,13 @@ pub(crate) fn routes() -> OpenApiRouter {
             health_method_not_allowed,
         ))
         // Discovery endpoints (this document itself and `/.well-known/*`) are
-        // served but deliberately not described.
+        // served but deliberately not described; RFC 9727 specifies the API
+        // catalog.
+        .route(
+            "/.well-known/api-catalog",
+            get(crate::handlers::well_known::get_api_catalog)
+                .fallback(read_only_method_not_allowed),
+        )
         .route(
             "/.well-known/docspec",
             get(crate::handlers::well_known::get_well_known).fallback(read_only_method_not_allowed),
@@ -189,10 +195,6 @@ pub(crate) fn routes() -> OpenApiRouter {
             "/openapi.json",
             get(crate::handlers::openapi::get_openapi).fallback(read_only_method_not_allowed),
         )
-        .routes(with_fallback(
-            routes!(crate::handlers::well_known::get_api_catalog),
-            read_only_method_not_allowed,
-        ))
         .fallback(not_found)
 }
 

@@ -4,8 +4,8 @@
 //! responses cannot disagree with what `POST /conversion` accepts. Each body
 //! is a struct with a `ToSchema` derive: the `OpenAPI` document publishes the
 //! one of `GET /conversion`, so a field added here shows up there too. The
-//! `/.well-known/docspec` schema is not published; tests check the body
-//! against it.
+//! `/.well-known/*` schemas are not published; tests check the bodies
+//! against them.
 
 use docspec_json::{JsonBackend, JsonEmitter, StrusonBackend};
 use utoipa::ToSchema;
@@ -234,32 +234,45 @@ mod tests {
     #![allow(clippy::expect_used, clippy::tests_outside_test_module)]
 
     use serde_json::{json, Value};
-    use utoipa::{openapi::ComponentsBuilder, PartialSchema as _};
+    use utoipa::openapi::ComponentsBuilder;
 
     use super::*;
 
-    #[test]
-    fn well_known_body_matches_its_schema() {
+    /// Validation errors of `body` against `T`'s own schema.
+    fn schema_errors<T>(body: &[u8]) -> Vec<String>
+    where
+        T: ToSchema,
+    {
         let mut nested = Vec::new();
-        WellKnown::schemas(&mut nested);
+        T::schemas(&mut nested);
         let components = ComponentsBuilder::new()
-            .schema(WellKnown::name(), WellKnown::schema())
+            .schema(T::name(), T::schema())
             .schemas_from_iter(nested)
             .build();
         let schema = json!({
             "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "$ref": "#/components/schemas/WellKnown",
+            "$ref": format!("#/components/schemas/{}", T::name()),
             "components": components,
         });
-        let body: Value =
-            serde_json::from_slice(&WellKnown::current().to_json().expect("serializes"))
-                .expect("valid JSON");
+        let body: Value = serde_json::from_slice(body).expect("valid JSON");
         let validator = jsonschema::validator_for(&schema).expect("valid JSON Schema");
-
-        let errors: Vec<String> = validator
+        validator
             .iter_errors(&body)
             .map(|error| format!("{error} at {}", error.instance_path()))
-            .collect();
-        assert_eq!(errors, Vec::<String>::new());
+            .collect()
+    }
+
+    #[test]
+    fn well_known_body_matches_its_schema() {
+        let body = WellKnown::current().to_json().expect("serializes");
+
+        assert_eq!(schema_errors::<WellKnown>(&body), Vec::<String>::new());
+    }
+
+    #[test]
+    fn api_catalog_body_matches_its_schema() {
+        let body = ApiCatalog::current().to_json().expect("serializes");
+
+        assert_eq!(schema_errors::<ApiCatalog>(&body), Vec::<String>::new());
     }
 }
