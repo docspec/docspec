@@ -402,15 +402,7 @@ fn capture_error_telemetry(
     let sentry_id_string: Option<String> = None;
     #[cfg(feature = "posthog")]
     {
-        let client_arc: Option<std::sync::Arc<posthog_rs::Client>> =
-            match crate::telemetry::posthog_client_slot().read() {
-                Ok(guard) => guard.as_ref().map(std::sync::Arc::clone),
-                Err(_poisoned) => {
-                    tracing::warn!("posthog slot poisoned; skipping error capture");
-                    None
-                }
-            };
-        if let Some(client) = client_arc {
+        if let Some(client) = crate::telemetry::current_posthog_client() {
             let event = build_posthog_error_event(detail, sentry_id_string);
             client.capture(event);
         }
