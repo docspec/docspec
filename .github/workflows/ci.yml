@@ -79,6 +79,18 @@ jobs:
           components: rustfmt
       - run: cargo fmt --all -- --check
 
+  deny:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check advisories licenses bans sources
+
   docker-build:
     name: Docker Build
     uses: ./.github/workflows/docker.yml
@@ -102,7 +114,7 @@ jobs:
     # are visible. Otherwise the PR job computes the next-version diff against
     # the still-old crates.io baseline and re-includes commits the release job
     # is in the middle of publishing, producing duplicate CHANGELOG entries.
-    needs: [test, clippy, fmt, features, docker-build, release-plz-release]
+    needs: [test, clippy, fmt, features, deny, docker-build, release-plz-release]
     if: >-
       github.event_name == 'push'
       && github.ref == 'refs/heads/main'
@@ -134,7 +146,7 @@ jobs:
 
   release-plz-release:
     name: Tag and publish crates
-    needs: [test, clippy, fmt, features, docker-build]
+    needs: [test, clippy, fmt, features, deny, docker-build]
     if: >-
       github.event_name == 'push'
       && github.ref == 'refs/heads/main'
