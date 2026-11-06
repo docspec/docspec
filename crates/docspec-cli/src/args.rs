@@ -116,7 +116,7 @@ pub enum CliOutputFormat {
     /// `BlockNote` JSON — supported: headings, lists, tables, links, images, styles.
     #[value(name = "blocknote")]
     Blocknote,
-    /// HTML5 — EXPERIMENTAL: paragraphs and text only; headings, lists, tables,
+    /// HTML5 — EXPERIMENTAL: paragraphs, code blocks and text; headings, lists, tables,
     /// links and images are silently dropped.
     #[value(name = "html")]
     Html,

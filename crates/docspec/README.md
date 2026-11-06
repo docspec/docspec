@@ -65,7 +65,7 @@ out-of-scope OOXML elements.
 | ---------------------- | --------------------------------------- | ------------------------------ |
 | `blocknote-writer`     | BlockNote JSON                          | `docspec-blocknote-writer`     |
 | `oxa-writer`           | oxa.dev JSON                            | `docspec-oxa-writer`           |
-| `html-writer`          | HTML (paragraphs only)                  | `docspec-html-writer`          |
+| `html-writer`          | HTML (paragraphs and code blocks only)  | `docspec-html-writer`          |
 | `pandoc-native-writer` | Pandoc native block list                | `docspec-pandoc-native-writer` |
 | `markdown-writer`      | Markdown (paragraphs and headings only) | `docspec-markdown-writer`      |
 

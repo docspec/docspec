@@ -30,7 +30,7 @@
 //! |---------------------|-------------------------|-------------------------------|
 //! | `blocknote-writer`  | `BlockNote` JSON        | [`writers::BlockNoteWriter`]  |
 //! | `oxa-writer`        | `oxa.dev` JSON          | `writers::OxaWriter`          |
-//! | `html-writer`       | HTML (paragraphs only)  | `writers::HtmlWriter`         |
+//! | `html-writer`       | HTML (paragraphs and code blocks only) | `writers::HtmlWriter`         |
 //! | `pandoc-native-writer` | Pandoc native block list | `writers::PandocNativeWriter` |
 //! | `markdown-writer`   | Markdown (paragraphs and headings only) | `writers::MarkdownWriter` |
 //!
@@ -158,7 +158,8 @@ pub mod writers {
     pub use docspec_oxa_writer::OxaWriter;
 
     /// Streaming HTML5 writer. Available when the `html-writer` feature is enabled.
-    /// Note: currently emits only `<html>/<body>/<p>` and text within paragraphs;
+    /// Note: currently emits only `<html>/<body>/<p>`, `<pre><code>` for code blocks,
+    /// and text within paragraphs and code blocks;
     /// other events are silently ignored.
     #[cfg(feature = "html-writer")]
     #[cfg_attr(docsrs, doc(cfg(feature = "html-writer")))]
