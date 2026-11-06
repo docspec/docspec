@@ -7,43 +7,22 @@ use std::fs;
 
 include!("src/args.rs");
 
-/// The EXIT STATUS section of the man page. Keep in step with
-/// `EXIT_STATUS_HELP` in `src/args.rs` and the README's "Exit status" table.
-const EXIT_STATUS_ROFF: &str = r#".SH "EXIT STATUS"
-.TP
-.B 0
-Success.
-.TP
-.B 2
-Command used incorrectly: unknown flag or value, missing subcommand, input format not given and not detectable, input and output are the same file.
-.TP
-.B 65
-The input document is malformed or holds something that cannot be converted (EX_DATAERR).
-.TP
-.B 66
-The input file does not exist or is a directory (EX_NOINPUT).
-.TP
-.B 69
-The HTTP server cannot listen on the given address (EX_UNAVAILABLE).
-.TP
-.B 70
-Internal DocSpec error (EX_SOFTWARE).
-.TP
-.B 71
-The operating system refused a resource (EX_OSERR).
-.TP
-.B 73
-The output file cannot be created (EX_CANTCREAT).
-.TP
-.B 74
-I/O failed while reading or writing (EX_IOERR).
-.TP
-.B 77
-Permission denied (EX_NOPERM).
-.PP
-Codes above 2 follow
-.IR sysexits (3).
-"#;
+/// The EXIT STATUS section of the man page, rendered from [`EXIT_STATUSES`].
+fn exit_status_roff() -> String {
+    let rows = EXIT_STATUSES
+        .iter()
+        .map(|(code, name, meaning)| {
+            let sysexit = if name.starts_with("EX_") {
+                format!(" ({name})")
+            } else {
+                String::new()
+            };
+            format!(".TP\n.B {code}\n{meaning}{sysexit}.\n")
+        })
+        .collect::<Vec<_>>()
+        .concat();
+    format!(".SH \"EXIT STATUS\"\n{rows}.PP\nCodes above 2 follow\n.IR sysexits (3).\n")
+}
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
@@ -56,7 +35,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
     let mut buf = Vec::new();
     man.render(&mut buf)?;
     // clap_mangen has no exit-status section; append the conventional one.
-    buf.extend_from_slice(EXIT_STATUS_ROFF.as_bytes());
+    buf.extend_from_slice(exit_status_roff().as_bytes());
     fs::write(out_dir.join("docspec.1"), buf)?;
 
     // Generate shell completions

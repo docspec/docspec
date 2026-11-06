@@ -163,16 +163,16 @@ by `--to markdown` or auto-detected from `.md` output paths.
 
 ## Exit status
 
-One code has one meaning, so a script can branch on `$?` without parsing stderr. Codes above 2 are from `<sysexits.h>`; 2 is kept for usage errors because that is what clap and most shells use, so clap's own parse errors and DocSpec's share a code.
+One code has one meaning, so a script can branch on `$?` without parsing stderr. Codes above 2 are from `<sysexits.h>`; 2 is kept for usage errors because that is what clap and most shells use, so clap's own parse errors and DocSpec's share a code. The HTTP server draws the same lines: it answers 422 where the CLI exits 65 and 500 where it exits 70.
 
 | Code | Name | Meaning |
 | --- | --- | --- |
-| 0 | `EX_OK` | Command completed successfully |
+| 0 | `EX_OK` | Success |
 | 2 | usage | Command used incorrectly: unknown flag or value, missing subcommand, input format not given and not detectable, input and output are the same file |
-| 65 | `EX_DATAERR` | The input document is malformed or holds something that cannot be converted (the HTTP server answers 422 for the same cases) |
+| 65 | `EX_DATAERR` | The input document is malformed or holds something that cannot be converted |
 | 66 | `EX_NOINPUT` | The input file does not exist or is a directory |
-| 69 | `EX_UNAVAILABLE` | `docspec http` cannot listen: address already in use or not available |
-| 70 | `EX_SOFTWARE` | Internal DocSpec error, such as a reader violating the event contract (the HTTP server answers 500) |
+| 69 | `EX_UNAVAILABLE` | The HTTP server cannot listen: the address is already in use or not available |
+| 70 | `EX_SOFTWARE` | Internal DocSpec error, such as a reader violating the event contract |
 | 71 | `EX_OSERR` | The operating system refused a resource: runtime or socket creation failed |
 | 73 | `EX_CANTCREAT` | The output file cannot be created |
 | 74 | `EX_IOERR` | I/O failed while reading the input or writing the output |
