@@ -576,9 +576,11 @@ impl<W: Write> BlockNoteWriter<W> {
         self.json.open_object()?;
         self.json.key("type").value("heading")?;
         self.write_id(id)?;
+        // Core's `Event::StartHeading` contract: writers clamp to their format's
+        // maximum. BlockNote's default heading schema allows `HEADING_LEVELS` 1–6.
         self.json
             .key("props")
-            .object(|j| j.key("level").value(level))?;
+            .object(|j| j.key("level").value(level.clamp(1, 6)))?;
         self.json.key("content").open_array()?;
         self.context.in_text_block = true;
         Ok(())

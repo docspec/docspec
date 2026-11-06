@@ -76,7 +76,7 @@ let json = String::from_utf8(buf)?;
 | Block type                         | BlockNote type                                    |
 | ---------------------------------- | ------------------------------------------------- |
 | Paragraph                          | `paragraph`                                       |
-| Heading (levels 1–6)               | `heading`                                         |
+| Heading (levels 1–6, higher clamped) | `heading`                                         |
 | Block quote                        | `quote`                                           |
 | Preformatted / code block          | `codeBlock`                                       |
 | Image                              | `image`                                           |
