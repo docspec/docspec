@@ -4,7 +4,6 @@
 extern crate alloc;
 
 pub mod cache;
-pub mod cli;
 mod discovery;
 pub mod error;
 pub mod format;
@@ -18,8 +17,7 @@ pub mod server;
 pub mod telemetry;
 pub mod tracing_init;
 
-pub use cli::Args;
-pub use server::{serve, ServerError};
+pub use server::{serve, ServerConfig, ServerError};
 
 /// Initialize Sentry (if DSN env var set) and return a guard that flushes Sentry on drop.
 /// MUST be called BEFORE building the tokio runtime; `main()` MUST hold the returned guard for the entire process lifetime.
@@ -52,8 +50,7 @@ pub fn init_tracing() {
 ///
 /// Returns [`ServerError`] if runtime construction fails or the HTTP server fails.
 #[inline]
-pub fn run_server(args: cli::Args) -> Result<(), ServerError> {
-    let config = args.into_config();
+pub fn run_server(config: ServerConfig) -> Result<(), ServerError> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()

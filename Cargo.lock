@@ -863,7 +863,6 @@ name = "docspec-http"
 version = "2.0.0-rc.1"
 dependencies = [
  "axum",
- "clap",
  "docspec",
  "docspec-core",
  "docspec-json",
