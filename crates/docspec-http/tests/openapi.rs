@@ -100,6 +100,22 @@ fn oas_schema() -> Value {
 }
 
 #[tokio::test]
+async fn openapi_json_is_the_served_document() {
+    let response = app()
+        .oneshot(common::empty_request("GET", "/openapi.json"))
+        .await
+        .expect("request succeeds");
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body read");
+
+    assert_eq!(
+        docspec_http::openapi_json().expect("document builds"),
+        &*bytes
+    );
+}
+
+#[tokio::test]
 async fn get_openapi_returns_openapi_document() {
     let response = app()
         .oneshot(common::empty_request("GET", "/openapi.json"))

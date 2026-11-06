@@ -19,6 +19,7 @@ pub mod telemetry;
 pub mod tracing_init;
 
 pub use cli::Args;
+pub use openapi::json as openapi_json;
 pub use server::{serve, ServerError};
 
 /// Initialize Sentry (if DSN env var set) and return a guard that flushes Sentry on drop.
