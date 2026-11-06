@@ -367,37 +367,22 @@ fn build_posthog_error_event(detail: &str, sentry_event_id: Option<String>) -> p
     event
 }
 
-#[cfg(feature = "sentry")]
-#[inline]
-fn capture_sentry(
-    detail: &str,
-    source: Option<&(dyn core::error::Error + Send + Sync + 'static)>,
-) -> sentry::types::Uuid {
-    source.map_or_else(
-        || sentry::capture_message(detail, sentry::Level::Error),
-        sentry::capture_error,
-    )
-}
-
 #[cfg(any(feature = "sentry", feature = "posthog"))]
 fn capture_error_telemetry(
-    status: StatusCode,
     detail: &str,
-    source: Option<&(dyn core::error::Error + Send + Sync + 'static)>,
+    source: &(dyn core::error::Error + Send + Sync + 'static),
 ) {
-    if status != StatusCode::INTERNAL_SERVER_ERROR && status != StatusCode::UNPROCESSABLE_ENTITY {
-        return;
-    }
-
     #[cfg(not(feature = "sentry"))]
     let _ = source;
+    #[cfg(not(feature = "posthog"))]
+    let _ = detail;
 
     #[cfg(all(feature = "sentry", not(feature = "posthog")))]
     {
-        let _ = capture_sentry(detail, source);
+        let _ = sentry::capture_error(source);
     }
     #[cfg(all(feature = "sentry", feature = "posthog"))]
-    let sentry_id_string: Option<String> = Some(capture_sentry(detail, source).to_string());
+    let sentry_id_string: Option<String> = Some(sentry::capture_error(source).to_string());
     #[cfg(all(not(feature = "sentry"), feature = "posthog"))]
     let sentry_id_string: Option<String> = None;
     #[cfg(feature = "posthog")]
@@ -614,25 +599,26 @@ impl HttpError {
     }
 
     /// Capture this error to configured telemetry backends (Sentry, `PostHog`)
-    /// when the variant is a 500 or 422.
+    /// when the variant is a 500.
+    ///
+    /// A 422 is the caller's document, not a service fault, so it is not an
+    /// exception; `docspec_conversions_total{error_class="unprocessable"}` and
+    /// the `conversion_completed` event already count them.
     #[cfg(any(feature = "sentry", feature = "posthog"))]
     pub(crate) fn capture_to_telemetry(&self) {
         match self {
             Self::Internal { source } => {
                 capture_error_telemetry(
-                    StatusCode::INTERNAL_SERVER_ERROR,
                     "An unexpected error occurred during conversion",
-                    Some(source.as_ref()),
+                    source.as_ref(),
                 );
-            }
-            Self::Unprocessable { detail, .. } => {
-                capture_error_telemetry(StatusCode::UNPROCESSABLE_ENTITY, detail.as_str(), None);
             }
             Self::BodyNotUtf8
             | Self::EmptyBody
             | Self::MethodNotAllowed { .. }
             | Self::NotAcceptable
             | Self::NotFound { .. }
+            | Self::Unprocessable { .. }
             | Self::UnsupportedMediaType { .. } => {}
         }
     }
@@ -813,7 +799,7 @@ mod tests {
 
     #[cfg(feature = "sentry")]
     #[test]
-    fn unprocessable_error_is_captured_by_sentry() {
+    fn unprocessable_error_is_not_captured_by_sentry() {
         let events = sentry::test::with_captured_events(|| {
             let _response = HttpError::Unprocessable {
                 detail: "bad input".to_owned(),
@@ -821,9 +807,7 @@ mod tests {
             }
             .into_response();
         });
-        assert_eq!(events.len(), 1);
-        assert_eq!(events[0].level, sentry::Level::Error);
-        assert_eq!(events[0].message.as_deref(), Some("bad input"));
+        assert_eq!(events.len(), 0);
     }
 
     #[cfg(feature = "sentry")]

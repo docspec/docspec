@@ -138,9 +138,8 @@ async fn internal_error_posthog_only_no_sentry_id() {
     );
 }
 
-#[cfg(feature = "sentry")]
 #[tokio::test]
-async fn unprocessable_error_dual_fire_includes_sentry_event_id() {
+async fn unprocessable_error_not_captured_by_posthog() {
     let _env_guard = lock_env();
     let mock_server = wiremock::MockServer::start().await;
     mount_posthog_stub(&mock_server).await;
@@ -157,13 +156,10 @@ async fn unprocessable_error_dual_fire_includes_sentry_event_id() {
     flush_and_clear_slot(client).await;
 
     let requests = mock_server.received_requests().await.unwrap_or_default();
-    assert_eq!(requests.len(), 1, "exactly 1 PostHog capture for 422");
-
-    let body: serde_json::Value = serde_json::from_slice(&requests[0].body).expect("valid JSON");
-    let event = find_event_in_posthog_body(&body);
-    assert!(
-        event["properties"].get("sentry_event_id").is_some(),
-        "sentry_event_id must be present for 422; body={body}"
+    assert_eq!(
+        requests.len(),
+        0,
+        "a 422 is the caller's document, not a service fault; no $exception; body={requests:?}"
     );
 }
 
