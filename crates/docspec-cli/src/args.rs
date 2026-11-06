@@ -2,9 +2,32 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
 
-/// Exit-status list for `--help`. Keep in step with `EXIT_STATUS_ROFF` in
-/// `build.rs` and the README's "Exit status" table.
-const EXIT_STATUS_HELP: &str = "Exit status:\n  0   success\n  2   command used incorrectly (usage, bad flag or value, format not given)\n  65  the input document is malformed or cannot be converted\n  66  the input file does not exist or is a directory\n  69  the HTTP server cannot listen on the given address\n  70  internal DocSpec error\n  71  the operating system refused a resource\n  73  the output file cannot be created\n  74  I/O failed while reading or writing\n  77  permission denied\n\nCodes above 2 follow <sysexits.h>.";
+/// Process exit statuses as `(code, sysexits name, meaning)`.
+///
+/// The one source for the `--help` footer, the man page's EXIT STATUS section
+/// (`build.rs`) and the README's "Exit status" table, which a test checks.
+pub const EXIT_STATUSES: &[(u8, &str, &str)] = &[
+    (0, "EX_OK", "Success"),
+    (2, "usage", "Command used incorrectly: unknown flag or value, missing subcommand, input format not given and not detectable, input and output are the same file"),
+    (65, "EX_DATAERR", "The input document is malformed or holds something that cannot be converted"),
+    (66, "EX_NOINPUT", "The input file does not exist or is a directory"),
+    (69, "EX_UNAVAILABLE", "The HTTP server cannot listen: the address is already in use or not available"),
+    (70, "EX_SOFTWARE", "Internal DocSpec error, such as a reader violating the event contract"),
+    (71, "EX_OSERR", "The operating system refused a resource: runtime or socket creation failed"),
+    (73, "EX_CANTCREAT", "The output file cannot be created"),
+    (74, "EX_IOERR", "I/O failed while reading the input or writing the output"),
+    (77, "EX_NOPERM", "Permission denied on the input, the output, or the listen port"),
+];
+
+/// The `--help` footer, rendered from [`EXIT_STATUSES`].
+fn exit_status_help() -> String {
+    let rows = EXIT_STATUSES
+        .iter()
+        .map(|(code, _, meaning)| format!("  {code:<3} {meaning}\n"))
+        .collect::<Vec<_>>()
+        .concat();
+    format!("Exit status:\n{rows}\nCodes above 2 follow <sysexits.h>.")
+}
 
 /// `DocSpec`: streaming document conversion.
 #[derive(Parser, Debug)]
@@ -14,7 +37,7 @@ const EXIT_STATUS_HELP: &str = "Exit status:\n  0   success\n  2   command used 
     about = "Streaming document conversion CLI",
     subcommand_required = true,
     arg_required_else_help = true,
-    after_long_help = EXIT_STATUS_HELP
+    after_long_help = exit_status_help()
 )]
 pub struct Cli {
     /// Selected top-level subcommand.
@@ -29,7 +52,7 @@ pub enum Commands {
     /// Convert documents between formats.
     #[command(
         long_about = "Convert documents between formats using a streaming event pipeline.\n\nInput: Markdown and DOCX are supported. DOCX preserves headings, tables, lists, hyperlinks, images, run styles, and colors. Known DOCX losses include vertical cell merges, comments, footnotes, headers and footers, document metadata, tracked deletions, and field-code hyperlinks. HTML input is experimental and preserves only <p> elements and their text; all other tags are dropped. ODT input is a placeholder: the file is ignored and the output is an empty document.\n\nOutput: BlockNote JSON is supported. HTML, oxa.dev JSON, Pandoc native, and Markdown outputs are experimental and silently drop structure they cannot express.",
-        after_long_help = EXIT_STATUS_HELP
+        after_long_help = exit_status_help()
     )]
     Convert(ConvertArgs),
     /// Run the HTTP API server.
@@ -137,6 +160,24 @@ pub enum CliOutputFormat {
 mod tests {
     #![allow(clippy::infallible_destructuring_match)]
     use super::*;
+
+    /// The README's "Exit status" table is a hand-written copy of
+    /// `EXIT_STATUSES`; this keeps it from drifting.
+    #[test]
+    fn readme_exit_status_table_matches_exit_statuses() {
+        let readme = include_str!("../README.md");
+        let rows: Vec<(u8, &str, &str)> = readme
+            .lines()
+            .filter_map(|line| {
+                let cells: Vec<&str> = line.split('|').map(str::trim).collect();
+                let &[_, code, name, meaning, _] = cells.as_slice() else {
+                    return None;
+                };
+                Some((code.parse().ok()?, name.trim_matches('`'), meaning))
+            })
+            .collect();
+        assert_eq!(rows, EXIT_STATUSES);
+    }
 
     #[test]
     fn clap_rejects_blocknote_as_input() {

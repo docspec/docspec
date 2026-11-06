@@ -1025,7 +1025,7 @@ mod tests {
                     .success()
                     .stdout(contains("Exit status:"))
                     .stdout(contains(
-                        "66  the input file does not exist or is a directory",
+                        "66  The input file does not exist or is a directory",
                     ));
             }
         }
