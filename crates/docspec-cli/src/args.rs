@@ -181,6 +181,50 @@ mod tests {
         assert_eq!(rows, EXIT_STATUSES);
     }
 
+    /// `build.rs` renders the man page's EXIT STATUS section from
+    /// `EXIT_STATUSES`; pin its exact roff.
+    #[test]
+    fn man_page_ends_with_exit_status_section() {
+        let man = include_str!(concat!(env!("OUT_DIR"), "/docspec.1"));
+        let expected = r#".SH "EXIT STATUS"
+.TP
+.B 0
+Success (EX_OK).
+.TP
+.B 2
+Command used incorrectly: unknown flag or value, missing subcommand, input format not given and not detectable, input and output are the same file.
+.TP
+.B 65
+The input document is malformed or holds something that cannot be converted (EX_DATAERR).
+.TP
+.B 66
+The input file does not exist or is a directory (EX_NOINPUT).
+.TP
+.B 69
+The HTTP server cannot listen: the address is already in use or not available (EX_UNAVAILABLE).
+.TP
+.B 70
+Internal DocSpec error, such as a reader violating the event contract (EX_SOFTWARE).
+.TP
+.B 71
+The operating system refused a resource: runtime or socket creation failed (EX_OSERR).
+.TP
+.B 73
+The output file cannot be created (EX_CANTCREAT).
+.TP
+.B 74
+I/O failed while reading the input or writing the output (EX_IOERR).
+.TP
+.B 77
+Permission denied on the input, the output, or the listen port (EX_NOPERM).
+.PP
+Codes above 2 follow
+.IR sysexits (3).
+"#;
+        let tail = man.get(man.len().saturating_sub(expected.len())..);
+        assert_eq!(tail, Some(expected));
+    }
+
     #[test]
     fn clap_rejects_blocknote_as_input() {
         let result = Cli::try_parse_from(["docspec", "convert", "--from", "blocknote", "x.md"]);
