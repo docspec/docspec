@@ -124,6 +124,7 @@ mod tests {
             ])
             .assert()
             .code(66)
+            // Only the ANSI prefix is DocSpec's; the OS supplies the message tail.
             .stderr(contains("\x1b["));
     }
 
@@ -140,6 +141,7 @@ mod tests {
             ])
             .assert()
             .code(66)
+            // Only the absence of ANSI is DocSpec's; the OS supplies the message tail.
             .stderr(contains("\x1b[").not());
     }
 
@@ -326,6 +328,7 @@ mod tests {
             .args(["convert", "--help"])
             .assert()
             .success()
+            // clap lays out the option list; only the flag names are DocSpec's.
             .stdout(contains("--from"))
             .stdout(contains("--to"))
             .stdout(contains("--output"))
@@ -335,9 +338,11 @@ mod tests {
     #[test]
     fn no_arguments_prints_help() {
         docspec_cmd()
+            .env_remove("CLICOLOR_FORCE")
             .assert()
             .failure()
-            .stderr(predicates::str::contains("Usage"));
+            // clap formats the usage text.
+            .stderr(contains("Usage: docspec <COMMAND>"));
     }
 
     #[test]
@@ -360,6 +365,7 @@ mod tests {
             ])
             .assert()
             .code(66)
+            // The OS supplies the message tail after the colon.
             .stderr(contains(
                 "error: cannot read input `/tmp/nonexistent-docspec-test-file-xyz.md`: ",
             ));
@@ -377,6 +383,7 @@ mod tests {
             ])
             .assert()
             .code(66)
+            // Only the absence of ANSI is DocSpec's; the OS supplies the message tail.
             .stderr(contains("\x1b[").not());
     }
 
@@ -457,9 +464,7 @@ mod tests {
             .args(["convert", path_str, "-o", path_str])
             .assert()
             .code(2)
-            .stderr(contains(
-                "error: input and output paths refer to the same file",
-            ));
+            .stderr("error: input and output paths refer to the same file\n");
     }
 
     #[test]
@@ -471,8 +476,8 @@ mod tests {
             .arg(input.path())
             .args(["-t", "blocknote"])
             .assert()
-            .failure()
-            .stderr(contains("error:"));
+            .code(2)
+            .stderr("error: cannot detect input format: use --from\n");
     }
 
     #[test]
@@ -485,7 +490,7 @@ mod tests {
             .args(["-t", "blocknote"])
             .assert()
             .code(2)
-            .stderr(contains("error: cannot detect input format: use --from"));
+            .stderr("error: cannot detect input format: use --from\n");
     }
 
     #[test]
@@ -580,10 +585,12 @@ mod tests {
     fn clap_rejects_blocknote_input_with_exit_code_2() {
         docspec_cmd()
             .args(["convert", "--from", "blocknote", "x.md"])
+            .env_remove("CLICOLOR_FORCE")
             .assert()
             .failure()
             .code(2)
-            .stderr(contains("invalid value 'blocknote'"));
+            // clap formats the invalid-value error.
+            .stderr(contains("invalid value 'blocknote' for '--from <FROM>'"));
     }
 
     #[test]
@@ -592,7 +599,8 @@ mod tests {
             .args(["convert", "--to", "markdown", "x.md"])
             .assert()
             .code(66)
-            .stderr(contains("No such file or directory"));
+            // The OS supplies the message tail after the colon.
+            .stderr(contains("error: cannot read input `x.md`: "));
     }
 
     #[test]
@@ -738,9 +746,11 @@ mod tests {
     #[test]
     fn bare_invocation_shows_help_and_exits_nonzero() {
         docspec_cmd()
+            .env_remove("CLICOLOR_FORCE")
             .assert()
             .failure()
-            .stderr(predicates::str::contains("subcommand").or(predicates::str::contains("Usage")));
+            // clap formats the usage text.
+            .stderr(contains("Usage: docspec <COMMAND>"));
     }
 
     #[test]
@@ -755,7 +765,7 @@ mod tests {
             .args(["--to", "blocknote"])
             .assert()
             .success()
-            .stdout(contains("paragraph"));
+            .stdout(concat!(r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{}}],"children":[]}]"#, "\n"));
     }
 
     #[test]
@@ -781,7 +791,7 @@ mod tests {
             .write_stdin(bytes)
             .assert()
             .success()
-            .stdout(contains("paragraph"));
+            .stdout(concat!(r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{}}],"children":[]}]"#, "\n"));
     }
 
     #[test]
@@ -793,8 +803,8 @@ mod tests {
             .args(["convert", "--to", "blocknote"])
             .write_stdin(bytes)
             .assert()
-            .failure()
-            .stderr(contains("cannot detect input format"));
+            .code(2)
+            .stderr("error: cannot detect input format: use --from\n");
     }
 
     #[test]
@@ -808,8 +818,7 @@ mod tests {
             .args(["--to", "blocknote"])
             .assert()
             .success()
-            .stdout(contains("Hello"))
-            .stdout(predicates::str::contains("\u{FEFF}Hello").not());
+            .stdout(concat!(r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#, "\n"));
     }
 
     #[test]
@@ -821,17 +830,18 @@ mod tests {
             .write_stdin(content.as_ref())
             .assert()
             .success()
-            .stdout(contains("Hello"))
-            .stdout(predicates::str::contains("\u{FEFF}Hello").not());
+            .stdout(concat!(r#"[{"type":"heading","props":{"level":1},"content":[{"type":"text","text":"Hello","styles":{}}],"children":[]}]"#, "\n"));
     }
 
     #[test]
     fn clap_rejects_unknown_input_format() {
         docspec_cmd()
             .args(["convert", "--from", "pdf", "--to", "blocknote"])
+            .env_remove("CLICOLOR_FORCE")
             .assert()
-            .failure()
-            .stderr(contains("pdf"));
+            .code(2)
+            // clap formats the invalid-value error.
+            .stderr(contains("invalid value 'pdf' for '--from <FROM>'"));
     }
 
     #[test]
@@ -911,9 +921,9 @@ mod tests {
                 .args(["convert", input.path().to_str().unwrap()])
                 .assert()
                 .code(65)
-                .stderr(contains(
-                    "error: parse error: malformed document.xml: unexpected EOF inside <w:body>",
-                ));
+                .stderr(
+                    "error: parse error: malformed document.xml: unexpected EOF inside <w:body>\n",
+                );
         }
 
         #[test]
@@ -930,6 +940,7 @@ mod tests {
                 ])
                 .assert()
                 .code(73)
+                // The OS supplies the message tail after the colon.
                 .stderr(contains(format!(
                     "error: cannot create output `{}`: ",
                     output.display()
@@ -949,6 +960,7 @@ mod tests {
                 .args(["convert", input.path().to_str().unwrap()])
                 .assert()
                 .code(77)
+                // The OS supplies the message tail after "Permission denied".
                 .stderr(contains(format!(
                     "error: cannot read input `{}`: Permission denied",
                     input.path().display()
@@ -963,10 +975,10 @@ mod tests {
                     .args(["convert", "--from", format, dir.path().to_str().unwrap()])
                     .assert()
                     .code(66)
-                    .stderr(contains(format!(
-                        "error: cannot read input `{}`: is a directory",
+                    .stderr(format!(
+                        "error: cannot read input `{}`: is a directory\n",
                         dir.path().display()
-                    )));
+                    ));
             }
         }
 
@@ -977,18 +989,16 @@ mod tests {
                 .args(["convert", input.path().to_str().unwrap()])
                 .assert()
                 .code(65)
-                .stderr(contains(format!(
-                    "error: cannot read input `{}`: stream did not contain valid UTF-8",
+                .stderr(format!(
+                    "error: cannot read input `{}`: stream did not contain valid UTF-8\n",
                     input.path().display()
-                )));
+                ));
             docspec_cmd()
                 .args(["convert", "--from", "markdown", "-"])
                 .write_stdin(&b"\xff\xfe# bad"[..])
                 .assert()
                 .code(65)
-                .stderr(contains(
-                    "error: I/O error: stream did not contain valid UTF-8",
-                ));
+                .stderr("error: I/O error: stream did not contain valid UTF-8\n");
         }
 
         #[cfg(target_os = "linux")]
@@ -1008,7 +1018,7 @@ mod tests {
                 .write_stdin("# Hi\n")
                 .assert()
                 .code(2)
-                .stderr(contains("error: cannot detect input format: use --from"));
+                .stderr("error: cannot detect input format: use --from\n");
         }
 
         #[test]
@@ -1023,10 +1033,21 @@ mod tests {
                     .args(args)
                     .assert()
                     .success()
-                    .stdout(contains("Exit status:"))
-                    .stdout(contains(
-                        "66  the input file does not exist or is a directory",
-                    ));
+                    // clap lays out the help above; the exit-status block is DocSpec's.
+                    .stdout(predicates::str::ends_with(concat!(
+                        "\nExit status:\n",
+                        "  0   success\n",
+                        "  2   command used incorrectly (usage, bad flag or value, format not given)\n",
+                        "  65  the input document is malformed or cannot be converted\n",
+                        "  66  the input file does not exist or is a directory\n",
+                        "  69  the HTTP server cannot listen on the given address\n",
+                        "  70  internal DocSpec error\n",
+                        "  71  the operating system refused a resource\n",
+                        "  73  the output file cannot be created\n",
+                        "  74  I/O failed while reading or writing\n",
+                        "  77  permission denied\n",
+                        "\nCodes above 2 follow <sysexits.h>.\n",
+                    )));
             }
         }
 
