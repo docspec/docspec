@@ -105,7 +105,7 @@ curl -X POST \
 ```json
 {
   "version": "2.0.0",
-  "links": { "conversion": "../conversion", "health": "../health" },
+  "links": { "conversion": "../conversion", "health": "../health", "openapi": "../openapi.json" },
   "conversion": {
     "inputs": ["text/markdown", "text/html", "..."],
     "outputs": ["application/vnd.docspec.blocknote+json", "..."]
