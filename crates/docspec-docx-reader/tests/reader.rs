@@ -2423,6 +2423,56 @@ mod events {
     }
 
     #[test]
+    fn w_cr_and_hyphen_run_children_emit_events() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>line1</w:t><w:cr/><w:t>line2</w:t><w:br/><w:t>line3</w:t><w:noBreakHyphen/><w:t>x</w:t><w:softHyphen/><w:t>y</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("line1"),
+                Event::LineBreak,
+                text("line2"),
+                Event::LineBreak,
+                text("line3"),
+                text("\u{2011}"),
+                text("x"),
+                text("\u{00AD}"),
+                text("y"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn w_cr_and_hyphen_run_children_with_end_tags_emit_events() {
+        let mut reader = make_reader(
+            r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>line1</w:t><w:cr></w:cr><w:t>line2</w:t><w:noBreakHyphen></w:noBreakHyphen><w:t>x</w:t><w:softHyphen></w:softHyphen><w:t>y</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let events = drive(&mut reader);
+        assert_eq!(
+            events,
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("line1"),
+                Event::LineBreak,
+                text("line2"),
+                text("\u{2011}"),
+                text("x"),
+                text("\u{00AD}"),
+                text("y"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
     fn w_br_between_separate_runs_emits_line_break() {
         let mut reader = make_reader(
             r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>foo</w:t></w:r><w:r><w:br/></w:r><w:r><w:t>bar</w:t></w:r></w:p></w:body></w:document>"#,
