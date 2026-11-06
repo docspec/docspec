@@ -10,8 +10,6 @@
 // (bad fixture paths, LFS pointers, unhandled enum variants) so call sites
 // stay terse and failures are obvious.
 #![allow(clippy::panic)]
-// Reason: Literal suffix rules have conflicting requirements in this crate
-#![allow(clippy::separated_literal_suffix)]
 
 pub mod builders;
 
