@@ -8,7 +8,6 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {
-    println!("cargo::rustc-check-cfg=cfg(coverage)");
     generate_corpus_tests("pandoc", "pandoc_corpus_tests.rs")?;
     generate_corpus_tests("docspec", "docspec_corpus_tests.rs")?;
     generate_corpus_tests("apache-tika", "apache_tika_corpus_tests.rs")?;

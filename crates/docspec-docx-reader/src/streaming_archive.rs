@@ -104,7 +104,6 @@ const _: fn() = || {
 };
 
 #[cfg(test)]
-#[cfg(not(coverage))]
 mod tests {
     #![allow(clippy::expect_used, clippy::unwrap_used)]
 

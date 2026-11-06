@@ -191,7 +191,6 @@ fn get_attr(elem: &quick_xml::events::BytesStart<'_>, name: &[u8]) -> Result<Opt
 }
 
 #[cfg(test)]
-#[cfg(not(coverage))]
 mod tests {
     use super::*;
     use std::io::Cursor;

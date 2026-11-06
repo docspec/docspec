@@ -193,7 +193,6 @@ impl DocumentReader {
     }
 
     #[cfg(test)]
-    #[cfg(not(coverage))]
     #[allow(clippy::expect_used, clippy::as_conversions)]
     pub(crate) fn from_xml_reader(
         xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
@@ -1139,7 +1138,6 @@ fn unexpected_eof(element: &str) -> Error {
 }
 
 #[cfg(test)]
-#[cfg(not(coverage))]
 mod tests {
     #![allow(
         clippy::expect_used,

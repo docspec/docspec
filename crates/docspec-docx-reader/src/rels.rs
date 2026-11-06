@@ -252,7 +252,6 @@ fn normalize_relative_target(base_part: &str, target: &str) -> docspec_core::Res
 }
 
 #[cfg(test)]
-#[cfg(not(coverage))]
 mod tests {
     #![allow(clippy::expect_used, clippy::panic)]
     use super::*;
