@@ -18,8 +18,9 @@ docspec-core = "1"
 ## What it handles today
 
 - Paragraphs (`<w:p>`) and direct text (`<w:t>` inside `<w:r>`)
-- Line breaks (`<w:br>`, including `w:type="page"` and `w:type="column"` — all emit `LineBreak`)
+- Line breaks (`<w:br>`, including `w:type="page"` and `w:type="column"`, and `<w:cr>` — all emit `LineBreak`)
 - Tabs (`<w:tab>` — emitted as a `Text` event containing the single character `"\t"`)
+- Hyphen characters (`<w:noBreakHyphen>` emitted as a `Text` event containing U+2011 NON-BREAKING HYPHEN; `<w:softHyphen>` emitted as a `Text` event containing U+00AD SOFT HYPHEN)
 - Tables (`<w:tbl>`, `<w:tr>`, `<w:tc>`) — structural events. Horizontal cell merging via `<w:gridSpan>` is emitted as `colspan`. Header rows via `<w:trPr><w:tblHeader/></w:trPr>` are emitted as `StartTableHeader` (with `scope: Column`) for cells in the contiguous header band at the top of the outermost table. Nested tables emit all cells as `StartTableCell` (header rows in nested tables are not supported). Vertical merging via `<w:vMerge>` is NOT yet supported — rowspan information is lost.
 - Run properties (`<w:rPr>`): `<w:b>` (bold), `<w:i>` (italic), `<w:u>` (underline — any `w:val` other than `none`), `<w:strike>` (strikethrough), `<w:dstrike>` (double-strike, collapses to strikethrough), `<w:vertAlign>` (`subscript` and `superscript` only; `baseline` resets to neither). These are emitted as deferred `StartTextStyle { kind, id: None }` / `EndTextStyle` wrapper events around the first run content, not as fields on `Text` events. Empty styled runs emit no style wrapper events; multiple `<w:t>` elements in one styled run share a single wrapper span.
 - Run color properties (`<w:rPr>`):

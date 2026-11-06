@@ -263,7 +263,7 @@ impl DocumentReader {
                 });
                 self.input.skip_subtree(start)?;
             }
-            b"br" => {
+            b"br" | b"cr" => {
                 self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
                 self.emit.push(Event::LineBreak);
                 self.input.skip_subtree(start)?;
@@ -309,9 +309,22 @@ impl DocumentReader {
                     content: "\t".to_string(),
                 });
             }
-            b"br" => {
+            b"br" | b"cr" => {
                 self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
                 self.emit.push(Event::LineBreak);
+            }
+            // ECMA-376 §17.3.3.18 non-breaking hyphen (U+2011) and §17.3.3.29 soft hyphen (U+00AD).
+            b"noBreakHyphen" => {
+                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
+                self.emit.push(Event::Text {
+                    content: "\u{2011}".to_string(),
+                });
+            }
+            b"softHyphen" => {
+                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
+                self.emit.push(Event::Text {
+                    content: "\u{00AD}".to_string(),
+                });
             }
             b"sym" => {
                 if let Some(text) = resolve_sym_char(props.as_ref().and_then(|p| p.font), empty) {

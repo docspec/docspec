@@ -7,6 +7,7 @@ ReaderFixtureSnapshot {
     StartDocument { id: None, language: None, metadata: None },
     StartParagraph { alignment: None, id: None },
     Text { content: "optional" },
+    Text { content: "\u{ad}" },
     Text { content: "hyphen" },
     EndParagraph,
     EndDocument,
