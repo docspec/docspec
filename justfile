@@ -1,5 +1,5 @@
 # Default recipe: run all checks (what CI does)
-default: fmt clippy test doc build
+default: fmt clippy test doc build deny
 
 # Format all Rust code
 fmt:
@@ -29,6 +29,10 @@ test:
 # To open in browser, run `just doc -- --open`
 doc:
     RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
+
+# Check advisories, licenses, bans and sources against deny.toml
+deny:
+    cargo deny check advisories licenses bans sources
 
 # Run coverage and produce a report.
 # --ignore-filename-regex excludes binary/WASM entry points per TESTING.md tolerance:
