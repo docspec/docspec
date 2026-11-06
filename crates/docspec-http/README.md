@@ -30,6 +30,8 @@ docspec-http = "2"
 tokio = { version = "1", features = ["full"] }
 ```
 
+Until 2.0.0 is released, Cargo needs the pre-release named explicitly: `docspec-http = "2.0.0-rc.1"`.
+
 ```rust
 use docspec_http::{serve, server::ServerConfig};
 
