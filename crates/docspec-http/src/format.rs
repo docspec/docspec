@@ -15,5 +15,8 @@ pub(crate) const ALLOW_CONVERSION: &str = "GET, HEAD, POST, OPTIONS";
 /// `Allow` header value for `/health`.
 pub(crate) const ALLOW_HEALTH: &str = "GET, HEAD, OPTIONS";
 
+/// `Allow` header value for `/.well-known/docspec`.
+pub(crate) const ALLOW_WELL_KNOWN: &str = "GET, HEAD";
+
 /// Health endpoint response body.
 pub const HEALTH_BODY: &str = "Healthy.";

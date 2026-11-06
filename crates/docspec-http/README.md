@@ -85,6 +85,7 @@ curl -X POST \
 | GET     | /health     | Liveness check                                                   |
 | HEAD    | /health     | Liveness check (no body)                                         |
 | OPTIONS | /health     | Allowed methods                                                  |
+| GET     | /.well-known/docspec | Discovery document: version, links, and conversion media types |
 | GET     | /metrics    | Prometheus metrics in exposition format 0.0.4                    |
 
 `GET /conversion` lets a client discover what the deployed server supports. `inputs` are the values accepted on `Content-Type`, `outputs` the values accepted on `Accept` (aliases included). The lists are built from the same tables that validate `POST /conversion`:
@@ -96,6 +97,24 @@ curl -X POST \
   "outputs": ["application/vnd.docspec.blocknote+json", "application/vnd.blocknote+json", "application/vnd.oxa+json", "application/vnd.pandoc.native", "text/html"]
 }
 ```
+
+`GET /.well-known/docspec` lets a client that knows only the server's address find everything else. It returns the version, `links` to the other resources, and the same media type lists under `conversion`:
+
+```json
+{
+  "version": "2.0.0",
+  "links": { "conversion": "/conversion", "health": "/health" },
+  "conversion": {
+    "inputs": ["text/markdown", "text/html", "..."],
+    "outputs": ["application/vnd.docspec.blocknote+json", "..."]
+  }
+}
+```
+
+How a client finds it:
+
+- **Host and port**: fetch `http://<host>:<port>/.well-known/docspec`, then resolve each link against that origin.
+- **Base URL** (DocSpec mounted under a reverse-proxy prefix such as `https://example.com/docspec`): fetch `{base}/.well-known/docspec` and prepend `{base}` to each link. RFC 8615 places well-known URIs at the origin root; resolving against the base URL is a pragmatic convention for prefixed deployments, not part of the RFC.
 
 ## Request / Response Headers
 
@@ -346,7 +365,7 @@ docspec-http = { version = "1", default-features = false }
 
 **`output_mime_type`**: `application/vnd.docspec.blocknote+json` (conversion succeeded; output produced by the BlockNote writer), `text/html` (conversion succeeded; output produced by the HTML writer), `application/vnd.oxa+json` (conversion succeeded; output produced by the oxa.dev writer), `application/vnd.pandoc.native` (conversion succeeded; output produced by the Pandoc native writer), `none` (no output produced — any error path).
 
-**`path`**: matched route template (`/conversion`, `/health`) or `unknown` for fallback handlers
+**`path`**: matched route template (`/conversion`, `/health`, `/.well-known/docspec`) or `unknown` for fallback handlers
 
 **`status`**: numeric HTTP status code as a string (e.g., `"200"`, `"422"`)
 
@@ -354,7 +373,7 @@ docspec-http = { version = "1", default-features = false }
 
 ### Cardinality Guarantees
 
-`path` is bounded to `{"/conversion", "/health", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 6 values (`text/markdown`, `text/html`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.oasis.opendocument.text`, `unsupported`, `none`). `output_mime_type` is bounded to 5 values (`application/vnd.docspec.blocknote+json`, `text/html`, `application/vnd.oxa+json`, `application/vnd.pandoc.native`, `none`). Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
+`path` is bounded to `{"/conversion", "/health", "/.well-known/docspec", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 6 values (`text/markdown`, `text/html`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.oasis.opendocument.text`, `unsupported`, `none`). `output_mime_type` is bounded to 5 values (`application/vnd.docspec.blocknote+json`, `text/html`, `application/vnd.oxa+json`, `application/vnd.pandoc.native`, `none`). Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
 
 ### Scrape Model
 

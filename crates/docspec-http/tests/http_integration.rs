@@ -690,6 +690,84 @@ async fn head_conversion_returns_200_without_body() {
 }
 
 #[tokio::test]
+async fn get_well_known_docspec_returns_discovery_document() {
+    let request = common::empty_request("GET", "/.well-known/docspec");
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content-type present"),
+        "application/json"
+    );
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .expect("cache-control present"),
+        CACHE_CONTROL
+    );
+
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        json!({
+            "version": env!("CARGO_PKG_VERSION"),
+            "links": {
+                "conversion": "/conversion",
+                "health": "/health",
+            },
+            "conversion": {
+                "inputs": [
+                    "text/markdown",
+                    "text/html",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "application/vnd.oasis.opendocument.text",
+                ],
+                "outputs": [
+                    "application/vnd.docspec.blocknote+json",
+                    "application/vnd.blocknote+json",
+                    "application/vnd.oxa+json",
+                    "application/vnd.pandoc.native",
+                    "text/html",
+                ],
+            },
+        })
+    );
+}
+
+#[tokio::test]
+async fn post_well_known_docspec_returns_405() {
+    let request = common::empty_request("POST", "/.well-known/docspec");
+
+    let response = app().oneshot(request).await.expect("request succeeds");
+
+    assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::ALLOW)
+            .expect("allow header present"),
+        "GET, HEAD"
+    );
+    let instance = instance_of(&response);
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        json!({
+            "type": "about:blank",
+            "title": "Method Not Allowed",
+            "status": 405,
+            "detail": "Method not allowed. Allowed methods: GET, HEAD.",
+            "instance": instance,
+        })
+    );
+}
+
+#[tokio::test]
 async fn options_conversion_returns_204() {
     let request = common::empty_request("OPTIONS", "/conversion");
 

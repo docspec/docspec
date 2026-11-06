@@ -31,18 +31,11 @@ pub fn router() -> Router {
     use axum::extract::DefaultBodyLimit;
     use axum::http::header::HeaderName;
     use axum::middleware;
-    use axum::routing::{get, post};
     use tower::ServiceBuilder;
     use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
     use tower_http::trace::{DefaultOnFailure, TraceLayer};
 
     use crate::cache::cache_control_layer;
-    use crate::handlers::{
-        conversion::{get_conversion, options_conversion, post_conversion},
-        fallback::{conversion_method_not_allowed, health_method_not_allowed, not_found},
-        health::{get_health, head_health, options_health},
-    };
-
     // Sentry-only imports — Body and Next are only used in the attach_sentry_tags
     // closure; option_layer and telemetry are only used in the sentry middleware stack.
     #[cfg(feature = "sentry")]
@@ -56,16 +49,6 @@ pub fn router() -> Router {
 
     let x_request_id = HeaderName::from_static("x-request-id");
     let x_trace_id = HeaderName::from_static(format::X_TRACE_ID_HEADER);
-
-    let conversion_route = post(post_conversion)
-        .get(get_conversion)
-        .options(options_conversion)
-        .fallback(conversion_method_not_allowed);
-
-    let health_route = get(get_health)
-        .head(head_health)
-        .options(options_health)
-        .fallback(health_method_not_allowed);
 
     #[cfg(feature = "sentry")]
     let attach_sentry_tags = |request: Request<Body>, next: Next| async move {
@@ -148,11 +131,40 @@ pub fn router() -> Router {
         .layer(PropagateRequestIdLayer::new(x_trace_id))
         .layer(cache_control_layer());
 
+    routes().layer(middleware_stack)
+}
+
+/// The route table: every path, its method handlers, and the 404/405 fallbacks.
+fn routes() -> Router {
+    use axum::routing::{get, post};
+
+    use crate::handlers::{
+        conversion::{get_conversion, options_conversion, post_conversion},
+        fallback::{conversion_method_not_allowed, health_method_not_allowed, not_found},
+        health::{get_health, head_health, options_health},
+        well_known::{get_well_known, well_known_method_not_allowed},
+    };
+
     Router::new()
-        .route("/conversion", conversion_route)
-        .route("/health", health_route)
+        .route(
+            "/conversion",
+            post(post_conversion)
+                .get(get_conversion)
+                .options(options_conversion)
+                .fallback(conversion_method_not_allowed),
+        )
+        .route(
+            "/health",
+            get(get_health)
+                .head(head_health)
+                .options(options_health)
+                .fallback(health_method_not_allowed),
+        )
+        .route(
+            "/.well-known/docspec",
+            get(get_well_known).fallback(well_known_method_not_allowed),
+        )
         .fallback(not_found)
-        .layer(middleware_stack)
 }
 
 /// Builds the public router and additionally registers `GET /metrics`
