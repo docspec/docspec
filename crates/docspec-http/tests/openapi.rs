@@ -19,6 +19,9 @@ use axum::{
 use serde_json::{json, Value};
 use tower::ServiceExt as _;
 
+/// Served paths the document leaves out on purpose.
+const DISCOVERY_PATHS: [&str; 2] = ["/.well-known/docspec", "/openapi.json"];
+
 const MIME_OPENAPI: &str = "application/vnd.oai.openapi+json;version=3.1";
 
 fn app() -> Router {
@@ -119,7 +122,8 @@ async fn get_openapi_returns_openapi_document() {
             "description": "Streaming document conversion. Errors are RFC 9457 problem details. \
                             `HEAD` is served wherever `GET` is. Undocumented paths answer 404 and \
                             other undocumented methods 405, both as problem details. `GET /metrics` is served only when metrics are \
-                            enabled and is not described here.",
+                            enabled and is not described here. The discovery endpoints (`/.well-known/*`, `/openapi.json`) \
+                            are served but not described here.",
             "version": env!("CARGO_PKG_VERSION"),
         }))
     );
@@ -199,14 +203,12 @@ async fn openapi_documents_exactly_the_served_operations() {
     assert_eq!(
         documented,
         [
-            ("/.well-known/docspec", "get"),
             ("/conversion", "get"),
             ("/conversion", "options"),
             ("/conversion", "post"),
             ("/health", "get"),
             ("/health", "head"),
             ("/health", "options"),
-            ("/openapi.json", "get"),
         ]
         .map(|(path, method)| (path.to_owned(), method.to_owned()))
     );
@@ -226,6 +228,18 @@ async fn openapi_documents_exactly_the_served_operations() {
             status != StatusCode::NOT_FOUND && status != StatusCode::METHOD_NOT_ALLOWED,
             "{method} {path} is documented but answered {status}"
         );
+    }
+
+    // Discovery endpoints are described by their own specs (RFC 8615/9727) or
+    // are this document itself, so they are served but left out.
+    for path in DISCOVERY_PATHS {
+        assert_eq!(paths.get(path), None, "{path} is documented");
+        let status = app()
+            .oneshot(common::empty_request("GET", path))
+            .await
+            .expect("request succeeds")
+            .status();
+        assert_eq!(status, StatusCode::OK, "GET {path}");
     }
 }
 
@@ -248,11 +262,6 @@ async fn assert_matches_component(uri: &str, component: &str) {
 #[tokio::test]
 async fn get_conversion_body_matches_its_schema() {
     assert_matches_component("/conversion", "ConversionFormats").await;
-}
-
-#[tokio::test]
-async fn well_known_docspec_body_matches_its_schema() {
-    assert_matches_component("/.well-known/docspec", "WellKnown").await;
 }
 
 #[tokio::test]

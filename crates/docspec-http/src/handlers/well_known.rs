@@ -3,10 +3,7 @@
 use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 
-use crate::{
-    discovery::WellKnown,
-    error::{HttpError, Problem},
-};
+use crate::{discovery::WellKnown, error::HttpError};
 
 /// Handle `GET /.well-known/docspec` — describe this server and link to its resources.
 ///
@@ -17,18 +14,6 @@ use crate::{
 /// # Errors
 ///
 /// Returns [`HttpError::Internal`] if the body cannot be serialized.
-#[utoipa::path(
-    get,
-    path = "/.well-known/docspec",
-    tag = "discovery",
-    summary = "Discovery document",
-    description = "The version, links to the other resources (relative to this document's URL), \
-                   and the media types `/conversion` supports.",
-    responses(
-        (status = 200, description = "The discovery document.", body = WellKnown, content_type = "application/json"),
-        (status = 500, description = "The response could not be built.", body = Problem, content_type = "application/problem+json"),
-    ),
-)]
 #[inline]
 // Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.
 #[allow(clippy::unused_async)]

@@ -121,7 +121,7 @@ Either way, resolve each link against the URL the document was fetched from, as 
 
 ### API description
 
-`GET /openapi.json` serves an [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0) description of every route above except `/metrics`, as `application/vnd.oai.openapi+json;version=3.1`. It is generated from the handlers' annotations (built once, on first request), so a route cannot be served without being described. The `POST /conversion` media types come from the same tables that validate requests. Feed it to Swagger UI, Redocly or a client generator.
+`GET /openapi.json` serves an [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0) description of every route above except `/metrics` and the discovery endpoints (`/.well-known/docspec` and `/openapi.json` itself, which are served but not described), as `application/vnd.oai.openapi+json;version=3.1`. It is generated from the handlers' annotations (built once, on first request), so no other route can be served without being described. The `POST /conversion` media types come from the same tables that validate requests. Feed it to Swagger UI, Redocly or a client generator.
 
 ## Request / Response Headers
 

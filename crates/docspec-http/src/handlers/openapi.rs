@@ -4,7 +4,7 @@ use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 
 use crate::{
-    error::{HttpError, Problem},
+    error::HttpError,
     openapi::{self, MIME_OPENAPI},
 };
 
@@ -13,17 +13,6 @@ use crate::{
 /// # Errors
 ///
 /// Returns [`HttpError::Internal`] if the document could not be built.
-#[utoipa::path(
-    get,
-    path = "/openapi.json",
-    tag = "discovery",
-    summary = "OpenAPI description",
-    description = "This document.",
-    responses(
-        (status = 200, description = "The OpenAPI 3.1 document.", body = serde_json::Value, content_type = MIME_OPENAPI),
-        (status = 500, description = "The document could not be built.", body = Problem, content_type = "application/problem+json"),
-    ),
-)]
 #[inline]
 // Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.
 #[allow(clippy::unused_async)]

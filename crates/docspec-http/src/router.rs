@@ -139,9 +139,10 @@ pub fn router() -> Router {
 /// The route table: every path, its method handlers, and the 404/405 fallbacks.
 ///
 /// Registering a handler through `routes!` also adds its `#[utoipa::path]`
-/// operation to the `OpenAPI` document, so every route served is described.
+/// operation to the `OpenAPI` document, so every route served is described,
+/// except the discovery endpoints, which are plain `route`s.
 pub(crate) fn routes() -> OpenApiRouter {
-    use axum::handler::Handler;
+    use axum::{handler::Handler, routing::get};
     use utoipa_axum::{router::UtoipaMethodRouter, routes};
 
     use crate::handlers::fallback::{
@@ -178,14 +179,16 @@ pub(crate) fn routes() -> OpenApiRouter {
             ),
             health_method_not_allowed,
         ))
-        .routes(with_fallback(
-            routes!(crate::handlers::well_known::get_well_known),
-            read_only_method_not_allowed,
-        ))
-        .routes(with_fallback(
-            routes!(crate::handlers::openapi::get_openapi),
-            read_only_method_not_allowed,
-        ))
+        // Discovery endpoints are served but not described: RFC 8615 describes
+        // `/.well-known/*`, and `/openapi.json` is the document itself.
+        .route(
+            "/.well-known/docspec",
+            get(crate::handlers::well_known::get_well_known).fallback(read_only_method_not_allowed),
+        )
+        .route(
+            "/openapi.json",
+            get(crate::handlers::openapi::get_openapi).fallback(read_only_method_not_allowed),
+        )
         .fallback(not_found)
 }
 

@@ -2,7 +2,9 @@
 //!
 //! Paths, operations and response schemas come from the `#[utoipa::path]`
 //! annotations of the handlers registered in [`crate::router::routes`], so a
-//! route cannot be served without being described. The media types of
+//! route cannot be served without being described, except the discovery
+//! endpoints (`/.well-known/*` and this document), which are left out on
+//! purpose. The media types of
 //! `POST /conversion` are filled in here from the tables in [`crate::mime`],
 //! which is also what validates requests, so the two cannot disagree.
 
@@ -40,7 +42,8 @@ pub(crate) fn base() -> OpenApi {
                     "Streaming document conversion. Errors are RFC 9457 problem details. \
                      `HEAD` is served wherever `GET` is. Undocumented paths answer 404 and \
                      other undocumented methods 405, both as problem details. `GET /metrics` is served only when metrics are enabled \
-                     and is not described here.",
+                     and is not described here. The discovery endpoints (`/.well-known/*`, `/openapi.json`) \
+                     are served but not described here.",
                 )),
         )
         .build()

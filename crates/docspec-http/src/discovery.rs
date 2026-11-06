@@ -2,8 +2,10 @@
 //!
 //! The media type lists come from the tables in [`crate::mime`], so discovery
 //! responses cannot disagree with what `POST /conversion` accepts. Each body
-//! is a struct whose `ToSchema` derive is what the `OpenAPI` document publishes,
-//! so a field added here shows up in the API description too.
+//! is a struct with a `ToSchema` derive: the `OpenAPI` document publishes the
+//! one of `GET /conversion`, so a field added here shows up there too. The
+//! `/.well-known/docspec` schema is not published; tests check the body
+//! against it.
 
 use docspec_json::{JsonBackend, JsonEmitter, StrusonBackend};
 use utoipa::ToSchema;
@@ -147,5 +149,40 @@ impl WellKnown {
             })
         })?;
         emitter.finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::expect_used, clippy::tests_outside_test_module)]
+
+    use serde_json::{json, Value};
+    use utoipa::{openapi::ComponentsBuilder, PartialSchema as _};
+
+    use super::*;
+
+    #[test]
+    fn well_known_body_matches_its_schema() {
+        let mut nested = Vec::new();
+        WellKnown::schemas(&mut nested);
+        let components = ComponentsBuilder::new()
+            .schema(WellKnown::name(), WellKnown::schema())
+            .schemas_from_iter(nested)
+            .build();
+        let schema = json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$ref": "#/components/schemas/WellKnown",
+            "components": components,
+        });
+        let body: Value =
+            serde_json::from_slice(&WellKnown::current().to_json().expect("serializes"))
+                .expect("valid JSON");
+        let validator = jsonschema::validator_for(&schema).expect("valid JSON Schema");
+
+        let errors: Vec<String> = validator
+            .iter_errors(&body)
+            .map(|error| format!("{error} at {}", error.instance_path()))
+            .collect();
+        assert_eq!(errors, Vec::<String>::new());
     }
 }
