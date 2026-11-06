@@ -8,9 +8,9 @@
 //!
 //! The writer emits JSON tokens directly to the underlying `Write` as events arrive using
 //! `docspec-json` for streaming JSON output. For text and URI-based images, memory usage is
-//! constant regardless of document size. Local buffering is used only for bounded conversion
-//! details such as asset-based image data URI encoding and lifting nested table event substreams
-//! after their enclosing table closes.
+//! constant regardless of document size. Local buffering is used only for asset-based image data
+//! URI encoding (bounded by one image) and for lifting nested tables and block-level content out
+//! of table cells after their enclosing table closes (grows with that content, tracked in #416).
 //!
 //! # Supported Events
 //!
