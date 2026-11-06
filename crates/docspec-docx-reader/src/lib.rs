@@ -9,9 +9,10 @@
 //! # Scope
 //!
 //! **In scope**: Paragraphs (`<w:p>`), direct text (`<w:t>` inside `<w:r>`),
-//! line breaks (`<w:br>` — including `w:type="page"` and `w:type="column"`, all
-//! emitted as `LineBreak`), tabs (`<w:tab>`, emitted as a `Text` event whose
-//! content is the single character `"\t"`), tables (`<w:tbl>`, `<w:tr>`,
+//! line breaks (`<w:br>` — including `w:type="page"` and `w:type="column"` — and
+//! `<w:cr>`, all emitted as `LineBreak`), tabs (`<w:tab>`, emitted as a `Text`
+//! event whose content is the single character `"\t"`), hyphens
+//! (`<w:noBreakHyphen>` as U+2011 and `<w:softHyphen>` as U+00AD), tables (`<w:tbl>`, `<w:tr>`,
 //! `<w:tc>`), lists (`<w:p>` with `<w:numPr>` — ordered and unordered),
 //! hyperlinks (`<w:hyperlink>` — resolved via `word/_rels/document.xml.rels`
 //! and emitted as `StartLink`/`EndLink` events around inline content),

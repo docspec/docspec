@@ -268,6 +268,20 @@ impl DocumentReader {
                 self.emit.push(Event::LineBreak);
                 self.input.skip_subtree(start)?;
             }
+            b"noBreakHyphen" => {
+                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
+                self.emit.push(Event::Text {
+                    content: "\u{2011}".to_string(),
+                });
+                self.input.skip_subtree(start)?;
+            }
+            b"softHyphen" => {
+                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
+                self.emit.push(Event::Text {
+                    content: "\u{00AD}".to_string(),
+                });
+                self.input.skip_subtree(start)?;
+            }
             b"drawing" => {
                 self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
                 self.parse_drawing_subtree()?;
