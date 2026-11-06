@@ -802,6 +802,18 @@ async fn post_api_catalog_returns_405() {
             .expect("allow header present"),
         "GET, HEAD"
     );
+    let instance = instance_of(&response);
+    let body = response_body_json(response.into_body()).await;
+    assert_eq!(
+        body,
+        json!({
+            "type": "about:blank",
+            "title": "Method Not Allowed",
+            "status": 405,
+            "detail": "Method not allowed. Allowed methods: GET, HEAD.",
+            "instance": instance,
+        })
+    );
 }
 
 #[tokio::test]
