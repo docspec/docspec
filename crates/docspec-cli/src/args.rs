@@ -10,6 +10,8 @@ const EXIT_STATUS_HELP: &str = "Exit status:\n  0   success\n  2   command used 
 #[derive(Parser, Debug)]
 #[command(
     name = "docspec",
+    // Pin the usage line; clap otherwise prints argv[0] (`docspec.exe` on Windows).
+    bin_name = "docspec",
     version,
     about = "Streaming document conversion CLI",
     subcommand_required = true,

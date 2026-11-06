@@ -338,6 +338,7 @@ mod tests {
     #[test]
     fn no_arguments_prints_help() {
         docspec_cmd()
+            .env_remove("CLICOLOR_FORCE")
             .assert()
             .failure()
             // clap formats the usage text.
@@ -584,6 +585,7 @@ mod tests {
     fn clap_rejects_blocknote_input_with_exit_code_2() {
         docspec_cmd()
             .args(["convert", "--from", "blocknote", "x.md"])
+            .env_remove("CLICOLOR_FORCE")
             .assert()
             .failure()
             .code(2)
@@ -744,6 +746,7 @@ mod tests {
     #[test]
     fn bare_invocation_shows_help_and_exits_nonzero() {
         docspec_cmd()
+            .env_remove("CLICOLOR_FORCE")
             .assert()
             .failure()
             // clap formats the usage text.
@@ -834,6 +837,7 @@ mod tests {
     fn clap_rejects_unknown_input_format() {
         docspec_cmd()
             .args(["convert", "--from", "pdf", "--to", "blocknote"])
+            .env_remove("CLICOLOR_FORCE")
             .assert()
             .code(2)
             // clap formats the invalid-value error.
