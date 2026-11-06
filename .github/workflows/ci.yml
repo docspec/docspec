@@ -124,6 +124,8 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - uses: ./.github/actions/setup-gh
+
       - name: Run release-plz (release-pr)
         uses: release-plz/action@v0.5
         with:
@@ -163,6 +165,8 @@ jobs:
           persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@stable
+
+      - uses: ./.github/actions/setup-gh
 
       # Trusted Publishing (OIDC) is the only auth path — release-plz
       # mints a short-lived token from crates.io via the workflow's
