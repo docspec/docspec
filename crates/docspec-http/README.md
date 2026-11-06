@@ -26,9 +26,11 @@ For end users who want a running HTTP server without writing Rust code, install 
 
 ```toml
 [dependencies]
-docspec-http = "1"
+docspec-http = "2"
 tokio = { version = "1", features = ["full"] }
 ```
+
+Until 2.0.0 is released, Cargo needs the pre-release named explicitly: `docspec-http = "2.0.0-rc.1"`.
 
 ```rust
 use docspec_http::{serve, server::ServerConfig};
@@ -199,13 +201,13 @@ Set ONE of the following to enable Sentry:
 
 If both are set, `DOCSPEC_SENTRY_DSN` wins. An empty string or malformed DSN is
 treated as "not set" — the server starts normally and logs a warning to stderr.
+Events are tagged with the release `docspec-http@<version>`, fixed at compile time.
 
 ### Configuration (all optional)
 
 These follow Sentry's standard conventions:
 
 - `SENTRY_ENVIRONMENT` — environment name (default: `production`)
-- `SENTRY_RELEASE` — release identifier (default: auto, `docspec-http@<version>`)
 - `SENTRY_SAMPLE_RATE` — error sample rate `[0.0, 1.0]` (default: `1.0`)
 - `SENTRY_TRACES_SAMPLE_RATE` — performance trace sample rate `[0.0, 1.0]` (default: `0.0`, traces disabled)
 
@@ -320,28 +322,28 @@ Default (both integrations compiled in):
 
 ```toml
 [dependencies]
-docspec-http = "1"
+docspec-http = "2"
 ```
 
 Sentry only:
 
 ```toml
 [dependencies]
-docspec-http = { version = "1", default-features = false, features = ["sentry"] }
+docspec-http = { version = "2", default-features = false, features = ["sentry"] }
 ```
 
 PostHog only:
 
 ```toml
 [dependencies]
-docspec-http = { version = "1", default-features = false, features = ["posthog"] }
+docspec-http = { version = "2", default-features = false, features = ["posthog"] }
 ```
 
 No telemetry:
 
 ```toml
 [dependencies]
-docspec-http = { version = "1", default-features = false }
+docspec-http = { version = "2", default-features = false }
 ```
 
 ## Metrics
