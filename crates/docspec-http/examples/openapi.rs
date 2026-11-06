@@ -5,7 +5,7 @@
 use std::io::Write as _;
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {
-    let document = docspec_http::openapi_json().map_err(|error| format!("{error:?}"))?;
+    let document = docspec_http::openapi_json()?;
     std::io::stdout().write_all(document)?;
     Ok(())
 }

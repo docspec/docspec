@@ -18,6 +18,6 @@ pub async fn get_openapi() -> Result<impl IntoResponse, HttpError> {
     Ok((
         StatusCode::OK,
         [(header::CONTENT_TYPE, HeaderValue::from_static(MIME_OPENAPI))],
-        openapi::json()?,
+        openapi::json().map_err(HttpError::internal)?,
     ))
 }
