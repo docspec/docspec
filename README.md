@@ -165,7 +165,7 @@ reach for the individual crates when you want the smallest possible dependency f
 ## What we stand for
 
 - **Memory conscious** — constant memory for DOCX (by path) and HTML apart from the cases under [Not bounded](SECURITY.md#not-bounded), Markdown bounded by input size; every allocation earns its keep.
-- **Streaming first** — events flow one at a time; nothing accumulates apart from the Markdown source and the cases under [Not bounded](SECURITY.md#not-bounded).
+- **Streaming first** — events flow one at a time; for DOCX and HTML read from a path, nothing accumulates apart from the cases under [Not bounded](SECURITY.md#not-bounded).
 - **Fail fast** — on corruption we stop and say so: no partial output, no silent truncation.
 - **No unsafe** — the workspace forbids `unsafe` entirely.
 - **Proven** — a 98% coverage floor on new and changed executable Rust lines in covered crates; no `unwrap` or `expect` in source.
