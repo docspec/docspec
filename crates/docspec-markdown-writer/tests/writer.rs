@@ -945,6 +945,151 @@ mod tests {
         assert_eq!(String::from_utf8(buf).unwrap(), "## Title\n\n");
     }
 
+    fn block(kind: fn() -> (Event, Event), texts: &[&str]) -> String {
+        let (start, end) = kind();
+        let mut events = vec![Event::StartDocument {
+            id: None,
+            language: None,
+            metadata: None,
+        }];
+        events.push(start);
+        events.extend(texts.iter().map(|text| Event::Text {
+            content: (*text).to_string(),
+        }));
+        events.push(end);
+        events.push(Event::EndDocument);
+        run(events)
+    }
+
+    fn paragraph() -> (Event, Event) {
+        (
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            Event::EndParagraph,
+        )
+    }
+
+    fn heading() -> (Event, Event) {
+        (
+            Event::StartHeading { level: 1, id: None },
+            Event::EndHeading,
+        )
+    }
+
+    #[test]
+    fn multi_digit_ordered_list_markers_are_escaped() {
+        assert_eq!(
+            block(paragraph, &["12. Annual report"]),
+            "12\\. Annual report\n\n"
+        );
+        assert_eq!(
+            block(paragraph, &["2024. Introduction"]),
+            "2024\\. Introduction\n\n"
+        );
+        assert_eq!(
+            block(paragraph, &["1234567890. ten digits"]),
+            "1234567890. ten digits\n\n"
+        );
+    }
+
+    #[test]
+    fn ordered_list_marker_before_tab_or_block_end_is_escaped() {
+        assert_eq!(block(paragraph, &["1.\tfoo"]), "1\\.\tfoo\n\n");
+        assert_eq!(block(paragraph, &["1."]), "1\\.\n\n");
+    }
+
+    #[test]
+    fn tilde_fence_at_block_start_is_escaped() {
+        assert_eq!(block(paragraph, &["~~~"]), "\\~~~\n\n");
+        assert_eq!(block(paragraph, &["~~~ rust"]), "\\~~~ rust\n\n");
+    }
+
+    #[test]
+    fn leading_whitespace_at_block_start_is_dropped() {
+        assert_eq!(block(paragraph, &["    indented"]), "indented\n\n");
+        assert_eq!(block(paragraph, &["\tindented"]), "indented\n\n");
+        assert_eq!(block(paragraph, &["  ", "  ", "# x"]), "\\# x\n\n");
+        assert_eq!(block(paragraph, &["   "]), "");
+    }
+
+    #[test]
+    fn empty_first_text_does_not_disable_block_start_escaping() {
+        assert_eq!(
+            block(paragraph, &["", "# not a heading"]),
+            "\\# not a heading\n\n"
+        );
+        assert_eq!(
+            block(paragraph, &["", "- not a list"]),
+            "\\- not a list\n\n"
+        );
+    }
+
+    #[test]
+    fn ordered_list_marker_spanning_text_events_is_escaped() {
+        assert_eq!(block(paragraph, &["1", ". two"]), "1\\. two\n\n");
+        assert_eq!(block(paragraph, &["1", "2"]), "12\n\n");
+        assert_eq!(block(paragraph, &["12", ".", " x"]), "12\\. x\n\n");
+        assert_eq!(block(heading, &["", "12", ". x"]), "# 12\\. x\n\n");
+    }
+
+    #[test]
+    fn setext_underline_at_block_start_passes_through() {
+        assert_eq!(block(paragraph, &["=== foo"]), "=== foo\n\n");
+    }
+
+    #[test]
+    fn trailing_hash_in_heading_is_escaped() {
+        assert_eq!(block(heading, &["Issue #"]), "# Issue \\#\n\n");
+        assert_eq!(block(heading, &["Issue ", "#"]), "# Issue \\#\n\n");
+    }
+
+    #[test]
+    fn end_document_flushes_held_block_start() {
+        assert_eq!(
+            run(vec![
+                Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                Event::StartParagraph {
+                    alignment: None,
+                    id: None,
+                },
+                Event::Text {
+                    content: "12".to_string(),
+                },
+                Event::EndDocument,
+            ]),
+            "12"
+        );
+    }
+
+    #[test]
+    fn finish_flushes_held_block_start() {
+        let mut buf = Vec::new();
+        let mut writer = MarkdownWriter::new(&mut buf);
+        writer
+            .handle_event(Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            })
+            .unwrap();
+        writer
+            .handle_event(Event::StartHeading { level: 2, id: None })
+            .unwrap();
+        writer
+            .handle_event(Event::Text {
+                content: "12.".to_string(),
+            })
+            .unwrap();
+        writer.finish().unwrap();
+        assert_eq!(String::from_utf8(buf).unwrap(), "## 12\\.\n\n");
+    }
+
     #[test]
     fn finish_after_start_document_no_blocks_no_end_document() {
         let mut buf = Vec::new();

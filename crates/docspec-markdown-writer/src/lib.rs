@@ -11,7 +11,8 @@
 //!
 //! - ATX headings: `# ` through `###### ` (levels 1–6; clamped from any u8)
 //! - Blank-line separator between blocks (`\n\n` after each non-empty block)
-//! - Empty paragraphs produce zero bytes
+//! - Empty (or whitespace-only) paragraphs produce zero bytes; leading
+//!   whitespace of a block is dropped
 //! - Empty headings produce only their ATX prefix + `\n\n` (e.g., `## \n\n`)
 //! - No document framing: Markdown has no equivalent of `[` / `]`
 //!
@@ -62,6 +63,10 @@ pub struct MarkdownWriter<W: Write> {
     finished: bool,
     in_block: Option<BlockKind>,
     text_in_current_block: bool,
+    /// Block-start text held until it classifies as an ordered-list marker or
+    /// not. Bounded: leading whitespace is dropped and the undecided prefix is
+    /// at most 10 chars (9 digits + `.`/`)`), so the streaming rule holds.
+    pending: String,
 }
 
 impl<W: Write> MarkdownWriter<W> {
@@ -75,7 +80,23 @@ impl<W: Write> MarkdownWriter<W> {
             finished: false,
             in_block: None,
             text_in_current_block: false,
+            pending: String::new(),
         }
+    }
+
+    /// Writes the held block start (with the ATX prefix for headings) once it
+    /// is classified or the block ends.
+    fn flush_block_start(&mut self) -> Result<()> {
+        if self.pending.is_empty() {
+            return Ok(());
+        }
+        if let Some(BlockKind::Heading(level)) = self.in_block {
+            write_atx_prefix(&mut self.writer, level)?;
+        }
+        escape::write_escaped_block_start(&mut self.writer, &self.pending)?;
+        self.pending.clear();
+        self.text_in_current_block = true;
+        Ok(())
     }
 }
 
@@ -107,6 +128,7 @@ impl<W: Write> EventSink for MarkdownWriter<W> {
     #[inline]
     fn finish(mut self) -> Result<()> {
         if self.started && !self.finished {
+            self.flush_block_start()?;
             match self.in_block {
                 Some(BlockKind::Paragraph) => {
                     if self.text_in_current_block {
@@ -137,8 +159,9 @@ impl<W: Write> EventSink for MarkdownWriter<W> {
     /// - `EndParagraph` — closes a paragraph; emits `\n\n` if text was written
     /// - `StartHeading { level, .. }` — opens a heading block; level is clamped to 1–6
     /// - `EndHeading` — closes a heading; emits `\n\n` (prefix was emitted lazily)
-    /// - `Text { content }` — writes escaped text; for headings, emits the ATX
-    ///   prefix lazily on the first text event of each heading
+    /// - `Text { content }` — writes escaped text; the block start (and, for
+    ///   headings, the ATX prefix) is held back — at most 10 chars — until it
+    ///   is known whether it forms an ordered-list marker, then escaped
     ///
     /// All other events are silently ignored.
     #[inline]
@@ -151,6 +174,7 @@ impl<W: Write> EventSink for MarkdownWriter<W> {
             }
             Event::EndDocument => {
                 if self.started && !self.finished {
+                    self.flush_block_start()?;
                     self.finished = true;
                 }
             }
@@ -161,6 +185,7 @@ impl<W: Write> EventSink for MarkdownWriter<W> {
                 self.text_in_current_block = false;
             }
             Event::EndParagraph if self.in_block == Some(BlockKind::Paragraph) => {
+                self.flush_block_start()?;
                 if self.text_in_current_block {
                     self.writer.write_all(b"\n\n")?;
                 }
@@ -175,6 +200,7 @@ impl<W: Write> EventSink for MarkdownWriter<W> {
                 self.text_in_current_block = false;
             }
             Event::EndHeading if matches!(self.in_block, Some(BlockKind::Heading(_))) => {
+                self.flush_block_start()?;
                 match (self.in_block, self.text_in_current_block) {
                     (Some(BlockKind::Heading(level)), false) => {
                         write_atx_prefix(&mut self.writer, level)?;
@@ -191,11 +217,15 @@ impl<W: Write> EventSink for MarkdownWriter<W> {
                 if self.text_in_current_block {
                     escape::write_escaped_inline(&mut self.writer, &content)?;
                 } else {
-                    if let Some(BlockKind::Heading(level)) = self.in_block {
-                        write_atx_prefix(&mut self.writer, level)?;
+                    let content = if self.pending.is_empty() {
+                        content.trim_start_matches(escape::BLOCK_START_WHITESPACE)
+                    } else {
+                        &content
+                    };
+                    self.pending.push_str(content);
+                    if !escape::block_start_undecided(&self.pending) {
+                        self.flush_block_start()?;
                     }
-                    escape::write_escaped_block_start(&mut self.writer, &content)?;
-                    self.text_in_current_block = true;
                 }
             }
             _ => {}
