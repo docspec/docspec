@@ -344,9 +344,15 @@ mod tests {
         writer.finish().expect("writer finish failed");
 
         let json = String::from_utf8(output).expect("not utf8");
-        assert!(
-            json.contains("\"bold\":true") || json.contains("\"bold\": true"),
-            "Expected bold flag in output: {json}"
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "bold", "styles": {"bold": true}}],
+                    "children": []
+                }
+            ]),
         );
     }
 }

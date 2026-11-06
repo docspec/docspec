@@ -80,11 +80,7 @@ fn any_reader_from_reader_docx_invalid_zip() {
 
     let result = AnyReader::from_reader(InputFormat::Docx, Cursor::new(b"not a zip".to_vec()));
     let err = result.err().expect("invalid zip must produce an error");
-    assert!(
-        err.to_string().to_lowercase().contains("zip")
-            || err.to_string().to_lowercase().contains("archive"),
-        "error should mention ZIP/archive: {err}"
-    );
+    assert_eq!(err.to_string(), "parse error: not a valid ZIP archive");
 }
 
 #[cfg(feature = "markdown")]
