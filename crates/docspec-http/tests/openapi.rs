@@ -230,8 +230,8 @@ async fn openapi_documents_exactly_the_served_operations() {
         );
     }
 
-    // Discovery endpoints are described by their own specs (RFC 8615/9727) or
-    // are this document itself, so they are served but left out.
+    // Discovery endpoints (this document itself and `/.well-known/*`) are
+    // served but deliberately not described.
     for path in DISCOVERY_PATHS {
         assert_eq!(paths.get(path), None, "{path} is documented");
         let status = app()

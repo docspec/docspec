@@ -179,8 +179,8 @@ pub(crate) fn routes() -> OpenApiRouter {
             ),
             health_method_not_allowed,
         ))
-        // Discovery endpoints are served but not described: RFC 8615 describes
-        // `/.well-known/*`, and `/openapi.json` is the document itself.
+        // Discovery endpoints (this document itself and `/.well-known/*`) are
+        // served but deliberately not described.
         .route(
             "/.well-known/docspec",
             get(crate::handlers::well_known::get_well_known).fallback(read_only_method_not_allowed),
