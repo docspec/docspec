@@ -6,7 +6,7 @@
 //! one of `GET /conversion`, so a field added here shows up there too. The
 //! API catalog's schema is not published; tests check its body against it.
 
-use docspec_json::{JsonBackend, JsonEmitter, StrusonBackend};
+use serde::Serialize;
 use utoipa::ToSchema;
 
 use crate::mime;
@@ -15,7 +15,7 @@ use crate::mime;
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Media types `POST /conversion` reads and writes.
-#[derive(ToSchema)]
+#[derive(Serialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct MediaTypes {
     /// Media types accepted on `Content-Type`.
@@ -36,25 +36,8 @@ impl MediaTypes {
     }
 }
 
-/// Writes the `"inputs"` and `"outputs"` arrays into the open object.
-fn write_media_types<B>(
-    object: &mut JsonEmitter<B>,
-    inputs: &[&str],
-    outputs: &[&str],
-) -> docspec_core::Result<()>
-where
-    B: JsonBackend,
-{
-    object
-        .key("inputs")
-        .array(|array| inputs.iter().try_for_each(|input| array.value(*input)))?;
-    object
-        .key("outputs")
-        .array(|array| outputs.iter().try_for_each(|output| array.value(*output)))
-}
-
 /// `GET /conversion` body: the server version and the media types it converts.
-#[derive(ToSchema)]
+#[derive(Serialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ConversionFormats {
     /// Version of the running server.
@@ -79,18 +62,13 @@ impl ConversionFormats {
     }
 
     /// Serializes this body as JSON.
-    pub(crate) fn to_json(&self) -> docspec_core::Result<Vec<u8>> {
-        let mut emitter = JsonEmitter::new(StrusonBackend::new(Vec::new()));
-        emitter.object(|object| {
-            object.key("version").value(self.version)?;
-            write_media_types(object, &self.inputs, &self.outputs)
-        })?;
-        emitter.finish()
+    pub(crate) fn to_json(&self) -> serde_json::Result<Vec<u8>> {
+        serde_json::to_vec(self)
     }
 }
 
 /// A link target: where it points and the media type found there.
-#[derive(ToSchema)]
+#[derive(Serialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct TargetLink {
     /// Target URI, relative to the catalog's URL.
@@ -102,7 +80,7 @@ pub(crate) struct TargetLink {
 }
 
 /// The links of one API: its endpoint and the description of it.
-#[derive(ToSchema)]
+#[derive(Serialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct LinkContext {
     /// The API endpoint, relative to the catalog's URL.
@@ -121,7 +99,7 @@ pub(crate) struct LinkContext {
 /// from RFC 9264 §4.2.2 and §4.2.3, which say `anchor` and `href` SHOULD NOT be
 /// relative: the server has no configured public base URL, and building one
 /// from the `Host` header would trust client input.
-#[derive(ToSchema)]
+#[derive(Serialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ApiCatalog {
     /// One link context per API.
@@ -143,26 +121,8 @@ impl ApiCatalog {
     }
 
     /// Serializes this body as JSON.
-    pub(crate) fn to_json(&self) -> docspec_core::Result<Vec<u8>> {
-        let mut emitter = JsonEmitter::new(StrusonBackend::new(Vec::new()));
-        emitter.object(|object| {
-            object.key("linkset").array(|linkset| {
-                self.linkset.iter().try_for_each(|context| {
-                    linkset.object(|entry| {
-                        entry.key("anchor").value(context.anchor)?;
-                        entry.key("service-desc").array(|targets| {
-                            context.service_desc.iter().try_for_each(|target| {
-                                targets.object(|link| {
-                                    link.key("href").value(target.href)?;
-                                    link.key("type").value(target.media_type)
-                                })
-                            })
-                        })
-                    })
-                })
-            })
-        })?;
-        emitter.finish()
+    pub(crate) fn to_json(&self) -> serde_json::Result<Vec<u8>> {
+        serde_json::to_vec(self)
     }
 }
 
