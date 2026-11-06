@@ -201,10 +201,28 @@ jobs:
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
+  # OPENAPI: the OpenAPI document of the HTTP API, generated from the code
+  openapi:
+    name: OpenAPI document
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo run -p docspec-http --example openapi > openapi.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: openapi
+          path: openapi.json
+          if-no-files-found: error
+
   # 7. RELEASE: Create GitHub Release with all artifacts
   release:
     name: Create GitHub Release
-    needs: [plan, build, attest, sign, docker]
+    needs: [plan, build, attest, sign, docker, openapi]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -221,6 +239,7 @@ jobs:
             release-artifacts/artifacts-*/*
             release-artifacts/signed-artifacts/**/*
             release-artifacts/dist-manifest/dist-manifest.json
+            release-artifacts/openapi/openapi.json
           draft: false
           prerelease: ${{ contains(github.ref, '-') }}
           append_body: false
