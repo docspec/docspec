@@ -31,13 +31,17 @@ impl<R: Read + Seek> BomStrippingReader<R> {
     /// Returns `Err` if the underlying reader returns an I/O error during the
     /// BOM probe or the subsequent seek-back.
     pub(in crate::factory) fn new(mut reader: R) -> Result<Self> {
-        let mut probe = [u8::default(); 3];
         let start = reader
             .stream_position()
             .map_err(|source| docspec_core::Error::Io { source })?;
-        let read_count = read_up_to_3(&mut reader, &mut probe)
+        // `Take::read_to_end` retries `Interrupted` and stops at EOF, so short inputs are fine.
+        let mut probe = Vec::with_capacity(3);
+        reader
+            .by_ref()
+            .take(3)
+            .read_to_end(&mut probe)
             .map_err(|source| docspec_core::Error::Io { source })?;
-        let has_bom = read_count == 3 && probe == [0xEF, 0xBB, 0xBF];
+        let has_bom = probe == [0xEF, 0xBB, 0xBF];
         if !has_bom {
             // Rewind to the original position so the caller sees every byte.
             reader
@@ -60,33 +64,6 @@ impl<R: Read + Seek> Seek for BomStrippingReader<R> {
     fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
         self.inner.seek(pos)
     }
-}
-
-/// Reads up to 3 bytes into `buf`, handling short reads gracefully.
-///
-/// Returns the number of bytes actually read (0, 1, 2, or 3). Unlike
-/// `read_exact`, this never returns `UnexpectedEof` for inputs shorter than
-/// 3 bytes — those are valid text (e.g. empty input, one character).
-fn read_up_to_3<R>(reader: &mut R, buf: &mut [u8; 3]) -> std::io::Result<usize>
-where
-    R: Read,
-{
-    let mut filled = usize::default();
-    while filled < 3 {
-        let remaining = buf.get_mut(filled..).ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "BOM probe index exceeds buffer length",
-            )
-        })?;
-        match reader.read(remaining) {
-            Ok(0) => break,
-            Ok(n) => filled = filled.saturating_add(n),
-            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
-            Err(error) => return Err(error),
-        }
-    }
-    Ok(filled)
 }
 
 #[cfg(test)]
