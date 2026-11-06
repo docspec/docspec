@@ -4810,6 +4810,60 @@ mod events {
     }
 
     #[test]
+    fn hyperlink_wrapping_ins_emits_link_text() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:r><w:t xml:space="preserve">before </w:t></w:r><w:hyperlink r:id="rId1"><w:ins w:id="1" w:author="Author" w:date="2024-01-01T00:00:00Z"><w:r><w:t>inserted link text</w:t></w:r></w:ins></w:hyperlink><w:r><w:t xml:space="preserve"> after</w:t></w:r></w:p></w:body>
+</w:document>"#;
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com/",
+            "External",
+        );
+        let events = hyperlink_events(document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("before "),
+                start_link("https://example.com/", None),
+                text("inserted link text"),
+                Event::EndLink,
+                text(" after"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn hyperlink_wrapping_sdt_emits_link_text() {
+        let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body><w:p><w:hyperlink r:id="rId1"><w:sdt><w:sdtPr><w:alias w:val="ignored"/></w:sdtPr><w:sdtContent><w:r><w:t>sdt link text</w:t></w:r></w:sdtContent></w:sdt></w:hyperlink></w:p></w:body>
+</w:document>"#;
+        let rels_xml = document_hyperlink_rels(
+            TRANSITIONAL_HYPERLINK_TYPE,
+            "https://example.com/",
+            "External",
+        );
+        let events = hyperlink_events(document_xml, Some(&rels_xml));
+        assert_eq!(
+            events,
+            vec![
+                start_document(),
+                start_paragraph(),
+                start_link("https://example.com/", None),
+                text("sdt link text"),
+                Event::EndLink,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
     fn hyperlink_with_whitespace_only_content_emits_link_around_whitespace_text() {
         let document_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
