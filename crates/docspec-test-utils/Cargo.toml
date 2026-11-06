@@ -3,6 +3,7 @@ name = "docspec-test-utils"
 version.workspace = true
 publish = false
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Internal test fixtures shared across the docspec workspace. Not published."
