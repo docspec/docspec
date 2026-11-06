@@ -40,8 +40,9 @@ enum CodeFrame {
 /// A streaming Pandoc native writer for `DocSpec` events.
 ///
 /// Writes compact Pandoc native block-list syntax directly to the underlying
-/// `Write` as events arrive. Implements [`EventSink`] for integration with
-/// the `DocSpec` pipeline.
+/// `Write` as events arrive, except code blocks and inline code, which are
+/// buffered per block until #460 lands. Implements [`EventSink`] for
+/// integration with the `DocSpec` pipeline.
 ///
 /// # Output format
 ///
