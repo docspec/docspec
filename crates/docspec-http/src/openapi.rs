@@ -49,12 +49,13 @@ pub(crate) fn base() -> OpenApi {
         .build()
 }
 
-/// Returns the serialized document.
+/// Returns the serialized document, the same bytes `GET /openapi.json` serves.
 ///
 /// # Errors
 ///
 /// Returns [`HttpError::Internal`] if the document could not be built.
-pub(crate) fn json() -> Result<&'static [u8], HttpError> {
+#[inline]
+pub fn json() -> Result<&'static [u8], HttpError> {
     DOCUMENT
         .as_deref()
         .map_err(|message| HttpError::internal(std::io::Error::other(message.clone())))
