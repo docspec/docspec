@@ -17,12 +17,15 @@ pub(crate) const BLOCKNOTE_WILDCARDS: [&str; 2] = ["application/*", "*/*"];
 /// [`OutputFormat::Html`] for `Accept: text/html`, and [`OutputFormat::Blocknote`]
 /// for the `BlockNote` MIMEs, `application/*`, `*/*`, and missing `Accept`.
 /// Wildcards default to `BlockNote` for back-compat with pre-oxa clients. When
-/// `Accept` lists multiple types, the first whose bare MIME matches a supported
-/// value wins (case-insensitive); `q=...` is stripped.
+/// `Accept` lists multiple types, the supported one (bare MIME, case-insensitive)
+/// with the highest `q` weight wins (RFC 9110 §12.5.1); ties go to list order.
+/// `q` is case-insensitive, defaults to 1, is clamped to 0..=1, and a malformed
+/// `q` counts as 1 rather than discarding the type. Types with `q=0` are never
+/// selected. Other parameters are ignored.
 ///
 /// # Errors
 ///
-/// Returns [`HttpError::NotAcceptable`] if no acceptable MIME type found.
+/// Returns [`HttpError::NotAcceptable`] if no supported MIME type has `q > 0`.
 #[inline]
 pub fn negotiate_accept(header_value: Option<&HeaderValue>) -> Result<OutputFormat, HttpError> {
     // Missing Accept == */* per RFC 7231 §5.3.2
@@ -33,22 +36,58 @@ pub fn negotiate_accept(header_value: Option<&HeaderValue>) -> Result<OutputForm
         .to_str()
         .map_err(|_err| HttpError::NotAcceptable)?;
 
+    let mut best: Option<(u16, OutputFormat)> = None;
     for part in header_str.split(',') {
-        let type_part = part.trim().split(';').next().map_or("", str::trim);
-        if BLOCKNOTE_WILDCARDS
+        let mut params = part.split(';').map(str::trim);
+        let type_part = params.next().unwrap_or("");
+        let format = if BLOCKNOTE_WILDCARDS
             .iter()
             .any(|wildcard| type_part.eq_ignore_ascii_case(wildcard))
         {
-            return Ok(OutputFormat::Blocknote);
-        }
-        if let Some(&(_, format)) = OUTPUT_MIMES
-            .iter()
-            .find(|(output_mime, _)| type_part.eq_ignore_ascii_case(output_mime))
-        {
-            return Ok(format);
+            Some(OutputFormat::Blocknote)
+        } else {
+            OUTPUT_MIMES
+                .iter()
+                .find(|(output_mime, _)| type_part.eq_ignore_ascii_case(output_mime))
+                .map(|&(_, format)| format)
+        };
+        let Some(format) = format else {
+            continue;
+        };
+        let weight = quality_thousandths(params);
+        // Strict `>` keeps list order as the tiebreak.
+        if weight > 0 && best.is_none_or(|(best_weight, _)| weight > best_weight) {
+            best = Some((weight, format));
         }
     }
-    Err(HttpError::NotAcceptable)
+    best.map(|(_, format)| format)
+        .ok_or(HttpError::NotAcceptable)
+}
+
+/// The `q` weight of one `Accept` part in thousandths, so `q=0.8` is 800.
+///
+/// Integer thousandths avoid float comparison. Absent, malformed, or
+/// out-of-range values count as 1000 (RFC 9110 §12.4.2 allows at most three
+/// decimals; extra digits are dropped).
+fn quality_thousandths<'part>(mut params: impl Iterator<Item = &'part str>) -> u16 {
+    let value = params.find_map(|param| {
+        let (name, value) = param.split_once('=')?;
+        name.trim().eq_ignore_ascii_case("q").then(|| value.trim())
+    });
+    value.and_then(parse_thousandths).unwrap_or(1000)
+}
+
+/// Parses a decimal such as `0.8` into thousandths, clamped to 0..=1000.
+fn parse_thousandths(value: &str) -> Option<u16> {
+    let (whole, fraction) = value.split_once('.').unwrap_or((value, ""));
+    let whole: u16 = whole.parse().ok()?;
+    let fraction: u16 = format!("{fraction:0<3}").get(..3)?.parse().ok()?;
+    Some(
+        whole
+            .saturating_mul(1000)
+            .saturating_add(fraction)
+            .min(1000),
+    )
 }
 
 /// Validates the `Content-Type` header for the `/conversion` endpoint and
