@@ -14,8 +14,6 @@ use crate::{
 ///
 /// Returns [`HttpError::Internal`] if the document could not be built.
 #[inline]
-// Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.
-#[allow(clippy::unused_async)]
 pub async fn get_openapi() -> Result<impl IntoResponse, HttpError> {
     Ok((
         StatusCode::OK,

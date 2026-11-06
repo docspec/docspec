@@ -36,8 +36,6 @@ enum Utf8Prevalidation {
         headers(("Allow" = String, description = "Methods allowed on `/conversion`.")),
     )),
 )]
-#[allow(clippy::unused_async)]
-// Reason: Axum handlers are async for route consistency even when no await is needed.
 #[inline]
 pub async fn options_conversion() -> impl IntoResponse {
     (
@@ -70,8 +68,6 @@ pub async fn options_conversion() -> impl IntoResponse {
         (status = 500, description = "The response could not be built.", body = Problem, content_type = "application/problem+json"),
     ),
 )]
-#[allow(clippy::unused_async)]
-// Reason: Axum handlers are async for route consistency even when no await is needed.
 #[inline]
 pub async fn get_conversion() -> Result<impl IntoResponse, HttpError> {
     let body = ConversionFormats::current()
