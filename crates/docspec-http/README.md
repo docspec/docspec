@@ -85,7 +85,6 @@ curl -X POST \
 | GET     | /health     | Liveness check                                                   |
 | HEAD    | /health     | Liveness check (no body)                                         |
 | OPTIONS | /health     | Allowed methods                                                  |
-| GET     | /.well-known/docspec | Discovery document: version, links, and conversion media types |
 | GET     | /openapi.json | OpenAPI 3.1 description of this API                             |
 | GET     | /.well-known/api-catalog | RFC 9727 API catalog linking `/conversion` to `/openapi.json` |
 | GET     | /metrics    | Prometheus metrics in exposition format 0.0.4                    |
@@ -100,31 +99,11 @@ curl -X POST \
 }
 ```
 
-`GET /.well-known/docspec` lets a client that knows only the server's address find everything else. It returns the version, `links` to the other resources, and the same media type lists under `conversion`:
-
-```json
-{
-  "version": "2.0.0",
-  "links": { "conversion": "../conversion", "health": "../health" },
-  "conversion": {
-    "inputs": ["text/markdown", "text/html", "..."],
-    "outputs": ["application/vnd.docspec.blocknote+json", "..."]
-  }
-}
-```
-
-How a client finds it:
-
-- **Host and port**: fetch `http://<host>:<port>/.well-known/docspec`.
-- **Base URL** (DocSpec mounted under a reverse-proxy prefix such as `https://example.com/docspec`): fetch `{base}/.well-known/docspec`. RFC 8615 places well-known URIs at the origin root; looking one up under a base URL is a pragmatic convention for prefixed deployments, not part of the RFC.
-
-Either way, resolve each link against the URL the document was fetched from, as any URL library does ([RFC 3986 §5](https://www.rfc-editor.org/rfc/rfc3986#section-5)). Links start with `../`, so `../conversion` from `https://example.com/docspec/.well-known/docspec` is `https://example.com/docspec/conversion`, and from `http://localhost:3000/.well-known/docspec` it is `http://localhost:3000/conversion`.
-
 ### API description
 
-`GET /openapi.json` serves an [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0) description of every route above except `/metrics` and the discovery endpoints (`/.well-known/docspec`, `/.well-known/api-catalog` and `/openapi.json` itself, which are served but not described), as `application/vnd.oai.openapi+json;version=3.1`. It is generated from the handlers' annotations (built once, on first request), so no other route can be served without being described. The `POST /conversion` media types come from the same tables that validate requests. Feed it to Swagger UI, Redocly or a client generator.
+`GET /openapi.json` serves an [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0) description of every route above except `/metrics` and the discovery endpoints (`/.well-known/api-catalog` and `/openapi.json` itself, which are served but not described), as `application/vnd.oai.openapi+json;version=3.1`. It is generated from the handlers' annotations (built once, on first request), so no other route can be served without being described. The `POST /conversion` media types come from the same tables that validate requests. Feed it to Swagger UI, Redocly or a client generator.
 
-Generic API tooling finds it through the standard [RFC 9727](https://www.rfc-editor.org/rfc/rfc9727) API catalog at `GET /.well-known/api-catalog`: an [RFC 9264](https://www.rfc-editor.org/rfc/rfc9264) linkset, served as `application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"`, whose `service-desc` link points from `../conversion` to `../openapi.json`. `HEAD` answers with `Link: <api-catalog>; rel="api-catalog"`. All three are relative to the catalog's URL, so they hold at the origin root and under a path prefix alike. RFC 9264 §4.2.2 and §4.2.3 say `anchor` and `href` SHOULD NOT be relative; DocSpec deviates deliberately because it has no configured public base URL and will not build one from the client-supplied `Host` header. Resolve them against the catalog's URL as described above.
+Generic API tooling finds it through the standard [RFC 9727](https://www.rfc-editor.org/rfc/rfc9727) API catalog at `GET /.well-known/api-catalog`: an [RFC 9264](https://www.rfc-editor.org/rfc/rfc9264) linkset, served as `application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"`, whose `service-desc` link points from `../conversion` to `../openapi.json`. `HEAD` answers with `Link: <api-catalog>; rel="api-catalog"`. All three are relative to the catalog's URL, so they hold at the origin root and under a path prefix alike. RFC 9264 §4.2.2 and §4.2.3 say `anchor` and `href` SHOULD NOT be relative; DocSpec deviates deliberately because it has no configured public base URL and will not build one from the client-supplied `Host` header. Resolve them against the URL the catalog was fetched from, as any URL library does ([RFC 3986 §5](https://www.rfc-editor.org/rfc/rfc3986#section-5)).
 
 ## Request / Response Headers
 
@@ -375,7 +354,7 @@ docspec-http = { version = "1", default-features = false }
 
 **`output_mime_type`**: `application/vnd.docspec.blocknote+json` (conversion succeeded; output produced by the BlockNote writer), `text/html` (conversion succeeded; output produced by the HTML writer), `application/vnd.oxa+json` (conversion succeeded; output produced by the oxa.dev writer), `application/vnd.pandoc.native` (conversion succeeded; output produced by the Pandoc native writer), `none` (no output produced — any error path).
 
-**`path`**: matched route template (`/conversion`, `/health`, `/.well-known/docspec`, `/.well-known/api-catalog`, `/openapi.json`) or `unknown` for fallback handlers
+**`path`**: matched route template (`/conversion`, `/health`, `/.well-known/api-catalog`, `/openapi.json`) or `unknown` for fallback handlers
 
 **`status`**: numeric HTTP status code as a string (e.g., `"200"`, `"422"`)
 
@@ -383,7 +362,7 @@ docspec-http = { version = "1", default-features = false }
 
 ### Cardinality Guarantees
 
-`path` is bounded to `{"/conversion", "/health", "/.well-known/docspec", "/.well-known/api-catalog", "/openapi.json", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 6 values (`text/markdown`, `text/html`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.oasis.opendocument.text`, `unsupported`, `none`). `output_mime_type` is bounded to 5 values (`application/vnd.docspec.blocknote+json`, `text/html`, `application/vnd.oxa+json`, `application/vnd.pandoc.native`, `none`). Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
+`path` is bounded to `{"/conversion", "/health", "/.well-known/api-catalog", "/openapi.json", "unknown"}`. `error_class` is bounded to 9 values. `result` is bounded to 3 values. Per-request identifiers (`X-Request-ID`, `X-Trace-ID`) are never used as labels. `input_mime_type` is bounded to 6 values (`text/markdown`, `text/html`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.oasis.opendocument.text`, `unsupported`, `none`). `output_mime_type` is bounded to 5 values (`application/vnd.docspec.blocknote+json`, `text/html`, `application/vnd.oxa+json`, `application/vnd.pandoc.native`, `none`). Both come from a fixed set of `&'static str` constants in the source — never from raw header values.
 
 ### Scrape Model
 
