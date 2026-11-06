@@ -151,4 +151,22 @@ mod tests {
     fn convert_unmapped_returns_none() {
         assert_eq!(SymbolFont::Wingdings.convert(0x01), None);
     }
+
+    /// `convert` binary-searches each table, so keys must be strictly
+    /// increasing (sorted and duplicate-free).
+    #[test]
+    fn tables_strictly_sorted_by_key() {
+        for (name, table) in [
+            ("wingdings", wingdings::TABLE),
+            ("wingdings2", wingdings2::TABLE),
+            ("wingdings3", wingdings3::TABLE),
+            ("webdings", webdings::TABLE),
+            ("symbol", symbol::TABLE),
+        ] {
+            assert!(
+                table.windows(2).all(|w| matches!(w, [a, b] if a.0 < b.0)),
+                "{name}::TABLE keys are not strictly increasing"
+            );
+        }
+    }
 }

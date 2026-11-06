@@ -231,27 +231,3 @@ pub(super) const TABLE: &[(u8, char)] = &[
     (0xFE, '\u{1F30E}'), // EARTH GLOBE ASIA-AUSTRALIA
     (0xFF, '\u{1F54A}'), // PRAYER BEADS
 ];
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn table_sorted() {
-        for (prev, curr) in TABLE.iter().zip(TABLE.iter().skip(1)) {
-            assert!(
-                prev.0 < curr.0,
-                "table not sorted: {:#04X} >= {:#04X}",
-                prev.0,
-                curr.0
-            );
-        }
-    }
-
-    #[test]
-    fn table_no_duplicates() {
-        for (prev, curr) in TABLE.iter().zip(TABLE.iter().skip(1)) {
-            assert_ne!(prev.0, curr.0, "duplicate key: {:#04X}", curr.0);
-        }
-    }
-}
