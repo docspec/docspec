@@ -124,9 +124,6 @@ where
     writer.write_all(ch.encode_utf8(&mut buf).as_bytes())
 }
 
-const _: fn(&mut io::Sink, &str) -> io::Result<()> = write_escaped_inline::<io::Sink>;
-const _: fn(&mut io::Sink, &str) -> io::Result<()> = write_escaped_block_start::<io::Sink>;
-
 #[cfg(test)]
 mod tests {
     #![allow(clippy::panic)]
