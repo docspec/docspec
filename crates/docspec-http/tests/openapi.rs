@@ -4,6 +4,7 @@
 #![allow(
     clippy::arbitrary_source_item_ordering,
     clippy::expect_used,
+    clippy::panic,
     clippy::tests_outside_test_module,
     clippy::unwrap_used
 )]
@@ -47,6 +48,48 @@ fn errors(schema: &Value, instance: &Value) -> Vec<String> {
         .iter_errors(instance)
         .map(|error| format!("{} at {}", error, error.instance_path()))
         .collect()
+}
+
+const OAS_SCHEMA_ID: &str = "https://spec.openapis.org/oas/3.1/schema/2022-10-07";
+const OAS_SCHEMA_PATH: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/oas-3.1-schema.json"
+);
+
+/// The official `OpenAPI` 3.1 meta-schema: read from the gitignored local
+/// copy, downloaded and cached there on first use.
+fn oas_schema() -> Value {
+    if let Ok(text) = std::fs::read_to_string(OAS_SCHEMA_PATH) {
+        return serde_json::from_str(&text).expect("cached OAS 3.1 schema is JSON");
+    }
+    let text = reqwest::blocking::get(OAS_SCHEMA_ID)
+        .and_then(reqwest::blocking::Response::error_for_status)
+        .and_then(reqwest::blocking::Response::text)
+        .unwrap_or_else(|error| {
+            panic!(
+                "downloading {OAS_SCHEMA_ID} failed ({error}); \
+                 needs network on first run, or place the file at {OAS_SCHEMA_PATH}"
+            )
+        });
+    let schema: Value = serde_json::from_str(&text).expect("downloaded OAS 3.1 schema is JSON");
+    assert_eq!(
+        schema.get("$id"),
+        Some(&json!(OAS_SCHEMA_ID)),
+        "downloaded schema is not the OAS 3.1 meta-schema"
+    );
+    // Write then rename, so a test running in parallel never reads a partial file.
+    let temp = format!(
+        "{OAS_SCHEMA_PATH}.{}.{:?}.tmp",
+        std::process::id(),
+        std::thread::current().id()
+    );
+    let dir = std::path::Path::new(OAS_SCHEMA_PATH)
+        .parent()
+        .expect("fixtures dir");
+    std::fs::create_dir_all(dir).expect("create fixtures dir");
+    std::fs::write(&temp, &text).expect("write OAS 3.1 schema");
+    std::fs::rename(&temp, OAS_SCHEMA_PATH).expect("store OAS 3.1 schema");
+    schema
 }
 
 #[tokio::test]
@@ -118,16 +161,17 @@ async fn post_openapi_returns_405() {
 
 #[tokio::test]
 async fn openapi_document_is_valid_openapi_3_1() {
-    let schema: Value =
-        serde_json::from_str(include_str!("fixtures/oas-3.1-schema.json")).expect("schema");
+    // reqwest::blocking panics inside the async runtime.
+    let schema = tokio::task::spawn_blocking(oas_schema)
+        .await
+        .expect("schema load");
 
     assert_eq!(errors(&schema, &openapi().await), Vec::<String>::new());
 }
 
 #[test]
 fn oas_schema_rejects_document_without_info() {
-    let schema: Value =
-        serde_json::from_str(include_str!("fixtures/oas-3.1-schema.json")).expect("schema");
+    let schema = oas_schema();
 
     assert_eq!(
         errors(&schema, &json!({"openapi": "3.1.0", "paths": {}})),
