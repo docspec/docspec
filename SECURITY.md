@@ -60,8 +60,12 @@ Limits exist where a document can make the process grow without bound. Every row
 | --- | --- | --- | --- |
 | DOCX list nesting level | clamped to 8 | `docspec-docx-reader` (`MAX_LIST_LEVEL`) | deeper levels are flattened to level 8, not rejected |
 | Inline style nesting depth | 32 | `docspec-core` (`MAX_STYLE_DEPTH`), used by `docspec-markdown-reader` (Markdown inline styles and the HTML translator) | opens beyond the depth are ignored, not rejected |
+| DOCX main part size (`word/document.xml` buffered by `from_reader`) | 256 MiB decompressed | `docspec-docx-reader` (`MAX_MAIN_PART_BYTES`) | conversion fails with `Error::Limit` |
+| DOCX metadata part size (relationships, `styles.xml`, `numbering.xml`, `[Content_Types].xml`) | 64 MiB decompressed | `docspec-docx-reader` (`MAX_METADATA_PART_BYTES`) | conversion fails with `Error::Limit` |
+| DOCX `document.xml` node size (one text node, comment or skipped subtree) | 64 MiB | `docspec-docx-reader` (`MAX_XML_NODE_BYTES`) | conversion fails with `Error::Limit` |
+| DOCX table nesting depth | 100 | `docspec-docx-reader` (`MAX_TABLE_NESTING_DEPTH`) | conversion fails with `Error::Limit` |
 
-Both bound a stack. Neither returns a dedicated HTTP status or CLI exit code; DOCX list levels are clamped and excess inline-style opens are ignored.
+The list level and inline style depth bound a stack; they return no error, as DOCX list levels are clamped and excess inline-style opens are ignored. The four DOCX reader caps reject the document with `Error::Limit`, which the HTTP API answers with `422` and problem type `https://problems.docspec.dev/resource-limit`, and on which the CLI exits non-zero.
 
 ### Opt-in, configured per server
 
@@ -72,7 +76,7 @@ None exist today. A request body size limit (#497, `413 Content Too Large`) and 
 - The HTTP server holds the accepted request body and the whole conversion output in memory for the duration of a request. Memory per request is proportional to input plus output size.
 - There is no request body size cap at the HTTP layer. axum's 2 MiB default is deliberately disabled so large documents are accepted (#497).
 - There is no conversion, request, idle or read timeout at the HTTP layer. A slow client or a slow document holds the connection; use a reverse proxy for connection timeouts (#498).
-- DOCX package part size, `document.xml` node size and table nesting depth are unbounded (#412, #496). A zip bomb or a deeply nested table can exhaust memory or the stack.
+- DOCX media parts (`word/media/*`) are streamed out by `DocxAssetHandle::stream_to` without a size cap, so a zip bomb in a media part can produce unbounded output (#507).
 - A single wide DOCX table is read into the reader's event queue before its first event is yielded, so memory is proportional to the largest table (#415).
 
 The streaming architecture is what makes the rest of a document cost constant memory: events flow one at a time from reader to writer. The limits tracked above are needed in the places where a format lets one node, one part, one nesting chain or one table defeat that.

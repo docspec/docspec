@@ -105,7 +105,7 @@ mod streaming_archive;
 mod styles;
 mod symbol_fonts;
 
-use std::io::{BufReader, Read, Seek};
+use std::io::{Read, Seek};
 use std::path::Path;
 
 pub use docspec_core::EventSource;
@@ -137,8 +137,9 @@ const _: for<'a> fn(&'a rels::ImageRel) -> (&'a str, bool) = _image_rel_fields;
 ///
 /// # Errors
 ///
-/// Returns [`docspec_core::Error::Io`] for I/O failures and [`docspec_core::Error::Parse`] for malformed
-/// archives or XML.
+/// Returns [`docspec_core::Error::Io`] for I/O failures, [`docspec_core::Error::Parse`] for malformed
+/// archives or XML, and [`docspec_core::Error::Limit`] when a package part, XML node or
+/// table nesting depth exceeds its cap.
 #[derive(Debug)]
 pub struct DocxReader {
     inner: document::DocumentReader,
@@ -161,7 +162,6 @@ impl DocxReader {
     {
         let (style_list, numbering, hyperlink_map, image_map, content_types, archive, stream) =
             package::open_package_from_path(path.as_ref())?;
-        let xml = quick_xml::Reader::from_reader(BufReader::new(stream));
         let data = document::DocxData {
             style_list,
             hyperlink_map,
@@ -170,7 +170,7 @@ impl DocxReader {
         };
         Ok(Self {
             inner: document::DocumentReader::from_xml_reader_and_archive(
-                xml,
+                stream,
                 data,
                 archive,
                 content_types,
@@ -183,14 +183,16 @@ impl DocxReader {
     /// The reader must be positioned at the start of a valid DOCX (ZIP) archive.
     ///
     /// **Memory note**: this constructor buffers `word/document.xml` into memory
-    /// (O(N) in document size). Use [`from_path`](Self::from_path) for O(1)
-    /// constant-memory streaming.
+    /// (O(N) in document size, bounded by a 256 MiB cap on the decompressed part).
+    /// Use [`from_path`](Self::from_path) for O(1) constant-memory streaming.
     ///
     /// # Errors
     ///
     /// Returns [`docspec_core::Error::Parse`] if the input is not a valid ZIP archive, if
     /// `_rels/.rels` is missing or malformed, or if the document target entry
-    /// cannot be opened. Returns [`docspec_core::Error::Io`] for I/O failures.
+    /// cannot be opened. Returns [`docspec_core::Error::Limit`] when `word/document.xml`
+    /// or a metadata part decompresses beyond its cap. Returns
+    /// [`docspec_core::Error::Io`] for I/O failures.
     #[inline]
     pub fn from_reader<R>(reader: R) -> Result<Self>
     where
@@ -198,7 +200,6 @@ impl DocxReader {
     {
         let (style_list, numbering, hyperlink_map, image_map, content_types, archive, stream) =
             package::open_package(reader)?;
-        let xml = quick_xml::Reader::from_reader(BufReader::new(stream));
         let data = document::DocxData {
             style_list,
             hyperlink_map,
@@ -207,7 +208,7 @@ impl DocxReader {
         };
         Ok(Self {
             inner: document::DocumentReader::from_xml_reader_and_archive(
-                xml,
+                stream,
                 data,
                 archive,
                 content_types,

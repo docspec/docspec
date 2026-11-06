@@ -44,6 +44,16 @@ pub enum Error {
         /// Position in the JSON source, if known.
         position: Option<Position>,
     },
+    /// A resource bound was exceeded.
+    ///
+    /// The input is within its format but beyond what this build will
+    /// process: a part, node or nesting depth over its cap. Distinct from
+    /// [`Parse`](Self::Parse) so callers can tell "too big" from "broken".
+    #[error("{message}")]
+    Limit {
+        /// Human-readable description naming the bound that was exceeded.
+        message: String,
+    },
     /// An unclassified error.
     #[error("{message}")]
     Other {
