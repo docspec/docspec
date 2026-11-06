@@ -17,6 +17,39 @@ yanked = "deny"
 id = "RUSTSEC-2024-0436"
 reason = "paste is a transitive dev-dependency of docspec-blocknote-writer only; no safe upgrade available; risk is limited to proc-macro expansion in test builds"
 
+# pulldown-cmark RUSTSEC-2026-0414 / RUSTSEC-2026-0433: both need
+# `Options::ENABLE_WIKILINKS`; docspec-markdown-reader sets only
+# `ENABLE_TABLES | ENABLE_STRIKETHROUGH` (verify with
+# `grep -rn ENABLE_ crates/docspec-markdown-reader/src`).
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0414"
+reason = "requires Options::ENABLE_WIKILINKS, which docspec-markdown-reader never sets"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0433"
+reason = "requires Options::ENABLE_WIKILINKS, which docspec-markdown-reader never sets"
+
+# zip RUSTSEC-2026-0367 / 0368 / 0369 / 0429: all four are in
+# `ZipArchive::extract` / `ZipStreamReader::extract`, which write entries to
+# the filesystem. DocSpec only reads entries in memory (verify with
+# `grep -rn 'extract\|ZipStreamReader' crates --include='*.rs'`). The zip 9
+# upgrade is tracked separately.
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0367"
+reason = "only ZipArchive::extract / ZipStreamReader::extract are affected; DocSpec never extracts to disk"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0368"
+reason = "only ZipArchive::extract is affected; DocSpec never extracts to disk"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0369"
+reason = "only ZipArchive::extract / ZipStreamReader::extract are affected; DocSpec never extracts to disk"
+
+[[advisories.ignore]]
+id = "RUSTSEC-2026-0429"
+reason = "only ZipArchive::extract is affected; DocSpec never extracts to disk"
+
 [licenses]
 # Require all licenses to be in the allow list below.
 # All licenses listed are OSI-approved or FSF-recognized open-source licenses.

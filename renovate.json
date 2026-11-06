@@ -3,6 +3,7 @@
   "extends": ["config:recommended"],
   "labels": ["dependencies"],
   "semanticCommits": "enabled",
+  "lockFileMaintenance": { "enabled": true },
   "packageRules": [
     {
       "description": "Use fix(deps) for production Cargo dependencies so version bumps trigger releases",
