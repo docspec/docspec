@@ -3,6 +3,7 @@
 use axum::{http::Request, Router};
 use metrics_exporter_prometheus::PrometheusHandle;
 use tower_http::request_id::{MakeRequestId, RequestId};
+use utoipa_axum::router::OpenApiRouter;
 
 use crate::format;
 use crate::metrics::{
@@ -131,38 +132,62 @@ pub fn router() -> Router {
         .layer(PropagateRequestIdLayer::new(x_trace_id))
         .layer(cache_control_layer());
 
-    routes().layer(middleware_stack)
+    let (routes, _) = routes().split_for_parts();
+    routes.layer(middleware_stack)
 }
 
 /// The route table: every path, its method handlers, and the 404/405 fallbacks.
-fn routes() -> Router {
-    use axum::routing::{get, post};
+///
+/// Registering a handler through `routes!` also adds its `#[utoipa::path]`
+/// operation to the `OpenAPI` document, so every route served is described,
+/// except the discovery endpoints, which are plain `route`s.
+pub(crate) fn routes() -> OpenApiRouter {
+    use axum::{handler::Handler, routing::get};
+    use utoipa_axum::{router::UtoipaMethodRouter, routes};
 
-    use crate::handlers::{
-        conversion::{get_conversion, options_conversion, post_conversion},
-        fallback::{conversion_method_not_allowed, health_method_not_allowed, not_found},
-        health::{get_health, head_health, options_health},
-        well_known::{get_well_known, well_known_method_not_allowed},
+    use crate::handlers::fallback::{
+        conversion_method_not_allowed, health_method_not_allowed, not_found,
+        read_only_method_not_allowed,
     };
 
-    Router::new()
-        .route(
-            "/conversion",
-            post(post_conversion)
-                .get(get_conversion)
-                .options(options_conversion)
-                .fallback(conversion_method_not_allowed),
-        )
-        .route(
-            "/health",
-            get(get_health)
-                .head(head_health)
-                .options(options_health)
-                .fallback(health_method_not_allowed),
-        )
+    /// Answers methods the path does not serve with `fallback` (a 405).
+    fn with_fallback<H, T>(
+        (schemas, paths, method_router): UtoipaMethodRouter,
+        fallback: H,
+    ) -> UtoipaMethodRouter
+    where
+        H: Handler<T, ()>,
+        T: 'static,
+    {
+        (schemas, paths, method_router.fallback(fallback))
+    }
+
+    OpenApiRouter::with_openapi(crate::openapi::base())
+        .routes(with_fallback(
+            routes!(
+                crate::handlers::conversion::post_conversion,
+                crate::handlers::conversion::get_conversion,
+                crate::handlers::conversion::options_conversion
+            ),
+            conversion_method_not_allowed,
+        ))
+        .routes(with_fallback(
+            routes!(
+                crate::handlers::health::get_health,
+                crate::handlers::health::head_health,
+                crate::handlers::health::options_health
+            ),
+            health_method_not_allowed,
+        ))
+        // Discovery endpoints (this document itself and `/.well-known/*`) are
+        // served but deliberately not described.
         .route(
             "/.well-known/docspec",
-            get(get_well_known).fallback(well_known_method_not_allowed),
+            get(crate::handlers::well_known::get_well_known).fallback(read_only_method_not_allowed),
+        )
+        .route(
+            "/openapi.json",
+            get(crate::handlers::openapi::get_openapi).fallback(read_only_method_not_allowed),
         )
         .fallback(not_found)
 }

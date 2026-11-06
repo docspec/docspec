@@ -45,3 +45,17 @@ pub async fn health_method_not_allowed() -> HttpError {
         allowed: format::ALLOW_HEALTH,
     }
 }
+
+/// Fallback handler for wrong HTTP methods on read-only resources
+/// (`/.well-known/docspec`, `/openapi.json`).
+///
+/// Returns 405 Method Not Allowed with `Allow: GET, HEAD`.
+#[inline]
+#[must_use]
+// Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.
+#[allow(clippy::unused_async)]
+pub async fn read_only_method_not_allowed() -> HttpError {
+    HttpError::MethodNotAllowed {
+        allowed: format::ALLOW_GET_HEAD,
+    }
+}

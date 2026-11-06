@@ -23,3 +23,6 @@ lcov.info
 .sisyphus/boulder.json
 .sisyphus/evidence/
 .sisyphus/notepads/
+
+# OAS 3.1 meta-schema, downloaded on demand by crates/docspec-http/tests/openapi.rs
+/crates/docspec-http/tests/fixtures/oas-3.1-schema.json

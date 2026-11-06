@@ -90,6 +90,15 @@ pub(crate) fn output_mimes() -> impl Iterator<Item = &'static str> {
     OUTPUT_MIMES.iter().map(|&(output_mime, _)| output_mime)
 }
 
+/// Output MIME types the server sends in `Content-Type`: the canonical one of
+/// each writer format, in table order, without aliases.
+pub(crate) fn served_output_mimes() -> impl Iterator<Item = &'static str> {
+    OUTPUT_MIMES
+        .iter()
+        .filter(|&&(output, format)| output_mime(format) == Some(output))
+        .map(|&(output, _)| output)
+}
+
 /// Joins items as an English "or" list with a serial comma: `a, b, or c`.
 pub(crate) fn english_or_list<'item>(items: impl IntoIterator<Item = &'item str>) -> String {
     let items: Vec<&str> = items.into_iter().collect();
@@ -193,6 +202,14 @@ mod tests {
                 MIME_PANDOC_NATIVE,
                 MIME_HTML
             ]
+        );
+    }
+
+    #[test]
+    fn served_output_mimes_skips_aliases() {
+        assert_eq!(
+            served_output_mimes().collect::<Vec<_>>(),
+            [MIME_BLOCKNOTE, MIME_OXA, MIME_PANDOC_NATIVE, MIME_HTML]
         );
     }
 

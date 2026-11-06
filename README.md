@@ -71,7 +71,7 @@ curl -X POST http://localhost:3000/conversion \
      -d '# Hello'
 ```
 
-`GET /conversion` lists the media types the running server reads and writes, `GET /health` is the liveness check; [`docspec-http`](crates/docspec-http) has the full endpoint, header, and format reference.
+`GET /conversion` lists the media types the running server reads and writes, `GET /openapi.json` describes the conversion and health endpoints in OpenAPI 3.1, `GET /health` is the liveness check; [`docspec-http`](crates/docspec-http) has the full endpoint, header, and format reference.
 
 ## What it reads and writes
 

@@ -12,8 +12,8 @@ use docspec::{InputFormat, OutputFormat};
 use docspec_core::EventSource;
 
 use crate::{
-    discovery,
-    error::{HttpError, InputProblem},
+    discovery::ConversionFormats,
+    error::{HttpError, InputProblem, Problem},
     format, mime_parser,
 };
 
@@ -24,6 +24,18 @@ enum Utf8Prevalidation {
 }
 
 /// Handle `OPTIONS /conversion` — returns allowed methods.
+#[utoipa::path(
+    options,
+    path = "/conversion",
+    tag = "conversion",
+    summary = "List the methods `/conversion` allows",
+    description = "Answers with the `Allow` header and no body.",
+    responses((
+        status = 204,
+        description = "The allowed methods.",
+        headers(("Allow" = String, description = "Methods allowed on `/conversion`.")),
+    )),
+)]
 #[allow(clippy::unused_async)]
 // Reason: Axum handlers are async for route consistency even when no await is needed.
 #[inline]
@@ -46,11 +58,25 @@ pub async fn options_conversion() -> impl IntoResponse {
 /// # Errors
 ///
 /// Returns [`HttpError::Internal`] if the body cannot be serialized.
+#[utoipa::path(
+    get,
+    path = "/conversion",
+    tag = "conversion",
+    summary = "List the supported media types",
+    description = "The media types `POST /conversion` accepts on `Content-Type` (`inputs`) and \
+                   `Accept` (`outputs`), and the server version.",
+    responses(
+        (status = 200, description = "Supported media types.", body = ConversionFormats, content_type = "application/json"),
+        (status = 500, description = "The response could not be built.", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
 #[allow(clippy::unused_async)]
 // Reason: Axum handlers are async for route consistency even when no await is needed.
 #[inline]
 pub async fn get_conversion() -> Result<impl IntoResponse, HttpError> {
-    let body = discovery::conversion_formats_json().map_err(HttpError::internal)?;
+    let body = ConversionFormats::current()
+        .to_json()
+        .map_err(HttpError::internal)?;
     Ok((
         StatusCode::OK,
         [(
@@ -96,6 +122,26 @@ pub async fn get_conversion() -> Result<impl IntoResponse, HttpError> {
 ///
 /// Returns [`HttpError`] when request headers or body are invalid, the
 /// conversion fails, or the response cannot be constructed.
+// The request and success media types are filled in from the MIME tables by
+// `crate::openapi`, so they are not repeated here.
+#[utoipa::path(
+    post,
+    path = "/conversion",
+    tag = "conversion",
+    summary = "Convert a document",
+    description = "`Content-Type` selects the reader and `Accept` selects the writer, from the \
+                   media types of the 200 response or their aliases. The first listed type the \
+                   server can write wins and q-values are ignored. A missing `Accept`, `*/*` or \
+                   `application/*` selects BlockNote JSON.",
+    responses(
+        (status = 200, description = "The converted document, in the negotiated output format."),
+        (status = 400, description = "The body is empty, or is not valid UTF-8 for a text input.", body = Problem, content_type = "application/problem+json"),
+        (status = 406, description = "No acceptable output format in `Accept`.", body = Problem, content_type = "application/problem+json"),
+        (status = 415, description = "Missing or unsupported `Content-Type`.", body = Problem, content_type = "application/problem+json"),
+        (status = 422, description = "The document could not be converted; `type` says why.", body = Problem, content_type = "application/problem+json"),
+        (status = 500, description = "Unexpected server error.", body = Problem, content_type = "application/problem+json"),
+    ),
+)]
 #[inline]
 pub async fn post_conversion(
     request_id: Option<axum::extract::Extension<tower_http::request_id::RequestId>>,

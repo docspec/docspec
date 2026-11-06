@@ -12,6 +12,7 @@ pub mod handlers;
 pub mod metrics;
 pub mod mime;
 pub mod mime_parser;
+mod openapi;
 pub mod router;
 pub mod server;
 pub mod telemetry;
