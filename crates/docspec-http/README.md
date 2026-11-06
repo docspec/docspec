@@ -164,7 +164,7 @@ Each type URI is a path on one host. `https://problems.docspec.dev/` serves a si
 
 The `instance` member ([§3.1.5](https://www.rfc-editor.org/rfc/rfc9457#section-3.1.5)) is the request id as a URI, `urn:uuid:<X-Request-ID>`, so a failure reported by a user can be found in the logs and in Sentry. It is present whenever the request id is a UUID, which is always the case for the id the server assigns. A client-supplied `X-Request-ID` that is not a UUID is not a URI; then `instance` is omitted and the id is still echoed in the header.
 
-Accepted `Accept` values for `/conversion`: `text/html` (HTML), `application/vnd.oxa+json` (oxa.dev), `application/vnd.pandoc.native` (Pandoc native), `application/vnd.docspec.blocknote+json`, `application/vnd.blocknote+json` (BlockNote alias), `application/*`, or `*/*`. Wildcards and missing `Accept` default to BlockNote for back-compat. Anything else returns 406. JSON responses, including problem details, carry no `charset` parameter (none is defined for JSON media types); `text/html` responses carry `charset=utf-8`.
+Accepted `Accept` values for `/conversion`: `text/html` (HTML), `application/vnd.oxa+json` (oxa.dev), `application/vnd.pandoc.native` (Pandoc native), `application/vnd.docspec.blocknote+json`, `application/vnd.blocknote+json` (BlockNote alias), `application/*`, or `*/*`. Wildcards and missing `Accept` default to BlockNote for back-compat. `q` weights are honoured (RFC 9110 §12.5.1): the supported type with the highest `q` wins, ties go to list order, and `q=0` excludes a type. Anything else returns 406. JSON responses, including problem details, carry no `charset` parameter (none is defined for JSON media types); `text/html` responses carry `charset=utf-8`.
 
 ## Deployment Notes
 

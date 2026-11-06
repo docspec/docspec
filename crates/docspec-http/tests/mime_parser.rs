@@ -271,6 +271,139 @@ fn accept_application_wildcard_returns_blocknote() {
     );
 }
 
+// ─── negotiate_accept: q weights (RFC 9110 §12.5.1) ─────────────────────────
+
+#[test]
+fn accept_q_zero_means_not_acceptable() {
+    let header = HeaderValue::from_static("text/html;q=0");
+    assert!(matches!(
+        negotiate_accept(Some(&header)),
+        Err(HttpError::NotAcceptable)
+    ));
+}
+
+#[test]
+fn accept_prefers_higher_q_over_list_order() {
+    let header = HeaderValue::from_static("text/html;q=0.1, application/vnd.oxa+json;q=1");
+    assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Oxa);
+}
+
+#[test]
+fn accept_wildcard_low_q_does_not_beat_explicit_type() {
+    let header = HeaderValue::from_static("*/*;q=0.1, application/vnd.oxa+json");
+    assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Oxa);
+}
+
+#[test]
+fn accept_q_name_is_case_insensitive() {
+    let header = HeaderValue::from_static("text/html; Q=0, application/vnd.oxa+json; Q=0.5");
+    assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Oxa);
+}
+
+#[test]
+fn accept_malformed_q_counts_as_full_weight() {
+    let header = HeaderValue::from_static("text/html;q=abc, application/vnd.oxa+json;q=0.9");
+    assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Html);
+}
+
+#[test]
+fn accept_q_above_one_is_malformed_so_list_order_breaks_the_tie() {
+    let header = HeaderValue::from_static("text/html;q=1, application/vnd.oxa+json;q=5");
+    assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Html);
+}
+
+#[test]
+fn accept_exact_q_zero_is_not_overridden_by_wildcard() {
+    let header = HeaderValue::from_static("application/vnd.docspec.blocknote+json;q=0, */*");
+    assert!(matches!(
+        negotiate_accept(Some(&header)),
+        Err(HttpError::NotAcceptable)
+    ));
+}
+
+#[test]
+fn accept_exact_q_zero_with_wildcard_falls_back_to_next_acceptable_format() {
+    let header = HeaderValue::from_static(
+        "application/vnd.docspec.blocknote+json;q=0, */*, application/vnd.oxa+json;q=0.5",
+    );
+    assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Oxa);
+}
+
+#[test]
+fn accept_wildcard_q_zero_does_not_exclude_an_exact_type() {
+    let header = HeaderValue::from_static("*/*;q=0, application/vnd.docspec.blocknote+json");
+    assert_eq!(
+        negotiate_accept(Some(&header)).unwrap(),
+        OutputFormat::Blocknote
+    );
+}
+
+#[test]
+fn accept_application_wildcard_is_more_specific_than_any() {
+    let header = HeaderValue::from_static("*/*, application/*;q=0");
+    assert!(matches!(
+        negotiate_accept(Some(&header)),
+        Err(HttpError::NotAcceptable)
+    ));
+}
+
+#[test]
+fn accept_html_q_zero_with_text_wildcard_rejects() {
+    let header = HeaderValue::from_static("text/html;q=0, text/*");
+    assert!(matches!(
+        negotiate_accept(Some(&header)),
+        Err(HttpError::NotAcceptable)
+    ));
+}
+
+#[test]
+fn accept_q_with_three_decimals_is_honoured() {
+    let header = HeaderValue::from_static("text/html;q=0.001, application/vnd.oxa+json;q=0.002");
+    assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Oxa);
+}
+
+#[test]
+fn accept_q_with_four_decimals_is_malformed_not_zero() {
+    let header = HeaderValue::from_static("text/html;q=0.0001");
+    assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Html);
+}
+
+#[test]
+fn accept_q_with_sign_is_malformed_not_zero() {
+    let header = HeaderValue::from_static("text/html;q=+0");
+    assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Html);
+}
+
+#[test]
+fn accept_q_one_with_nonzero_decimals_is_malformed() {
+    let header = HeaderValue::from_static("text/html;q=1.001, application/vnd.oxa+json;q=0.999");
+    assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Html);
+}
+
+#[test]
+fn accept_q_zero_with_trailing_dot_and_zeros_excludes() {
+    let header = HeaderValue::from_static("text/html;q=0., application/vnd.oxa+json;q=0.000");
+    assert!(matches!(
+        negotiate_accept(Some(&header)),
+        Err(HttpError::NotAcceptable)
+    ));
+}
+
+#[test]
+fn accept_q_one_with_three_zeros_is_full_weight() {
+    let header = HeaderValue::from_static("text/html;q=0.999, application/vnd.oxa+json;q=1.000");
+    assert_eq!(negotiate_accept(Some(&header)).unwrap(), OutputFormat::Oxa);
+}
+
+#[test]
+fn accept_only_q_zero_matches_rejects_even_with_unknown_types() {
+    let header = HeaderValue::from_static("text/plain, */*;q=0");
+    assert!(matches!(
+        negotiate_accept(Some(&header)),
+        Err(HttpError::NotAcceptable)
+    ));
+}
+
 // ─── validate_content_type: DOCX ─────────────────────────────────────────────
 
 #[test]

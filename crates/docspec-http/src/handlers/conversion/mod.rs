@@ -130,9 +130,9 @@ pub async fn get_conversion() -> Result<impl IntoResponse, HttpError> {
     tag = "conversion",
     summary = "Convert a document",
     description = "`Content-Type` selects the reader and `Accept` selects the writer, from the \
-                   media types of the 200 response or their aliases. The first listed type the \
-                   server can write wins and q-values are ignored. A missing `Accept`, `*/*` or \
-                   `application/*` selects BlockNote JSON.",
+                   media types of the 200 response or their aliases. The supported type with the \
+                   highest `q` weight wins, ties go to list order, and `q=0` excludes a type. A \
+                   missing `Accept`, `*/*` or `application/*` selects BlockNote JSON.",
     responses(
         (status = 200, description = "The converted document, in the negotiated output format."),
         (status = 400, description = "The body is empty, or is not valid UTF-8 for a text input.", body = Problem, content_type = "application/problem+json"),
