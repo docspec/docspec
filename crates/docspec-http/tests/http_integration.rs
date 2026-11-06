@@ -717,8 +717,8 @@ async fn get_well_known_docspec_returns_discovery_document() {
         json!({
             "version": env!("CARGO_PKG_VERSION"),
             "links": {
-                "conversion": "/conversion",
-                "health": "/health",
+                "conversion": "../conversion",
+                "health": "../health",
             },
             "conversion": {
                 "inputs": [
@@ -736,6 +736,56 @@ async fn get_well_known_docspec_returns_discovery_document() {
                 ],
             },
         })
+    );
+}
+
+#[tokio::test]
+async fn well_known_docspec_links_resolve_at_root_and_under_prefix() {
+    let request = common::empty_request("GET", "/.well-known/docspec");
+    let response = app().oneshot(request).await.expect("request succeeds");
+    let body = response_body_json(response.into_body()).await;
+    let links = body
+        .get("links")
+        .and_then(Value::as_object)
+        .expect("links is an object");
+
+    let resolve = |document: &str| -> Vec<(String, String)> {
+        let base = url::Url::parse(document).expect("valid document url");
+        links
+            .iter()
+            .map(|(name, href)| {
+                let href = href.as_str().expect("link is a string");
+                let target = base.join(href).expect("link resolves");
+                (name.clone(), target.to_string())
+            })
+            .collect()
+    };
+
+    assert_eq!(
+        resolve("http://localhost:3000/.well-known/docspec"),
+        [
+            (
+                "conversion".to_owned(),
+                "http://localhost:3000/conversion".to_owned()
+            ),
+            (
+                "health".to_owned(),
+                "http://localhost:3000/health".to_owned()
+            ),
+        ]
+    );
+    assert_eq!(
+        resolve("https://example.com/docspec/.well-known/docspec"),
+        [
+            (
+                "conversion".to_owned(),
+                "https://example.com/docspec/conversion".to_owned()
+            ),
+            (
+                "health".to_owned(),
+                "https://example.com/docspec/health".to_owned()
+            ),
+        ]
     );
 }
 
