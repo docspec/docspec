@@ -48,7 +48,7 @@ fn internal_error_captured_with_request_id_tag() {
 }
 
 #[test]
-fn unprocessable_error_captured() {
+fn unprocessable_error_not_captured() {
     let _env_guard = lock_env();
     let events = sentry::test::with_captured_events(|| {
         use axum::response::IntoResponse as _;
@@ -62,12 +62,8 @@ fn unprocessable_error_captured() {
     });
     assert_eq!(
         events.len(),
-        1,
-        "expected exactly 1 captured event for Unprocessable error"
-    );
-    assert_eq!(
-        events.first().expect("expected event").level,
-        sentry::Level::Error
+        0,
+        "a 422 is the caller's document, not a service fault; it must not be captured"
     );
 }
 
