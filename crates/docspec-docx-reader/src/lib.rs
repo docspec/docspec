@@ -224,7 +224,6 @@ impl EventSource for DocxReader {
 }
 
 #[cfg(test)]
-#[cfg(not(coverage))]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::panic)]
     use super::*;
