@@ -12,8 +12,9 @@ use docspec::{InputFormat, OutputFormat};
 use docspec_core::EventSource;
 
 use crate::{
+    discovery,
     error::{HttpError, InputProblem},
-    mime_parser,
+    format, mime_parser,
 };
 
 enum Utf8Prevalidation {
@@ -29,8 +30,35 @@ enum Utf8Prevalidation {
 pub async fn options_conversion() -> impl IntoResponse {
     (
         StatusCode::NO_CONTENT,
-        [(header::ALLOW, HeaderValue::from_static("POST, OPTIONS"))],
+        [(
+            header::ALLOW,
+            HeaderValue::from_static(format::ALLOW_CONVERSION),
+        )],
     )
+}
+
+/// Handle `GET /conversion` — list the supported input and output media types.
+///
+/// Returns 200 with `Content-Type: application/json` and a body holding the
+/// server `version`, the `inputs` accepted on `Content-Type` and the `outputs`
+/// accepted on `Accept`.
+///
+/// # Errors
+///
+/// Returns [`HttpError::Internal`] if the body cannot be serialized.
+#[allow(clippy::unused_async)]
+// Reason: Axum handlers are async for route consistency even when no await is needed.
+#[inline]
+pub async fn get_conversion() -> Result<impl IntoResponse, HttpError> {
+    let body = discovery::conversion_formats_json().map_err(HttpError::internal)?;
+    Ok((
+        StatusCode::OK,
+        [(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        )],
+        body,
+    ))
 }
 
 /// Handle `POST /conversion` — convert markdown or HTML to `BlockNote` JSON, HTML, `oxa.dev` JSON, or Pandoc native.

@@ -38,7 +38,7 @@ pub fn router() -> Router {
 
     use crate::cache::cache_control_layer;
     use crate::handlers::{
-        conversion::{options_conversion, post_conversion},
+        conversion::{get_conversion, options_conversion, post_conversion},
         fallback::{conversion_method_not_allowed, health_method_not_allowed, not_found},
         health::{get_health, head_health, options_health},
     };
@@ -58,6 +58,7 @@ pub fn router() -> Router {
     let x_trace_id = HeaderName::from_static(format::X_TRACE_ID_HEADER);
 
     let conversion_route = post(post_conversion)
+        .get(get_conversion)
         .options(options_conversion)
         .fallback(conversion_method_not_allowed);
 

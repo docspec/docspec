@@ -5,6 +5,7 @@ extern crate alloc;
 
 pub mod cache;
 pub mod cli;
+mod discovery;
 pub mod error;
 pub mod format;
 pub mod handlers;

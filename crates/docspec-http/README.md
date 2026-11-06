@@ -79,11 +79,23 @@ curl -X POST \
 | Method  | Path        | Description                                                      |
 | ------- | ----------- | ---------------------------------------------------------------- |
 | POST    | /conversion | Convert markdown, HTML, or DOCX to BlockNote (default), HTML, oxa.dev JSON, or Pandoc native |
+| GET     | /conversion | Supported input/output media types and server version (JSON)     |
+| HEAD    | /conversion | Supported media types (no body)                                  |
 | OPTIONS | /conversion | Preflight / allowed methods                                      |
 | GET     | /health     | Liveness check                                                   |
 | HEAD    | /health     | Liveness check (no body)                                         |
 | OPTIONS | /health     | Allowed methods                                                  |
 | GET     | /metrics    | Prometheus metrics in exposition format 0.0.4                    |
+
+`GET /conversion` lets a client discover what the deployed server supports. `inputs` are the values accepted on `Content-Type`, `outputs` the values accepted on `Accept` (aliases included). The lists are built from the same tables that validate `POST /conversion`:
+
+```json
+{
+  "version": "2.0.0",
+  "inputs": ["text/markdown", "text/html", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.oasis.opendocument.text"],
+  "outputs": ["application/vnd.docspec.blocknote+json", "application/vnd.blocknote+json", "application/vnd.oxa+json", "application/vnd.pandoc.native", "text/html"]
+}
+```
 
 ## Request / Response Headers
 
