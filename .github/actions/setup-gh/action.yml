@@ -19,7 +19,7 @@ runs:
           *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
         esac
         name="gh_${GH_VERSION}_linux_${arch}"
-        curl --fail --location --show-error --silent \
+        curl --fail --location --show-error --silent --retry 3 --max-time 120 \
           --output "${RUNNER_TEMP}/${name}.tar.gz" \
           "https://github.com/cli/cli/releases/download/v${GH_VERSION}/${name}.tar.gz"
         echo "${sha256}  ${RUNNER_TEMP}/${name}.tar.gz" | sha256sum --check --strict
