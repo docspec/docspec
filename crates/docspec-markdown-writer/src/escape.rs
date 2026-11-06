@@ -3,7 +3,6 @@
 use std::io::{self, Write};
 
 use core::iter::Peekable;
-use core::str::Chars;
 
 const REPLACEMENT_CHARACTER: &[u8] = "\u{FFFD}".as_bytes();
 
@@ -43,17 +42,19 @@ where
 /// heading, block quote, list item, thematic break or fenced code block, and
 /// the `.`/`)` of an ordered-list marker. An end of text right after the
 /// marker counts as the list separator, so pass the whole block start or hold
-/// it while [`block_start_undecided`] is true.
+/// it while [`block_start_undecided`] is true. `head` and `tail` are escaped
+/// as one text, so a held prefix never needs to be joined with what follows.
 ///
 /// Normalizes NUL and line endings before escaping and streams output without
 /// accumulating the whole escaped text.
-pub(crate) fn write_escaped_block_start<W>(writer: &mut W, text: &str) -> io::Result<()>
+pub(crate) fn write_escaped_block_start<W>(writer: &mut W, head: &str, tail: &str) -> io::Result<()>
 where
     W: Write,
 {
-    let mut chars = text
-        .trim_start_matches(BLOCK_START_WHITESPACE)
+    let mut chars = head
         .chars()
+        .chain(tail.chars())
+        .skip_while(|ch| BLOCK_START_WHITESPACE.contains(ch))
         .peekable();
     let Some(first) = next_normalized_char(&mut chars) else {
         return Ok(());
@@ -77,12 +78,10 @@ where
     Ok(())
 }
 
-fn write_ordered_list_marker_tail<W>(
-    writer: &mut W,
-    chars: &mut Peekable<Chars<'_>>,
-) -> io::Result<()>
+fn write_ordered_list_marker_tail<W, I>(writer: &mut W, chars: &mut Peekable<I>) -> io::Result<()>
 where
     W: Write,
+    I: Iterator<Item = char>,
 {
     // CommonMark §5.3: 1–9 digits, then `.` or `)`, then a space, tab or end
     // of line. The first digit is already written; a tenth digit falls through
@@ -113,7 +112,10 @@ where
     Ok(())
 }
 
-fn next_normalized_char(chars: &mut Peekable<Chars<'_>>) -> Option<char> {
+fn next_normalized_char<I>(chars: &mut Peekable<I>) -> Option<char>
+where
+    I: Iterator<Item = char>,
+{
     match chars.next()? {
         '\0' => Some('\u{FFFD}'),
         '\r' => {
@@ -173,7 +175,7 @@ mod tests {
 
     fn block_start(input: &str) -> Vec<u8> {
         let mut output = Vec::new();
-        if let Err(error) = write_escaped_block_start(&mut output, input) {
+        if let Err(error) = write_escaped_block_start(&mut output, input, "") {
             panic!("block-start escape failed: {error}");
         }
         output
