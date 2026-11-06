@@ -442,6 +442,17 @@ mod tests {
     }
 
     #[test]
+    fn parse_hex_color_non_ascii_returns_none() {
+        // Both are 6 bytes: `é` is 2 bytes, so they reach the 6-digit arm.
+        assert_eq!("é1234".len(), 6);
+        assert_eq!("1é234".len(), 6);
+        // `0..2` is exactly `é`, which is not hex.
+        assert_eq!(parse_hex_color("é1234"), None);
+        // `0..2` ends inside `é`, so `str::get` returns `None`.
+        assert_eq!(parse_hex_color("1é234"), None);
+    }
+
+    #[test]
     fn parse_hex_color_black_returns_some() {
         assert_eq!(
             parse_hex_color("000000"),
