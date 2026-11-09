@@ -12,6 +12,17 @@ use std::io::{Read, Seek, SeekFrom};
 
 use docspec_core::Result;
 
+/// The UTF-8 encoding of U+FEFF, the byte-order mark this reader strips.
+const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
+
+/// How many bytes [`BomStrippingReader::new`] reads to look for a BOM.
+///
+/// Exactly the length of [`UTF8_BOM`]: fewer bytes cannot match a BOM, and
+/// every byte past it is document content the probe would have to give back.
+/// `u64` because that is what [`Read::take`] takes; a test pins it to
+/// `UTF8_BOM.len()`.
+const BOM_PROBE_LEN: u64 = 3;
+
 /// Detects and skips a leading UTF-8 BOM on the wrapped reader.
 ///
 /// Construction performs the BOM check eagerly via [`Self::new`].
@@ -35,13 +46,13 @@ impl<R: Read + Seek> BomStrippingReader<R> {
             .stream_position()
             .map_err(|source| docspec_core::Error::Io { source })?;
         // `Take::read_to_end` retries `Interrupted` and stops at EOF, so short inputs are fine.
-        let mut probe = Vec::with_capacity(3);
+        let mut probe = Vec::with_capacity(UTF8_BOM.len());
         reader
             .by_ref()
-            .take(3)
+            .take(BOM_PROBE_LEN)
             .read_to_end(&mut probe)
             .map_err(|source| docspec_core::Error::Io { source })?;
-        let has_bom = probe == [0xEF, 0xBB, 0xBF];
+        let has_bom = probe == UTF8_BOM;
         if !has_bom {
             // Rewind to the original position so the caller sees every byte.
             reader
@@ -73,6 +84,11 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
+
+    #[test]
+    fn bom_probe_len_matches_bom_length() {
+        assert_eq!(BOM_PROBE_LEN, u64::try_from(UTF8_BOM.len()).unwrap());
+    }
 
     #[test]
     fn strips_bom_when_present() {
