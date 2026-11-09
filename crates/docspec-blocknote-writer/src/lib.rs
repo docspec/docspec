@@ -39,8 +39,7 @@
 //!
 //! - **Preserved**: [`StartTextStyle`](docspec_core::Event::StartTextStyle) / [`EndTextStyle`](docspec_core::Event::EndTextStyle), [`Text`](docspec_core::Event::Text) (with currently open inline styles), [`LineBreak`](docspec_core::Event::LineBreak), [`SoftBreak`](docspec_core::Event::SoftBreak)
 //! - **Absorbed silently**: [`StartParagraph`](docspec_core::Event::StartParagraph) / [`EndParagraph`](docspec_core::Event::EndParagraph) (paragraph boundaries are dropped — adjacent paragraphs concatenate without separator)
-//! - **Dropped**: [`StartBlockQuote`](docspec_core::Event::StartBlockQuote), [`StartPreformatted`](docspec_core::Event::StartPreformatted), [`StartHeading`](docspec_core::Event::StartHeading), [`ThematicBreak`](docspec_core::Event::ThematicBreak) — silently discarded
-//! - **Lifted**: nested [`StartTable`](docspec_core::Event::StartTable) and its children, and [`Image`](docspec_core::Event::Image) events that appear inside a cell — buffered and replayed as top-level sibling blocks after the enclosing outermost table closes
+//! - **Lifted**: [`StartHeading`](docspec_core::Event::StartHeading), [`StartBlockQuote`](docspec_core::Event::StartBlockQuote), [`StartPreformatted`](docspec_core::Event::StartPreformatted), [`StartOrderedListItem`](docspec_core::Event::StartOrderedListItem) / [`StartUnorderedListItem`](docspec_core::Event::StartUnorderedListItem) and their children, [`ThematicBreak`](docspec_core::Event::ThematicBreak), nested [`StartTable`](docspec_core::Event::StartTable) and its children, and [`Image`](docspec_core::Event::Image) events that appear inside a cell — buffered and replayed as top-level sibling blocks after the enclosing outermost table closes
 //!
 //! Nested tables (a `StartTable` inside a cell) are buffered between the first nested
 //! `StartTable` and its matching `EndTable`, then replayed through the writer after the
@@ -56,6 +55,9 @@
 //! document order). Inline text adjacent to a lifted image in the same cell stays in that
 //! cell — only the image moves out. Images inside a nested cell lift through the recursive
 //! drain: they emit as siblings of the (already-lifted) nested table.
+//!
+//! Headings, blockquotes, preformatted blocks, list items, and thematic breaks inside a cell
+//! lift the same way: replayed after the outermost table closes, in document order.
 //!
 //! # List Support
 //!
@@ -89,14 +91,13 @@
 //! including any `Text` events nested within them. The drop applies anywhere inside a list
 //! item: both in the inline `content[]` slot (around the first paragraph) and after the item
 //! has transitioned to `children[]` (for multi-paragraph items or items containing nested
-//! lists). This differs from the table cell policy: cells preserve `Text` while absorbing
-//! block boundaries (so a heading inside a cell becomes plain text), whereas list items
-//! suppress text inside dropped blocks entirely.
+//! lists). This differs from the table cell policy: cells lift block content out of the table,
+//! whereas list items drop it along with its text.
 //!
 //! ## Container Interactions
 //!
-//! - **Inside a table cell**: list items are dropped entirely, consistent with other block-level
-//!   content inside cells.
+//! - **Inside a table cell**: list items are lifted out and emitted after the outermost table
+//!   closes, like other block-level content inside cells.
 //! - **Inside a blockquote**: the blockquote is force-closed and the list item is emitted at the
 //!   top level as a sibling. This matches the existing sibling-emit behavior for headings and
 //!   images inside blockquotes.
@@ -653,7 +654,7 @@ impl<W: Write> BlockNoteWriter<W> {
         id: Option<&str>,
         alignment: Option<&TextAlignment>,
     ) -> Result<()> {
-        // Inside a table cell, BlockNote's content type is InlineContent[] — block-level events are dropped.
+        // Inside a table cell, BlockNote's content type is InlineContent[] — paragraph boundaries are absorbed.
         if self.context.in_table_cell {
             return Ok(());
         }
