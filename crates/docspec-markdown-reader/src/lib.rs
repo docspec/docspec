@@ -100,7 +100,10 @@
 
 extern crate alloc;
 
-#[cfg_attr(all(), allow(clippy::mem_forget))]
+#[expect(
+    clippy::mem_forget,
+    reason = "self_cell! expands to mem::forget; the cell owns the source String for the parser's lifetime"
+)]
 mod parser_cell {
     use self_cell::self_cell;
 
