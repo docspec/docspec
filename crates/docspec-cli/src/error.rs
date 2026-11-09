@@ -146,7 +146,7 @@ mod tests {
             message: "pipeline failed".to_string(),
         };
         let err = CliError::Conversion(inner);
-        assert!(err.to_string().contains("pipeline failed"));
+        assert_eq!(err.to_string(), "pipeline failed");
     }
 
     #[test]
@@ -161,13 +161,16 @@ mod tests {
     fn display_io_error() {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
         let err = CliError::Io(io_err);
-        assert!(err.to_string().contains("file not found"));
+        assert_eq!(err.to_string(), "file not found");
     }
 
     #[test]
     fn display_same_input_output() {
         let err = CliError::SameInputOutput;
-        assert!(err.to_string().contains("same file"));
+        assert_eq!(
+            err.to_string(),
+            "input and output paths refer to the same file"
+        );
     }
 
     #[test]
@@ -176,14 +179,22 @@ mod tests {
             message: "test".to_string(),
         };
         let err = CliError::from(inner);
-        assert!(matches!(err, CliError::Conversion(_)));
+        // `docspec_core::Error` has no `PartialEq`, so the payload is pinned by guard.
+        assert!(matches!(
+            err,
+            CliError::Conversion(docspec_core::Error::Other { message }) if message == "test"
+        ));
     }
 
     #[test]
     fn from_io_error() {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "test");
         let err = CliError::from(io_err);
-        assert!(matches!(err, CliError::Io(_)));
+        // `std::io::Error` has no `PartialEq`, so the payload is pinned by guard.
+        assert!(matches!(
+            err,
+            CliError::Io(source) if source.kind() == ErrorKind::NotFound && source.to_string() == "test"
+        ));
     }
 
     fn io(kind: ErrorKind) -> std::io::Error {
