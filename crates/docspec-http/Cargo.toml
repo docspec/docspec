@@ -21,7 +21,6 @@ posthog = ["dep:posthog-rs", "uuid/v4"]
 
 [dependencies]
 axum = "0.8"
-clap = { version = "4", features = ["derive"] }
 tokio = { version = "1", features = [
   "rt-multi-thread",
   "macros",
