@@ -71,7 +71,7 @@ curl -X POST \
 | ---- | ---- | ----------- |
 | `serve(config: ServerConfig)` | async fn | Start the HTTP server with the given configuration. Runs until SIGINT or SIGTERM. |
 | `ServerConfig` | struct | Server bind configuration: `host: String`, `port: u16`. |
-| `cli::Args` | struct | Clap-derived argument struct for `--host` and `--port`. Useful when building a CLI that delegates to this library. |
+| `run_server(config: ServerConfig)` | fn | Blocking entrypoint for CLIs: builds the Tokio runtime, initializes tracing, and runs `serve()` until SIGINT or SIGTERM. |
 | `init_telemetry()` | fn | Initialize telemetry from environment variables. Call it before creating the Tokio runtime and keep the returned guard alive for the process lifetime. |
 | `init_tracing()` | fn | Initialize the tracing subscriber (stderr, INFO, pretty format). Call before `serve()`. |
 | `TelemetryGuard` | struct | Drop guard returned by `init_telemetry()`. Keep alive for the duration of the process to ensure Sentry flushes on exit. |
