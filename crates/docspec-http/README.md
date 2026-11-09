@@ -195,7 +195,7 @@ These follow Sentry's standard conventions:
 | Signal                                                  | Sentry?                                 | PostHog?                  |
 | ------------------------------------------------------- | --------------------------------------- | ------------------------- |
 | `500 Internal Server Error` (`HttpError::Internal`)     | yes (event)                             | yes (`$exception`)        |
-| `422 Unprocessable Content` (`HttpError::Unprocessable`) | yes (event)                             | yes (`$exception`)        |
+| `422 Unprocessable Content` (`HttpError::Unprocessable`) | no                                      | no                        |
 | Other 4xx responses                                     | no                                      | no                        |
 | Panics                                                  | yes (event)                             | no (no panic hook)        |
 | `tracing::error!` calls                                 | yes (event)                             | no                        |
@@ -245,7 +245,7 @@ starts normally without PostHog.
 | Signal | Captured? | Event name |
 | --- | --- | --- |
 | `500 Internal Server Error` (`HttpError::Internal`) | yes | `$exception` |
-| `422 Unprocessable Content` (`HttpError::Unprocessable`) | yes | `$exception` |
+| `422 Unprocessable Content` (`HttpError::Unprocessable`) | no | — |
 | Other 4xx responses | no | — |
 | Panics | no (no panic hook) | — |
 | `POST /conversion` success or failure | yes | `conversion_completed` |
@@ -269,8 +269,10 @@ Conversion events use the `X-Request-ID` header value when present, else a per-e
 ### PostHog + Sentry coexistence
 
 When both `DOCSPEC_SENTRY_DSN` and `DOCSPEC_POSTHOG_API_KEY` are set (and both features are compiled
-in), EVERY 500 and 422 response is reported to BOTH backends by design. This is the intentional
-coexistence mode.
+in), EVERY 500 response is reported to BOTH backends by design. This is the intentional
+coexistence mode. A 422 is the caller's document, not a service fault, so it is not reported as an
+exception to either backend; the `docspec_conversions_total{error_class="unprocessable"}` counter
+and the PostHog `conversion_completed` event (`error_class`) already count them.
 
 **Double-billing warning:** each error is counted as one event in Sentry and one event in PostHog.
 To avoid double-billing, unset one of the two env vars OR compile without the corresponding feature
