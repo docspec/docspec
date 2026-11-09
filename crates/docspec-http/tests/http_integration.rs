@@ -689,106 +689,6 @@ async fn head_conversion_returns_200_without_body() {
     assert_eq!(response_body_text(response.into_body()).await, "");
 }
 
-#[tokio::test]
-async fn get_well_known_docspec_returns_discovery_document() {
-    let request = common::empty_request("GET", "/.well-known/docspec");
-
-    let response = app().oneshot(request).await.expect("request succeeds");
-
-    assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(
-        response
-            .headers()
-            .get(header::CONTENT_TYPE)
-            .expect("content-type present"),
-        "application/json"
-    );
-    assert_eq!(
-        response
-            .headers()
-            .get(header::CACHE_CONTROL)
-            .expect("cache-control present"),
-        CACHE_CONTROL
-    );
-
-    let body = response_body_json(response.into_body()).await;
-    assert_eq!(
-        body,
-        json!({
-            "version": env!("CARGO_PKG_VERSION"),
-            "links": {
-                "conversion": "../conversion",
-                "health": "../health",
-            },
-            "conversion": {
-                "inputs": [
-                    "text/markdown",
-                    "text/html",
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    "application/vnd.oasis.opendocument.text",
-                ],
-                "outputs": [
-                    "application/vnd.docspec.blocknote+json",
-                    "application/vnd.blocknote+json",
-                    "application/vnd.oxa+json",
-                    "application/vnd.pandoc.native",
-                    "text/html",
-                ],
-            },
-        })
-    );
-}
-
-#[tokio::test]
-async fn well_known_docspec_links_resolve_at_root_and_under_prefix() {
-    let request = common::empty_request("GET", "/.well-known/docspec");
-    let response = app().oneshot(request).await.expect("request succeeds");
-    let body = response_body_json(response.into_body()).await;
-    let links = body
-        .get("links")
-        .and_then(Value::as_object)
-        .expect("links is an object");
-
-    let resolve = |document: &str| -> Vec<(String, String)> {
-        let base = url::Url::parse(document).expect("valid document url");
-        links
-            .iter()
-            .map(|(name, href)| {
-                let href = href.as_str().expect("link is a string");
-                let target = base.join(href).expect("link resolves");
-                (name.clone(), target.to_string())
-            })
-            .collect()
-    };
-
-    assert_eq!(
-        resolve("http://localhost:3000/.well-known/docspec"),
-        [
-            (
-                "conversion".to_owned(),
-                "http://localhost:3000/conversion".to_owned()
-            ),
-            (
-                "health".to_owned(),
-                "http://localhost:3000/health".to_owned()
-            ),
-        ]
-    );
-    assert_eq!(
-        resolve("https://example.com/docspec/.well-known/docspec"),
-        [
-            (
-                "conversion".to_owned(),
-                "https://example.com/docspec/conversion".to_owned()
-            ),
-            (
-                "health".to_owned(),
-                "https://example.com/docspec/health".to_owned()
-            ),
-        ]
-    );
-}
-
 const API_CATALOG_CT: &str =
     r#"application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727""#;
 const API_CATALOG_LINK: &str = r#"<api-catalog>; rel="api-catalog""#;
@@ -891,22 +791,6 @@ async fn api_catalog_links_resolve_at_root_and_under_prefix() {
 #[tokio::test]
 async fn post_api_catalog_returns_405() {
     let request = common::empty_request("POST", "/.well-known/api-catalog");
-
-    let response = app().oneshot(request).await.expect("request succeeds");
-
-    assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
-    assert_eq!(
-        response
-            .headers()
-            .get(header::ALLOW)
-            .expect("allow header present"),
-        "GET, HEAD"
-    );
-}
-
-#[tokio::test]
-async fn post_well_known_docspec_returns_405() {
-    let request = common::empty_request("POST", "/.well-known/docspec");
 
     let response = app().oneshot(request).await.expect("request succeeds");
 

@@ -4,8 +4,7 @@
 //! responses cannot disagree with what `POST /conversion` accepts. Each body
 //! is a struct with a `ToSchema` derive: the `OpenAPI` document publishes the
 //! one of `GET /conversion`, so a field added here shows up there too. The
-//! `/.well-known/*` schemas are not published; tests check the bodies
-//! against them.
+//! API catalog's schema is not published; tests check its body against it.
 
 use docspec_json::{JsonBackend, JsonEmitter, StrusonBackend};
 use utoipa::ToSchema;
@@ -85,68 +84,6 @@ impl ConversionFormats {
         emitter.object(|object| {
             object.key("version").value(self.version)?;
             write_media_types(object, &self.inputs, &self.outputs)
-        })?;
-        emitter.finish()
-    }
-}
-
-/// Links from the discovery document to the server's other resources.
-///
-/// Each is relative to the discovery document's own URL (RFC 3986 §5), so
-/// `../` reaches the server root and links still resolve behind a path prefix.
-#[derive(ToSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct Links {
-    /// The conversion endpoint.
-    #[schema(format = "uri-reference")]
-    conversion: &'static str,
-    /// The liveness check.
-    #[schema(format = "uri-reference")]
-    health: &'static str,
-}
-
-/// `GET /.well-known/docspec` body: the version, links to the server's
-/// resources, and the media types `/conversion` supports.
-#[derive(ToSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct WellKnown {
-    /// Version of the running server.
-    version: &'static str,
-    /// Links to the server's resources.
-    links: Links,
-    /// Media types `POST /conversion` reads and writes.
-    conversion: MediaTypes,
-}
-
-impl WellKnown {
-    /// The discovery document of this build.
-    pub(crate) fn current() -> Self {
-        Self {
-            version: VERSION,
-            links: Links {
-                conversion: "../conversion",
-                health: "../health",
-            },
-            conversion: MediaTypes::current(),
-        }
-    }
-
-    /// Serializes this body as JSON.
-    pub(crate) fn to_json(&self) -> docspec_core::Result<Vec<u8>> {
-        let mut emitter = JsonEmitter::new(StrusonBackend::new(Vec::new()));
-        emitter.object(|object| {
-            object.key("version").value(self.version)?;
-            object.key("links").object(|links| {
-                links.key("conversion").value(self.links.conversion)?;
-                links.key("health").value(self.links.health)
-            })?;
-            object.key("conversion").object(|conversion| {
-                write_media_types(
-                    conversion,
-                    &self.conversion.inputs,
-                    &self.conversion.outputs,
-                )
-            })
         })?;
         emitter.finish()
     }
@@ -260,13 +197,6 @@ mod tests {
             .iter_errors(&body)
             .map(|error| format!("{error} at {}", error.instance_path()))
             .collect()
-    }
-
-    #[test]
-    fn well_known_body_matches_its_schema() {
-        let body = WellKnown::current().to_json().expect("serializes");
-
-        assert_eq!(schema_errors::<WellKnown>(&body), Vec::<String>::new());
     }
 
     #[test]

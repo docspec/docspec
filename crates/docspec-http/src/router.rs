@@ -188,10 +188,6 @@ pub(crate) fn routes() -> OpenApiRouter {
                 .fallback(read_only_method_not_allowed),
         )
         .route(
-            "/.well-known/docspec",
-            get(crate::handlers::well_known::get_well_known).fallback(read_only_method_not_allowed),
-        )
-        .route(
             "/openapi.json",
             get(crate::handlers::openapi::get_openapi).fallback(read_only_method_not_allowed),
         )
