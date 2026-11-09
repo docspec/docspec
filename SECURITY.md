@@ -74,6 +74,8 @@ None exist today. A request body size limit (#497, `413 Content Too Large`) and 
 - There is no conversion, request, idle or read timeout at the HTTP layer. A slow client or a slow document holds the connection; use a reverse proxy for connection timeouts (#498).
 - DOCX package part size, `document.xml` node size and table nesting depth are unbounded (#412, #496). A zip bomb or a deeply nested table can exhaust memory or the stack.
 - A single wide DOCX table is read into the reader's event queue before its first event is yielded, so memory is proportional to the largest table (#415).
+- DOCX read through `from_reader` (as the HTTP server does) buffers the whole decompressed `document.xml` before parsing; `from_path` streams it (#410).
+- The Markdown reader reads the whole source into memory before parsing (pulldown-cmark borrows it), so memory is proportional to the input size (#567).
 - The BlockNote writer buffers nested tables and block-level content found inside table cells until the outermost table closes, so memory is proportional to that content (#416).
 - The Pandoc native writer buffers each code block and inline code span in full before writing it, so memory is proportional to the largest one (#460).
 
