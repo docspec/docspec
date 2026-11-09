@@ -39,18 +39,18 @@
 //!
 //! - **Preserved**: [`StartTextStyle`](docspec_core::Event::StartTextStyle) / [`EndTextStyle`](docspec_core::Event::EndTextStyle), [`Text`](docspec_core::Event::Text) (with currently open inline styles), [`LineBreak`](docspec_core::Event::LineBreak), [`SoftBreak`](docspec_core::Event::SoftBreak)
 //! - **Absorbed silently**: [`StartParagraph`](docspec_core::Event::StartParagraph) / [`EndParagraph`](docspec_core::Event::EndParagraph) (paragraph boundaries are dropped — adjacent paragraphs concatenate without separator)
-//! - **Lifted**: [`StartHeading`](docspec_core::Event::StartHeading), [`StartBlockQuote`](docspec_core::Event::StartBlockQuote), [`StartPreformatted`](docspec_core::Event::StartPreformatted), [`StartOrderedListItem`](docspec_core::Event::StartOrderedListItem) / [`StartUnorderedListItem`](docspec_core::Event::StartUnorderedListItem) and their children, [`ThematicBreak`](docspec_core::Event::ThematicBreak), nested [`StartTable`](docspec_core::Event::StartTable) and its children, and [`Image`](docspec_core::Event::Image) events that appear inside a cell — buffered and replayed as top-level sibling blocks after the enclosing outermost table closes
+//! - **Lifted**: [`StartHeading`](docspec_core::Event::StartHeading), [`StartBlockQuote`](docspec_core::Event::StartBlockQuote), [`StartPreformatted`](docspec_core::Event::StartPreformatted), [`StartOrderedListItem`](docspec_core::Event::StartOrderedListItem) / [`StartUnorderedListItem`](docspec_core::Event::StartUnorderedListItem) and their children, [`ThematicBreak`](docspec_core::Event::ThematicBreak), nested [`StartTable`](docspec_core::Event::StartTable) and its children, and [`Image`](docspec_core::Event::Image) events that appear inside a cell — buffered and replayed as sibling blocks of the outermost table after it closes (at document root, or inside the nearest enclosing block that accepts children, such as a blockquote or list item)
 //!
 //! Nested tables (a `StartTable` inside a cell) are buffered between the first nested
 //! `StartTable` and its matching `EndTable`, then replayed through the writer after the
-//! enclosing outermost table closes. Each lifted nested table emits as a top-level sibling
-//! block in document order. The buffer empties on every outer `EndTable`, so nesting any
-//! number of levels deep collapses to a flat top-level sequence: `A` containing `B`
-//! containing `C` emits as `A, B, C`. Inline text adjacent to a nested table in the same
+//! enclosing outermost table closes. Each lifted nested table emits as a sibling block of
+//! the outermost table, in document order. The buffer empties on every outer `EndTable`, so
+//! nesting any number of levels deep collapses to a flat sequence of siblings: `A`
+//! containing `B` containing `C` emits as `A, B, C`. Inline text adjacent to a nested table in the same
 //! outer cell stays in that outer cell.
 //!
-//! Images encountered inside a cell are likewise buffered and replayed as top-level sibling
-//! blocks after the enclosing outermost table closes. Their order in the output mirrors the
+//! Images encountered inside a cell are likewise buffered and replayed as sibling blocks of
+//! the outermost table after it closes. Their order in the output mirrors the
 //! order they appeared inside the table (interleaved with any lifted nested tables in
 //! document order). Inline text adjacent to a lifted image in the same cell stays in that
 //! cell — only the image moves out. Images inside a nested cell lift through the recursive
@@ -298,7 +298,7 @@ pub struct BlockNoteWriter<W: Write> {
     json: JsonEmitter<StrusonBackend<W>>,
     /// Whether at least one `StyledText` has been emitted into the current link's content array.
     link_emitted_styled_text: bool,
-    /// Events deferred for replay at the outermost `EndTable` as top-level siblings:
+    /// Events deferred for replay at the outermost `EndTable` as siblings of that table:
     /// nested-table substreams, in-cell `Image` events, and block-level events started
     /// inside a table cell. All are illegal inside `BlockNote`'s `tableCell.content`;
     /// co-buffering preserves their document order.
