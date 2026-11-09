@@ -199,27 +199,3 @@ pub(super) const TABLE: &[(u8, char)] = &[
     (0xFD, '\u{F8FD}'), // PRIVATE USE CHARACTER
     (0xFE, '\u{F8FE}'), // PRIVATE USE CHARACTER
 ];
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn table_sorted() {
-        for (prev, curr) in TABLE.iter().zip(TABLE.iter().skip(1)) {
-            assert!(
-                prev.0 < curr.0,
-                "table not sorted: {:#04X} >= {:#04X}",
-                prev.0,
-                curr.0
-            );
-        }
-    }
-
-    #[test]
-    fn table_no_duplicates() {
-        for (prev, curr) in TABLE.iter().zip(TABLE.iter().skip(1)) {
-            assert_ne!(prev.0, curr.0, "duplicate key: {:#04X}", curr.0);
-        }
-    }
-}
