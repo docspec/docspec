@@ -46,15 +46,15 @@
 //! enclosing outermost table closes. Each lifted nested table emits as a sibling block of
 //! the outermost table, in document order. The buffer empties on every outer `EndTable`, so
 //! nesting any number of levels deep collapses to a flat sequence of siblings: `A`
-//! containing `B` containing `C` emits as `A, B, C`. Inline text adjacent to a nested table in the same
-//! outer cell stays in that outer cell.
+//! containing `B` containing `C` emits as `A, B, C`. Inline text adjacent to a nested
+//! table in the same outer cell stays in that outer cell.
 //!
 //! Images encountered inside a cell are likewise buffered and replayed as sibling blocks of
-//! the outermost table after it closes. Their order in the output mirrors the
-//! order they appeared inside the table (interleaved with any lifted nested tables in
-//! document order). Inline text adjacent to a lifted image in the same cell stays in that
-//! cell — only the image moves out. Images inside a nested cell lift through the recursive
-//! drain: they emit as siblings of the (already-lifted) nested table.
+//! the outermost table after it closes. Their order in the output mirrors the order they
+//! appeared inside the table (interleaved with any lifted nested tables in document
+//! order). Inline text adjacent to a lifted image in the same cell stays in that cell —
+//! only the image moves out. Images inside a nested cell lift through the recursive drain:
+//! they emit as siblings of the (already-lifted) nested table.
 //!
 //! Headings, blockquotes, preformatted blocks, list items, and thematic breaks inside a cell
 //! lift the same way: replayed after the outermost table closes, in document order.
