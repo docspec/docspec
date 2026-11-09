@@ -1700,6 +1700,72 @@ mod tests {
     }
 
     #[test]
+    fn heading_level_0_clamps_to_1() {
+        let json = run_events(&[
+            start_document(),
+            start_heading(0),
+            text("Title"),
+            Event::EndHeading,
+            Event::EndDocument,
+        ]);
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 1},
+                    "content": [{"type": "text", "text": "Title", "styles": {}}],
+                    "children": []
+                }
+            ]),
+        );
+    }
+
+    #[test]
+    fn heading_level_7_clamps_to_6() {
+        let json = run_events(&[
+            start_document(),
+            start_heading(7),
+            text("Title"),
+            Event::EndHeading,
+            Event::EndDocument,
+        ]);
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 6},
+                    "content": [{"type": "text", "text": "Title", "styles": {}}],
+                    "children": []
+                }
+            ]),
+        );
+    }
+
+    #[test]
+    fn heading_level_255_clamps_to_6() {
+        let json = run_events(&[
+            start_document(),
+            start_heading(255),
+            text("Title"),
+            Event::EndHeading,
+            Event::EndDocument,
+        ]);
+        assert_json_eq(
+            &json,
+            json!([
+                {
+                    "type": "heading",
+                    "props": {"level": 6},
+                    "content": [{"type": "text", "text": "Title", "styles": {}}],
+                    "children": []
+                }
+            ]),
+        );
+    }
+
+    #[test]
     fn empty_heading() {
         let json = run_events(&[
             start_document(),
