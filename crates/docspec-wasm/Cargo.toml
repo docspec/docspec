@@ -58,6 +58,9 @@ multiple_inherent_impl = "allow"
 allow_attributes_without_reason = "allow"
 shadow_same = "allow"
 default_numeric_fallback = "allow"
+# Reason: clippy::restriction denies both separated_literal_suffix and unseparated_literal_suffix,
+# which demand opposite spellings; keep the glued form (`8u64`)
+unseparated_literal_suffix = "allow"
 std_instead_of_core = "warn"
 alloc_instead_of_core = "warn"
 std_instead_of_alloc = "warn"
