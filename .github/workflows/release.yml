@@ -18,7 +18,7 @@ jobs:
   # 1. PLAN: Determine what to build (cargo-dist)
   plan:
     name: Plan release
-    runs-on: 9xx
+    runs-on: ubuntu-latest
     outputs:
       manifest: ${{ steps.plan.outputs.manifest }}
     steps:
@@ -76,7 +76,7 @@ jobs:
   attest:
     name: Generate attestations
     needs: build
-    runs-on: 9xx
+    runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v8
@@ -92,7 +92,7 @@ jobs:
   sign:
     name: Sign binaries
     needs: build
-    runs-on: 9xx
+    runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v8
@@ -205,7 +205,7 @@ jobs:
   release:
     name: Create GitHub Release
     needs: [plan, build, attest, sign, docker]
-    runs-on: 9xx
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
