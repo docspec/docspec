@@ -4,7 +4,6 @@
     clippy::else_if_without_else,
     clippy::expect_used,
     clippy::indexing_slicing,
-    clippy::separated_literal_suffix,
     clippy::unwrap_used
 )]
 

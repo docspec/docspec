@@ -5,10 +5,8 @@
     clippy::indexing_slicing,
     clippy::panic,
     clippy::redundant_test_prefix,
-    clippy::separated_literal_suffix,
     clippy::std_instead_of_core,
     clippy::tests_outside_test_module,
-    clippy::unseparated_literal_suffix,
     clippy::unwrap_used
 )]
 
