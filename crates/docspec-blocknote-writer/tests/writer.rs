@@ -21,7 +21,7 @@ mod tests {
         AssetHandle, Color, Event, EventSink as _, ImageSource, StackTrackingSink, TextAlignment,
         TextStyleKind,
     };
-    use docspec_test_utils::builders::text;
+    use docspec_test_utils::builders::{start_document, start_paragraph, text};
     use docspec_test_utils::{assert_json_eq, FailingWriter};
     use serde_json::json;
 
@@ -101,21 +101,6 @@ mod tests {
         let writer = BlockNoteWriter::new(&mut buf);
         docspec_test_utils::drive(writer, events.iter().cloned());
         String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8")
-    }
-
-    fn start_document() -> Event {
-        Event::StartDocument {
-            id: None,
-            language: None,
-            metadata: None,
-        }
-    }
-
-    fn start_paragraph() -> Event {
-        Event::StartParagraph {
-            alignment: None,
-            id: None,
-        }
     }
 
     fn start_paragraph_with_alignment(alignment: TextAlignment) -> Event {
@@ -1530,33 +1515,18 @@ mod tests {
 
     #[test]
     fn orphan_end_unordered_list_item_is_silent_ok() {
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        let result = writer.handle_event(Event::EndUnorderedListItem);
-        assert!(
-            result.is_ok(),
-            "orphan EndUnorderedListItem must be silently absorbed"
-        );
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-        let output = String::from_utf8_lossy(&buf);
+        let output = run_direct_writer_events(&[
+            start_document(),
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
         assert_json_eq(&output, json!([]));
     }
 
     #[test]
     fn orphan_end_blockquote_is_silent_ok() {
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        let result = writer.handle_event(Event::EndBlockQuote);
-        assert!(
-            result.is_ok(),
-            "orphan EndBlockQuote must be silently absorbed"
-        );
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-        let output = String::from_utf8_lossy(&buf);
+        let output =
+            run_direct_writer_events(&[start_document(), Event::EndBlockQuote, Event::EndDocument]);
         assert_json_eq(&output, json!([]));
     }
 
@@ -2447,14 +2417,11 @@ mod tests {
 
     #[test]
     fn image_in_blockquote_emits_as_child() {
-        let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
-
-        // > ![logo](https://example.com/logo.png)
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_blockquote()).is_ok());
-        assert!(writer
-            .handle_event(Event::Image {
+        let json = run_events(&[
+            // > ![logo](https://example.com/logo.png)
+            start_document(),
+            start_blockquote(),
+            Event::Image {
                 source: ImageSource::Uri {
                     uri: "https://example.com/logo.png".to_string(),
                 },
@@ -2462,13 +2429,10 @@ mod tests {
                 decorative: false,
                 id: None,
                 title: None,
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-
-        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+            },
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([
@@ -2490,25 +2454,21 @@ mod tests {
 
     #[test]
     fn nested_blockquote_emits_as_child() {
-        let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
-
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_blockquote()).is_ok());
-        assert!(writer.handle_event(start_paragraph()).is_ok());
-        assert!(writer.handle_event(text("outer")).is_ok());
-        assert!(writer.handle_event(Event::EndParagraph).is_ok());
-        // DO NOT close outer quote - send nested StartBlockQuote directly
-        assert!(writer.handle_event(start_blockquote()).is_ok());
-        assert!(writer.handle_event(start_paragraph()).is_ok());
-        assert!(writer.handle_event(text("inner")).is_ok());
-        assert!(writer.handle_event(Event::EndParagraph).is_ok());
-        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
-        // StackTrackingSink auto-closes outer blockquote on EndDocument
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-
-        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        let json = run_events(&[
+            start_document(),
+            start_blockquote(),
+            start_paragraph(),
+            text("outer"),
+            Event::EndParagraph,
+            // DO NOT close outer quote - send nested StartBlockQuote directly
+            start_blockquote(),
+            start_paragraph(),
+            text("inner"),
+            Event::EndParagraph,
+            Event::EndBlockQuote,
+            // StackTrackingSink auto-closes outer blockquote on EndDocument
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([
@@ -2529,24 +2489,20 @@ mod tests {
 
     #[test]
     fn blockquote_with_inline_then_block_child_transitions_state() {
-        let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
-
-        // > inline text
-        // > ## block heading
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_blockquote()).is_ok());
-        assert!(writer.handle_event(start_paragraph()).is_ok());
-        assert!(writer.handle_event(text("inline")).is_ok());
-        assert!(writer.handle_event(Event::EndParagraph).is_ok());
-        assert!(writer.handle_event(start_heading(2)).is_ok());
-        assert!(writer.handle_event(text("block")).is_ok());
-        assert!(writer.handle_event(Event::EndHeading).is_ok());
-        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-
-        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        let json = run_events(&[
+            // > inline text
+            // > ## block heading
+            start_document(),
+            start_blockquote(),
+            start_paragraph(),
+            text("inline"),
+            Event::EndParagraph,
+            start_heading(2),
+            text("block"),
+            Event::EndHeading,
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([
@@ -2609,20 +2565,16 @@ mod tests {
 
     #[test]
     fn heading_in_blockquote_emits_as_child() {
-        let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
-
-        // > # Title
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_blockquote()).is_ok());
-        assert!(writer.handle_event(start_heading(1)).is_ok());
-        assert!(writer.handle_event(text("Title")).is_ok());
-        assert!(writer.handle_event(Event::EndHeading).is_ok());
-        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-
-        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        let json = run_events(&[
+            // > # Title
+            start_document(),
+            start_blockquote(),
+            start_heading(1),
+            text("Title"),
+            Event::EndHeading,
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([
@@ -2644,22 +2596,16 @@ mod tests {
 
     #[test]
     fn code_block_in_blockquote_emits_as_child() {
-        let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
-
-        // > ```code```
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_blockquote()).is_ok());
-        assert!(writer
-            .handle_event(start_preformatted(Some("rust")))
-            .is_ok());
-        assert!(writer.handle_event(text("fn main() {}")).is_ok());
-        assert!(writer.handle_event(Event::EndPreformatted).is_ok());
-        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-
-        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        let json = run_events(&[
+            // > ```code```
+            start_document(),
+            start_blockquote(),
+            start_preformatted(Some("rust")),
+            text("fn main() {}"),
+            Event::EndPreformatted,
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([
@@ -2681,14 +2627,11 @@ mod tests {
 
     #[test]
     fn image_in_heading_emits_sibling() {
-        let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
-
-        // # ![logo](https://example.com/logo.png)
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_heading(1)).is_ok());
-        assert!(writer
-            .handle_event(Event::Image {
+        let json = run_events(&[
+            // # ![logo](https://example.com/logo.png)
+            start_document(),
+            start_heading(1),
+            Event::Image {
                 source: ImageSource::Uri {
                     uri: "https://example.com/logo.png".to_string(),
                 },
@@ -2696,14 +2639,13 @@ mod tests {
                 decorative: false,
                 id: None,
                 title: None,
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::EndHeading).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
+            },
+            Event::EndHeading,
+            Event::EndDocument,
+        ]);
 
         assert_json_eq(
-            &String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8"),
+            &json,
             json!([
                 {"type": "heading", "props": {"level": 1}, "content": [], "children": []},
                 {
@@ -2718,20 +2660,14 @@ mod tests {
 
     #[test]
     fn thematic_break_in_blockquote_emits_as_child() {
-        let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
-
-        // > ---
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_blockquote()).is_ok());
-        assert!(writer
-            .handle_event(Event::ThematicBreak { id: None })
-            .is_ok());
-        assert!(writer.handle_event(Event::EndBlockQuote).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-
-        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        let json = run_events(&[
+            // > ---
+            start_document(),
+            start_blockquote(),
+            Event::ThematicBreak { id: None },
+            Event::EndBlockQuote,
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([{"type": "quote", "content": [], "children": [{"type": "divider"}]}]),
@@ -3689,39 +3625,31 @@ mod tests {
         // defensive guard in handle_end_table that returns early when no
         // table is open. Bypasses StackTrackingSink to drive a hand-crafted
         // sequence the stack tracker would otherwise reject.
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        let result = writer.handle_event(Event::EndTable);
-        assert!(result.is_ok(), "orphan EndTable must be silently absorbed");
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        let json =
+            run_direct_writer_events(&[start_document(), Event::EndTable, Event::EndDocument]);
         assert_json_eq(&json, json!([]));
     }
 
     #[test]
     fn nested_table_lifts_to_top_level_sibling() {
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_table()).is_ok());
-        assert!(writer.handle_event(start_table_row()).is_ok());
-        assert!(writer.handle_event(start_table_cell()).is_ok());
-        assert!(writer.handle_event(text("outer")).is_ok());
-        assert!(writer.handle_event(start_table()).is_ok());
-        assert!(writer.handle_event(start_table_row()).is_ok());
-        assert!(writer.handle_event(start_table_cell()).is_ok());
-        assert!(writer.handle_event(text("inner")).is_ok());
-        assert!(writer.handle_event(Event::EndTableCell).is_ok());
-        assert!(writer.handle_event(Event::EndTableRow).is_ok());
-        assert!(writer.handle_event(Event::EndTable).is_ok());
-        assert!(writer.handle_event(Event::EndTableCell).is_ok());
-        assert!(writer.handle_event(Event::EndTableRow).is_ok());
-        assert!(writer.handle_event(Event::EndTable).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        let json = run_direct_writer_events(&[
+            start_document(),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("outer"),
+            start_table(),
+            start_table_row(),
+            start_table_cell(),
+            text("inner"),
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndTableCell,
+            Event::EndTableRow,
+            Event::EndTable,
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([
@@ -4740,17 +4668,11 @@ mod tests {
         // block). Covers the guard that returns early when the close has no
         // matching open. Bypasses StackTrackingSink since the stack tracker
         // rejects orphan close events.
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        let result = writer.handle_event(Event::EndPreformatted);
-        assert!(
-            result.is_ok(),
-            "orphan EndPreformatted must be silently absorbed"
-        );
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-        let json = String::from_utf8(buf).expect("output should be valid UTF-8");
+        let json = run_direct_writer_events(&[
+            start_document(),
+            Event::EndPreformatted,
+            Event::EndDocument,
+        ]);
         assert_json_eq(&json, json!([]));
     }
 
@@ -6543,7 +6465,9 @@ mod tests {
         // Uses BlockNoteWriter directly to bypass StackTrackingSink validation.
         let mut buf = Vec::<u8>::new();
         let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
+        writer
+            .handle_event(start_document())
+            .expect("StartDocument should be accepted");
         let result = writer.handle_event(Event::StartOrderedListItem {
             id: None,
             level: 0,
@@ -6630,17 +6554,8 @@ mod tests {
         // is zero — the !in_text_block guard returns Ok(()) silently.
         // Uses BlockNoteWriter directly because StackTrackingSink rejects orphan
         // End events.
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        let result = writer.handle_event(Event::EndHeading);
-        assert!(
-            result.is_ok(),
-            "orphan EndHeading must be silently absorbed"
-        );
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-        let json = String::from_utf8(buf).expect("output must be valid UTF-8");
+        let json =
+            run_direct_writer_events(&[start_document(), Event::EndHeading, Event::EndDocument]);
         assert_json_eq(&json, json!([]));
     }
 
@@ -6697,10 +6612,8 @@ mod tests {
         // links) must all return Ok(()) without emitting any JSON. Uses
         // BlockNoteWriter directly to bypass StackTrackingSink validation of
         // stack-order constraints on orphan End events.
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        for event in [
+        let json = run_direct_writer_events(&[
+            start_document(),
             Event::EndCaption,
             Event::EndDefinitionDetail,
             Event::EndDefinitionList,
@@ -6712,30 +6625,21 @@ mod tests {
             Event::StartDefinitionList { id: None },
             Event::StartDefinitionTerm { id: None },
             Event::StartFootnote { id: 1 },
-        ] {
-            assert!(
-                writer.handle_event(event).is_ok(),
-                "catch-all events must return Ok(())"
-            );
-        }
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        assert!(writer.finish().is_ok());
-        let json = String::from_utf8(buf).expect("output must be valid UTF-8");
+            Event::EndDocument,
+        ]);
         assert_eq!(json, "[]", "no JSON output from catch-all events");
     }
 
     #[test]
     fn end_heading_closes_open_heading_block() {
         // Drives close_text_block! in the EndHeading arm (line 853) via raw BlockNoteWriter.
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_heading(2)).is_ok());
-        assert!(writer.handle_event(text("Heading text")).is_ok());
-        assert!(writer.handle_event(Event::EndHeading).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        let json = run_direct_writer_events(&[
+            start_document(),
+            start_heading(2),
+            text("Heading text"),
+            Event::EndHeading,
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([
@@ -6752,17 +6656,13 @@ mod tests {
     #[test]
     fn end_preformatted_closes_open_code_block() {
         // Drives close_text_block! in EndPreformatted arm (line 861) via raw BlockNoteWriter.
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer
-            .handle_event(start_preformatted(Some("rust")))
-            .is_ok());
-        assert!(writer.handle_event(text("let x = 1;")).is_ok());
-        assert!(writer.handle_event(Event::EndPreformatted).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        let json = run_direct_writer_events(&[
+            start_document(),
+            start_preformatted(Some("rust")),
+            text("let x = 1;"),
+            Event::EndPreformatted,
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([
@@ -6943,15 +6843,13 @@ mod tests {
     fn end_paragraph_in_normal_context_closes_paragraph_block() {
         // Drives close_text_block! in handle_end_paragraph normal path (line 344)
         // via raw BlockNoteWriter.
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer.handle_event(start_paragraph()).is_ok());
-        assert!(writer.handle_event(text("plain text")).is_ok());
-        assert!(writer.handle_event(Event::EndParagraph).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+        let json = run_direct_writer_events(&[
+            start_document(),
+            start_paragraph(),
+            text("plain text"),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([
@@ -7029,25 +6927,21 @@ mod tests {
     fn multi_paragraph_list_item_raw_covers_second_para_paths() {
         // Drives handle_paragraph second-para path (lines 477, 488) and
         // handle_end_paragraph second-para-close path (line 324) via raw BlockNoteWriter.
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer
-            .handle_event(Event::StartUnorderedListItem {
+        let json = run_direct_writer_events(&[
+            start_document(),
+            Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
-            })
-            .is_ok());
-        assert!(writer.handle_event(start_paragraph()).is_ok());
-        assert!(writer.handle_event(text("first")).is_ok());
-        assert!(writer.handle_event(Event::EndParagraph).is_ok());
-        assert!(writer.handle_event(start_paragraph()).is_ok());
-        assert!(writer.handle_event(text("second")).is_ok());
-        assert!(writer.handle_event(Event::EndParagraph).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+            },
+            start_paragraph(),
+            text("first"),
+            Event::EndParagraph,
+            start_paragraph(),
+            text("second"),
+            Event::EndParagraph,
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([
@@ -7070,28 +6964,22 @@ mod tests {
     fn open_current_list_item_children_state_paths() {
         // Drives open_current_list_item_children with content_array_open=true (line 726)
         // and children_array_open=false (line 737) via raw BlockNoteWriter.
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer
-            .handle_event(Event::StartUnorderedListItem {
+        let json = run_direct_writer_events(&[
+            start_document(),
+            Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
-            })
-            .is_ok());
-        assert!(writer.handle_event(text("parent")).is_ok());
-        assert!(writer
-            .handle_event(Event::StartUnorderedListItem {
+            },
+            text("parent"),
+            Event::StartUnorderedListItem {
                 id: None,
                 level: 1,
                 style_type: docspec_core::ListStyleType::Disc,
-            })
-            .is_ok());
-        assert!(writer.handle_event(text("child")).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+            },
+            text("child"),
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([
@@ -7114,21 +7002,17 @@ mod tests {
     fn open_list_item_object_with_valid_start_value() {
         // Drives u32::try_from success path for the ordered-list `start` prop
         // and ListStackEntry push fields in open_list_item_object.
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer
-            .handle_event(Event::StartOrderedListItem {
+        let json = run_direct_writer_events(&[
+            start_document(),
+            Event::StartOrderedListItem {
                 id: None,
                 level: 0,
                 start: Some(42),
                 style_type: docspec_core::ListStyleType::Decimal,
-            })
-            .is_ok());
-        assert!(writer.handle_event(text("item 42")).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+            },
+            text("item 42"),
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([
@@ -7145,11 +7029,9 @@ mod tests {
     #[test]
     fn image_event_with_alt_and_id_fields() {
         // Drives Image match arm pattern bindings (lines 900-901) via raw BlockNoteWriter.
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer
-            .handle_event(Event::Image {
+        let json = run_direct_writer_events(&[
+            start_document(),
+            Event::Image {
                 source: ImageSource::Uri {
                     uri: "https://example.com/photo.jpg".to_string(),
                 },
@@ -7157,11 +7039,9 @@ mod tests {
                 title: None,
                 decorative: false,
                 id: Some("img-1".to_string()),
-            })
-            .is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+            },
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([
@@ -7180,22 +7060,18 @@ mod tests {
     fn ordered_list_item_with_id_and_start_fields() {
         // Drives StartOrderedListItem match arm pattern bindings (lines 904-905) via
         // raw BlockNoteWriter.
-        let mut buf = Vec::<u8>::new();
-        let mut writer = BlockNoteWriter::new(&mut buf);
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer
-            .handle_event(Event::StartOrderedListItem {
+        let json = run_direct_writer_events(&[
+            start_document(),
+            Event::StartOrderedListItem {
                 id: Some("li-1".to_string()),
                 level: 0,
                 start: Some(5),
                 style_type: docspec_core::ListStyleType::Decimal,
-            })
-            .is_ok());
-        assert!(writer.handle_event(text("five")).is_ok());
-        assert!(writer.handle_event(Event::EndOrderedListItem).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+            },
+            text("five"),
+            Event::EndOrderedListItem,
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([
@@ -7227,16 +7103,7 @@ mod tests {
             Event::StartDefinitionTerm { id: None },
             Event::StartFootnote { id: 7 },
         ] {
-            let mut buf = Vec::<u8>::new();
-            let mut writer = BlockNoteWriter::new(&mut buf);
-            assert!(writer.handle_event(start_document()).is_ok());
-            assert!(
-                writer.handle_event(event).is_ok(),
-                "catch-all event must return Ok(())"
-            );
-            assert!(writer.handle_event(Event::EndDocument).is_ok());
-            assert!(writer.finish().is_ok());
-            let json = String::from_utf8(buf).expect("output must be valid UTF-8");
+            let json = run_direct_writer_events(&[start_document(), event, Event::EndDocument]);
             assert_eq!(json, "[]", "catch-all events must not emit JSON");
         }
     }
@@ -7783,26 +7650,22 @@ mod tests {
         // Exercises lines 477, 488, 324, 344 in handle_paragraph and handle_end_paragraph
         // for the second-and-subsequent paragraph case. Direct event emission without
         // StackTrackingSink to isolate the dispatch logic.
-        let mut buf = Vec::<u8>::new();
-        let mut writer = StackTrackingSink::new(BlockNoteWriter::new(&mut buf));
-        assert!(writer.handle_event(start_document()).is_ok());
-        assert!(writer
-            .handle_event(Event::StartUnorderedListItem {
+        let json = run_events(&[
+            start_document(),
+            Event::StartUnorderedListItem {
                 id: None,
                 level: 0,
                 style_type: docspec_core::ListStyleType::Disc,
-            })
-            .is_ok());
-        assert!(writer.handle_event(start_paragraph()).is_ok());
-        assert!(writer.handle_event(text("first")).is_ok());
-        assert!(writer.handle_event(Event::EndParagraph).is_ok());
-        assert!(writer.handle_event(start_paragraph()).is_ok());
-        assert!(writer.handle_event(text("second")).is_ok());
-        assert!(writer.handle_event(Event::EndParagraph).is_ok());
-        assert!(writer.handle_event(Event::EndUnorderedListItem).is_ok());
-        assert!(writer.handle_event(Event::EndDocument).is_ok());
-        writer.finish().expect("writer should finish fixture");
-        let json = String::from_utf8(buf).expect("BlockNoteWriter output should be valid UTF-8");
+            },
+            start_paragraph(),
+            text("first"),
+            Event::EndParagraph,
+            start_paragraph(),
+            text("second"),
+            Event::EndParagraph,
+            Event::EndUnorderedListItem,
+            Event::EndDocument,
+        ]);
         assert_json_eq(
             &json,
             json!([
