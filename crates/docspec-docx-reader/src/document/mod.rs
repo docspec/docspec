@@ -611,9 +611,12 @@ impl DocumentReader {
                     b"hyperlink" => {
                         nested_depth = nested_depth.saturating_add(1);
                     }
-                    _ => {
+                    local if is_denied_container(local) => {
                         self.input.skip_subtree(&tag)?;
                     }
+                    // Same policy as `parse_p`: descend into ins/sdt/smartTag
+                    // wrappers so their `w:r` children reach the `b"r"` arm.
+                    _ => {}
                 },
                 quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"hyperlink" => {
                     nested_depth = nested_depth.saturating_sub(1);
