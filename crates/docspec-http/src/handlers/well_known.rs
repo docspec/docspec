@@ -15,8 +15,6 @@ use crate::{discovery::ApiCatalog, error::HttpError, format};
 ///
 /// Returns [`HttpError::Internal`] if the body cannot be serialized.
 #[inline]
-// Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.
-#[allow(clippy::unused_async)]
 pub async fn get_api_catalog() -> Result<impl IntoResponse, HttpError> {
     let body = ApiCatalog::current()
         .to_json()

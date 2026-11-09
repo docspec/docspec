@@ -19,8 +19,6 @@ use crate::format;
 )]
 #[inline]
 #[must_use]
-// Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.
-#[allow(clippy::unused_async)]
 pub async fn get_health() -> impl IntoResponse {
     (
         http::StatusCode::OK,
@@ -47,8 +45,6 @@ pub async fn get_health() -> impl IntoResponse {
 )]
 #[inline]
 #[must_use]
-// Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.
-#[allow(clippy::unused_async)]
 pub async fn head_health() -> impl IntoResponse {
     http::StatusCode::NO_CONTENT
 }
@@ -70,8 +66,6 @@ pub async fn head_health() -> impl IntoResponse {
 )]
 #[inline]
 #[must_use]
-// Reason: Axum handlers must be async to satisfy the Handler trait, even if they don't await.
-#[allow(clippy::unused_async)]
 pub async fn options_health() -> impl IntoResponse {
     (
         http::StatusCode::NO_CONTENT,
