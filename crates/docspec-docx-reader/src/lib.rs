@@ -25,12 +25,17 @@
 //! `alt` attribute on the parent `<v:shape>`. Multiple `<v:imagedata>` elements in one
 //! `<w:pict>` emit multiple `Image` events in document order. `<v:group>` wrappers are
 //! transparent.
-//! Emits: `StartDocument`, `StartParagraph`, `StartTextStyle`, `Text`,
-//! `EndTextStyle`, `LineBreak`, `EndParagraph`, `StartTable`, `StartTableRow`,
-//! `StartTableCell`, `StartTableHeader`, `EndTableHeader`, `EndTableCell`,
-//! `EndTableRow`, `EndTable`, `StartLink`, `EndLink`, `StartOrderedListItem`,
-//! `EndOrderedListItem`, `StartUnorderedListItem`, `EndUnorderedListItem`,
-//! `Image`, `EndDocument`.
+//! Heading, block-quote, and code paragraph styles (`<w:pStyle>`) emit
+//! `StartHeading`/`EndHeading`, `StartBlockQuote`/`EndBlockQuote`, and
+//! `StartPreformatted`/`EndPreformatted`; see the crate README for the style
+//! names recognized.
+//! Emits: `StartDocument`, `StartHeading`, `EndHeading`, `StartBlockQuote`,
+//! `EndBlockQuote`, `StartParagraph`, `StartPreformatted`, `StartTextStyle`,
+//! `Text`, `EndTextStyle`, `LineBreak`, `EndParagraph`, `EndPreformatted`,
+//! `StartTable`, `StartTableRow`, `StartTableCell`, `StartTableHeader`,
+//! `EndTableHeader`, `EndTableCell`, `EndTableRow`, `EndTable`, `StartLink`,
+//! `EndLink`, `StartOrderedListItem`, `EndOrderedListItem`,
+//! `StartUnorderedListItem`, `EndUnorderedListItem`, `Image`, `EndDocument`.
 //!
 //! The elements listed under "Out of scope" are the reader's denylist — their
 //! entire subtree is silently dropped. Every other element (known or unknown)
@@ -38,7 +43,6 @@
 //!
 //! **Out of scope (subtree silently dropped)**:
 //! - Run styling not listed in the crate README
-//! - Headings (any `<w:pStyle>` value — every paragraph is `StartParagraph`)
 //! - Vertical cell merging (`<w:vMerge>`) — every cell emits with
 //!   `rowspan: None`
 //! - Header rows in nested tables — only the outermost table honors
@@ -122,9 +126,9 @@ const _: for<'a> fn(&'a rels::ImageRel) -> (&'a str, bool) = _image_rel_fields;
 /// A streaming DOCX reader that implements [`EventSource`].
 ///
 /// `DocxReader` parses a DOCX archive and emits `DocSpec` events one at a time.
-/// `<w:p>` paragraphs, `<w:t>` text, `<w:br>` line breaks, `<w:tab>` tabs,
-/// table elements (`<w:tbl>`, `<w:tr>`, `<w:tc>`), and `DrawingML` images
-/// (`<w:drawing>`) are recognized; all other elements are silently ignored.
+/// See the crate-level docs for the recognized elements and the emitted
+/// events. Elements on the reader's denylist have their entire subtree
+/// dropped; every other element, known or unknown, is descended into.
 ///
 /// # Streaming
 ///
