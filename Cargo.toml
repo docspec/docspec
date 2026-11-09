@@ -124,6 +124,9 @@ shadow_same = "allow"
 shadow_reuse = "allow"
 # Reason: Too noisy; numeric types clear from context
 default_numeric_fallback = "allow"
+# Reason: clippy::restriction denies both separated_literal_suffix and unseparated_literal_suffix,
+# which demand opposite spellings; keep the glued form (`8u64`)
+unseparated_literal_suffix = "allow"
 # Reason: Targeting embedded — prefer core/alloc over std where possible
 # std_instead_of_core is unactionable on stable for the std::io items we depend on
 # (Cursor is unstable in core::io; Read/Seek/Write/Take/Error/ErrorKind do not exist in core at all).

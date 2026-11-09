@@ -1139,12 +1139,7 @@ fn unexpected_eof(element: &str) -> Error {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::panic,
-        clippy::separated_literal_suffix,
-        clippy::too_many_lines
-    )]
+    #![allow(clippy::expect_used, clippy::panic, clippy::too_many_lines)]
     use std::io::{Cursor, Read};
     use std::sync::Arc;
 

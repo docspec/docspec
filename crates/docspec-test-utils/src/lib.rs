@@ -10,8 +10,6 @@
 // (bad fixture paths, LFS pointers, unhandled enum variants) so call sites
 // stay terse and failures are obvious.
 #![allow(clippy::panic)]
-// Reason: Literal suffix rules have conflicting requirements in this crate
-#![allow(clippy::separated_literal_suffix)]
 
 pub mod builders;
 
@@ -215,7 +213,7 @@ mod tests {
             let n = handle
                 .stream_to(&mut buf)
                 .expect("stream_to should succeed");
-            assert_eq!(n, 8_u64);
+            assert_eq!(n, 8u64);
             assert_eq!(buf.as_slice(), PNG_SIGNATURE);
         } else {
             panic!("expected ImageSource::Asset");
