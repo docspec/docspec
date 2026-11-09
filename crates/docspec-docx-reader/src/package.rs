@@ -240,7 +240,6 @@ fn parse_error(message: String) -> Error {
 }
 
 #[cfg(test)]
-#[cfg(not(coverage))]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::indexing_slicing)]
     use core::fmt::Write as _;
