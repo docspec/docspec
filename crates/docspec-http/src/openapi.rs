@@ -17,7 +17,7 @@ use utoipa::openapi::{
     ContentBuilder, InfoBuilder, OpenApi, OpenApiBuilder, RefOr, Required, Schema,
 };
 
-use crate::{discovery::VERSION, error::HttpError, mime};
+use crate::{discovery::VERSION, mime};
 
 /// Media type of the `OpenAPI` document.
 pub(crate) const MIME_OPENAPI: &str = "application/vnd.oai.openapi+json;version=3.1";
@@ -49,15 +49,17 @@ pub(crate) fn base() -> OpenApi {
         .build()
 }
 
-/// Returns the serialized document.
+/// Returns the serialized document, the same bytes `GET /openapi.json` serves.
 ///
 /// # Errors
 ///
-/// Returns [`HttpError::Internal`] if the document could not be built.
-pub(crate) fn json() -> Result<&'static [u8], HttpError> {
+/// Returns an [`std::io::Error`] of kind [`std::io::ErrorKind::Other`],
+/// carrying the reason, if the document could not be built.
+#[inline]
+pub fn json() -> Result<&'static [u8], std::io::Error> {
     DOCUMENT
         .as_deref()
-        .map_err(|message| HttpError::internal(std::io::Error::other(message.clone())))
+        .map_err(|message| std::io::Error::other(message.clone()))
 }
 
 /// Builds the document from the route table and the MIME tables.
