@@ -1982,6 +1982,65 @@ mod tests {
     }
 
     #[test]
+    fn br_before_paragraph_text_is_dropped() {
+        let events = collect_markdown("first\n\n<br>second line\n");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                helpers::text("first"),
+                Event::EndParagraph,
+                helpers::start_paragraph(),
+                helpers::text("second line"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn br_alone_in_a_block_is_dropped() {
+        let events = collect_markdown("<br>\n\n<br>\n");
+
+        assert_eq!(events, vec![helpers::start_document(), Event::EndDocument]);
+    }
+
+    #[test]
+    fn br_alone_in_a_block_quote_is_dropped() {
+        let events = collect_markdown("> <br>\n");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                Event::StartBlockQuote { id: None },
+                Event::EndBlockQuote,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn br_inside_a_block_html_heading_is_kept() {
+        let events = collect_markdown("<h1>a<br>b</h1>\n");
+
+        assert_eq!(
+            events,
+            vec![
+                helpers::start_document(),
+                helpers::start_heading(1),
+                helpers::text("a"),
+                Event::LineBreak,
+                helpers::text("b"),
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
     fn block_h1_single_line() {
         let events = collect_markdown("<h1>Title</h1>\n");
 
