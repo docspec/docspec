@@ -12,6 +12,81 @@ For pre-1.5.0 history of individual crates, see git tags matching
 
 ## [Unreleased]
 
+## [2.0.0-rc.2](https://github.com/docspec/docspec/compare/v2.0.0-rc.1...v2.0.0-rc.2) - 2026-11-09
+
+### Added
+
+- *(odt-reader)* add placeholder ODT input that yields an empty document
+- *(http)* serve an RFC 9727 API catalog at /.well-known/api-catalog
+- *(http)* publish an OpenAPI 3.1 document at /openapi.json
+- *(http)* serve /.well-known/docspec discovery document
+- *(http)* list supported media types on GET /conversion ([#518](https://github.com/docspec/docspec/pull/518))
+
+### Fixed
+
+- *(odt-reader)* take the input in constructors and reject directories
+- *(blocknote-writer)* clamp heading levels to 1–6
+- *(docx-reader)* read hyperlink text inside ins/sdt/smartTag wrappers
+- *(http)* weigh Accept by most specific range and strict qvalues
+- *(http)* stop reporting 422 client errors to Sentry and PostHog
+- *(http)* honour q weights in Accept negotiation
+- *(http)* leave the API catalog out of the OpenAPI document
+- *(http)* make the api-catalog Link header resolve under a path prefix
+- *(http)* leave the discovery endpoints out of the OpenAPI document
+- *(http)* describe Accept in prose and keep utoipa out of the public API
+- *(http)* make discovery links resolve under a path prefix
+
+### Other
+
+- Merge pull request #556 from docspec/test/cli-exact-assertions
+- Merge pull request #561 from docspec/refactor/bom-probe-take
+- *(docspec)* name and document the BOM probe length
+- *(docspec)* read the BOM probe with Read::take
+- *(cli)* assert exact values instead of substrings on DocSpec's own output
+- *(docker)* move the builder off the EOL rust:alpine3.20 tag
+- Merge pull request #536 from docspec/fix/blocknote-heading-level-clamp
+- Merge pull request #559 from docspec/refactor/blocknote-drop-leaf-child-kind
+- *(blocknote-writer)* rewrap the lifted-content paragraphs
+- *(blocknote-writer)* say lifted cell content becomes siblings of the outermost table
+- *(blocknote-writer)* say block content in table cells is lifted, not dropped
+- Merge pull request #558 from docspec/test/blocknote-use-test-utils
+- Merge pull request #543 from docspec/docs/security-md-writer-buffers
+- *(blocknote-writer)* delete the unconstructed ChildKind::Leaf and const _ dead-code dodges
+- *(blocknote-writer)* use the shared builders and run_events helpers
+- list the BlockNote and Pandoc writer buffers in SECURITY.md
+- Merge pull request #539 from docspec/fix/docx-hyperlink-wrapped-runs
+- Merge pull request #563 from docspec/test/docx-symbol-font-tables
+- drop the per-test literal-suffix allows
+- Merge pull request #562 from docspec/refactor/docx-parse-hex-color
+- Merge pull request #564 from docspec/docs/docx-reader-crate-docs
+- Merge pull request #545 from docspec/build/docx-reader-coverage-cfg
+- Merge pull request #554 from docspec/build/docker-builder-image
+- *(docx-reader)* pin that deletions inside a hyperlink stay dropped
+- *(docx-reader)* cover non-ASCII input to parse_hex_color
+- *(docx-reader)* one sortedness test for the five symbol-font tables
+- *(docx-reader)* parse hex colours with from_str_radix
+- *(docx-reader)* make the crate docs match the emitted event set
+- *(deps)* bump zip to 9
+- *(docx-reader)* run unit tests under coverage
+- Merge pull request #551 from docspec/refactor/markdown-reader-mem-forget-expect
+- *(markdown-reader)* replace the hidden mem_forget allow with a reasoned expect
+- Merge pull request #549 from docspec/fix/http-422-telemetry
+- Merge pull request #552 from docspec/refactor/http-drop-unused-async-allows
+- Merge pull request #540 from docspec/fix/http-accept-q-values
+- *(http)* delete the 11 dead unused_async allows
+- Merge pull request #547 from docspec/docs/http-readme-sentry-release
+- *(http)* check the read-only 405 problem body on the API catalog
+- *(http)* remove the /.well-known/docspec discovery document
+- *(http)* note the rc pre-release pin until 2.0.0 ships
+- *(http)* capture 500s with sentry::capture_error directly
+- *(http)* drop the SENTRY_RELEASE bullet and fix the dependency version snippets
+- *(http)* give the real reason discovery endpoints are not described
+- *(http)* download the OAS 3.1 meta-schema on demand instead of vendoring it
+- *(http)* check problem body members match the Problem schema
+- *(http)* drop trailing slash from discovery base URL example
+- *(http)* build 406 and 415 details from the MIME tables ([#517](https://github.com/docspec/docspec/pull/517))
+- *(cli)* pin the clap bin name and strip forced colour in usage tests
+
 ## [2.0.0-rc.1](https://github.com/docspec/docspec/compare/v1.21.11...v2.0.0-rc.1) - 2026-11-03
 
 ### Added
