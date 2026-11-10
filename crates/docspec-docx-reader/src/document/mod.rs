@@ -15,18 +15,20 @@ mod input;
 mod media;
 mod props;
 mod text;
-pub(crate) mod xml;
 
 pub use context::DocxData;
 use context::PackageContext;
+use docspec_xml::{parse_error, resolve_reference};
 use emit::EmitState;
 use input::XmlCursor;
 use props::{
     parse_ppr, parse_rpr, parse_tcpr, parse_trpr, resolved_run_styles, ResolvedCellProperties,
     ResolvedParagraphProperties, ResolvedRowProperties, ResolvedRunProperties,
 };
-use text::{collect_text_content, decode_general_ref, normalize_symbol_text, resolve_sym_char};
-use xml::parse_error;
+use text::{collect_text_content, normalize_symbol_text, resolve_sym_char};
+
+/// Starts every error about malformed `document.xml` content.
+const DOCUMENT_CONTEXT: &str = "malformed document.xml";
 
 const MAX_LIST_LEVEL: u32 = 8;
 
@@ -342,7 +344,7 @@ impl DocumentReader {
                     return Ok(());
                 }
                 quick_xml::events::Event::GeneralRef(reference) => {
-                    let text = decode_general_ref(&reference)?;
+                    let text = resolve_reference(DOCUMENT_CONTEXT, &reference)?;
                     if !text.is_empty() {
                         self.emit_deferred_styles_if_needed(props.as_ref(), &mut content_emitted);
                         self.emit.push(Event::Text { content: text });

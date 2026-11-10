@@ -4,6 +4,7 @@ members = [
   "crates/docspec",
   "crates/docspec-core",
   "crates/docspec-zip",
+  "crates/docspec-xml",
   "crates/docspec-docx-reader",
   "crates/docspec-html-reader",
   "crates/docspec-odt-reader",
@@ -31,6 +32,7 @@ repository = "https://github.com/docspec/docspec"
 docspec = { path = "crates/docspec", version = "2.0.0-rc.2" }
 docspec-core = { path = "crates/docspec-core", version = "2.0.0-rc.2" }
 docspec-zip = { path = "crates/docspec-zip", version = "2.0.0-rc.2" }
+docspec-xml = { path = "crates/docspec-xml", version = "2.0.0-rc.2" }
 docspec-json = { path = "crates/docspec-json", version = "2.0.0-rc.2" }
 docspec-markdown-reader = { path = "crates/docspec-markdown-reader", version = "2.0.0-rc.2" }
 docspec-html-reader = { path = "crates/docspec-html-reader", version = "2.0.0-rc.2" }
@@ -44,6 +46,7 @@ docspec-pandoc-native-writer = { path = "crates/docspec-pandoc-native-writer", v
 docspec-markdown-writer = { path = "crates/docspec-markdown-writer", version = "2.0.0-rc.2" }
 docspec-test-utils = { path = "crates/docspec-test-utils" }
 self_cell = "1.2"
+quick-xml = "0.41"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

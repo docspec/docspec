@@ -5,7 +5,7 @@ use std::io::Read;
 
 use quick_xml::events::Event;
 
-use crate::document::xml::{attr_string, parse_error};
+use docspec_xml::{attr_string, malformed, parse_error};
 
 /// Error prefix for malformed attributes in `[Content_Types].xml`.
 const ATTRIBUTE_ERROR_CONTEXT: &str = "malformed [Content_Types].xml";
@@ -73,7 +73,7 @@ pub(crate) fn parse(xml: &[u8]) -> docspec_core::Result<ContentTypes> {
                 return Ok(ct);
             }
             Err(err) => {
-                return Err(parse_error(format!("malformed [Content_Types].xml: {err}")));
+                return Err(malformed("malformed [Content_Types].xml", err));
             }
             Ok(_) => {}
         }

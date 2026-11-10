@@ -62,6 +62,7 @@ changelog_include = [
   "docspec-core",
   "docspec-json",
   "docspec-zip",
+  "docspec-xml",
   "docspec-blocknote-writer",
   "docspec-docx-reader",
   "docspec-html-reader",

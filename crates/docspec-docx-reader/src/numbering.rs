@@ -3,9 +3,9 @@
 use core::fmt;
 use std::{collections::HashMap, io::Read};
 
-use crate::document::xml::{attr_string, parse_error};
 use crate::properties;
 use docspec_core::ListStyleType;
+use docspec_xml::{attr_string, malformed, parse_error};
 use quick_xml::events::Event;
 
 /// Error prefix for malformed attributes in `numbering.xml`.
@@ -236,7 +236,7 @@ where
                 return Ok(numbering);
             }
             Err(err) => {
-                return Err(parse_error(format!("malformed numbering.xml: {err}")));
+                return Err(malformed("malformed numbering.xml", err));
             }
             Ok(_) => {}
         }

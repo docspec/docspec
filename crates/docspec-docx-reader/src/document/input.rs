@@ -6,8 +6,11 @@
 
 use std::io::{BufReader, Read};
 
-use docspec_core::{Error, Result};
+use docspec_core::Result;
+use docspec_xml::xml_error;
 use quick_xml::events::{BytesStart, Event as XmlEvent};
+
+use super::DOCUMENT_CONTEXT;
 
 /// Initial scratch capacity, sized to hold a typical run of markup without regrowing.
 const SCRATCH_CAPACITY: usize = 4096;
@@ -41,7 +44,7 @@ impl XmlCursor {
         Ok(self
             .reader
             .read_event_into(&mut self.scratch)
-            .map_err(map_quick_xml_error)?
+            .map_err(|err| xml_error(DOCUMENT_CONTEXT, err))?
             .into_owned())
     }
 
@@ -50,7 +53,7 @@ impl XmlCursor {
         let end = start.to_end().into_owned();
         self.reader
             .read_to_end_into(end.name(), &mut self.scratch)
-            .map_err(map_quick_xml_error)?;
+            .map_err(|err| xml_error(DOCUMENT_CONTEXT, err))?;
         Ok(())
     }
 }
@@ -58,18 +61,5 @@ impl XmlCursor {
 impl core::fmt::Debug for XmlCursor {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("XmlCursor").finish_non_exhaustive()
-    }
-}
-
-/// Converts a quick-xml failure into the crate error type, preserving I/O kind.
-fn map_quick_xml_error(err: quick_xml::Error) -> Error {
-    match err {
-        quick_xml::Error::Io(source) => Error::Io {
-            source: std::io::Error::new(source.kind(), source.to_string()),
-        },
-        other => Error::Parse {
-            message: format!("malformed document.xml: {other}"),
-            position: None,
-        },
     }
 }

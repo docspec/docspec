@@ -12,6 +12,7 @@ on:
           - docspec-core
           - docspec-json
           - docspec-zip
+          - docspec-xml
           - docspec-markdown-reader
           - docspec-html-reader
           - docspec-docx-reader

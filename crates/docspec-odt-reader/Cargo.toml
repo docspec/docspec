@@ -12,8 +12,9 @@ categories = ["parsing"]
 
 [dependencies]
 docspec-core = { workspace = true }
+docspec-xml = { workspace = true }
 docspec-zip = { workspace = true }
-quick-xml = "0.41"
+quick-xml = { workspace = true }
 
 [dev-dependencies]
 docspec-test-utils = { workspace = true }

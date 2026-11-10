@@ -1,0 +1,18 @@
+[package]
+name = "docspec-xml"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+description = "XML error and decoding helpers shared by the DocSpec readers for XML-based formats"
+keywords = ["document", "conversion", "streaming", "xml"]
+categories = ["parsing"]
+
+[dependencies]
+docspec-core = { workspace = true }
+quick-xml = { workspace = true }
+
+[lints]
+workspace = true
