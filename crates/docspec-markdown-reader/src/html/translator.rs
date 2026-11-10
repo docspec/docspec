@@ -193,6 +193,11 @@ pub(crate) fn translate_block(
                     } else {
                         out.push(heading_acc.open(level));
                     }
+                } else if matches!(intent, TagIntent::LineBreak)
+                    && (!heading_acc.is_open() || heading_acc.is_inside_nested_ignored_heading())
+                {
+                    // Block HTML only carries inline content inside a heading; a break
+                    // anywhere else would sit outside any block.
                 } else {
                     out.extend(translate_void(&intent, HtmlContext::Block));
                 }

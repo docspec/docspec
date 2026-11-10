@@ -330,6 +330,12 @@ impl MarkdownReader {
         for event in events {
             match event {
                 Event::Text { content } => self.enqueue_text(content),
+                // Same rule as a Markdown hard break: a break before `StartParagraph` is malformed.
+                Event::LineBreak if self.block_state == BlockState::PendingExplicit => {}
+                Event::LineBreak => {
+                    self.emit_pending_link_start();
+                    self.queue.push_back(Event::LineBreak);
+                }
                 other => self.queue.push_back(other),
             }
         }
