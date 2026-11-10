@@ -347,6 +347,8 @@ impl MarkdownReader {
         self.flush_pending_paragraph_start();
         if let Some(link) = self.link.as_mut() {
             if !link.started {
+                // A style opened before the link must not straddle its start.
+                self.queue.extend(self.inline_style_stack.suspend());
                 self.queue.push_back(Event::StartLink {
                     href: link.href.clone(),
                     id: None,
@@ -501,6 +503,8 @@ impl MarkdownReader {
     /// Emits `EndLink` (and `StartLink` if not yet emitted) for the buffered link.
     fn handle_end_link(&mut self) {
         let Some(link) = self.link.take() else { return };
+        // A style still open inside the link must not straddle its end.
+        self.queue.extend(self.inline_style_stack.suspend());
         if link.started {
             self.queue.push_back(Event::EndLink);
         } else {

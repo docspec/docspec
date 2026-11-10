@@ -197,6 +197,26 @@ impl StyleStack {
         emitted
     }
 
+    /// Closes every released style and defers all open styles again.
+    ///
+    /// Used where another span must not overlap the open styles, such as a
+    /// link boundary: emit the returned [`Event::EndTextStyle`] events, then
+    /// the boundary event. The styles stay open and their starts are released
+    /// again by the next [`StyleStack::note_text`], on the other side of the
+    /// boundary (close-and-reopen, Rule 9).
+    #[inline]
+    pub fn suspend(&mut self) -> Vec<Event> {
+        let mut emitted = Vec::new();
+        for frame in self.frames.iter_mut().rev() {
+            if frame.text_emitted {
+                emitted.push(Event::EndTextStyle);
+                frame.text_emitted = false;
+            }
+        }
+        self.rebuild_deferred_starts();
+        emitted
+    }
+
     /// Returns `true` when no open frames and no deferred starts remain.
     #[inline]
     #[must_use]
@@ -377,6 +397,47 @@ mod tests {
         assert_eq!(stack.open(TextStyleKind::Bold), Vec::new());
         assert_eq!(stack.open(TextStyleKind::Italic), Vec::new());
         assert_eq!(stack.close_all(), Vec::new());
+        assert!(stack.is_empty());
+    }
+
+    #[test]
+    fn suspend_closes_released_frames_and_defers_them_again() {
+        let mut stack = StyleStack::default();
+
+        assert_eq!(stack.open(TextStyleKind::Bold), Vec::new());
+        assert_eq!(stack.open(TextStyleKind::Italic), Vec::new());
+        assert_eq!(
+            stack.note_text(),
+            vec![start(TextStyleKind::Bold), start(TextStyleKind::Italic)]
+        );
+        assert_eq!(
+            stack.suspend(),
+            vec![Event::EndTextStyle, Event::EndTextStyle]
+        );
+        assert_eq!(
+            stack.note_text(),
+            vec![start(TextStyleKind::Bold), start(TextStyleKind::Italic)]
+        );
+        assert_eq!(
+            stack.close_all(),
+            vec![Event::EndTextStyle, Event::EndTextStyle]
+        );
+    }
+
+    #[test]
+    fn suspend_with_deferred_only_emits_nothing_and_keeps_the_starts() {
+        let mut stack = StyleStack::default();
+
+        assert_eq!(stack.open(TextStyleKind::Bold), Vec::new());
+        assert_eq!(stack.suspend(), Vec::new());
+        assert_eq!(stack.note_text(), vec![start(TextStyleKind::Bold)]);
+    }
+
+    #[test]
+    fn suspend_on_an_empty_stack_emits_nothing() {
+        let mut stack = StyleStack::default();
+
+        assert_eq!(stack.suspend(), Vec::new());
         assert!(stack.is_empty());
     }
 

@@ -1588,6 +1588,157 @@ mod tests {
     }
 
     #[test]
+    fn style_around_a_link_is_closed_inside_the_link() {
+        assert_eq!(
+            collect_markdown("**[b](u)** tail"),
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                Event::StartLink {
+                    href: "u".to_string(),
+                    title: None,
+                    id: None,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                helpers::text("b"),
+                Event::EndTextStyle,
+                Event::EndLink,
+                helpers::text(" tail"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn style_spanning_a_link_and_trailing_text_is_reopened_after_the_link() {
+        assert_eq!(
+            collect_markdown("**[b](u) tail**"),
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                Event::StartLink {
+                    href: "u".to_string(),
+                    title: None,
+                    id: None,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                helpers::text("b"),
+                Event::EndTextStyle,
+                Event::EndLink,
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                helpers::text(" tail"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn style_opened_before_a_link_is_closed_before_the_link() {
+        assert_eq!(
+            collect_markdown("**a [b](u) c**"),
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                helpers::text("a "),
+                Event::EndTextStyle,
+                Event::StartLink {
+                    href: "u".to_string(),
+                    title: None,
+                    id: None,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                helpers::text("b"),
+                Event::EndTextStyle,
+                Event::EndLink,
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                helpers::text(" c"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn html_style_opened_inside_a_link_is_reopened_after_the_link() {
+        assert_eq!(
+            collect_markdown("[a <b>b](u) c</b>"),
+            vec![
+                helpers::start_document(),
+                helpers::start_paragraph(),
+                Event::StartLink {
+                    href: "u".to_string(),
+                    title: None,
+                    id: None,
+                },
+                helpers::text("a "),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                helpers::text("b"),
+                Event::EndTextStyle,
+                Event::EndLink,
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                helpers::text(" c"),
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn style_around_a_link_in_a_heading_is_closed_inside_the_link() {
+        assert_eq!(
+            collect_markdown("# **[t](u)**"),
+            vec![
+                helpers::start_document(),
+                helpers::start_heading(1),
+                Event::StartLink {
+                    href: "u".to_string(),
+                    title: None,
+                    id: None,
+                },
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                helpers::text("t"),
+                Event::EndTextStyle,
+                Event::EndLink,
+                Event::EndHeading,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
     fn link_with_code_span() {
         let markdown = "[`code`](https://example.com)";
         let mut reader = MarkdownReader::from_str(markdown);
