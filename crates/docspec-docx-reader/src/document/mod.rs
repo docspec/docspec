@@ -263,16 +263,13 @@ impl DocumentReader {
                 self.input.skip_subtree(start)?;
             }
             b"br" => {
-                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
                 self.emit.push(Event::LineBreak);
                 self.input.skip_subtree(start)?;
             }
             b"drawing" => {
-                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
                 self.parse_drawing_subtree()?;
             }
             b"pict" => {
-                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
                 self.parse_pict_subtree()?;
             }
             b"instrText" | b"fldChar" => {
@@ -309,7 +306,6 @@ impl DocumentReader {
                 });
             }
             b"br" => {
-                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
                 self.emit.push(Event::LineBreak);
             }
             b"sym" => {
@@ -2273,6 +2269,135 @@ mod tests {
             vec![
                 start_doc(),
                 start_para(),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn styled_run_with_only_a_break_opens_no_style() {
+        let doc = document_with_body("<w:p><w:r><w:rPr><w:b/></w:rPr><w:br/></w:r></w:p>");
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::LineBreak,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn styled_run_with_only_a_non_empty_break_element_opens_no_style() {
+        let doc = document_with_body("<w:p><w:r><w:rPr><w:b/></w:rPr><w:br></w:br></w:r></w:p>");
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::LineBreak,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn styled_run_with_only_an_imageless_pict_emits_nothing() {
+        let doc = document_with_body(
+            "<w:p><w:r><w:rPr><w:b/></w:rPr><w:pict><v:shape/></w:pict></w:r><w:r><w:t>x</w:t></w:r></w:p>",
+        );
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::Text {
+                    content: "x".to_string(),
+                },
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn styled_run_with_only_an_unresolved_drawing_emits_nothing() {
+        let doc = document_with_body(
+            "<w:p><w:r><w:rPr><w:b/></w:rPr><w:drawing></w:drawing></w:r></w:p>",
+        );
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn styled_run_opens_its_style_at_the_first_text_after_a_break() {
+        let doc =
+            document_with_body("<w:p><w:r><w:rPr><w:b/></w:rPr><w:br/><w:t>b</w:t></w:r></w:p>");
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::LineBreak,
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                Event::Text {
+                    content: "b".to_string(),
+                },
+                Event::EndTextStyle,
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn styled_run_keeps_one_style_span_across_a_break_between_text() {
+        let doc = document_with_body(
+            "<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>a</w:t><w:br/><w:t>b</w:t></w:r></w:p>",
+        );
+        let mut reader = make_reader(&doc);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                Event::StartTextStyle {
+                    kind: TextStyleKind::Bold,
+                    id: None,
+                },
+                Event::Text {
+                    content: "a".to_string(),
+                },
+                Event::LineBreak,
+                Event::Text {
+                    content: "b".to_string(),
+                },
+                Event::EndTextStyle,
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
