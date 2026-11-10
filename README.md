@@ -135,7 +135,7 @@ reach for the individual crates when you want the smallest possible dependency f
 - [`docspec-docx-reader`](crates/docspec-docx-reader) — DOCX
 - [`docspec-html-reader`](crates/docspec-html-reader) — HTML
 - [`docspec-markdown-reader`](crates/docspec-markdown-reader) — Markdown (CommonMark + GFM)
-- [`docspec-odt-reader`](crates/docspec-odt-reader) — ODT (placeholder: emits an empty document)
+- [`docspec-odt-reader`](crates/docspec-odt-reader) — ODT (paragraphs only)
 
 **Writers**
 

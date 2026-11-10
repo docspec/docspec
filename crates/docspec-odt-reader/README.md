@@ -1,8 +1,10 @@
 # docspec-odt-reader
 
-**ODT to DocSpec event stream reader — placeholder**
+**ODT to DocSpec event stream reader**
 
-This crate reserves the ODT (OpenDocument Text) input slot in DocSpec. It does not parse ODT yet: the input is ignored and `OdtReader` always emits an empty document, `StartDocument` followed by `EndDocument`. Every writer turns that into its normal empty output.
+Reads ODT (OpenDocument Text) files into DocSpec events. Only paragraphs are read for now: their text, repeated spaces, tabs, and line breaks. Paragraphs inside lists, table cells, and sections come out as plain paragraphs. Headings, styles, link targets, images, notes, and metadata are dropped.
+
+`OdtReader::from_path` streams `content.xml` in constant memory; `OdtReader::from_reader` buffers it.
 
 ## Add it
 
@@ -13,11 +15,10 @@ docspec-odt-reader = "2"
 
 ## Use it
 
-```rust
-use std::io::Cursor;
+```rust,no_run
 use docspec_odt_reader::{EventSource, OdtReader};
 
-let mut reader = OdtReader::from_reader(Cursor::new(b"PK..."))?;
+let mut reader = OdtReader::from_path("document.odt")?;
 while let Some(event) = reader.next_event()? {
     println!("{event:?}");
 }

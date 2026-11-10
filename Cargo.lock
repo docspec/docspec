@@ -920,6 +920,8 @@ version = "2.0.0-rc.2"
 dependencies = [
  "docspec-core",
  "docspec-test-utils",
+ "docspec-zip",
+ "quick-xml",
  "tempfile",
 ]
 

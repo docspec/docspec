@@ -33,8 +33,7 @@ pub const MIME_BLOCKNOTE_ALIAS: &str = "application/vnd.blocknote+json";
 pub const MIME_DOCX: &str =
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-/// MIME type for ODT input (placeholder reader: the body is ignored and an
-/// empty document is produced). Strict like [`MIME_DOCX`] — no parameters.
+/// MIME type for ODT input. Strict like [`MIME_DOCX`] — no parameters.
 pub const MIME_ODT: &str = "application/vnd.oasis.opendocument.text";
 
 /// MIME type for HTML. Accepted as both input `Content-Type` and output

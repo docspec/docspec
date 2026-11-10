@@ -159,44 +159,62 @@ mod tests {
     }
 
     #[cfg(feature = "odt")]
-    fn empty_document() -> Vec<docspec_core::Event> {
+    fn hello_odt() -> Vec<u8> {
+        docspec_test_utils::synth_odt("<office:text><text:p>hello</text:p></office:text>")
+    }
+
+    #[cfg(feature = "odt")]
+    fn hello_document() -> Vec<docspec_core::Event> {
         vec![
             docspec_core::Event::StartDocument {
                 id: None,
                 language: None,
                 metadata: None,
             },
+            docspec_core::Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+            docspec_core::Event::Text {
+                content: "hello".to_string(),
+            },
+            docspec_core::Event::EndParagraph,
             docspec_core::Event::EndDocument,
         ]
     }
 
     #[cfg(feature = "odt")]
     #[test]
-    fn odt_placeholder_ignores_input_from_reader() {
+    fn odt_reads_paragraphs_from_reader() {
         let reader =
-            AnyReader::from_reader(InputFormat::Odt, std::io::Cursor::new(b"anything")).unwrap();
-        assert_eq!(odt_events(reader), empty_document());
+            AnyReader::from_reader(InputFormat::Odt, std::io::Cursor::new(hello_odt())).unwrap();
+        assert_eq!(odt_events(reader), hello_document());
     }
 
     #[cfg(feature = "odt")]
     #[test]
-    fn odt_placeholder_ignores_input_from_str() {
-        let reader = AnyReader::from_str(InputFormat::Odt, "anything").unwrap();
-        assert_eq!(odt_events(reader), empty_document());
+    fn odt_from_str_rejects_non_zip_text() {
+        let Err(docspec_core::Error::Parse { message, position }) =
+            AnyReader::from_str(InputFormat::Odt, "anything")
+        else {
+            panic!("expected a parse error");
+        };
+        assert_eq!(message, "not a valid ZIP archive");
+        assert_eq!(position, None);
     }
 
     #[cfg(feature = "odt")]
     #[test]
-    fn odt_placeholder_ignores_input_from_path() {
+    fn odt_reads_paragraphs_from_path() {
         let file = tempfile::NamedTempFile::new().unwrap();
-        std::fs::write(file.path(), b"anything").unwrap();
+        std::fs::write(file.path(), hello_odt()).unwrap();
         let reader = AnyReader::from_path(InputFormat::Odt, file.path()).unwrap();
-        assert_eq!(odt_events(reader), empty_document());
+        assert_eq!(odt_events(reader), hello_document());
     }
 
     #[cfg(feature = "odt")]
     #[test]
-    fn odt_placeholder_from_missing_path_is_io_error() {
+    fn odt_from_missing_path_is_io_error() {
         let dir = tempfile::tempdir().unwrap();
         let result = AnyReader::from_path(InputFormat::Odt, dir.path().join("missing.odt"));
         let Err(docspec_core::Error::Io { source }) = result else {
