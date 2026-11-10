@@ -14,7 +14,7 @@ If the bug is a **security vulnerability** — a parser that panics or hangs on 
 
 - **Search first.** Someone may have already reported it. Add to the existing issue instead of opening a duplicate.
 - **Check you're current.** Reproduce on the latest release (or `main`) before filing — the bug may already be fixed.
-- **Check it's actually a bug.** DocSpec is honest about its limits: some inputs are documented as unsupported and some content is knowingly dropped (for example, the HTML reader and writer are paragraph-only today). Skim the relevant crate README before filing. If we drop something *without* documenting it, that itself is a bug — tell us.
+- **Check it's actually a bug.** DocSpec is honest about its limits: some inputs are documented as unsupported and some content is knowingly dropped (for example, the HTML reader is paragraph-only and the HTML writer emits only paragraphs and code blocks today). Skim the relevant crate README before filing. If we drop something *without* documenting it, that itself is a bug — tell us.
 - **Reduce it.** The most useful thing you can send is the *smallest* document that still reproduces the problem. A ten-page report that fails is a mystery; a three-line document that fails is a test case.
 
 ### What makes a report actionable

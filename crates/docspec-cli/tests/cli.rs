@@ -633,6 +633,38 @@ mod tests {
     }
 
     #[test]
+    fn markdown_fenced_code_block_to_html_pre_code() {
+        docspec_cmd()
+            .args(["convert", "--from", "markdown", "--to", "html"])
+            .write_stdin("Intro\n\n```rust\nif a < b && c {\n    go();\n}\n```\n")
+            .assert()
+            .success()
+            .stdout(concat!(
+                "<html><body><p>Intro</p>",
+                "<pre><code class=\"language-rust\">if a &lt; b &amp;&amp; c {\n    go();\n}</code></pre>",
+                "</body></html>\n"
+            ));
+    }
+
+    #[test]
+    fn docx_code_block_to_html_pre_code() {
+        // The expected output from #475: the code lines survive, `->` escaped.
+        let fixture = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/docx/pandoc/codeblock.docx"
+        );
+        docspec_cmd()
+            .args(["convert", "--from", "docx", "--to", "html", fixture])
+            .assert()
+            .success()
+            .stdout(concat!(
+                "<html><body><p>This is some code:</p>",
+                "<pre><code>readDocx :: ReaderOptions\n         -&gt; B.ByteString\n         -&gt; Pandoc</code></pre>",
+                "<p>from the beginning of the docx reader.</p></body></html>\n"
+            ));
+    }
+
+    #[test]
     fn convert_markdown_to_html_file_via_extension_autodetect() {
         let input = markdown_tempfile(b"Hello world\n", ".md");
         let output = empty_tempfile(".html");
