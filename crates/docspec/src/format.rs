@@ -19,7 +19,7 @@ pub enum InputFormat {
     /// Available when the `docx` feature is enabled.
     #[cfg(feature = "docx")]
     Docx,
-    /// ODT — paragraphs only.
+    /// ODT — paragraphs and headings.
     /// Available when the `odt` feature is enabled.
     #[cfg(feature = "odt")]
     Odt,

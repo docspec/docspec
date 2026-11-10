@@ -17,7 +17,7 @@
 //! | `markdown`     | Markdown (`CommonMark` + GFM tables/strikethrough)  | [`readers::MarkdownReader`] |
 //! | `html`         | HTML (paragraphs only)                              | `readers::HtmlReader`       |
 //! | `docx`         | DOCX (paragraphs, headings, tables, lists, hyperlinks, images, run styles)  | `readers::DocxReader`       |
-//! | `odt`          | ODT — paragraphs only                                        | `readers::OdtReader`        |
+//! | `odt`          | ODT — paragraphs and headings                                | `readers::OdtReader`        |
 //!
 //! [`readers::DocxReader`] is dispatched through [`AnyReader::from_reader`] and
 //! [`AnyReader::from_path`]. Use `AnyReader::from_path(InputFormat::Docx, path)` to
@@ -133,7 +133,7 @@ pub mod readers {
     pub use docspec_docx_reader::DocxReader;
 
     /// ODT reader. Available when the `odt` feature is enabled.
-    /// Reads paragraphs only; see the [`docspec_odt_reader`] crate docs for the
+    /// Reads paragraphs and headings; see the [`docspec_odt_reader`] crate docs for the
     /// supported and out-of-scope list.
     #[cfg(feature = "odt")]
     #[cfg_attr(docsrs, doc(cfg(feature = "odt")))]
