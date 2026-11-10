@@ -216,6 +216,21 @@ impl DocumentReader {
     }
 }
 
+/// Maps a run character element to its event: `w:tab`, `w:br`, `w:cr`, and the
+/// ECMA-376 §17.3.3.18 non-breaking hyphen (U+2011) and §17.3.3.29 soft hyphen (U+00AD).
+fn run_char_event(name: &[u8]) -> Option<Event> {
+    let text = match name {
+        b"br" | b"cr" => return Some(Event::LineBreak),
+        b"tab" => "\t",
+        b"noBreakHyphen" => "\u{2011}",
+        b"softHyphen" => "\u{00AD}",
+        _ => return None,
+    };
+    Some(Event::Text {
+        content: text.to_string(),
+    })
+}
+
 impl DocumentReader {
     fn emit_deferred_styles_if_needed(
         &mut self,
@@ -231,6 +246,17 @@ impl DocumentReader {
         *content_emitted = true;
     }
 
+    /// Opens any deferred run styles, then pushes one piece of run content.
+    fn push_run_content(
+        &mut self,
+        props: Option<&ResolvedRunProperties>,
+        content_emitted: &mut bool,
+        event: Event,
+    ) {
+        self.emit_deferred_styles_if_needed(props, content_emitted);
+        self.emit.push(event);
+    }
+
     fn close_run_styles(&mut self, props: Option<&ResolvedRunProperties>) {
         self.emit.close_styles(resolved_run_styles(props));
     }
@@ -242,6 +268,10 @@ impl DocumentReader {
         content_emitted: &mut bool,
     ) -> Result<()> {
         let local_name = start.local_name();
+        if let Some(event) = run_char_event(local_name.as_ref()) {
+            self.push_run_content(props.as_ref(), content_emitted, event);
+            return self.input.skip_subtree(start);
+        }
         match local_name.as_ref() {
             b"rPr" if !*content_emitted && props.is_none() => {
                 *props = Some(parse_rpr(&mut self.input, &self.package)?);
@@ -251,21 +281,12 @@ impl DocumentReader {
                 let text = collect_text_content(&mut self.input)?;
                 let text = normalize_symbol_text(props.as_ref().and_then(|p| p.font), text);
                 if !text.is_empty() {
-                    self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
-                    self.emit.push(Event::Text { content: text });
+                    self.push_run_content(
+                        props.as_ref(),
+                        content_emitted,
+                        Event::Text { content: text },
+                    );
                 }
-            }
-            b"tab" => {
-                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
-                self.emit.push(Event::Text {
-                    content: "\t".to_string(),
-                });
-                self.input.skip_subtree(start)?;
-            }
-            b"br" => {
-                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
-                self.emit.push(Event::LineBreak);
-                self.input.skip_subtree(start)?;
             }
             b"drawing" => {
                 self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
@@ -293,6 +314,10 @@ impl DocumentReader {
         content_emitted: &mut bool,
     ) {
         let local_name = empty.local_name();
+        if let Some(event) = run_char_event(local_name.as_ref()) {
+            self.push_run_content(props.as_ref(), content_emitted, event);
+            return;
+        }
         match local_name.as_ref() {
             b"rPr" if !*content_emitted && props.is_none() => {
                 *props = Some(ResolvedRunProperties {
@@ -302,20 +327,13 @@ impl DocumentReader {
                     font: None,
                 });
             }
-            b"tab" => {
-                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
-                self.emit.push(Event::Text {
-                    content: "\t".to_string(),
-                });
-            }
-            b"br" => {
-                self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
-                self.emit.push(Event::LineBreak);
-            }
             b"sym" => {
                 if let Some(text) = resolve_sym_char(props.as_ref().and_then(|p| p.font), empty) {
-                    self.emit_deferred_styles_if_needed(props.as_ref(), content_emitted);
-                    self.emit.push(Event::Text { content: text });
+                    self.push_run_content(
+                        props.as_ref(),
+                        content_emitted,
+                        Event::Text { content: text },
+                    );
                 }
             }
             _ => {}
