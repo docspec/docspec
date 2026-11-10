@@ -15,9 +15,9 @@ use docspec_core::ImageSource;
 
 use crate::content_types::ContentTypes;
 use crate::numbering::{ListLookupResult, MinimalNumbering};
-use crate::package::ReadSeek;
 use crate::rels::{HyperlinkMap, ImageMap};
 use crate::styles::{StyleClassification, StyleList};
+use docspec_zip::ReadSeek;
 
 /// Package parts required to construct a document reader.
 pub struct DocxData {

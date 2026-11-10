@@ -2,7 +2,7 @@
 //!
 //! `StreamingArchive::open` uses `ZipArchive` only to locate an entry and capture
 //! its compressed byte range. The returned reader then streams that byte range
-//! directly from the DOCX file with bounded memory.
+//! directly from the file with bounded memory.
 
 use std::fs::File;
 use std::io::{Read, Seek as _, SeekFrom};
@@ -26,19 +26,26 @@ impl Read for EntryReader {
     }
 }
 
-/// Streaming reader for one DOCX ZIP entry.
+/// Streaming reader for one ZIP entry.
 ///
 /// Constructed via [`StreamingArchive::open`]. The archive is inspected once for
 /// entry metadata; `Read` then pulls bytes directly from the compressed entry
-/// range without materializing the full XML document.
-pub(crate) struct StreamingArchive {
+/// range without materializing the full entry.
+pub struct StreamingArchive {
     reader: EntryReader,
 }
 
 impl StreamingArchive {
     /// Opens the ZIP archive at `path` and positions the reader on the entry
-    /// named `entry_name` (typically `"word/document.xml"`).
-    pub(crate) fn open(path: &Path, entry_name: &str) -> Result<Self> {
+    /// named `entry_name` (for example `"word/document.xml"`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Io`] if the file cannot be opened or read, and
+    /// [`Error::Parse`] if it is not a valid ZIP archive, has no such entry, or
+    /// the entry uses a compression method other than stored or deflate.
+    #[inline]
+    pub fn open(path: &Path, entry_name: &str) -> Result<Self> {
         let file = File::open(path).map_err(Error::from)?;
         let mut archive = ZipArchive::new(file).map_err(|err| match err {
             ZipError::Io(source) => Error::Io { source },
@@ -86,6 +93,7 @@ impl StreamingArchive {
 }
 
 impl Read for StreamingArchive {
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         self.reader.read(buf)
     }

@@ -8,7 +8,8 @@ use std::{
 
 use docspec_core::AssetHandle;
 
-use crate::{content_types::ContentTypes, package::ReadSeek};
+use crate::content_types::ContentTypes;
+use docspec_zip::ReadSeek;
 
 /// Resolves a single embedded asset from a shared DOCX ZIP archive.
 pub struct DocxAssetHandle {

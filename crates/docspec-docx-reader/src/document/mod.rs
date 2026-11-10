@@ -179,7 +179,7 @@ impl DocumentReader {
     pub fn from_xml_reader_and_archive(
         xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
         data: DocxData,
-        archive: Arc<Mutex<zip::ZipArchive<Box<dyn crate::package::ReadSeek + 'static>>>>,
+        archive: Arc<Mutex<zip::ZipArchive<Box<dyn docspec_zip::ReadSeek + 'static>>>>,
         content_types: Arc<crate::content_types::ContentTypes>,
     ) -> Self {
         Self {
@@ -204,7 +204,7 @@ impl DocumentReader {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
         let archive = zip::ZipArchive::new(
-            Box::new(Cursor::new(EMPTY_ZIP)) as Box<dyn crate::package::ReadSeek + 'static>
+            Box::new(Cursor::new(EMPTY_ZIP)) as Box<dyn docspec_zip::ReadSeek + 'static>
         )
         .expect("minimal empty zip must be valid");
         Self::from_xml_reader_and_archive(

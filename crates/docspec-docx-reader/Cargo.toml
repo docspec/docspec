@@ -13,9 +13,9 @@ exclude = ["tests/fixtures/**", "tests/snapshots/**"]
 
 [dependencies]
 docspec-core = { workspace = true }
+docspec-zip = { workspace = true }
 quick-xml = "0.41"
 zip = { version = "9", default-features = false, features = ["deflate"] }
-flate2 = "1"
 
 [dev-dependencies]
 docspec-blocknote-writer = { workspace = true }

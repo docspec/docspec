@@ -105,7 +105,6 @@ mod numbering;
 mod package;
 mod properties;
 mod rels;
-mod streaming_archive;
 mod styles;
 mod symbol_fonts;
 
