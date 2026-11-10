@@ -98,6 +98,13 @@ pub enum BlockKind {
 /// This sink maintains a stack of [`BlockKind`] values representing currently open containers.
 /// Use the query methods to inspect the current nesting state.
 ///
+/// # Validation
+///
+/// The stream must open with [`StartDocument`](Event::StartDocument) and reach
+/// [`EndDocument`](Event::EndDocument) before [`finish`](EventSink::finish): any other first
+/// event, and a `finish` on a stream that stopped early, return
+/// [`Error::InvalidSequence`](crate::Error::InvalidSequence).
+///
 /// # Normalization Behavior
 ///
 /// - **Auto-insert**: If a [`Text`](Event::Text) event arrives outside any content-bearing block,
@@ -117,13 +124,6 @@ impl<S: EventSink> StackTrackingSink<S> {
     /// Handles an `EndDocument` event: drains all remaining open blocks in reverse order,
     /// emits their close events, sets `document_finished`, then forwards `EndDocument`.
     fn handle_end_document(&mut self) -> Result<()> {
-        if !self.stack.contains(&BlockKind::Document) {
-            return Err(Error::InvalidSequence {
-                expected: "open Document".to_string(),
-                found: "EndDocument".to_string(),
-                message: "EndDocument received without StartDocument".to_string(),
-            });
-        }
         while let Some(kind) = self.stack.pop() {
             if kind != BlockKind::Document {
                 self.sink.handle_event(end_event_for(kind))?;
@@ -143,13 +143,6 @@ impl<S: EventSink> StackTrackingSink<S> {
                 message: "handle_end_event called with non-End event".to_string(),
             });
         };
-        if self.stack.is_empty() {
-            return Err(Error::InvalidSequence {
-                expected: "open block".to_string(),
-                found: format!("{target_kind:?}"),
-                message: "received End event with empty stack".to_string(),
-            });
-        }
         if self.stack.contains(&target_kind) {
             while self.stack.last() != Some(&target_kind) {
                 if let Some(popped_kind) = self.stack.pop() {
@@ -300,6 +293,13 @@ impl<S: EventSink> StackTrackingSink<S> {
 impl<S: EventSink> EventSink for StackTrackingSink<S> {
     #[inline]
     fn finish(self) -> Result<()> {
+        if !self.document_finished {
+            return Err(Error::InvalidSequence {
+                expected: "EndDocument".to_string(),
+                found: "end of stream".to_string(),
+                message: "stream ended before EndDocument".to_string(),
+            });
+        }
         self.sink.finish()
     }
 
@@ -312,6 +312,14 @@ impl<S: EventSink> EventSink for StackTrackingSink<S> {
                 expected: "end of stream".to_string(),
                 found: format!("{event:?}"),
                 message: "event received after document already finished".to_string(),
+            });
+        }
+
+        if self.stack.is_empty() && !matches!(event, Event::StartDocument { .. }) {
+            return Err(Error::InvalidSequence {
+                expected: "StartDocument".to_string(),
+                found: format!("{event:?}"),
+                message: "event received before StartDocument".to_string(),
             });
         }
 

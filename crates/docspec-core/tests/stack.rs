@@ -464,7 +464,16 @@ mod tests {
     #[test]
     fn sink_finish_forwards_to_inner() {
         let mock = MockSink::new();
-        let sink = StackTrackingSink::new(mock);
+        let mut sink = StackTrackingSink::new(mock);
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(&mut sink, Event::EndDocument);
         let result = sink.finish();
         assert!(matches!(result, Ok(())));
     }
@@ -546,9 +555,79 @@ mod tests {
         let result = sink.handle_event(Event::EndParagraph);
         assert_invalid_sequence(
             &result,
-            "open block",
-            "Paragraph",
-            "received End event with empty stack",
+            "StartDocument",
+            "EndParagraph",
+            "event received before StartDocument",
+        );
+    }
+
+    #[test]
+    fn text_before_start_document_returns_error() {
+        let mut sink = StackTrackingSink::new(MockSink::new());
+
+        let result = sink.handle_event(Event::Text {
+            content: "orphan".to_string(),
+        });
+        assert_invalid_sequence(
+            &result,
+            "StartDocument",
+            "Text { content: \"orphan\" }",
+            "event received before StartDocument",
+        );
+    }
+
+    #[test]
+    fn block_start_before_start_document_returns_error() {
+        let mut sink = StackTrackingSink::new(MockSink::new());
+
+        let result = sink.handle_event(Event::StartParagraph {
+            alignment: None,
+            id: None,
+        });
+        assert_invalid_sequence(
+            &result,
+            "StartDocument",
+            "StartParagraph { alignment: None, id: None }",
+            "event received before StartDocument",
+        );
+    }
+
+    #[test]
+    fn finish_on_an_empty_stream_returns_error() {
+        let sink = StackTrackingSink::new(MockSink::new());
+
+        assert_invalid_sequence(
+            &sink.finish(),
+            "EndDocument",
+            "end of stream",
+            "stream ended before EndDocument",
+        );
+    }
+
+    #[test]
+    fn finish_before_end_document_returns_error() {
+        let mut sink = StackTrackingSink::new(MockSink::new());
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
+        send(
+            &mut sink,
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        );
+
+        assert_invalid_sequence(
+            &sink.finish(),
+            "EndDocument",
+            "end of stream",
+            "stream ended before EndDocument",
         );
     }
 
@@ -560,9 +639,9 @@ mod tests {
         let result = sink.handle_event(Event::EndDocument);
         assert_invalid_sequence(
             &result,
-            "open Document",
+            "StartDocument",
             "EndDocument",
-            "EndDocument received without StartDocument",
+            "event received before StartDocument",
         );
     }
 
@@ -665,6 +744,14 @@ mod tests {
     #[test]
     fn link_is_content_bearing() {
         let mut sink = StackTrackingSink::new(MockSink::new());
+        send(
+            &mut sink,
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+        );
 
         assert!(!sink.has_open_content());
 

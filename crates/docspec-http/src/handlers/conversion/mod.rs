@@ -256,9 +256,8 @@ where
 /// `InvalidSequence` means a reader emitted an event stream that violates the
 /// well-formedness rules, which can only be a `DocSpec` defect, so it is a
 /// `500` whose cause stays out of the response. Every other kind carries
-/// caller-derived data (a parser error, a writer left unfinished by an
-/// incomplete document, a dangling relationship) and is a `422` with the
-/// message as `detail`. `Io` is included: in this handler the input is an
+/// caller-derived data (a parser error, a dangling relationship) and is a
+/// `422` with the message as `detail`. `Io` is included: in this handler the input is an
 /// in-memory `Cursor` and the output a `Vec<u8>`, both infallible, so the only
 /// reachable `Io` is a media part missing from the caller's ZIP.
 fn classify_conversion_error(error: docspec_core::Error) -> HttpError {
@@ -555,19 +554,32 @@ mod tests {
     }
 
     #[test]
-    fn incomplete_document_failing_in_finish_is_unprocessable() {
-        // No EndParagraph, no EndDocument: the stream ends cleanly but early,
-        // so the JSON emitter cannot finish. That is the input's fault.
+    fn stream_that_ends_before_end_document_is_internal_for_every_format() {
+        // No EndParagraph, no EndDocument: a reader that stops early has broken
+        // the event contract, whichever writer receives the stream.
+        for format in [
+            OutputFormat::Blocknote,
+            OutputFormat::Html,
+            OutputFormat::Markdown,
+            OutputFormat::Oxa,
+            OutputFormat::PandocNative,
+        ] {
+            let mut out = Vec::new();
+            let source =
+                FakeSource::new(vec![start_document(), start_paragraph(), text("x")], None);
+            let result = run_conversion(source, AnyWriter::new(format, &mut out));
+            assert!(
+                matches!(result, Err(HttpError::Internal { .. })),
+                "{format:?} accepted a truncated stream"
+            );
+        }
+    }
+
+    #[test]
+    fn empty_stream_is_internal() {
         let mut out = Vec::new();
-        let source = FakeSource::new(vec![start_document(), start_paragraph(), text("x")], None);
-        let result = run_conversion(source, AnyWriter::new(OutputFormat::Blocknote, &mut out));
-        assert_eq!(
-            unprocessable(result.unwrap_err()),
-            (
-                InputProblem::Malformed,
-                "JSON error: cannot finish: open containers remain or no root value written"
-                    .to_owned()
-            )
-        );
+        let source = FakeSource::new(Vec::new(), None);
+        let result = run_conversion(source, AnyWriter::new(OutputFormat::Html, &mut out));
+        assert!(matches!(result, Err(HttpError::Internal { .. })));
     }
 }
