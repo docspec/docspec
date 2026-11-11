@@ -331,6 +331,27 @@ fn eof_inside_a_paragraph_is_a_parse_error() {
 }
 
 #[test]
+fn truncated_content_is_a_parse_error() {
+    for content in [
+        "",
+        "<?xml version=\"1.0\"?>",
+        "plain text",
+        "<office:document-content><office:body>",
+        "<office:text><text:p>one</text:p>",
+    ] {
+        let mut reader = OdtReader::from_reader(Cursor::new(synth_odt(content))).unwrap();
+        let Err(Error::Parse { message, position }) = try_collect_events(&mut reader) else {
+            panic!("expected a parse error for {content:?}");
+        };
+        assert_eq!(
+            message, "malformed content.xml: unexpected end of file",
+            "{content:?}"
+        );
+        assert_eq!(position, None, "{content:?}");
+    }
+}
+
+#[test]
 fn malformed_xml_is_a_parse_error() {
     assert_eq!(
         parse_error("<text:p>a<!-x</text:p>"),

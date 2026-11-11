@@ -32,9 +32,13 @@
 //!
 //! # Streaming Guarantee
 //!
-//! - **`from_path`**: streams `content.xml` in constant memory.
+//! - **`from_path`**: streams `content.xml`; memory is proportional to the
+//!   largest single XML node (one long text run, say), not to the file.
 //! - **`from_reader`**: buffers `content.xml` into memory — O(N) in document
-//!   size. Use `from_path` when constant memory is required.
+//!   size. Use `from_path` for large documents.
+//!
+//! Neither the decompressed `content.xml` size nor a single node is capped yet
+//! (#582), so a crafted file can exhaust memory.
 //!
 //! # Quick Start
 //!
@@ -86,6 +90,10 @@ pub struct OdtReader {
     in_paragraph: bool,
     /// Nesting depth inside a subtree that is being dropped; 0 when not skipping.
     skip_depth: usize,
+    /// Elements opened and not yet closed; nonzero at EOF means a cut-off file.
+    open_elements: usize,
+    /// Whether a root element was seen; an empty or text-only file has none.
+    saw_root: bool,
 }
 
 impl core::fmt::Debug for OdtReader {
@@ -101,7 +109,7 @@ impl OdtReader {
     /// Creates a reader from any `Read + Seek` source holding an ODT archive.
     ///
     /// **Memory note**: this buffers `content.xml` into memory. Use
-    /// [`from_path`](Self::from_path) for constant-memory streaming.
+    /// [`from_path`](Self::from_path) to stream it.
     ///
     /// # Errors
     ///
@@ -118,8 +126,7 @@ impl OdtReader {
         Ok(Self::new(Box::new(Cursor::new(content))))
     }
 
-    /// Creates a reader for the ODT file at `path`, streaming `content.xml`
-    /// in constant memory.
+    /// Creates a reader for the ODT file at `path`, streaming `content.xml`.
     ///
     /// # Errors
     ///
@@ -156,6 +163,8 @@ impl OdtReader {
             phase: Phase::NotStarted,
             in_paragraph: false,
             skip_depth: 0,
+            open_elements: 0,
+            saw_root: false,
         }
     }
 }
@@ -181,9 +190,17 @@ impl EventSource for OdtReader {
                 .xml
                 .read_event_into(&mut self.scratch)
                 .map_err(xml_error)?;
+            match token {
+                XmlEvent::Start(_) => {
+                    self.open_elements = self.open_elements.saturating_add(1);
+                    self.saw_root = true;
+                }
+                XmlEvent::End(_) => self.open_elements = self.open_elements.saturating_sub(1),
+                _ => {}
+            }
             let event = match token {
                 XmlEvent::Eof => {
-                    if self.in_paragraph {
+                    if self.open_elements > 0 || !self.saw_root {
                         return Err(malformed("unexpected end of file"));
                     }
                     self.phase = Phase::Finished;
