@@ -29,6 +29,12 @@
 //! elements (e.g., `<strong>`, `<em>`) is preserved as `Text` events, but
 //! the formatting structure is dropped.
 //!
+//! # Malformed Markup
+//!
+//! Markup mistakes that browsers recover from, such as a bare `<` in text or
+//! `&amp` without its semicolon, are recovered the same way. Only I/O failures
+//! and text that is not valid UTF-8 return an error.
+//!
 //! # Streaming
 //!
 //! `HtmlReader` streams its source via `html5gum::IoReader`'s 16 KB sliding-window
@@ -230,15 +236,12 @@ impl EventSource for HtmlReader {
                             html5gum::Token::String(spanned) => {
                                 self.handle_text(&spanned.value.0)?;
                             }
-                            html5gum::Token::Comment(_) | html5gum::Token::Doctype(_) => {
-                                // Silently ignore
-                            }
-                            html5gum::Token::Error(spanned) => {
-                                return Err(docspec_core::Error::Parse {
-                                    message: format!("html5gum: {:?}", spanned.value),
-                                    position: None,
-                                });
-                            }
+                            // A `Token::Error` is a WHATWG parse error that html5gum has
+                            // already recovered from the way browsers do; the tokens that
+                            // follow carry the recovered content, so it is not fatal.
+                            html5gum::Token::Comment(_)
+                            | html5gum::Token::Doctype(_)
+                            | html5gum::Token::Error(_) => {}
                         },
                         Err(source) => return Err(docspec_core::Error::Io { source }),
                     }

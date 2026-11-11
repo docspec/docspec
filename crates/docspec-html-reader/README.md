@@ -45,6 +45,8 @@ In a real pipeline, connect it to any `EventSink` with `docspec_core::pipe(reade
 
 We emit exactly five event kinds: `StartDocument`, `StartParagraph`, `Text`, `EndParagraph`, `EndDocument`. That means `<p>` elements and the text inside them. Text content inside inline elements like `<strong>` or `<em>` is preserved as `Text` events, but the formatting structure is dropped. Everything else — headings, lists, tables, images, every other HTML element — is silently ignored. No half-formed events, no silent guesses.
 
+Markup mistakes that browsers recover from, such as a bare `<` in text or `&amp` without its semicolon, are recovered the same way rather than failing the conversion. Only I/O failures and text that is not valid UTF-8 are errors.
+
 Memory stays constant regardless of document size. Both `from_str` and `from_reader` stream through `html5gum::IoReader`'s 16 KB sliding-window buffer; the document never needs to fit in memory.
 
 ## Related
