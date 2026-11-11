@@ -2349,6 +2349,35 @@ mod tests {
     }
 
     #[test]
+    fn styled_run_with_only_an_image_drawing_emits_a_bare_image() {
+        let mut image_map = crate::rels::ImageMap::default();
+        image_map.insert(
+            "rId1".to_string(),
+            image_rel("word/media/image1.png", false),
+        );
+        let doc = drawing_document(&picture_with_blip(
+            r#"descr="alt text""#,
+            r#"<a:blip r:embed="rId1"/>"#,
+        ))
+        .replace("<w:r><w:drawing>", "<w:r><w:rPr><w:b/></w:rPr><w:drawing>");
+        let mut reader = make_reader_with_images(&doc, image_map);
+
+        assert_eq!(
+            collect_events(&mut reader),
+            vec![
+                start_doc(),
+                start_para(),
+                image_event(
+                    asset_source("zip://word/media/image1.png"),
+                    Some("alt text"),
+                ),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
     fn styled_run_opens_its_style_at_the_first_text_after_a_break() {
         let doc =
             document_with_body("<w:p><w:r><w:rPr><w:b/></w:rPr><w:br/><w:t>b</w:t></w:r></w:p>");
