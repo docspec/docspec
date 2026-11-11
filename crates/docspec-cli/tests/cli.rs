@@ -926,6 +926,179 @@ mod tests {
                 );
         }
 
+        /// A DOCX with 5000 paragraphs whose `document.xml` is cut off, so the
+        /// conversion writes well past the output buffer before it fails.
+        fn truncated_long_docx() -> Vec<u8> {
+            let paragraphs = "<w:p><w:r><w:t>paragraph</w:t></w:r></w:p>".repeat(5000);
+            synth_docx(
+                r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+                &format!(
+                    r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{paragraphs}"#
+                ),
+            )
+        }
+
+        fn dir_listing(dir: &std::path::Path) -> Vec<String> {
+            let mut names: Vec<String> = std::fs::read_dir(dir)
+                .unwrap()
+                .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+                .collect();
+            names.sort();
+            names
+        }
+
+        #[test]
+        fn failed_conversion_keeps_previous_output() {
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::write(dir.path().join("in.docx"), truncated_long_docx()).unwrap();
+            std::fs::write(dir.path().join("out.json"), b"GOOD PREVIOUS OUTPUT\n").unwrap();
+            docspec_cmd()
+                .current_dir(dir.path())
+                .args(["convert", "in.docx", "-o", "out.json"])
+                .assert()
+                .code(65)
+                .stderr(
+                    "error: parse error: malformed document.xml: unexpected EOF inside <w:body>\n",
+                );
+            assert_eq!(
+                std::fs::read(dir.path().join("out.json")).unwrap(),
+                b"GOOD PREVIOUS OUTPUT\n"
+            );
+            assert_eq!(dir_listing(dir.path()), ["in.docx", "out.json"]);
+        }
+
+        #[test]
+        fn failed_conversion_leaves_no_output_file() {
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::write(dir.path().join("in.docx"), truncated_long_docx()).unwrap();
+            docspec_cmd()
+                .current_dir(dir.path())
+                .args(["convert", "in.docx", "-o", "out.json"])
+                .assert()
+                .code(65);
+            assert_eq!(dir_listing(dir.path()), ["in.docx"]);
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn successful_conversion_keeps_output_mode() {
+            use std::os::unix::fs::PermissionsExt as _;
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::write(dir.path().join("in.md"), b"x\n").unwrap();
+            let out = dir.path().join("out.html");
+            std::fs::write(&out, b"old\n").unwrap();
+            std::fs::set_permissions(&out, std::fs::Permissions::from_mode(0o640)).unwrap();
+            docspec_cmd()
+                .current_dir(dir.path())
+                .args(["convert", "in.md", "-o", "out.html"])
+                .assert()
+                .success()
+                .stderr("");
+            assert_eq!(
+                std::fs::read_to_string(&out).unwrap(),
+                "<html><body><p>x</p></body></html>\n"
+            );
+            assert_eq!(
+                std::fs::metadata(&out).unwrap().permissions().mode() & 0o777,
+                0o640
+            );
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn new_output_gets_default_file_mode() {
+            use std::os::unix::fs::PermissionsExt as _;
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::write(dir.path().join("in.md"), b"x\n").unwrap();
+            // A file the test creates the ordinary way shows what umask allows.
+            std::fs::write(dir.path().join("probe"), b"").unwrap();
+            let expected = std::fs::metadata(dir.path().join("probe"))
+                .unwrap()
+                .permissions()
+                .mode();
+            docspec_cmd()
+                .current_dir(dir.path())
+                .args(["convert", "in.md", "-o", "out.html"])
+                .assert()
+                .success();
+            assert_eq!(
+                std::fs::metadata(dir.path().join("out.html"))
+                    .unwrap()
+                    .permissions()
+                    .mode(),
+                expected
+            );
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn symlinked_output_is_written_through() {
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::write(dir.path().join("in.md"), b"x\n").unwrap();
+            std::fs::write(dir.path().join("target.html"), b"old\n").unwrap();
+            std::os::unix::fs::symlink("target.html", dir.path().join("link.html")).unwrap();
+            docspec_cmd()
+                .current_dir(dir.path())
+                .args(["convert", "in.md", "-o", "link.html"])
+                .assert()
+                .success()
+                .stderr("");
+            assert!(std::fs::symlink_metadata(dir.path().join("link.html"))
+                .unwrap()
+                .file_type()
+                .is_symlink());
+            assert_eq!(
+                std::fs::read_to_string(dir.path().join("target.html")).unwrap(),
+                "<html><body><p>x</p></body></html>\n"
+            );
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn read_only_output_exits_77_and_is_kept() {
+            use std::os::unix::fs::PermissionsExt as _;
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::write(dir.path().join("in.md"), b"x\n").unwrap();
+            let out = dir.path().join("out.html");
+            std::fs::write(&out, b"old\n").unwrap();
+            std::fs::set_permissions(&out, std::fs::Permissions::from_mode(0o444)).unwrap();
+            let Err(denied) = std::fs::OpenOptions::new().write(true).open(&out) else {
+                return; // root ignores mode bits; nothing to assert
+            };
+            docspec_cmd()
+                .current_dir(dir.path())
+                .args(["convert", "in.md", "-o", "out.html"])
+                .assert()
+                .code(77)
+                .stderr(format!(
+                    "error: cannot create output `out.html`: {denied}\n"
+                ));
+            assert_eq!(std::fs::read(&out).unwrap(), b"old\n");
+            assert_eq!(dir_listing(dir.path()), ["in.md", "out.html"]);
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn dangling_symlink_output_creates_its_target() {
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::write(dir.path().join("in.md"), b"x\n").unwrap();
+            std::os::unix::fs::symlink("target.html", dir.path().join("link.html")).unwrap();
+            docspec_cmd()
+                .current_dir(dir.path())
+                .args(["convert", "in.md", "-o", "link.html"])
+                .assert()
+                .success()
+                .stderr("");
+            assert!(std::fs::symlink_metadata(dir.path().join("link.html"))
+                .unwrap()
+                .file_type()
+                .is_symlink());
+            assert_eq!(
+                std::fs::read_to_string(dir.path().join("target.html")).unwrap(),
+                "<html><body><p>x</p></body></html>\n"
+            );
+        }
+
         #[test]
         fn uncreatable_output_exits_73() {
             let input = markdown_tempfile(b"# Hi\n", ".md");
@@ -940,11 +1113,12 @@ mod tests {
                 ])
                 .assert()
                 .code(73)
-                // The OS supplies the message tail after the colon.
-                .stderr(contains(format!(
-                    "error: cannot create output `{}`: ",
-                    output.display()
-                )));
+                // The OS supplies the message tail; it must not name the temp file.
+                .stderr(format!(
+                    "error: cannot create output `{}`: {}\n",
+                    output.display(),
+                    std::fs::File::create(&output).unwrap_err()
+                ));
         }
 
         #[cfg(unix)]
