@@ -2,6 +2,7 @@
 
 use std::fs::File;
 use std::io::{BufWriter, Cursor, ErrorKind, Read as _, Write};
+use std::path::Path;
 
 use docspec::{AnyReader, AnyWriter};
 
@@ -24,6 +25,40 @@ where
     output.write_all(b"\n").map_err(Into::into)
 }
 
+/// Whether `a` and `b` name the same existing file, however they are spelled:
+/// `./x` and `x`, absolute and relative, symlinks, and (on Unix) hard links.
+/// A path that does not exist cannot be the other one. Any other lookup error
+/// is returned rather than read as "different files".
+fn same_file(a: &Path, b: &Path) -> Result<bool> {
+    #[cfg(unix)]
+    fn identity(path: &Path) -> std::io::Result<(u64, u64)> {
+        use std::os::unix::fs::MetadataExt as _;
+        std::fs::metadata(path).map(|meta| (meta.dev(), meta.ino()))
+    }
+    #[cfg(not(unix))]
+    fn identity(path: &Path) -> std::io::Result<std::path::PathBuf> {
+        std::fs::canonicalize(path)
+    }
+    let a_id = match identity(a) {
+        Ok(id) => id,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(false),
+        Err(source) => {
+            return Err(CliError::InputUnreadable {
+                path: a.to_path_buf(),
+                source,
+            })
+        }
+    };
+    match identity(b) {
+        Ok(b_id) => Ok(a_id == b_id),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),
+        Err(source) => Err(CliError::OutputUnwritable {
+            path: b.to_path_buf(),
+            source,
+        }),
+    }
+}
+
 /// Executes the `convert` subcommand.
 pub fn run(args: ConvertArgs) -> Result<()> {
     let ConvertArgs {
@@ -35,7 +70,10 @@ pub fn run(args: ConvertArgs) -> Result<()> {
     } = args;
 
     if let (Some(source_path), Some(destination_path)) = (&input_path, &output_path) {
-        if source_path == destination_path {
+        // The literal comparison also refuses a path that does not exist yet.
+        if source_path.as_os_str() != "-"
+            && (source_path == destination_path || same_file(source_path, destination_path)?)
+        {
             return Err(CliError::SameInputOutput);
         }
     }

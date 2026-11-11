@@ -467,6 +467,114 @@ mod tests {
             .stderr("error: input and output paths refer to the same file\n");
     }
 
+    /// Converts `input` onto `output` inside `dir` and asserts the run is
+    /// refused as the same file, with the input bytes left untouched.
+    fn assert_same_file_refused(dir: &std::path::Path, input: &str, output: &str) {
+        docspec_cmd()
+            .current_dir(dir)
+            .args(["convert", input, "-o", output, "--to", "html"])
+            .assert()
+            .code(2)
+            .stderr("error: input and output paths refer to the same file\n");
+        assert_eq!(std::fs::read(dir.join("in.md")).unwrap(), b"# Test\n");
+    }
+
+    #[test]
+    fn same_input_output_through_dot_slash_exits_2() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("in.md"), b"# Test\n").unwrap();
+        assert_same_file_refused(dir.path(), "./in.md", "in.md");
+    }
+
+    #[test]
+    fn same_input_output_through_absolute_path_exits_2() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("in.md"), b"# Test\n").unwrap();
+        let absolute = dir.path().join("in.md");
+        assert_same_file_refused(dir.path(), absolute.to_str().unwrap(), "in.md");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn same_input_output_through_symlink_exits_2() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("in.md"), b"# Test\n").unwrap();
+        std::os::unix::fs::symlink("in.md", dir.path().join("alias.md")).unwrap();
+        assert_same_file_refused(dir.path(), "alias.md", "in.md");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn same_input_output_through_hard_link_exits_2() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("in.md"), b"# Test\n").unwrap();
+        std::fs::hard_link(dir.path().join("in.md"), dir.path().join("link.md")).unwrap();
+        assert_same_file_refused(dir.path(), "in.md", "link.md");
+    }
+
+    #[test]
+    fn same_missing_path_exits_2() {
+        let dir = tempfile::tempdir().unwrap();
+        docspec_cmd()
+            .current_dir(dir.path())
+            .args(["convert", "in.md", "-o", "in.md", "--to", "html"])
+            .assert()
+            .code(2)
+            .stderr("error: input and output paths refer to the same file\n");
+    }
+
+    // The `.xyz` input has no detectable format and no `--from`, so a run that
+    // skipped the lookup error would exit 2 at format detection instead.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn output_lookup_error_is_reported_not_skipped() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("in.xyz"), b"# Test\n").unwrap();
+        std::os::unix::fs::symlink("loop.html", dir.path().join("loop.html")).unwrap();
+        docspec_cmd()
+            .current_dir(dir.path())
+            .args(["convert", "in.xyz", "-o", "loop.html"])
+            .assert()
+            .code(73)
+            .stderr(
+                "error: cannot create output `loop.html`: \
+                 Too many levels of symbolic links (os error 40)\n",
+            );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn input_lookup_error_is_reported_not_skipped() {
+        let dir = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink("loop.xyz", dir.path().join("loop.xyz")).unwrap();
+        docspec_cmd()
+            .current_dir(dir.path())
+            .args(["convert", "loop.xyz", "-o", "out.html"])
+            .assert()
+            .code(74)
+            .stderr(
+                "error: cannot read input `loop.xyz`: \
+                 Too many levels of symbolic links (os error 40)\n",
+            );
+    }
+
+    #[test]
+    fn stdin_dash_with_existing_output_file_is_not_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("out.html"), b"old\n").unwrap();
+        docspec_cmd()
+            .current_dir(dir.path())
+            .args(["convert", "-", "--from", "markdown", "-o", "out.html"])
+            .write_stdin("x\n")
+            .assert()
+            .success()
+            .stderr("");
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("out.html")).unwrap(),
+            "<html><body><p>x</p></body></html>\n"
+        );
+    }
+
     #[test]
     fn unknown_extension_requires_from_flag() {
         let input = markdown_tempfile(b"# Hello\n", ".xyz");
