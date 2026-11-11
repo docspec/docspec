@@ -37,7 +37,7 @@ pub enum AnyReader {
     /// DOCX reader from [`docspec_docx_reader`].
     #[cfg(feature = "docx")]
     Docx(DocxReader),
-    /// Placeholder ODT reader from [`docspec_odt_reader`]; ignores its input.
+    /// ODT reader from [`docspec_odt_reader`]; reads paragraphs only.
     #[cfg(feature = "odt")]
     Odt(OdtReader),
 }

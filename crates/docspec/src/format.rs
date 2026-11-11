@@ -19,7 +19,7 @@ pub enum InputFormat {
     /// Available when the `docx` feature is enabled.
     #[cfg(feature = "docx")]
     Docx,
-    /// ODT — placeholder: the input is ignored and an empty document is emitted.
+    /// ODT — paragraphs only.
     /// Available when the `odt` feature is enabled.
     #[cfg(feature = "odt")]
     Odt,

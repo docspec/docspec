@@ -18,7 +18,7 @@ default = ["markdown", "blocknote", "pandoc-native"]
 markdown = ["dep:docspec-markdown-reader"]
 html = ["dep:docspec-html-reader"]
 docx = ["dep:docspec-docx-reader"]
-# Placeholder: accepts ODT input and emits an empty document.
+# Reads paragraphs only.
 odt = ["dep:docspec-odt-reader"]
 
 # Format writers (event sinks).

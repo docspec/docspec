@@ -86,3 +86,16 @@ Drop a new `.docx` in `docx/docspec/`, add a row to the table above, then run
 `INSTA_UPDATE=unseen cargo test --test snapshots -p docspec-docx-reader`
 to materialise the snapshot, review it with `cargo insta review`, and commit
 the fixture, the snapshot, and this attribution update together.
+
+## DocSpec-Curated ODT Corpus (`odt/docspec/`)
+
+- **Title**: DocSpec ODT Regression Corpus
+- **Author**: DocSpec contributors
+- **License**: ODC-By-1.0 (Open Data Commons Attribution License v1.0) — SPDX identifier `ODC-By-1.0`; canonical text at <https://opendatacommons.org/licenses/by/1-0/>
+- **Source**: Original work, saved from LibreOffice Writer by DocSpec maintainers.
+
+### Fixtures
+
+| Fixture | Primary event coverage |
+|---------|------------------------|
+| `paragraphs.odt` | Paragraphs with a span, a link, an entity reference, and a line break; paragraphs inside a list item and a table cell, flattened. |

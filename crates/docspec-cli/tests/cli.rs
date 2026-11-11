@@ -15,7 +15,7 @@ use tempfile::NamedTempFile;
 
 use serde_json::json;
 
-use docspec_test_utils::{assert_json_eq, synth_docx, synth_docx_with_image_png};
+use docspec_test_utils::{assert_json_eq, synth_docx, synth_docx_with_image_png, synth_odt};
 
 fn docspec_cmd() -> Command {
     let result = Command::cargo_bin("docspec");
@@ -769,8 +769,9 @@ mod tests {
     }
 
     #[test]
-    fn convert_odt_file_yields_empty_blocknote_document() {
-        let input = markdown_tempfile(b"not parsed yet", ".odt");
+    fn convert_odt_file_to_blocknote_stdout() {
+        let bytes = synth_odt("<office:text><text:p>hello</text:p></office:text>");
+        let input = markdown_tempfile(&bytes, ".odt");
 
         docspec_cmd()
             .arg("convert")
@@ -778,7 +779,7 @@ mod tests {
             .args(["--to", "blocknote"])
             .assert()
             .success()
-            .stdout("[]\n");
+            .stdout(concat!(r#"[{"type":"paragraph","content":[{"type":"text","text":"hello","styles":{}}],"children":[]}]"#, "\n"));
     }
 
     #[test]

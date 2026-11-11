@@ -53,7 +53,7 @@ picks the right reader for you.
 | `markdown` | Markdown (CommonMark + GFM tables/strikethrough)                                            | `docspec-markdown-reader` |
 | `html`     | HTML (paragraphs only)                                                                       | `docspec-html-reader`     |
 | `docx`     | DOCX (paragraphs, headings, tables, lists, hyperlinks, images, run styles, color/highlight) | `docspec-docx-reader`     |
-| `odt`      | ODT — placeholder: input is ignored, emits an empty document | `docspec-odt-reader`      |
+| `odt`      | ODT — paragraphs only                                        | `docspec-odt-reader`      |
 
 `DocxReader` is dispatched through `AnyReader::from_reader` and `AnyReader::from_path`. See
 [`docspec-docx-reader`](https://docs.rs/docspec-docx-reader) for the authoritative list of supported and

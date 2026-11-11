@@ -165,7 +165,7 @@ The `.pem` and `.sig` files are attached to the GitHub Release alongside the tar
 release-plz publishes crates in topological dependency order so that each crate's dependencies are already on crates.io before it publishes. The order is:
 
 1. `docspec-core` (leaf, no internal dependencies)
-2. `docspec-zip`, `docspec-json`, `docspec-markdown-reader`, `docspec-html-reader`, `docspec-odt-reader`, `docspec-html-writer`, `docspec-markdown-writer`, `docspec-pandoc-native-writer` (depend only on `docspec-core`), then `docspec-docx-reader` (depends on `docspec-core` and `docspec-zip`)
+2. `docspec-zip`, `docspec-json`, `docspec-markdown-reader`, `docspec-html-reader`, `docspec-html-writer`, `docspec-markdown-writer`, `docspec-pandoc-native-writer` (depend only on `docspec-core`), then `docspec-docx-reader` and `docspec-odt-reader` (depend on `docspec-core` and `docspec-zip`)
 3. `docspec-blocknote-writer`, `docspec-oxa-writer` (depend on `docspec-core` and `docspec-json`)
 4. `docspec` (the facade, depends on readers and writers)
 5. `docspec-cli` and `docspec-http` (depend on the facade and core crates)

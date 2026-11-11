@@ -321,12 +321,12 @@ async fn post_conversion_docx_happy_path() {
 }
 
 #[tokio::test]
-async fn post_conversion_odt_placeholder_returns_empty_document() {
+async fn post_conversion_odt_happy_path() {
     let request = common::request(
         "POST",
         "/conversion",
         &[("content-type", "application/vnd.oasis.opendocument.text")],
-        b"not parsed yet".to_vec(),
+        docspec_test_utils::synth_odt("<office:text><text:p>Hello</text:p></office:text>"),
     );
     let response = app().oneshot(request).await.expect("request succeeds");
     assert_eq!(response.status(), StatusCode::OK);
@@ -338,7 +338,14 @@ async fn post_conversion_odt_placeholder_returns_empty_document() {
         OUTPUT_MIME
     );
     let body = response_body_json(response.into_body()).await;
-    assert_eq!(body, serde_json::json!([]));
+    assert_eq!(
+        body,
+        serde_json::json!([{
+            "type": "paragraph",
+            "content": [{"type": "text", "text": "Hello", "styles": {}}],
+            "children": []
+        }])
+    );
 }
 
 #[tokio::test]

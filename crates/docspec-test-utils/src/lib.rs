@@ -82,6 +82,28 @@ pub fn synth_docx_with_entries(entries: &[(&str, CompressionMethod, &[u8])]) -> 
     writer.finish().expect("finish failed").into_inner()
 }
 
+/// Builds a minimal ODT archive whose `content.xml` is `content_xml`.
+///
+/// # Panics
+///
+/// Panics if the ZIP writer fails (should never happen for in-memory buffers).
+#[inline]
+#[must_use]
+pub fn synth_odt(content_xml: &str) -> Vec<u8> {
+    synth_docx_with_entries(&[
+        (
+            "mimetype",
+            CompressionMethod::Stored,
+            b"application/vnd.oasis.opendocument.text",
+        ),
+        (
+            "content.xml",
+            CompressionMethod::Deflated,
+            content_xml.as_bytes(),
+        ),
+    ])
+}
+
 /// Builds a minimal DOCX archive with an embedded PNG image.
 ///
 /// The synthetic DOCX contains:
