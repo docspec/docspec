@@ -23,18 +23,29 @@ enum TextStyleFrame {
     Flattened,
 }
 
+/// Code whose string literal has been opened in the output and is being
+/// streamed into. Only the escaper's one-character lookahead is held, never the
+/// code itself.
 #[derive(Debug)]
 enum CodeFrame {
-    Block {
-        id: Option<String>,
-        syntax: Option<String>,
-        buffer: String,
-    },
+    /// A `CodeBlock` opened by `StartPreformatted`.
+    Block { literal: escape::HaskellString },
+    /// An inline `Code` opened by a `Code` text style. `nested_style_depth`
+    /// counts text styles opened inside it, which are absorbed into the code.
     Inline {
-        id: Option<String>,
-        buffer: String,
+        literal: escape::HaskellString,
         nested_style_depth: u32,
     },
+}
+
+impl CodeFrame {
+    /// The open string literal, whichever kind of code this is.
+    #[inline]
+    const fn literal_mut(&mut self) -> &mut escape::HaskellString {
+        match self {
+            Self::Block { literal } | Self::Inline { literal, .. } => literal,
+        }
+    }
 }
 
 /// A streaming Pandoc native writer for `DocSpec` events.
@@ -95,37 +106,31 @@ impl<W: Write> PandocNativeWriter<W> {
         Ok(())
     }
 
+    /// Escapes `content` straight into the open code string literal.
+    #[inline]
+    fn write_code_text(&mut self, content: &str) -> Result<()> {
+        if let Some(frame) = self.code_frame.as_mut() {
+            frame.literal_mut().write(&mut self.writer, content)?;
+        }
+        Ok(())
+    }
+
     #[inline]
     fn handle_event_in_code_frame(&mut self, event: Event) -> Result<()> {
         match event {
-            Event::Text { content } => {
-                if let Some(frame) = self.code_frame.as_mut() {
-                    let buffer = match frame {
-                        CodeFrame::Block { buffer, .. } | CodeFrame::Inline { buffer, .. } => {
-                            buffer
-                        }
-                    };
-                    buffer.push_str(&content);
-                }
-            }
+            Event::Text { content } => self.write_code_text(&content)?,
             // A break inside code is part of the code string. In a code block both
             // kinds end a line, as in the BlockNote writer. In inline code a hard
             // break is a newline (Pandoc's DOCX reader does the same) and a soft
             // break is a space (CommonMark §6.1: line endings in code spans).
-            Event::LineBreak => {
-                if let Some(CodeFrame::Block { buffer, .. } | CodeFrame::Inline { buffer, .. }) =
-                    self.code_frame.as_mut()
-                {
-                    buffer.push('\n');
-                }
-            }
+            Event::LineBreak => self.write_code_text("\n")?,
             Event::SoftBreak => {
-                if let Some(frame) = self.code_frame.as_mut() {
-                    match frame {
-                        CodeFrame::Block { buffer, .. } => buffer.push('\n'),
-                        CodeFrame::Inline { buffer, .. } => buffer.push(' '),
-                    }
-                }
+                let separator = if matches!(&self.code_frame, Some(CodeFrame::Inline { .. })) {
+                    " "
+                } else {
+                    "\n"
+                };
+                self.write_code_text(separator)?;
             }
             Event::StartTextStyle { .. } => {
                 if let Some(CodeFrame::Inline {
@@ -141,11 +146,11 @@ impl<W: Write> PandocNativeWriter<W> {
                 }) if *nested_style_depth > 0 => {
                     *nested_style_depth = nested_style_depth.saturating_sub(1);
                 }
-                Some(CodeFrame::Inline { .. }) => self.flush_code_frame()?,
+                Some(CodeFrame::Inline { .. }) => self.close_code_frame()?,
                 _ => {}
             },
             Event::EndPreformatted if matches!(&self.code_frame, Some(CodeFrame::Block { .. })) => {
-                self.flush_code_frame()?;
+                self.close_code_frame()?;
             }
             _ => {}
         }
@@ -153,11 +158,15 @@ impl<W: Write> PandocNativeWriter<W> {
     }
 
     #[inline]
-    fn handle_start_text_style(&mut self, kind: &TextStyleKind, id: Option<String>) -> Result<()> {
+    fn handle_start_text_style(&mut self, kind: &TextStyleKind, id: Option<&str>) -> Result<()> {
         if matches!(kind, TextStyleKind::Code) {
+            self.write_inline_separator()?;
+            self.writer.write_all(b"Code ")?;
+            self.write_attr(id, &[])?;
+            self.writer.write_all(b" ")?;
+            let literal = escape::HaskellString::open(&mut self.writer)?;
             self.code_frame = Some(CodeFrame::Inline {
-                id,
-                buffer: String::new(),
+                literal,
                 nested_style_depth: 0,
             });
             return Ok(());
@@ -199,12 +208,12 @@ impl<W: Write> PandocNativeWriter<W> {
         Ok(())
     }
 
-    /// Closes the open paragraph or heading: flushes pending inline code, closes
+    /// Closes the open paragraph or heading: closes open inline code, closes
     /// any orphaned text-style wrappers, and writes the block's closing `]`.
     #[inline]
     fn close_inline_block(&mut self) -> Result<()> {
         if matches!(&self.code_frame, Some(CodeFrame::Inline { .. })) {
-            self.flush_code_frame()?;
+            self.close_code_frame()?;
         }
         self.close_orphaned_inline_frames()?;
         self.writer.write_all(b"]")?;
@@ -216,7 +225,7 @@ impl<W: Write> PandocNativeWriter<W> {
     #[inline]
     fn handle_end_document(&mut self) -> Result<()> {
         if matches!(&self.code_frame, Some(CodeFrame::Inline { .. })) {
-            self.flush_code_frame()?;
+            self.close_code_frame()?;
         }
         while !self.inline_has_content.is_empty() {
             self.writer.write_all(b"]")?;
@@ -224,49 +233,33 @@ impl<W: Write> PandocNativeWriter<W> {
         }
         self.text_style_frames.clear();
         self.inline_block = None;
-        if self.code_frame.is_some() {
-            self.flush_code_frame()?;
-        }
+        self.close_code_frame()?;
         self.writer.write_all(b"]")?;
         self.finished = true;
         Ok(())
     }
 
     #[inline]
-    fn handle_start_preformatted(
-        &mut self,
-        id: Option<String>,
-        syntax: Option<String>,
-    ) -> Result<()> {
+    fn handle_start_preformatted(&mut self, id: Option<&str>, syntax: Option<&str>) -> Result<()> {
         self.write_block_separator()?;
-        self.code_frame = Some(CodeFrame::Block {
-            id,
-            syntax,
-            buffer: String::new(),
-        });
+        self.writer.write_all(b"CodeBlock ")?;
+        match syntax {
+            Some(s) => self.write_attr(id, &[s])?,
+            None => self.write_attr(id, &[])?,
+        }
+        self.writer.write_all(b" ")?;
+        let literal = escape::HaskellString::open(&mut self.writer)?;
+        self.code_frame = Some(CodeFrame::Block { literal });
         Ok(())
     }
 
+    /// Writes the closing `"` of the open code string, if any, and leaves code.
     #[inline]
-    fn flush_code_frame(&mut self) -> Result<()> {
-        match self.code_frame.take() {
-            Some(CodeFrame::Block { id, syntax, buffer }) => {
-                self.writer.write_all(b"CodeBlock ")?;
-                match syntax.as_deref() {
-                    Some(s) => self.write_attr(id.as_deref(), &[s])?,
-                    None => self.write_attr(id.as_deref(), &[])?,
-                }
-                self.writer.write_all(b" ")?;
-                escape::write_haskell_string(&mut self.writer, &buffer)?;
-            }
-            Some(CodeFrame::Inline { id, buffer, .. }) => {
-                self.write_inline_separator()?;
-                self.writer.write_all(b"Code ")?;
-                self.write_attr(id.as_deref(), &[])?;
-                self.writer.write_all(b" ")?;
-                escape::write_haskell_string(&mut self.writer, &buffer)?;
-            }
-            None => {}
+    fn close_code_frame(&mut self) -> Result<()> {
+        if let Some(CodeFrame::Block { literal } | CodeFrame::Inline { literal, .. }) =
+            self.code_frame.take()
+        {
+            literal.close(&mut self.writer)?;
         }
         Ok(())
     }
@@ -384,10 +377,10 @@ impl<W: Write> EventSink for PandocNativeWriter<W> {
                 self.close_inline_block()?;
             }
             Event::StartTextStyle { kind, id } if !self.inline_has_content.is_empty() => {
-                self.handle_start_text_style(&kind, id)?;
+                self.handle_start_text_style(&kind, id.as_deref())?;
             }
             Event::StartPreformatted { id, syntax } if self.can_start_block() => {
-                self.handle_start_preformatted(id, syntax)?;
+                self.handle_start_preformatted(id.as_deref(), syntax.as_deref())?;
             }
             Event::EndTextStyle => match self.text_style_frames.pop() {
                 Some(TextStyleFrame::Wrapped) => {
