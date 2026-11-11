@@ -7,23 +7,25 @@
 //!
 //! # Scope
 //!
-//! Only paragraphs are read for now.
+//! Only paragraphs and headings are read for now.
 //!
-//! **In scope**: paragraphs (`<text:p>`), their text, spans and links
+//! **In scope**: paragraphs (`<text:p>`), headings (`<text:h>`, with the level
+//! from `text:outline-level`, 1 when absent), their text, spans and links
 //! (`<text:span>`, `<text:a>` — transparent, their text is emitted unstyled
 //! and unlinked), repeated spaces (`<text:s>`), tabs (`<text:tab>`, emitted as
 //! a `Text` event whose content is `"\t"`), and line breaks
 //! (`<text:line-break>`).
-//! Emits: `StartDocument`, `StartParagraph`, `Text`, `LineBreak`,
-//! `EndParagraph`, `EndDocument`.
+//! Emits: `StartDocument`, `StartParagraph`, `StartHeading`, `Text`,
+//! `LineBreak`, `EndParagraph`, `EndHeading`, `EndDocument`.
 //!
-//! Paragraphs inside lists, table cells, and sections come out as plain,
-//! flat paragraphs.
+//! Paragraphs and headings inside lists, table cells, and sections come out
+//! flat, as if they were at the top level.
 //!
 //! **Out of scope (silently dropped)**:
-//! - Headings (`<text:h>`)
-//! - Every other element inside a paragraph, with its subtree: notes, frames,
-//!   images, annotations, and fields
+//! - Every other element inside a paragraph or heading, with its subtree:
+//!   notes, frames, images, annotations, and fields
+//! - Paragraphs styled to look like headings (a `<text:p>` with a heading
+//!   style) — emitted as paragraphs
 //! - Tracked changes (`<text:tracked-changes>`) — accept-changes semantics
 //! - Styles, alignment, link targets, and document metadata
 //! - Flat ODT (`.fodt`) and encrypted documents
@@ -53,6 +55,8 @@
 //! ```
 
 use core::fmt::Display;
+use core::num::NonZeroU8;
+use core::str::FromStr;
 use std::io::{BufReader, Cursor, Read, Seek};
 use std::path::Path;
 
@@ -78,6 +82,15 @@ enum Phase {
     Finished,
 }
 
+/// The block whose inline content is being read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Block {
+    /// Inside `<text:p>`.
+    Paragraph,
+    /// Inside `<text:h>`.
+    Heading,
+}
+
 /// A streaming ODT reader that implements [`EventSource`].
 ///
 /// See the crate-level docs for the elements it recognizes.
@@ -90,7 +103,8 @@ pub struct OdtReader {
     xml: quick_xml::Reader<BufReader<Box<dyn Read + Send>>>,
     scratch: Vec<u8>,
     phase: Phase,
-    in_paragraph: bool,
+    /// The open paragraph or heading, if any. Blocks never nest.
+    block: Option<Block>,
     /// Nesting depth inside a subtree that is being dropped; 0 when not skipping.
     skip_depth: usize,
     /// Elements opened and not yet closed; nonzero at EOF means a cut-off file.
@@ -164,7 +178,7 @@ impl OdtReader {
             xml,
             scratch: Vec::new(),
             phase: Phase::NotStarted,
-            in_paragraph: false,
+            block: None,
             skip_depth: 0,
             open_elements: 0,
             saw_root: false,
@@ -218,20 +232,32 @@ impl EventSource for OdtReader {
                     None
                 }
                 _ if self.skip_depth > 0 => None,
-                XmlEvent::Start(start) => match (self.in_paragraph, start.local_name().as_ref()) {
+                XmlEvent::Start(start) => match (self.block.is_some(), start.local_name().as_ref())
+                {
                     (false, b"p") => {
-                        self.in_paragraph = true;
+                        self.block = Some(Block::Paragraph);
                         Some(Event::StartParagraph {
                             alignment: None,
                             id: None,
                         })
+                    }
+                    (false, b"h") => {
+                        // Absent means level 1; zero is not a level.
+                        let level = number::<NonZeroU8>(&self.xml, &start, "outline-level")?
+                            .map_or(1, NonZeroU8::get);
+                        self.block = Some(Block::Heading);
+                        Some(Event::StartHeading { id: None, level })
                     }
                     (false, b"tracked-changes") => {
                         self.skip_depth = 1;
                         None
                     }
                     (false, _) | (true, b"span" | b"a") => None,
-                    (true, b"s") => text(" ".repeat(space_count(&start)?)),
+                    (true, b"s") => {
+                        // `u16` bounds the allocation a hostile count could force.
+                        let count = number::<u16>(&self.xml, &start, "c")?.map_or(1, usize::from);
+                        text(" ".repeat(count))
+                    }
                     (true, b"tab") => text("\t".to_string()),
                     (true, b"line-break") => Some(Event::LineBreak),
                     // Notes and frames hold paragraphs of their own, which must not nest.
@@ -240,19 +266,26 @@ impl EventSource for OdtReader {
                         None
                     }
                 },
-                XmlEvent::End(end) if self.in_paragraph && end.local_name().as_ref() == b"p" => {
-                    self.in_paragraph = false;
-                    Some(Event::EndParagraph)
-                }
+                XmlEvent::End(end) => match (self.block, end.local_name().as_ref()) {
+                    (Some(Block::Paragraph), b"p") => {
+                        self.block = None;
+                        Some(Event::EndParagraph)
+                    }
+                    (Some(Block::Heading), b"h") => {
+                        self.block = None;
+                        Some(Event::EndHeading)
+                    }
+                    _ => None,
+                },
                 // shortcut: ODF whitespace collapsing is not applied, upgrade when a real
                 // file shows doubled spaces.
-                XmlEvent::Text(raw) if self.in_paragraph => {
+                XmlEvent::Text(raw) if self.block.is_some() => {
                     text(raw.decode().map_err(malformed)?.into_owned())
                 }
-                XmlEvent::CData(raw) if self.in_paragraph => {
+                XmlEvent::CData(raw) if self.block.is_some() => {
                     text(raw.decode().map_err(malformed)?.into_owned())
                 }
-                XmlEvent::GeneralRef(reference) if self.in_paragraph => {
+                XmlEvent::GeneralRef(reference) if self.block.is_some() => {
                     text(docspec_xml::resolve_reference(CONTEXT, &reference)?)
                 }
                 _ => None,
@@ -269,17 +302,24 @@ fn text(content: String) -> Option<Event> {
     (!content.is_empty()).then_some(Event::Text { content })
 }
 
-/// The number of spaces a `<text:s>` element stands for: its `text:c`, or 1.
-fn space_count(start: &BytesStart<'_>) -> Result<usize> {
-    let Some(attribute) = start.try_get_attribute("text:c").map_err(malformed)? else {
-        return Ok(1);
-    };
-    // `u16` bounds the allocation a hostile count could force.
-    core::str::from_utf8(&attribute.value)
-        .ok()
-        .and_then(|value| value.parse::<u16>().ok())
-        .map(usize::from)
-        .ok_or_else(|| malformed("invalid text:c"))
+/// The numeric value of the text-namespace attribute `name`, or `None` when it
+/// is absent. Matched by local name, like elements, so any prefix works.
+fn number<T>(
+    xml: &quick_xml::Reader<impl Read>,
+    start: &BytesStart<'_>,
+    name: &str,
+) -> Result<Option<T>>
+where
+    T: FromStr,
+{
+    docspec_xml::attr_string(xml, start, name.as_bytes(), CONTEXT)?
+        .map(|value| {
+            value
+                .parse()
+                .ok()
+                .ok_or_else(|| malformed(format!("invalid text:{name}")))
+        })
+        .transpose()
 }
 
 /// Builds a position-less parse error for `content.xml`.

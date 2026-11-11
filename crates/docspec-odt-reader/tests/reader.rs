@@ -80,6 +80,14 @@ fn paragraph(content: &str) -> Vec<Event> {
     vec![start_paragraph(), text(content), Event::EndParagraph]
 }
 
+fn heading(level: u8, content: &str) -> Vec<Event> {
+    vec![
+        Event::StartHeading { id: None, level },
+        text(content),
+        Event::EndHeading,
+    ]
+}
+
 fn odt_file(bytes: &[u8]) -> tempfile::NamedTempFile {
     let mut file = tempfile::NamedTempFile::new().unwrap();
     file.write_all(bytes).unwrap();
@@ -195,13 +203,140 @@ fn paragraphs_in_lists_tables_and_sections_are_flattened() {
 }
 
 #[test]
-fn headings_and_text_outside_paragraphs_are_dropped() {
+fn text_outside_a_block_is_dropped() {
     assert_eq!(
-        body_events(
-            r#"<text:h text:outline-level="1">Title &amp; <![CDATA[more]]></text:h><text:p>body</text:p>"#
-        ),
+        body_events("stray &amp; <![CDATA[more]]><text:p>body</text:p>"),
         paragraph("body")
     );
+}
+
+#[test]
+fn headings_carry_their_outline_level() {
+    assert_eq!(
+        body_events(concat!(
+            r#"<text:h text:outline-level="1">one</text:h>"#,
+            r#"<text:p>body</text:p>"#,
+            r#"<text:h text:outline-level="3">three</text:h>"#,
+            r#"<text:h>default</text:h>"#,
+            r#"<text:h text:outline-level="10">ten</text:h>"#
+        )),
+        [
+            heading(1, "one"),
+            paragraph("body"),
+            heading(3, "three"),
+            heading(1, "default"),
+            heading(10, "ten"),
+        ]
+        .concat()
+    );
+}
+
+#[test]
+fn heading_inline_content_is_read_like_a_paragraph() {
+    assert_eq!(
+        body_events(concat!(
+            r#"<text:h text:outline-level="2"><text:bookmark-start text:name="x"/>a"#,
+            r#"<text:span>b</text:span><text:a xlink:href="x">c</text:a><text:s text:c="2"/>"#,
+            r#"<text:tab/>&amp;<text:line-break/><text:note><text:note-body>"#,
+            r#"<text:p>footnote</text:p></text:note-body></text:note>d</text:h>"#
+        )),
+        vec![
+            Event::StartHeading { id: None, level: 2 },
+            text("a"),
+            text("b"),
+            text("c"),
+            text("  "),
+            text("\t"),
+            text("&"),
+            Event::LineBreak,
+            text("d"),
+            Event::EndHeading,
+        ]
+    );
+}
+
+#[test]
+fn headings_in_lists_are_flattened() {
+    assert_eq!(
+        body_events(concat!(
+            r#"<text:list><text:list-item><text:h text:outline-level="2">numbered</text:h>"#,
+            r#"</text:list-item></text:list>"#
+        )),
+        heading(2, "numbered")
+    );
+}
+
+#[test]
+fn blocks_do_not_nest() {
+    assert_eq!(
+        body_events(concat!(
+            r#"<text:p>a<draw:frame><draw:text-box><text:h text:outline-level="1">boxed</text:h>"#,
+            r#"</draw:text-box></draw:frame>b</text:p>"#,
+            r#"<text:h>c<text:p>inner</text:p>d</text:h>"#
+        )),
+        [
+            vec![start_paragraph(), text("a"), text("b"), Event::EndParagraph],
+            vec![
+                Event::StartHeading { id: None, level: 1 },
+                text("c"),
+                text("d"),
+                Event::EndHeading,
+            ],
+        ]
+        .concat()
+    );
+}
+
+#[test]
+fn attributes_match_any_prefix_bound_to_the_text_namespace() {
+    let bytes = synth_odt(concat!(
+        r#"<office:document-content"#,
+        r#" xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0""#,
+        r#" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#,
+        r#"<office:body><office:text>"#,
+        r#"<t:h t:outline-level="2">a</t:h><t:p>b<t:s t:c="3"/>c</t:p>"#,
+        r#"</office:text></office:body></office:document-content>"#
+    ));
+    let events = collect_events(&mut OdtReader::from_reader(Cursor::new(bytes)).unwrap());
+    assert_eq!(
+        events,
+        [
+            vec![start_document()],
+            heading(2, "a"),
+            vec![
+                start_paragraph(),
+                text("b"),
+                text("   "),
+                text("c"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ],
+        ]
+        .concat()
+    );
+}
+
+#[test]
+fn invalid_outline_level_is_a_parse_error() {
+    for level in ["0", "x", "300"] {
+        assert_eq!(
+            parse_error(&format!(
+                r#"<text:h text:outline-level="{level}">a</text:h>"#
+            )),
+            "malformed content.xml: invalid text:outline-level"
+        );
+    }
+}
+
+#[test]
+fn eof_inside_a_heading_is_a_parse_error() {
+    let bytes = synth_odt("<text:h>unfinished");
+    let mut reader = OdtReader::from_reader(Cursor::new(bytes)).unwrap();
+    let Err(Error::Parse { message, position }) = try_collect_events(&mut reader) else {
+        panic!("expected a parse error");
+    };
+    assert_eq!(message, "malformed content.xml: unexpected end of file");
+    assert_eq!(position, None);
 }
 
 #[test]
@@ -440,6 +575,37 @@ fn reads_a_document_saved_by_libreoffice() {
             ],
             paragraph("List item"),
             paragraph("Cell"),
+            paragraph("Last paragraph."),
+            vec![Event::EndDocument],
+        ]
+        .concat()
+    );
+}
+
+#[test]
+fn reads_headings_saved_by_libreoffice() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tests/fixtures/odt/docspec/headings.odt"
+    );
+    let from_path = collect_events(&mut OdtReader::from_path(path).unwrap());
+    let bytes = std::fs::read(path).unwrap();
+    let from_reader = collect_events(&mut OdtReader::from_reader(Cursor::new(bytes)).unwrap());
+    assert_eq!(from_path, from_reader);
+    assert_eq!(
+        from_path,
+        [
+            vec![start_document()],
+            heading(1, "Title"),
+            paragraph("Intro paragraph."),
+            vec![
+                Event::StartHeading { id: None, level: 2 },
+                text("Section with "),
+                text("emphasis"),
+                Event::EndHeading,
+            ],
+            paragraph("Body paragraph."),
+            heading(3, "Subsection"),
             paragraph("Last paragraph."),
             vec![Event::EndDocument],
         ]

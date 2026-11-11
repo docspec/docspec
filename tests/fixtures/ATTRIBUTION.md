@@ -98,4 +98,5 @@ the fixture, the snapshot, and this attribution update together.
 
 | Fixture | Primary event coverage |
 |---------|------------------------|
+| `headings.odt` | Headings at levels 1 to 3 (`text:h` with `text:outline-level`), one with a span and each with a bookmark inside, interleaved with paragraphs. |
 | `paragraphs.odt` | Paragraphs with a span, a link, an entity reference, and a line break; paragraphs inside a list item and a table cell, flattened. |
