@@ -129,6 +129,7 @@ reach for the individual crates when you want the smallest possible dependency f
 - [`docspec`](crates/docspec) — convenience facade; readers, writers, and core types behind feature flags
 - [`docspec-core`](crates/docspec-core) — the event model, the `EventSource`/`EventSink` traits, and the streaming pipeline
 - [`docspec-zip`](crates/docspec-zip) — ZIP container access shared by the DOCX and ODT readers
+- [`docspec-xml`](crates/docspec-xml) — XML error and decoding helpers shared by the DOCX and ODT readers
 
 **Readers**
 

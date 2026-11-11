@@ -9,6 +9,7 @@ use docspec_core::{Error, Result};
 use zip::result::ZipError;
 use zip::ZipArchive;
 
+use docspec_xml::parse_error;
 use docspec_zip::{open_archive, read_optional_entry, ReadSeek, StreamingArchive};
 
 use crate::content_types;
@@ -197,13 +198,6 @@ where
     R: Read + Seek,
 {
     path.map_or(Ok(None), |path| read_optional_entry(archive, path))
-}
-
-fn parse_error(message: String) -> Error {
-    Error::Parse {
-        message,
-        position: None,
-    }
 }
 
 #[cfg(test)]

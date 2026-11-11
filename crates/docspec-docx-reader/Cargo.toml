@@ -13,8 +13,9 @@ exclude = ["tests/fixtures/**", "tests/snapshots/**"]
 
 [dependencies]
 docspec-core = { workspace = true }
+docspec-xml = { workspace = true }
 docspec-zip = { workspace = true }
-quick-xml = "0.41"
+quick-xml = { workspace = true }
 zip = { version = "9", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]

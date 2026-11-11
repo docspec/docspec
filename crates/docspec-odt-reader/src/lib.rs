@@ -59,10 +59,13 @@ use std::path::Path;
 pub use docspec_core::EventSource;
 use docspec_core::{Error, Event, Result};
 use docspec_zip::{open_archive, read_optional_entry, StreamingArchive};
-use quick_xml::events::{BytesRef, BytesStart, Event as XmlEvent};
+use quick_xml::events::{BytesStart, Event as XmlEvent};
 
 /// The archive entry holding the document body.
 const CONTENT_ENTRY: &str = "content.xml";
+
+/// Starts every error about malformed `content.xml` content.
+const CONTEXT: &str = "malformed content.xml";
 
 /// Which part of the stream comes next.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -189,7 +192,7 @@ impl EventSource for OdtReader {
             let token = self
                 .xml
                 .read_event_into(&mut self.scratch)
-                .map_err(xml_error)?;
+                .map_err(|err| docspec_xml::xml_error(CONTEXT, err))?;
             match token {
                 XmlEvent::Start(_) => {
                     self.open_elements = self.open_elements.saturating_add(1);
@@ -250,7 +253,7 @@ impl EventSource for OdtReader {
                     text(raw.decode().map_err(malformed)?.into_owned())
                 }
                 XmlEvent::GeneralRef(reference) if self.in_paragraph => {
-                    text(resolve_reference(&reference)?)
+                    text(docspec_xml::resolve_reference(CONTEXT, &reference)?)
                 }
                 _ => None,
             };
@@ -279,33 +282,10 @@ fn space_count(start: &BytesStart<'_>) -> Result<usize> {
         .ok_or_else(|| malformed("invalid text:c"))
 }
 
-/// Resolves an entity or character reference to the text it stands for.
-fn resolve_reference(reference: &BytesRef<'_>) -> Result<String> {
-    // quick-xml hands over the name without its delimiters; restoring them
-    // reuses its entity table.
-    let escaped = format!("&{};", reference.decode().map_err(malformed)?);
-    Ok(quick_xml::escape::unescape(&escaped)
-        .map_err(malformed)?
-        .into_owned())
-}
-
 /// Builds a position-less parse error for `content.xml`.
 fn malformed<E>(err: E) -> Error
 where
     E: Display,
 {
-    Error::Parse {
-        message: format!("malformed {CONTENT_ENTRY}: {err}"),
-        position: None,
-    }
-}
-
-/// Converts a quick-xml failure, preserving the I/O error kind.
-fn xml_error(err: quick_xml::Error) -> Error {
-    match err {
-        quick_xml::Error::Io(source) => Error::Io {
-            source: std::io::Error::new(source.kind(), source.to_string()),
-        },
-        other => malformed(other),
-    }
+    docspec_xml::malformed(CONTEXT, err)
 }

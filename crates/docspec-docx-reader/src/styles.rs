@@ -4,7 +4,7 @@ use docspec_core::Result;
 use quick_xml::events::Event;
 use quick_xml::XmlVersion;
 
-use crate::document::xml::parse_error;
+use docspec_xml::{malformed, parse_error};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -100,7 +100,7 @@ impl StyleList {
                 Ok(Event::Eof) => break,
 
                 Err(err) => {
-                    return Err(parse_error(format!("malformed styles.xml: {err}")));
+                    return Err(malformed("malformed styles.xml", err));
                 }
                 Ok(_) => {}
             }
@@ -161,7 +161,7 @@ where
                 return Err(parse_error("unexpected EOF inside <w:style>".to_string()));
             }
             Err(err) => {
-                return Err(parse_error(format!("malformed styles.xml: {err}")));
+                return Err(malformed("malformed styles.xml", err));
             }
             Ok(_) => {}
         }

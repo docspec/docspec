@@ -832,6 +832,7 @@ dependencies = [
  "docspec-blocknote-writer",
  "docspec-core",
  "docspec-test-utils",
+ "docspec-xml",
  "docspec-zip",
  "insta",
  "quick-xml",
@@ -920,6 +921,7 @@ version = "2.0.0-rc.2"
 dependencies = [
  "docspec-core",
  "docspec-test-utils",
+ "docspec-xml",
  "docspec-zip",
  "quick-xml",
  "tempfile",
@@ -963,6 +965,14 @@ dependencies = [
  "docspec-test-utils",
  "serde_json",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "docspec-xml"
+version = "2.0.0-rc.2"
+dependencies = [
+ "docspec-core",
+ "quick-xml",
 ]
 
 [[package]]

@@ -12,7 +12,7 @@ use std::io::Read;
 use docspec_core::Error;
 use quick_xml::events::{BytesStart, Event};
 
-use crate::document::xml::{attr_string, parse_error};
+use docspec_xml::{attr_string, parse_error};
 
 /// Error prefix for every malformed relationship part, root or document-level.
 const RELS_ERROR_CONTEXT: &str = "malformed _rels/.rels";

@@ -6,10 +6,11 @@
 //! descent and take only the cursor and the resolved font they actually need.
 
 use docspec_core::Result;
-use quick_xml::events::{BytesRef, BytesStart};
+use docspec_xml::{malformed, resolve_reference};
+use quick_xml::events::BytesStart;
 
 use super::input::XmlCursor;
-use super::{parse_error, read_attribute, unexpected_eof};
+use super::{read_attribute, unexpected_eof, DOCUMENT_CONTEXT};
 use crate::symbol_fonts::SymbolFont;
 
 /// Reads the character data of the currently open `<w:t>` element.
@@ -25,19 +26,19 @@ pub(super) fn collect_text_content(input: &mut XmlCursor) -> Result<String> {
             quick_xml::events::Event::Text(text) => {
                 let decoded = text
                     .decode()
-                    .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
+                    .map_err(|err| malformed(DOCUMENT_CONTEXT, err))?;
                 let unescaped = quick_xml::escape::unescape(&decoded)
-                    .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
+                    .map_err(|err| malformed(DOCUMENT_CONTEXT, err))?;
                 content.push_str(&unescaped);
             }
             quick_xml::events::Event::CData(cdata) => {
                 let bytes = cdata.into_inner();
-                let text = core::str::from_utf8(&bytes)
-                    .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
+                let text =
+                    core::str::from_utf8(&bytes).map_err(|err| malformed(DOCUMENT_CONTEXT, err))?;
                 content.push_str(text);
             }
             quick_xml::events::Event::GeneralRef(reference) => {
-                content.push_str(&decode_general_ref(&reference)?);
+                content.push_str(&resolve_reference(DOCUMENT_CONTEXT, &reference)?);
             }
             quick_xml::events::Event::End(end) if end.local_name().as_ref() == b"t" => {
                 return Ok(content);
@@ -83,20 +84,6 @@ pub(super) fn normalize_symbol_text(font: Option<SymbolFont>, text: String) -> S
         }
     }
     out
-}
-
-/// Resolves an XML entity reference to the text it stands for.
-///
-/// `quick-xml` surfaces the reference name without its delimiters, so they are
-/// restored before unescaping to reuse the standard entity table.
-pub(super) fn decode_general_ref(reference: &BytesRef<'_>) -> Result<String> {
-    let decoded = reference
-        .decode()
-        .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
-    let escaped = format!("&{decoded};");
-    let unescaped = quick_xml::escape::unescape(&escaped)
-        .map_err(|err| parse_error(format!("malformed document.xml: {err}")))?;
-    Ok(unescaped.into_owned())
 }
 
 /// Resolves a `<w:sym>` element to its Unicode character.
