@@ -171,11 +171,8 @@ impl HtmlReader {
             alignment: None,
             id: None,
         });
+        // HTML ignores the self-closing flag on `<p/>`: it is a plain start tag.
         self.in_paragraph = true;
-        if tag.self_closing {
-            self.queue.push_back(Event::EndParagraph);
-            self.in_paragraph = false;
-        }
     }
 
     /// Translates a text token into a queued event.

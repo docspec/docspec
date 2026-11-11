@@ -300,6 +300,39 @@ mod tests {
     }
 
     #[test]
+    fn self_closing_p_inside_paragraph_opens_new_paragraph() {
+        // <p/> is a plain <p> start tag in HTML: it closes "a" and opens a
+        // paragraph that holds "b"; the final </p> closes that one.
+        assert_eq!(
+            collect_events("<p>a<p/>b</p>"),
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("a"),
+                Event::EndParagraph,
+                start_paragraph(),
+                text("b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn self_closing_p_keeps_following_text() {
+        assert_eq!(
+            collect_events("<p/>b"),
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("b"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
     fn trailing_p_start_tag_opens_empty_paragraph_closed_at_eof() {
         assert_eq!(
             collect_events("<p>a<p>"),
@@ -470,8 +503,8 @@ mod tests {
 
     #[test]
     fn self_closing_p_slash() {
-        // html5gum emits StartTag { self_closing: true } for <p />, so the
-        // implementation immediately follows StartParagraph with EndParagraph.
+        // HTML ignores the self-closing flag on <p />: it opens a paragraph
+        // that stays empty and is closed at EOF.
         let events = collect_events("<p />");
         assert_eq!(
             events,
