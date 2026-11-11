@@ -523,15 +523,17 @@ mod tests {
             .stderr("error: input and output paths refer to the same file\n");
     }
 
-    #[cfg(unix)]
+    // The `.xyz` input has no detectable format and no `--from`, so a run that
+    // skipped the lookup error would exit 2 at format detection instead.
+    #[cfg(target_os = "linux")]
     #[test]
     fn output_lookup_error_is_reported_not_skipped() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("in.md"), b"# Test\n").unwrap();
+        std::fs::write(dir.path().join("in.xyz"), b"# Test\n").unwrap();
         std::os::unix::fs::symlink("loop.html", dir.path().join("loop.html")).unwrap();
         docspec_cmd()
             .current_dir(dir.path())
-            .args(["convert", "in.md", "-o", "loop.html"])
+            .args(["convert", "in.xyz", "-o", "loop.html"])
             .assert()
             .code(73)
             .stderr(
@@ -540,18 +542,18 @@ mod tests {
             );
     }
 
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     #[test]
     fn input_lookup_error_is_reported_not_skipped() {
         let dir = tempfile::tempdir().unwrap();
-        std::os::unix::fs::symlink("loop.md", dir.path().join("loop.md")).unwrap();
+        std::os::unix::fs::symlink("loop.xyz", dir.path().join("loop.xyz")).unwrap();
         docspec_cmd()
             .current_dir(dir.path())
-            .args(["convert", "loop.md", "-o", "out.html"])
+            .args(["convert", "loop.xyz", "-o", "out.html"])
             .assert()
             .code(74)
             .stderr(
-                "error: cannot read input `loop.md`: \
+                "error: cannot read input `loop.xyz`: \
                  Too many levels of symbolic links (os error 40)\n",
             );
     }
