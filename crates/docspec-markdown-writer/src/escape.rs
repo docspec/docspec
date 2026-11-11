@@ -3,9 +3,22 @@
 use std::io::{self, Write};
 
 use core::iter::Peekable;
-use core::str::Chars;
 
 const REPLACEMENT_CHARACTER: &[u8] = "\u{FFFD}".as_bytes();
+
+/// Whitespace dropped at a block start: `CommonMark` strips it from paragraph
+/// content anyway, and four spaces or a tab would open an indented code block.
+pub(crate) const BLOCK_START_WHITESPACE: [char; 4] = [' ', '\t', '\r', '\n'];
+
+/// Whether `text` could still become an ordered-list marker and needs more
+/// text to classify: nothing yet, or 1–9 digits optionally followed by `.`/`)`
+/// with the separator not seen yet.
+pub(crate) fn block_start_undecided(text: &str) -> bool {
+    let rest = text.trim_start_matches(BLOCK_START_WHITESPACE);
+    let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+    let tail = rest.trim_start_matches(|ch: char| ch.is_ascii_digit());
+    matches!((digits, tail), (0, "") | (1..=9, "" | "." | ")"))
+}
 
 /// Writes `text` with inline-sensitive `CommonMark` punctuation escaped.
 ///
@@ -25,21 +38,32 @@ where
 /// Writes `text` with inline-sensitive and block-start-sensitive `CommonMark`
 /// punctuation escaped.
 ///
+/// Drops leading whitespace, then escapes a first character that would open a
+/// heading, block quote, list item, thematic break or fenced code block, and
+/// the `.`/`)` of an ordered-list marker. An end of text right after the
+/// marker counts as the list separator, so pass the whole block start or hold
+/// it while [`block_start_undecided`] is true. `head` and `tail` are escaped
+/// as one text, so a held prefix never needs to be joined with what follows.
+///
 /// Normalizes NUL and line endings before escaping and streams output without
 /// accumulating the whole escaped text.
-pub(crate) fn write_escaped_block_start<W>(writer: &mut W, text: &str) -> io::Result<()>
+pub(crate) fn write_escaped_block_start<W>(writer: &mut W, head: &str, tail: &str) -> io::Result<()>
 where
     W: Write,
 {
-    let mut chars = text.chars().peekable();
+    let mut chars = head
+        .chars()
+        .chain(tail.chars())
+        .skip_while(|ch| BLOCK_START_WHITESPACE.contains(ch))
+        .peekable();
     let Some(first) = next_normalized_char(&mut chars) else {
         return Ok(());
     };
 
     match first {
-        '#' | '>' | '-' | '+' => {
+        '#' | '>' | '-' | '+' | '~' => {
             writer.write_all(b"\\")?;
-            write_inline_char(writer, first)?;
+            write_raw_char(writer, first)?;
         }
         '0'..='9' => {
             write_raw_char(writer, first)?;
@@ -54,36 +78,44 @@ where
     Ok(())
 }
 
-fn write_ordered_list_marker_tail<W>(
-    writer: &mut W,
-    chars: &mut Peekable<Chars<'_>>,
-) -> io::Result<()>
+fn write_ordered_list_marker_tail<W, I>(writer: &mut W, chars: &mut Peekable<I>) -> io::Result<()>
 where
     W: Write,
+    I: Iterator<Item = char>,
 {
-    let possible_marker = next_normalized_char(chars);
-    let Some(marker @ ('.' | ')')) = possible_marker else {
-        if let Some(ch) = possible_marker {
+    // CommonMark §5.3: 1–9 digits, then `.` or `)`, then a space, tab or end
+    // of line. The first digit is already written; a tenth digit falls through
+    // as plain text.
+    let mut next = next_normalized_char(chars);
+    for _ in 1..9 {
+        let Some(digit @ '0'..='9') = next else {
+            break;
+        };
+        write_raw_char(writer, digit)?;
+        next = next_normalized_char(chars);
+    }
+    let Some(marker @ ('.' | ')')) = next else {
+        if let Some(ch) = next {
             write_inline_char(writer, ch)?;
         }
         return Ok(());
     };
 
-    let next = next_normalized_char(chars);
-    if next == Some(' ') {
+    let after = next_normalized_char(chars);
+    if matches!(after, None | Some(' ' | '\t')) {
         writer.write_all(b"\\")?;
-        write_raw_char(writer, marker)?;
-        writer.write_all(b" ")?;
-    } else {
-        write_inline_char(writer, marker)?;
-        if let Some(ch) = next {
-            write_inline_char(writer, ch)?;
-        }
+    }
+    write_raw_char(writer, marker)?;
+    if let Some(ch) = after {
+        write_inline_char(writer, ch)?;
     }
     Ok(())
 }
 
-fn next_normalized_char(chars: &mut Peekable<Chars<'_>>) -> Option<char> {
+fn next_normalized_char<I>(chars: &mut Peekable<I>) -> Option<char>
+where
+    I: Iterator<Item = char>,
+{
     match chars.next()? {
         '\0' => Some('\u{FFFD}'),
         '\r' => {
@@ -111,6 +143,9 @@ where
         '<' => writer.write_all(b"\\<"),
         '&' => writer.write_all(b"\\&"),
         '!' => writer.write_all(b"\\!"),
+        // Escaped everywhere so a trailing `#` in a heading never reads as
+        // an ATX closing sequence.
+        '#' => writer.write_all(b"\\#"),
         '\u{FFFD}' => writer.write_all(REPLACEMENT_CHARACTER),
         ch => write_raw_char(writer, ch),
     }
@@ -128,7 +163,7 @@ where
 mod tests {
     #![allow(clippy::panic)]
 
-    use super::{write_escaped_block_start, write_escaped_inline};
+    use super::{block_start_undecided, write_escaped_block_start, write_escaped_inline};
 
     fn inline(input: &str) -> Vec<u8> {
         let mut output = Vec::new();
@@ -140,7 +175,7 @@ mod tests {
 
     fn block_start(input: &str) -> Vec<u8> {
         let mut output = Vec::new();
-        if let Err(error) = write_escaped_block_start(&mut output, input) {
+        if let Err(error) = write_escaped_block_start(&mut output, input, "") {
             panic!("block-start escape failed: {error}");
         }
         output
@@ -278,5 +313,59 @@ mod tests {
     fn block_start_digit_only_passthrough() {
         // "1" — digit with no following char, no escaping needed
         assert_eq!(block_start("1"), b"1");
+    }
+
+    #[test]
+    fn block_start_multi_digit_marker_escaped() {
+        assert_eq!(block_start("12. foo"), b"12\\. foo");
+        assert_eq!(block_start("123456789) foo"), b"123456789\\) foo");
+    }
+
+    #[test]
+    fn block_start_ten_digit_marker_not_escaped() {
+        assert_eq!(block_start("1234567890. foo"), b"1234567890. foo");
+    }
+
+    #[test]
+    fn block_start_marker_before_tab_or_end_escaped() {
+        assert_eq!(block_start("1.\tfoo"), b"1\\.\tfoo");
+        assert_eq!(block_start("1."), b"1\\.");
+    }
+
+    #[test]
+    fn block_start_tilde_escaped() {
+        assert_eq!(block_start("~~~ rust"), b"\\~~~ rust");
+    }
+
+    #[test]
+    fn block_start_leading_whitespace_dropped() {
+        assert_eq!(block_start("    code"), b"code");
+        assert_eq!(block_start("\t\r\n # foo"), b"\\# foo");
+        assert_eq!(block_start("   "), b"");
+    }
+
+    #[test]
+    fn hash_escaped_inline() {
+        assert_eq!(inline("Issue #"), b"Issue \\#");
+    }
+
+    #[test]
+    fn undecided_while_marker_incomplete() {
+        assert!(block_start_undecided(""));
+        assert!(block_start_undecided("   "));
+        assert!(block_start_undecided("  1"));
+        assert!(block_start_undecided("123456789"));
+        assert!(block_start_undecided("12."));
+        assert!(block_start_undecided("12)"));
+    }
+
+    #[test]
+    fn decided_once_classifiable() {
+        assert!(!block_start_undecided("1234567890"));
+        assert!(!block_start_undecided("12. "));
+        assert!(!block_start_undecided("12.x"));
+        assert!(!block_start_undecided("."));
+        assert!(!block_start_undecided("# foo"));
+        assert!(!block_start_undecided("a"));
     }
 }

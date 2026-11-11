@@ -11,7 +11,8 @@
 //!
 //! - ATX headings: `# ` through `###### ` (levels 1–6; clamped from any u8)
 //! - Blank-line separator between blocks (`\n\n` after each non-empty block)
-//! - Empty paragraphs produce zero bytes
+//! - Empty (or whitespace-only) paragraphs produce zero bytes; leading
+//!   whitespace of a block is dropped
 //! - Empty headings produce only their ATX prefix + `\n\n` (e.g., `## \n\n`)
 //! - No document framing: Markdown has no equivalent of `[` / `]`
 //!
@@ -62,6 +63,11 @@ pub struct MarkdownWriter<W: Write> {
     finished: bool,
     in_block: Option<BlockKind>,
     text_in_current_block: bool,
+    /// Block-start text held until it classifies as an ordered-list marker or
+    /// not. Bounded: text is only copied in while the held text plus the new
+    /// `Text` fits in [`MAX_PENDING`] bytes (an undecided prefix is at most 9
+    /// digits + `.`/`)`), so the streaming rule holds.
+    pending: String,
 }
 
 impl<W: Write> MarkdownWriter<W> {
@@ -75,9 +81,28 @@ impl<W: Write> MarkdownWriter<W> {
             finished: false,
             in_block: None,
             text_in_current_block: false,
+            pending: String::new(),
         }
     }
+
+    /// Writes the held block start followed by `tail` (with the ATX prefix
+    /// for headings) once it is classified or the block ends.
+    fn flush_block_start(&mut self, tail: &str) -> Result<()> {
+        if self.pending.is_empty() && tail.is_empty() {
+            return Ok(());
+        }
+        if let Some(BlockKind::Heading(level)) = self.in_block {
+            write_atx_prefix(&mut self.writer, level)?;
+        }
+        escape::write_escaped_block_start(&mut self.writer, &self.pending, tail)?;
+        self.pending.clear();
+        self.text_in_current_block = true;
+        Ok(())
+    }
 }
+
+/// Longest block start that can still be undecided: 9 digits + `.`/`)`.
+const MAX_PENDING: usize = 10;
 
 fn write_atx_prefix<W>(writer: &mut W, level: u8) -> Result<()>
 where
@@ -107,6 +132,7 @@ impl<W: Write> EventSink for MarkdownWriter<W> {
     #[inline]
     fn finish(mut self) -> Result<()> {
         if self.started && !self.finished {
+            self.flush_block_start("")?;
             match self.in_block {
                 Some(BlockKind::Paragraph) => {
                     if self.text_in_current_block {
@@ -137,8 +163,9 @@ impl<W: Write> EventSink for MarkdownWriter<W> {
     /// - `EndParagraph` — closes a paragraph; emits `\n\n` if text was written
     /// - `StartHeading { level, .. }` — opens a heading block; level is clamped to 1–6
     /// - `EndHeading` — closes a heading; emits `\n\n` (prefix was emitted lazily)
-    /// - `Text { content }` — writes escaped text; for headings, emits the ATX
-    ///   prefix lazily on the first text event of each heading
+    /// - `Text { content }` — writes escaped text; the block start (and, for
+    ///   headings, the ATX prefix) is held back — at most 10 bytes — until it
+    ///   is known whether it forms an ordered-list marker, then escaped
     ///
     /// All other events are silently ignored.
     #[inline]
@@ -151,6 +178,7 @@ impl<W: Write> EventSink for MarkdownWriter<W> {
             }
             Event::EndDocument => {
                 if self.started && !self.finished {
+                    self.flush_block_start("")?;
                     self.finished = true;
                 }
             }
@@ -161,6 +189,7 @@ impl<W: Write> EventSink for MarkdownWriter<W> {
                 self.text_in_current_block = false;
             }
             Event::EndParagraph if self.in_block == Some(BlockKind::Paragraph) => {
+                self.flush_block_start("")?;
                 if self.text_in_current_block {
                     self.writer.write_all(b"\n\n")?;
                 }
@@ -175,6 +204,7 @@ impl<W: Write> EventSink for MarkdownWriter<W> {
                 self.text_in_current_block = false;
             }
             Event::EndHeading if matches!(self.in_block, Some(BlockKind::Heading(_))) => {
+                self.flush_block_start("")?;
                 match (self.in_block, self.text_in_current_block) {
                     (Some(BlockKind::Heading(level)), false) => {
                         write_atx_prefix(&mut self.writer, level)?;
@@ -191,15 +221,83 @@ impl<W: Write> EventSink for MarkdownWriter<W> {
                 if self.text_in_current_block {
                     escape::write_escaped_inline(&mut self.writer, &content)?;
                 } else {
-                    if let Some(BlockKind::Heading(level)) = self.in_block {
-                        write_atx_prefix(&mut self.writer, level)?;
+                    let content = if self.pending.is_empty() {
+                        content.trim_start_matches(escape::BLOCK_START_WHITESPACE)
+                    } else {
+                        &content
+                    };
+                    // Longer than MAX_PENDING means decided: write it straight
+                    // from `content` instead of copying it.
+                    if self.pending.len().saturating_add(content.len()) > MAX_PENDING {
+                        self.flush_block_start(content)?;
+                    } else {
+                        self.pending.push_str(content);
+                        if !escape::block_start_undecided(&self.pending) {
+                            self.flush_block_start("")?;
+                        }
                     }
-                    escape::write_escaped_block_start(&mut self.writer, &content)?;
-                    self.text_in_current_block = true;
                 }
             }
             _ => {}
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use super::{Event, EventSink as _, MarkdownWriter};
+
+    /// Drives one paragraph and returns the output and the largest `pending`
+    /// length and capacity seen after any event.
+    fn paragraph(texts: &[&str]) -> (String, usize, usize) {
+        let mut buf = Vec::new();
+        let mut writer = MarkdownWriter::new(&mut buf);
+        let mut max_len = 0;
+        let mut max_capacity = 0;
+        let events = [
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        ]
+        .into_iter()
+        .chain(texts.iter().map(|content| Event::Text {
+            content: (*content).to_string(),
+        }))
+        .chain([Event::EndParagraph, Event::EndDocument]);
+        for event in events {
+            writer.handle_event(event).unwrap();
+            max_len = max_len.max(writer.pending.len());
+            max_capacity = max_capacity.max(writer.pending.capacity());
+        }
+        writer.finish().unwrap();
+        (String::from_utf8(buf).unwrap(), max_len, max_capacity)
+    }
+
+    #[test]
+    fn large_first_text_is_not_copied_into_pending() {
+        let body = "x".repeat(1 << 20);
+        let (output, max_len, max_capacity) = paragraph(&[&format!("  12. {body}")]);
+        assert_eq!(output, format!("12\\. {body}\n\n"));
+        assert_eq!(max_len, 0);
+        assert_eq!(max_capacity, 0);
+    }
+
+    #[test]
+    fn large_text_after_held_prefix_is_not_copied_into_pending() {
+        let body = "x".repeat(1 << 20);
+        let (output, max_len, max_capacity) = paragraph(&["12", &format!(". {body}")]);
+        assert_eq!(output, format!("12\\. {body}\n\n"));
+        assert_eq!(max_len, 2);
+        // Reason: String growth is defined by std, so the exact capacity is not ours to pin.
+        assert!(max_capacity <= 16, "pending grew to {max_capacity}");
     }
 }
