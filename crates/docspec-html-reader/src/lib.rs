@@ -157,21 +157,22 @@ impl HtmlReader {
 
     /// Translates a start tag token into queued events.
     fn handle_start_tag(&mut self, tag: &html5gum::StartTag<()>) {
-        if &*tag.name != b"p" || self.in_paragraph {
-            // Nested <p> while already in paragraph: silently ignore (including self-closing nested)
+        if &*tag.name != b"p" {
             // All other tags: silently ignore
             return;
+        }
+        if self.in_paragraph {
+            // `</p>` is optional in HTML and paragraphs cannot nest: a `<p>`
+            // start tag closes the open paragraph before opening its own.
+            self.queue.push_back(Event::EndParagraph);
         }
 
         self.queue.push_back(Event::StartParagraph {
             alignment: None,
             id: None,
         });
+        // HTML ignores the self-closing flag on `<p/>`: it is a plain start tag.
         self.in_paragraph = true;
-        if tag.self_closing {
-            self.queue.push_back(Event::EndParagraph);
-            self.in_paragraph = false;
-        }
     }
 
     /// Translates a text token into a queued event.
