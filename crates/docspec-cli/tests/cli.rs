@@ -927,6 +927,27 @@ mod tests {
         }
 
         #[test]
+        fn closed_stdout_exits_141_without_message() {
+            use std::io::Read as _;
+            use std::process::{Command, Stdio};
+
+            // Far more output than a pipe buffer holds, so the writer is
+            // still busy when the reading end goes away.
+            let input = markdown_tempfile("paragraph\n\n".repeat(200_000).as_bytes(), ".md");
+            let mut child = Command::new(assert_cmd::cargo::cargo_bin("docspec"))
+                .args(["convert", input.path().to_str().unwrap(), "--to", "html"])
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap();
+            let mut head: [u8; 20] = [0; 20];
+            child.stdout.take().unwrap().read_exact(&mut head).unwrap();
+            let output = child.wait_with_output().unwrap();
+            assert_eq!(String::from_utf8(output.stderr).unwrap(), "");
+            assert_eq!(output.status.code(), Some(141));
+        }
+
+        #[test]
         fn uncreatable_output_exits_73() {
             let input = markdown_tempfile(b"# Hi\n", ".md");
             let dir = tempfile::tempdir().unwrap();
@@ -1045,8 +1066,9 @@ mod tests {
   73  The output file cannot be created
   74  I/O failed while reading the input or writing the output
   77  Permission denied on the input, the output, or the listen port
+  141 Standard output was closed before the output was written, such as by piping into head; nothing is printed
 
-Codes above 2 follow <sysexits.h>.
+Codes 65 to 77 follow <sysexits.h>; 141 is 128 + SIGPIPE.
 ",
                     ));
             }

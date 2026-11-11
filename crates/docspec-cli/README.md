@@ -163,7 +163,7 @@ by `--to markdown` or auto-detected from `.md` output paths.
 
 ## Exit status
 
-One code has one meaning, so a script can branch on `$?` without parsing stderr. Codes above 2 are from `<sysexits.h>`; 2 is kept for usage errors because that is what clap and most shells use, so clap's own parse errors and DocSpec's share a code. The HTTP server draws the same lines: it answers 422 where the CLI exits 65 and 500 where it exits 70.
+One code has one meaning, so a script can branch on `$?` without parsing stderr. Codes 65 to 77 are from `<sysexits.h>`; 141 is 128 + `SIGPIPE`, what `cat` and other Unix tools report when whatever reads their output goes away; 2 is kept for usage errors because that is what clap and most shells use, so clap's own parse errors and DocSpec's share a code. The HTTP server draws the same lines: it answers 422 where the CLI exits 65 and 500 where it exits 70.
 
 | Code | Name | Meaning |
 | --- | --- | --- |
@@ -177,6 +177,7 @@ One code has one meaning, so a script can branch on `$?` without parsing stderr.
 | 73 | `EX_CANTCREAT` | The output file cannot be created |
 | 74 | `EX_IOERR` | I/O failed while reading the input or writing the output |
 | 77 | `EX_NOPERM` | Permission denied on the input, the output, or the listen port |
+| 141 | `SIGPIPE` | Standard output was closed before the output was written, such as by piping into head; nothing is printed |
 
 There is no generic exit 1: an error DocSpec cannot classify is still a conversion failure and exits 65, as the HTTP server answers 422 for it. A Rust panic exits with 101 under the default `panic = "unwind"` profile; a `panic = "abort"` build dies with `SIGABRT` instead.
 

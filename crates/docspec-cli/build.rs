@@ -21,7 +21,7 @@ fn exit_status_roff() -> String {
         })
         .collect::<Vec<_>>()
         .concat();
-    format!(".SH \"EXIT STATUS\"\n{rows}.PP\nCodes above 2 follow\n.IR sysexits (3).\n")
+    format!(".SH \"EXIT STATUS\"\n{rows}.PP\nCodes 65 to 77 follow\n.IR sysexits (3);\n141 is 128 + SIGPIPE.\n")
 }
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {
