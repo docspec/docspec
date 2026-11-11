@@ -513,6 +513,50 @@ mod tests {
     }
 
     #[test]
+    fn same_missing_path_exits_2() {
+        let dir = tempfile::tempdir().unwrap();
+        docspec_cmd()
+            .current_dir(dir.path())
+            .args(["convert", "in.md", "-o", "in.md", "--to", "html"])
+            .assert()
+            .code(2)
+            .stderr("error: input and output paths refer to the same file\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn output_lookup_error_is_reported_not_skipped() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("in.md"), b"# Test\n").unwrap();
+        std::os::unix::fs::symlink("loop.html", dir.path().join("loop.html")).unwrap();
+        docspec_cmd()
+            .current_dir(dir.path())
+            .args(["convert", "in.md", "-o", "loop.html"])
+            .assert()
+            .code(73)
+            .stderr(
+                "error: cannot create output `loop.html`: \
+                 Too many levels of symbolic links (os error 40)\n",
+            );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn input_lookup_error_is_reported_not_skipped() {
+        let dir = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink("loop.md", dir.path().join("loop.md")).unwrap();
+        docspec_cmd()
+            .current_dir(dir.path())
+            .args(["convert", "loop.md", "-o", "out.html"])
+            .assert()
+            .code(74)
+            .stderr(
+                "error: cannot read input `loop.md`: \
+                 Too many levels of symbolic links (os error 40)\n",
+            );
+    }
+
+    #[test]
     fn stdin_dash_with_existing_output_file_is_not_refused() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("out.html"), b"old\n").unwrap();
