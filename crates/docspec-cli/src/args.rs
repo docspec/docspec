@@ -17,6 +17,7 @@ pub const EXIT_STATUSES: &[(u8, &str, &str)] = &[
     (73, "EX_CANTCREAT", "The output file cannot be created"),
     (74, "EX_IOERR", "I/O failed while reading the input or writing the output"),
     (77, "EX_NOPERM", "Permission denied on the input, the output, or the listen port"),
+    (141, "SIGPIPE", "Standard output was closed before the output was written, such as by piping into head; nothing is printed"),
 ];
 
 /// The `--help` footer, rendered from [`EXIT_STATUSES`].
@@ -26,7 +27,7 @@ fn exit_status_help() -> String {
         .map(|(code, _, meaning)| format!("  {code:<3} {meaning}\n"))
         .collect::<Vec<_>>()
         .concat();
-    format!("Exit status:\n{rows}\nCodes above 2 follow <sysexits.h>.")
+    format!("Exit status:\n{rows}\nCodes 65 to 77 follow <sysexits.h>; 141 is 128 + SIGPIPE.")
 }
 
 /// `DocSpec`: streaming document conversion.
@@ -217,9 +218,13 @@ I/O failed while reading the input or writing the output (EX_IOERR).
 .TP
 .B 77
 Permission denied on the input, the output, or the listen port (EX_NOPERM).
+.TP
+.B 141
+Standard output was closed before the output was written, such as by piping into head; nothing is printed.
 .PP
-Codes above 2 follow
-.IR sysexits (3).
+Codes 65 to 77 follow
+.IR sysexits (3);
+141 is 128 + SIGPIPE.
 "#;
         let tail = man.get(man.len().saturating_sub(expected.len())..);
         assert_eq!(tail, Some(expected));

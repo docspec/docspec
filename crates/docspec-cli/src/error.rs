@@ -35,6 +35,10 @@ pub mod exit {
     pub const IOERR: u8 = 74;
     /// `EX_NOPERM`: permission denied.
     pub const NOPERM: u8 = 77;
+    /// 128 + `SIGPIPE`: standard output was closed before the output was
+    /// written. Not from `<sysexits.h>`: it is what `cat` and other tools
+    /// report when killed by `SIGPIPE`, which Rust programs ignore.
+    pub const PIPE: u8 = 141;
 }
 
 /// Result type alias for CLI operations.
@@ -91,6 +95,19 @@ pub enum CliError {
 }
 
 impl CliError {
+    /// Whether this is a write to standard output after its reader went away,
+    /// as in `docspec convert … | head`. That is not a failure worth a
+    /// message, so the CLI exits [`exit::PIPE`] without printing one.
+    #[must_use]
+    pub fn is_broken_pipe(&self) -> bool {
+        match self {
+            Self::Io(source) | Self::Conversion(docspec_core::Error::Io { source }) => {
+                source.kind() == ErrorKind::BrokenPipe
+            }
+            _ => false,
+        }
+    }
+
     /// The process exit code for this error, per [`exit`].
     ///
     /// Classification is by error kind, never by message text. A core
@@ -102,6 +119,9 @@ impl CliError {
     /// that is [`exit::DATAERR`], as the HTTP server answers 422 for it.
     #[must_use]
     pub fn exit_code(&self) -> u8 {
+        if self.is_broken_pipe() {
+            return exit::PIPE;
+        }
         match self {
             Self::Conversion(docspec_core::Error::InvalidSequence { .. }) => exit::SOFTWARE,
             Self::Conversion(docspec_core::Error::Io { source })
@@ -155,6 +175,7 @@ mod tests {
             exit::CANTCREAT,
             exit::IOERR,
             exit::NOPERM,
+            exit::PIPE,
         ];
         consts.sort_unstable();
         let table: Vec<u8> = crate::args::EXIT_STATUSES
@@ -283,7 +304,21 @@ mod tests {
 
     #[test]
     fn io_during_conversion_exits_74() {
-        assert_eq!(CliError::Io(io(ErrorKind::BrokenPipe)).exit_code(), 74);
+        assert_eq!(CliError::Io(io(ErrorKind::Other)).exit_code(), 74);
+    }
+
+    #[test]
+    fn broken_pipe_exits_141_silently() {
+        let direct = CliError::Io(io(ErrorKind::BrokenPipe));
+        let wrapped = CliError::Conversion(docspec_core::Error::Io {
+            source: io(ErrorKind::BrokenPipe),
+        });
+        assert!(direct.is_broken_pipe());
+        assert!(wrapped.is_broken_pipe());
+        assert_eq!(direct.exit_code(), 141);
+        assert_eq!(wrapped.exit_code(), 141);
+        assert!(!CliError::Io(io(ErrorKind::Other)).is_broken_pipe());
+        assert!(!CliError::SameInputOutput.is_broken_pipe());
     }
 
     #[test]

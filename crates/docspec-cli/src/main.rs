@@ -37,7 +37,9 @@ fn main() -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
-            write_error(&err, color);
+            if !err.is_broken_pipe() {
+                write_error(&err, color);
+            }
             ExitCode::from(err.exit_code())
         }
     }
