@@ -1,0 +1,22 @@
+[package]
+name = "docspec-zip"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+description = "ZIP container access shared by the DocSpec readers for ZIP-based formats"
+keywords = ["document", "conversion", "streaming", "zip"]
+categories = ["parsing"]
+
+[dependencies]
+docspec-core = { workspace = true }
+zip = { version = "9", default-features = false, features = ["deflate"] }
+flate2 = "1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

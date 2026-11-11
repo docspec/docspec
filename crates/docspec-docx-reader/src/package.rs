@@ -9,15 +9,13 @@ use docspec_core::{Error, Result};
 use zip::result::ZipError;
 use zip::ZipArchive;
 
+use docspec_zip::{open_archive, read_optional_entry, ReadSeek, StreamingArchive};
+
 use crate::content_types;
 use crate::content_types::ContentTypes;
 use crate::rels;
 use crate::rels::{HyperlinkMap, ImageMap};
 use crate::styles::StyleList;
-
-/// Object-safe alias combining [`Read`], [`Seek`], and [`Send`] for use in trait objects.
-pub(crate) trait ReadSeek: Read + Seek + Send {}
-impl<T: Read + Seek + Send> ReadSeek for T {}
 
 type PackageContents = (
     StyleList,
@@ -37,8 +35,7 @@ pub fn open_package<R>(reader: R) -> Result<PackageContents>
 where
     R: Read + Seek + Send + 'static,
 {
-    let boxed: Box<dyn ReadSeek + 'static> = Box::new(reader);
-    let mut archive = ZipArchive::new(boxed).map_err(map_zip_open_error)?;
+    let mut archive = open_archive(reader)?;
 
     let rels_bytes = read_root_rels_bytes(&mut archive)?;
 
@@ -73,8 +70,7 @@ where
 
 pub(crate) fn open_package_from_path(path: &Path) -> Result<PackageContents> {
     let asset_file = File::open(path).map_err(Error::from)?;
-    let boxed: Box<dyn ReadSeek + 'static> = Box::new(asset_file);
-    let mut asset_archive = ZipArchive::new(boxed).map_err(map_zip_open_error)?;
+    let mut asset_archive = open_archive(asset_file)?;
 
     let rels_bytes = read_root_rels_bytes(&mut asset_archive)?;
 
@@ -83,7 +79,7 @@ pub(crate) fn open_package_from_path(path: &Path) -> Result<PackageContents> {
     let (style_list, numbering, hyperlink_map, image_map, content_types) =
         load_small_package_parts(&mut asset_archive, &document_path)?;
 
-    let streaming = crate::streaming_archive::StreamingArchive::open(path, &document_path)?;
+    let streaming = StreamingArchive::open(path, &document_path)?;
 
     let content_types_arc = Arc::new(content_types);
     let archive_arc = Arc::new(Mutex::new(asset_archive));
@@ -97,20 +93,6 @@ pub(crate) fn open_package_from_path(path: &Path) -> Result<PackageContents> {
         archive_arc,
         Box::new(streaming),
     ))
-}
-
-fn map_zip_open_error(err: ZipError) -> Error {
-    match err {
-        ZipError::InvalidArchive(_) | ZipError::UnsupportedArchive(_) => Error::Parse {
-            message: "not a valid ZIP archive".to_string(),
-            position: None,
-        },
-        ZipError::Io(source) => Error::Io { source },
-        ZipError::FileNotFound
-        | ZipError::InvalidPassword
-        | ZipError::CompressionMethodNotSupported(_)
-        | _ => parse_error(format!("not a valid ZIP archive: {err}")),
-    }
 }
 
 fn read_root_rels_bytes<R>(archive: &mut ZipArchive<R>) -> Result<Vec<u8>>
@@ -215,21 +197,6 @@ where
     R: Read + Seek,
 {
     path.map_or(Ok(None), |path| read_optional_entry(archive, path))
-}
-
-fn read_optional_entry<R>(archive: &mut ZipArchive<R>, path: &str) -> Result<Option<Vec<u8>>>
-where
-    R: Read + Seek,
-{
-    match archive.by_name(path) {
-        Ok(mut entry) => {
-            let mut bytes = Vec::new();
-            entry.read_to_end(&mut bytes).map_err(Error::from)?;
-            Ok(Some(bytes))
-        }
-        Err(ZipError::FileNotFound) => Ok(None),
-        Err(err) => Err(parse_error(format!("malformed ZIP: {err}"))),
-    }
 }
 
 fn parse_error(message: String) -> Error {

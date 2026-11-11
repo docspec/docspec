@@ -61,6 +61,7 @@ changelog_path = "./CHANGELOG.md"
 changelog_include = [
   "docspec-core",
   "docspec-json",
+  "docspec-zip",
   "docspec-blocknote-writer",
   "docspec-docx-reader",
   "docspec-html-reader",

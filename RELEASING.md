@@ -4,13 +4,13 @@ This is the maintainer runbook for releasing DocSpec. It covers the full release
 
 ## Overview
 
-DocSpec uses a unified ecosystem version across all 12 crates. Every release is tagged `vX.Y.Z` at the workspace level, and all publishable crates carry that same version. [release-plz](https://release-plz.dev) is the canonical release driver: it reads Conventional Commits, opens a release PR, and on merge handles tagging and publishing.
+DocSpec uses a unified ecosystem version across all its crates. Every release is tagged `vX.Y.Z` at the workspace level, and all publishable crates carry that same version. [release-plz](https://release-plz.dev) is the canonical release driver: it reads Conventional Commits, opens a release PR, and on merge handles tagging and publishing.
 
 Crates publish to crates.io via Trusted Publishing (OIDC). No long-lived API tokens are stored in repository secrets. Binaries for `docspec-cli` are built and distributed by [cargo-dist](https://opensource.axo.dev/cargo-dist/). Docker images are built and pushed from release-plz's native release outputs via the reusable `docker.yml` workflow. All artifacts carry SLSA L2 build provenance attestations and cosign keyless signatures.
 
 ## Versioning Policy
 
-DocSpec uses one ecosystem version across all 12 crates. The version lives in `[workspace.package].version` in the root `Cargo.toml`, and every crate inherits it via `version.workspace = true`. Internal crate-to-crate dependencies are declared in `[workspace.dependencies]` and track the workspace version exactly.
+DocSpec uses one ecosystem version across all its crates. The version lives in `[workspace.package].version` in the root `Cargo.toml`, and every crate inherits it via `version.workspace = true`. Internal crate-to-crate dependencies are declared in `[workspace.dependencies]` and track the workspace version exactly.
 
 SemVer applies at the ecosystem level. A breaking change in any single crate triggers a major bump for the entire ecosystem. This is intentional: users who depend on the `docspec` facade crate get a clear signal when anything in the stack changed incompatibly, even if the specific sub-crate they use was untouched.
 
@@ -28,7 +28,7 @@ The typical release flows like this:
 2. release-plz detects the new commit and opens a release PR. The PR contains the proposed version bump and an updated `CHANGELOG.md`.
 3. A maintainer reviews the release PR (see the next section for what to check).
 4. The maintainer merges the release PR.
-5. The `release-plz-release` job inside `ci.yml` runs after every other CI job (`test`, `clippy`, `fmt`, `docker-build`) passes on `main`. It executes release-plz, which tags `vX.Y.Z` and publishes all 11 publishable crates to crates.io in topological order, with a 30-minute retry wrapper to handle index propagation lag.
+5. The `release-plz-release` job inside `ci.yml` runs after every other CI job (`test`, `clippy`, `fmt`, `docker-build`) passes on `main`. It executes release-plz, which tags `vX.Y.Z` and publishes all publishable crates to crates.io in topological order, with a 30-minute retry wrapper to handle index propagation lag.
 6. If release-plz reports that a release was created, the `docker-publish` job (also in `ci.yml`) calls `docker.yml` to build, push, sign, and attest the Docker image. The Docker image tags strip the Git tag's `v` prefix, so `v1.5.0` publishes `ghcr.io/docspec/api:1.5.0` plus `1.5`, `1`, and `latest`.
 
 From merge to fully published artifacts typically takes 30 to 60 minutes, depending on crates.io index propagation.
@@ -87,7 +87,7 @@ rc mode ends with the promotion: from the next commit on, release-plz proposes o
 
 Trusted Publishing lets crates.io verify the publish request came from a specific GitHub Actions workflow, with no stored API token. You configure it once per crate on crates.io, and then the workflow just works.
 
-For each of the 11 publishable crates, add two Trusted Publishing entries:
+For each publishable crate, add two Trusted Publishing entries:
 
 1. Log in to [crates.io](https://crates.io) and navigate to the crate's page.
 2. Go to **Settings** > **Trusted Publishing**.
@@ -106,7 +106,7 @@ For each of the 11 publishable crates, add two Trusted Publishing entries:
    - **Environment**: `release`
 8. Save.
 
-The 12 publishable crates are: `docspec-core`, `docspec-json`, `docspec-markdown-reader`, `docspec-html-reader`, `docspec-docx-reader`, `docspec-odt-reader`, `docspec-blocknote-writer`, `docspec-oxa-writer`, `docspec-html-writer`, `docspec`, `docspec-cli`, and `docspec-http`.
+The 15 publishable crates are: `docspec-core`, `docspec-zip`, `docspec-json`, `docspec-markdown-reader`, `docspec-html-reader`, `docspec-docx-reader`, `docspec-odt-reader`, `docspec-blocknote-writer`, `docspec-oxa-writer`, `docspec-html-writer`, `docspec-markdown-writer`, `docspec-pandoc-native-writer`, `docspec`, `docspec-cli`, and `docspec-http`.
 
 `docspec-wasm` is **not** configured for Trusted Publishing. It has `publish = false` and never reaches crates.io.
 
@@ -165,8 +165,8 @@ The `.pem` and `.sig` files are attached to the GitHub Release alongside the tar
 release-plz publishes crates in topological dependency order so that each crate's dependencies are already on crates.io before it publishes. The order is:
 
 1. `docspec-core` (leaf, no internal dependencies)
-2. `docspec-json`, `docspec-markdown-reader`, `docspec-html-reader`, `docspec-docx-reader`, `docspec-odt-reader` (depend only on `docspec-core`)
-3. `docspec-blocknote-writer`, `docspec-oxa-writer`, `docspec-html-writer` (depend on `docspec-core` and `docspec-json`)
+2. `docspec-zip`, `docspec-json`, `docspec-markdown-reader`, `docspec-html-reader`, `docspec-odt-reader`, `docspec-html-writer`, `docspec-markdown-writer`, `docspec-pandoc-native-writer` (depend only on `docspec-core`), then `docspec-docx-reader` (depends on `docspec-core` and `docspec-zip`)
+3. `docspec-blocknote-writer`, `docspec-oxa-writer` (depend on `docspec-core` and `docspec-json`)
 4. `docspec` (the facade, depends on readers and writers)
 5. `docspec-cli` and `docspec-http` (depend on the facade and core crates)
 
@@ -213,16 +213,17 @@ After a failed mid-release that left a new crate unpublished (the classic sympto
 
 ## Yank Policy
 
-Under unified ecosystem versioning, yanking one crate at a release version without yanking the others breaks the ecosystem version story. A user who depends on `docspec = "1.5.0"` expects all 11 crates at `1.5.0` to be coherent.
+Under unified ecosystem versioning, yanking one crate at a release version without yanking the others breaks the ecosystem version story. A user who depends on `docspec = "1.5.0"` expects all DocSpec crates at `1.5.0` to be coherent.
 
-If a bad release slips through, the policy is: yank all 11 publishable crates at the bad version simultaneously, then rush a `1.5.x+1` patch release with the fix. Do not yank selectively.
+If a bad release slips through, the policy is: yank all publishable crates at the bad version simultaneously, then rush a `1.5.x+1` patch release with the fix. Do not yank selectively.
 
 To yank all crates at a version:
 
 ```bash
-for crate in docspec-core docspec-json docspec-markdown-reader docspec-html-reader \
+for crate in docspec-core docspec-zip docspec-json docspec-markdown-reader docspec-html-reader \
   docspec-docx-reader docspec-odt-reader docspec-blocknote-writer docspec-oxa-writer \
-  docspec-html-writer docspec docspec-cli docspec-http; do
+  docspec-html-writer docspec-markdown-writer docspec-pandoc-native-writer docspec docspec-cli \
+  docspec-http; do
   cargo yank --version 1.5.0 "$crate"
 done
 ```
