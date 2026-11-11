@@ -243,7 +243,7 @@ impl EventSource for OdtReader {
                     }
                     (false, b"h") => {
                         // Absent means level 1; zero is not a level.
-                        let level = number::<NonZeroU8>(&start, "text:outline-level")?
+                        let level = number::<NonZeroU8>(&self.xml, &start, "outline-level")?
                             .map_or(1, NonZeroU8::get);
                         self.block = Some(Block::Heading);
                         Some(Event::StartHeading { id: None, level })
@@ -255,7 +255,7 @@ impl EventSource for OdtReader {
                     (false, _) | (true, b"span" | b"a") => None,
                     (true, b"s") => {
                         // `u16` bounds the allocation a hostile count could force.
-                        let count = number::<u16>(&start, "text:c")?.map_or(1, usize::from);
+                        let count = number::<u16>(&self.xml, &start, "c")?.map_or(1, usize::from);
                         text(" ".repeat(count))
                     }
                     (true, b"tab") => text("\t".to_string()),
@@ -302,19 +302,24 @@ fn text(content: String) -> Option<Event> {
     (!content.is_empty()).then_some(Event::Text { content })
 }
 
-/// The numeric value of the attribute `name`, or `None` when it is absent.
-fn number<T>(start: &BytesStart<'_>, name: &str) -> Result<Option<T>>
+/// The numeric value of the text-namespace attribute `name`, or `None` when it
+/// is absent. Matched by local name, like elements, so any prefix works.
+fn number<T>(
+    xml: &quick_xml::Reader<impl Read>,
+    start: &BytesStart<'_>,
+    name: &str,
+) -> Result<Option<T>>
 where
     T: FromStr,
 {
-    let Some(attribute) = start.try_get_attribute(name).map_err(malformed)? else {
-        return Ok(None);
-    };
-    core::str::from_utf8(&attribute.value)
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .map(Some)
-        .ok_or_else(|| malformed(format!("invalid {name}")))
+    docspec_xml::attr_string(xml, start, name.as_bytes(), CONTEXT)?
+        .map(|value| {
+            value
+                .parse()
+                .ok()
+                .ok_or_else(|| malformed(format!("invalid text:{name}")))
+        })
+        .transpose()
 }
 
 /// Builds a position-less parse error for `content.xml`.

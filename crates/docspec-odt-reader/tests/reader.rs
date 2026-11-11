@@ -288,6 +288,35 @@ fn blocks_do_not_nest() {
 }
 
 #[test]
+fn attributes_match_any_prefix_bound_to_the_text_namespace() {
+    let bytes = synth_odt(concat!(
+        r#"<office:document-content"#,
+        r#" xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0""#,
+        r#" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#,
+        r#"<office:body><office:text>"#,
+        r#"<t:h t:outline-level="2">a</t:h><t:p>b<t:s t:c="3"/>c</t:p>"#,
+        r#"</office:text></office:body></office:document-content>"#
+    ));
+    let events = collect_events(&mut OdtReader::from_reader(Cursor::new(bytes)).unwrap());
+    assert_eq!(
+        events,
+        [
+            vec![start_document()],
+            heading(2, "a"),
+            vec![
+                start_paragraph(),
+                text("b"),
+                text("   "),
+                text("c"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ],
+        ]
+        .concat()
+    );
+}
+
+#[test]
 fn invalid_outline_level_is_a_parse_error() {
     for level in ["0", "x", "300"] {
         assert_eq!(
