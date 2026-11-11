@@ -449,6 +449,13 @@ mod tests {
         }
     }
 
+    fn internal(error: HttpError) -> String {
+        match error {
+            HttpError::Internal { source } => source.to_string(),
+            other => panic!("expected Internal, got {other:?}"),
+        }
+    }
+
     #[test]
     fn invalid_sequence_is_internal() {
         assert!(matches!(
@@ -554,32 +561,44 @@ mod tests {
     }
 
     #[test]
-    fn stream_that_ends_before_end_document_is_internal_for_every_format() {
-        // No EndParagraph, no EndDocument: a reader that stops early has broken
-        // the event contract, whichever writer receives the stream.
-        for format in [
-            OutputFormat::Blocknote,
-            OutputFormat::Html,
-            OutputFormat::Markdown,
-            OutputFormat::Oxa,
-            OutputFormat::PandocNative,
-        ] {
-            let mut out = Vec::new();
-            let source =
-                FakeSource::new(vec![start_document(), start_paragraph(), text("x")], None);
-            let result = run_conversion(source, AnyWriter::new(format, &mut out));
-            assert!(
-                matches!(result, Err(HttpError::Internal { .. })),
-                "{format:?} accepted a truncated stream"
-            );
+    fn stream_that_never_starts_or_finishes_the_document_is_internal_for_every_format() {
+        // A reader that emits nothing, skips StartDocument, or stops before
+        // EndDocument has broken the event contract, whichever writer receives
+        // the stream.
+        let cases = [
+            (
+                Vec::new(),
+                "invalid event sequence: expected EndDocument, found end of stream: \
+                 stream ended before EndDocument",
+            ),
+            (
+                vec![text("orphan")],
+                "invalid event sequence: expected StartDocument, found Text { content: \"orphan\" }: \
+                 event received before StartDocument",
+            ),
+            (
+                vec![start_document(), start_paragraph(), text("x")],
+                "invalid event sequence: expected EndDocument, found end of stream: \
+                 stream ended before EndDocument",
+            ),
+        ];
+        for (events, expected) in cases {
+            for format in [
+                OutputFormat::Blocknote,
+                OutputFormat::Html,
+                OutputFormat::Markdown,
+                OutputFormat::Oxa,
+                OutputFormat::PandocNative,
+            ] {
+                let mut out = Vec::new();
+                let source = FakeSource::new(events.clone(), None);
+                let result = run_conversion(source, AnyWriter::new(format, &mut out));
+                assert_eq!(
+                    internal(result.unwrap_err()),
+                    expected,
+                    "{format:?} with {events:?}"
+                );
+            }
         }
-    }
-
-    #[test]
-    fn empty_stream_is_internal() {
-        let mut out = Vec::new();
-        let source = FakeSource::new(Vec::new(), None);
-        let result = run_conversion(source, AnyWriter::new(OutputFormat::Html, &mut out));
-        assert!(matches!(result, Err(HttpError::Internal { .. })));
     }
 }
