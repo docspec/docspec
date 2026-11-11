@@ -45,7 +45,7 @@ docspec convert [OPTIONS] [INPUT]
 #### Options
 
 - `-o, --output <FILE>` — Output file (stdout if omitted)
-- `-f, --from <FORMAT>` — Input format (auto-detected from extension if omitted). Valid values: `markdown`, `html`, `docx`
+- `-f, --from <FORMAT>` — Input format (auto-detected from extension if omitted). Valid values: `markdown`, `html`, `docx`, `odt` (placeholder)
 - `-t, --to <FORMAT>` — Output format (auto-detected from extension if omitted). Valid values: `blocknote`, `html`, `markdown`, `oxa`, `pandoc-native`
 - `--color <WHEN>` — When to use colors: `auto`, `always`, `never` (default: `auto`)
 - `-h, --help` — Print help
