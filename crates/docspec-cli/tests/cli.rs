@@ -1053,6 +1053,52 @@ mod tests {
             );
         }
 
+        #[cfg(unix)]
+        #[test]
+        fn read_only_output_exits_77_and_is_kept() {
+            use std::os::unix::fs::PermissionsExt as _;
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::write(dir.path().join("in.md"), b"x\n").unwrap();
+            let out = dir.path().join("out.html");
+            std::fs::write(&out, b"old\n").unwrap();
+            std::fs::set_permissions(&out, std::fs::Permissions::from_mode(0o444)).unwrap();
+            let Err(denied) = std::fs::OpenOptions::new().write(true).open(&out) else {
+                return; // root ignores mode bits; nothing to assert
+            };
+            docspec_cmd()
+                .current_dir(dir.path())
+                .args(["convert", "in.md", "-o", "out.html"])
+                .assert()
+                .code(77)
+                .stderr(format!(
+                    "error: cannot create output `out.html`: {denied}\n"
+                ));
+            assert_eq!(std::fs::read(&out).unwrap(), b"old\n");
+            assert_eq!(dir_listing(dir.path()), ["in.md", "out.html"]);
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn dangling_symlink_output_creates_its_target() {
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::write(dir.path().join("in.md"), b"x\n").unwrap();
+            std::os::unix::fs::symlink("target.html", dir.path().join("link.html")).unwrap();
+            docspec_cmd()
+                .current_dir(dir.path())
+                .args(["convert", "in.md", "-o", "link.html"])
+                .assert()
+                .success()
+                .stderr("");
+            assert!(std::fs::symlink_metadata(dir.path().join("link.html"))
+                .unwrap()
+                .file_type()
+                .is_symlink());
+            assert_eq!(
+                std::fs::read_to_string(dir.path().join("target.html")).unwrap(),
+                "<html><body><p>x</p></body></html>\n"
+            );
+        }
+
         #[test]
         fn uncreatable_output_exits_73() {
             let input = markdown_tempfile(b"# Hi\n", ".md");
@@ -1067,11 +1113,12 @@ mod tests {
                 ])
                 .assert()
                 .code(73)
-                // The OS supplies the message tail after the colon.
-                .stderr(contains(format!(
-                    "error: cannot create output `{}`: ",
-                    output.display()
-                )));
+                // The OS supplies the message tail; it must not name the temp file.
+                .stderr(format!(
+                    "error: cannot create output `{}`: {}\n",
+                    output.display(),
+                    std::fs::File::create(&output).unwrap_err()
+                ));
         }
 
         #[cfg(unix)]

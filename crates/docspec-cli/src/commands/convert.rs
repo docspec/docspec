@@ -1,6 +1,6 @@
 //! `docspec convert` subcommand: convert documents between formats.
 
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Cursor, ErrorKind, Read as _, Write};
 use std::path::Path;
 
@@ -87,14 +87,27 @@ pub fn run(args: ConvertArgs) -> Result<()> {
                 source,
             };
             let existing = std::fs::metadata(path).ok();
-            if existing
-                .as_ref()
-                .is_some_and(|metadata| !metadata.is_file())
+            let dangling_link = existing.is_none()
+                && std::fs::symlink_metadata(path)
+                    .is_ok_and(|metadata| metadata.file_type().is_symlink());
+            if dangling_link
+                || existing
+                    .as_ref()
+                    .is_some_and(|metadata| !metadata.is_file())
             {
-                // Not a regular file (`/dev/stdout`, a FIFO, a directory):
-                // there is nothing to keep and nowhere to rename onto.
+                // Not a regular file (`/dev/stdout`, a FIFO, a directory, a
+                // dangling symlink): there is nothing to keep and nowhere to
+                // rename onto.
                 let file = File::create(path).map_err(unwritable)?;
                 return write_output(reader, output_format, file);
+            }
+            if existing.is_some() {
+                // The rename would bypass the file's own write permission;
+                // refuse a file `File::create` could not open either.
+                OpenOptions::new()
+                    .write(true)
+                    .open(path)
+                    .map_err(unwritable)?;
             }
 
             // Write beside the destination and rename only on success, so a
@@ -105,11 +118,12 @@ pub fn run(args: ConvertArgs) -> Result<()> {
                 .parent()
                 .filter(|parent| !parent.as_os_str().is_empty())
                 .unwrap_or_else(|| Path::new("."));
-            let mut builder = tempfile::Builder::new();
-            // Same mode a fresh `File::create` would get, instead of 0600.
-            #[cfg(unix)]
-            builder.permissions(std::os::unix::fs::PermissionsExt::from_mode(0o666));
-            let temp = builder.tempfile_in(dir).map_err(unwritable)?;
+            // `make_in` with `File::create_new` keeps the mode a fresh
+            // `File::create` would get (not 0600) and reports the bare OS
+            // error, without the temp file's path.
+            let temp = tempfile::Builder::new()
+                .make_in(dir, |temp_path| File::create_new(temp_path))
+                .map_err(unwritable)?;
             if let Some(metadata) = existing {
                 temp.as_file()
                     .set_permissions(metadata.permissions())
