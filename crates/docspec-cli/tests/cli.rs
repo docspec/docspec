@@ -1033,21 +1033,22 @@ mod tests {
                     .args(args)
                     .assert()
                     .success()
-                    // clap lays out the help above; the exit-status block is DocSpec's.
-                    .stdout(predicates::str::ends_with(concat!(
-                        "\nExit status:\n",
-                        "  0   success\n",
-                        "  2   command used incorrectly (usage, bad flag or value, format not given)\n",
-                        "  65  the input document is malformed or cannot be converted\n",
-                        "  66  the input file does not exist or is a directory\n",
-                        "  69  the HTTP server cannot listen on the given address\n",
-                        "  70  internal DocSpec error\n",
-                        "  71  the operating system refused a resource\n",
-                        "  73  the output file cannot be created\n",
-                        "  74  I/O failed while reading or writing\n",
-                        "  77  permission denied\n",
-                        "\nCodes above 2 follow <sysexits.h>.\n",
-                    )));
+                    .stdout(predicates::str::ends_with(
+                        "Exit status:
+  0   Success
+  2   Command used incorrectly: unknown flag or value, missing subcommand, input format not given and not detectable, input and output are the same file
+  65  The input document is malformed or holds something that cannot be converted
+  66  The input file does not exist or is a directory
+  69  The HTTP server cannot listen: the address is already in use or not available
+  70  Internal DocSpec error, such as a reader violating the event contract
+  71  The operating system refused a resource: runtime or socket creation failed
+  73  The output file cannot be created
+  74  I/O failed while reading the input or writing the output
+  77  Permission denied on the input, the output, or the listen port
+
+Codes above 2 follow <sysexits.h>.
+",
+                    ));
             }
         }
 

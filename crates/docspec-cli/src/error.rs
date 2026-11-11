@@ -140,6 +140,31 @@ impl CliError {
 mod tests {
     use super::*;
 
+    /// Every `exit::*` constant is one row of `EXIT_STATUSES` and vice
+    /// versa; `0` has no constant because success is not an error.
+    #[cfg(feature = "http")]
+    #[test]
+    fn exit_constants_match_exit_statuses_table() {
+        let mut consts = vec![
+            exit::USAGE,
+            exit::DATAERR,
+            exit::NOINPUT,
+            exit::UNAVAILABLE,
+            exit::SOFTWARE,
+            exit::OSERR,
+            exit::CANTCREAT,
+            exit::IOERR,
+            exit::NOPERM,
+        ];
+        consts.sort_unstable();
+        let table: Vec<u8> = crate::args::EXIT_STATUSES
+            .iter()
+            .map(|&(code, _, _)| code)
+            .filter(|&code| code != 0)
+            .collect();
+        assert_eq!(table, consts);
+    }
+
     #[test]
     fn display_conversion_error() {
         let inner = docspec_core::Error::Other {
