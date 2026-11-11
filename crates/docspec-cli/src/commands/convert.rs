@@ -2,6 +2,7 @@
 
 use std::fs::File;
 use std::io::{BufWriter, Cursor, ErrorKind, Read as _, Write};
+use std::path::Path;
 
 use docspec::{AnyReader, AnyWriter};
 
@@ -81,15 +82,54 @@ pub fn run(args: ConvertArgs) -> Result<()> {
             write_cli_terminating_newline(&mut stdout)
         }
         Some(path) => {
-            let file = File::create(path).map_err(|source| CliError::OutputUnwritable {
+            let unwritable = |source| CliError::OutputUnwritable {
                 path: path.clone(),
                 source,
-            })?;
-            let mut writer = BufWriter::new(file);
-            run_pipeline(reader, output_format, &mut writer)?;
-            write_cli_terminating_newline(&mut writer)?;
-            writer.flush()?;
+            };
+            let existing = std::fs::metadata(path).ok();
+            if existing
+                .as_ref()
+                .is_some_and(|metadata| !metadata.is_file())
+            {
+                // Not a regular file (`/dev/stdout`, a FIFO, a directory):
+                // there is nothing to keep and nowhere to rename onto.
+                let file = File::create(path).map_err(unwritable)?;
+                return write_output(reader, output_format, file);
+            }
+
+            // Write beside the destination and rename only on success, so a
+            // failed conversion leaves the previous output untouched. A
+            // symlinked destination is resolved so the link itself survives.
+            let target = std::fs::canonicalize(path).unwrap_or_else(|_| path.clone());
+            let dir = target
+                .parent()
+                .filter(|parent| !parent.as_os_str().is_empty())
+                .unwrap_or_else(|| Path::new("."));
+            let mut builder = tempfile::Builder::new();
+            // Same mode a fresh `File::create` would get, instead of 0600.
+            #[cfg(unix)]
+            builder.permissions(std::os::unix::fs::PermissionsExt::from_mode(0o666));
+            let temp = builder.tempfile_in(dir).map_err(unwritable)?;
+            if let Some(metadata) = existing {
+                temp.as_file()
+                    .set_permissions(metadata.permissions())
+                    .map_err(unwritable)?;
+            }
+            write_output(reader, output_format, temp.as_file())?;
+            temp.persist(&target)
+                .map_err(|error| unwritable(error.error))?;
             Ok(())
         }
     }
+}
+
+fn write_output<W>(reader: AnyReader, output_format: docspec::OutputFormat, output: W) -> Result<()>
+where
+    W: Write,
+{
+    let mut writer = BufWriter::new(output);
+    run_pipeline(reader, output_format, &mut writer)?;
+    write_cli_terminating_newline(&mut writer)?;
+    writer.flush()?;
+    Ok(())
 }
