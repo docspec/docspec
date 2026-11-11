@@ -4,17 +4,12 @@
 
 #[cfg(test)]
 mod tests {
-    use docspec_core::{Error, Event, Result};
+    use docspec_core::{Error, Event};
     use docspec_html_reader::{EventSource as _, HtmlReader};
 
     fn collect_events(input: &str) -> Vec<Event> {
         let mut reader = HtmlReader::from_str(input);
         docspec_test_utils::collect_events(&mut reader)
-    }
-
-    fn collect_events_result(input: &str) -> Result<Vec<Event>> {
-        let mut reader = HtmlReader::from_str(input);
-        docspec_test_utils::try_collect_events(&mut reader)
     }
 
     #[test]
@@ -473,20 +468,64 @@ mod tests {
         );
     }
 
+    /// The events for one paragraph holding `texts`, in a whole document.
+    fn one_paragraph(texts: &[&str]) -> Vec<Event> {
+        let mut events = vec![
+            Event::StartDocument {
+                id: None,
+                language: None,
+                metadata: None,
+            },
+            Event::StartParagraph {
+                alignment: None,
+                id: None,
+            },
+        ];
+        events.extend(texts.iter().map(|text| Event::Text {
+            content: (*text).to_string(),
+        }));
+        events.extend([Event::EndParagraph, Event::EndDocument]);
+        events
+    }
+
     #[test]
-    fn token_error_propagates() {
-        // "<" triggers EofBeforeTagName in html5gum, which is reachable with &str input.
-        let result = collect_events_result("<");
-        match result {
-            Err(Error::Parse { message, position }) => {
-                assert_eq!(
-                    message, "html5gum: EofBeforeTagName",
-                    "expected exact html5gum error message"
-                );
-                assert_eq!(position, None, "expected no position");
-            }
-            other => panic!("expected Parse error, got: {other:?}"),
-        }
+    fn bare_less_than_in_text_is_kept() {
+        // InvalidFirstCharacterOfTagName: browsers keep "<" as text.
+        assert_eq!(
+            collect_events("<p>if a < b then</p>"),
+            one_paragraph(&["if a < b then"])
+        );
+    }
+
+    #[test]
+    fn character_reference_without_semicolon_is_decoded() {
+        // MissingSemicolonAfterCharacterReference: browsers decode "&amp" anyway.
+        assert_eq!(collect_events("<p>a &amp b</p>"), one_paragraph(&["a & b"]));
+    }
+
+    #[test]
+    fn attributes_without_whitespace_are_recovered() {
+        // MissingWhitespaceBetweenAttributes: the tag still opens a paragraph.
+        assert_eq!(
+            collect_events(r#"<p a="1"b="2">x</p>"#),
+            one_paragraph(&["x"])
+        );
+    }
+
+    #[test]
+    fn lone_less_than_at_eof_is_text_outside_paragraph() {
+        // EofBeforeTagName: "<" becomes text, which outside a <p> is dropped.
+        assert_eq!(
+            collect_events("<"),
+            vec![
+                Event::StartDocument {
+                    id: None,
+                    language: None,
+                    metadata: None,
+                },
+                Event::EndDocument,
+            ]
+        );
     }
 
     #[test]
