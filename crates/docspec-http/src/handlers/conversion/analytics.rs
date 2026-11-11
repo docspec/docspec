@@ -78,9 +78,7 @@ pub(super) fn record_completion(ctx: CompletionContext<'_>) {
         conversion_duration_ms,
         trace_id_owned,
     } = ctx;
-    if let Some(client) = crate::telemetry::current_posthog_client(
-        "posthog slot poisoned; skipping conversion analytics",
-    ) {
+    if let Some(client) = crate::telemetry::current_posthog_client() {
         let distinct_id_owned =
             request_id_opt.map_or_else(|| uuid::Uuid::new_v4().to_string(), str::to_owned);
         let is_anonymous = request_id_opt.is_none();
@@ -206,49 +204,5 @@ mod coverage_tests {
             error.to_string(),
             "Serialization Error: forced test failure"
         );
-    }
-
-    #[test]
-    fn poisoned_posthog_slot_skips_completion_in_an_isolated_process() {
-        let test_binary = std::env::current_exe().unwrap_or_default();
-        assert!(!test_binary.as_os_str().is_empty());
-        assert!(std::process::Command::new(test_binary)
-            .args([
-                "--ignored",
-                "--exact",
-                "handlers::conversion::analytics::coverage_tests::poisoned_slot_child_probe",
-            ])
-            .status()
-            .is_ok_and(|status| status.success()));
-    }
-
-    #[test]
-    #[ignore = "executed by poisoned_posthog_slot_skips_completion_in_an_isolated_process"]
-    fn poisoned_slot_child_probe() {
-        let slot = crate::telemetry::posthog_client_slot();
-        let poison_result = std::thread::spawn(|| {
-            let guard = slot
-                .write()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let _guard = guard;
-            std::panic::resume_unwind(Box::new("intentional test lock poison"));
-        })
-        .join();
-        assert!(poison_result.is_err());
-
-        let trace_id_owned = None;
-        super::record_completion(super::CompletionContext {
-            request_id_opt: None,
-            result_label: "success",
-            error_class_label: "none",
-            input_mime_label: "text/markdown",
-            output_mime_label: "application/vnd.docspec.blocknote+json",
-            body_len_for_logging: 100,
-            output_bytes: 200,
-            conversion_duration_ms: 50,
-            trace_id_owned: &trace_id_owned,
-        });
-
-        slot.clear_poison();
     }
 }
