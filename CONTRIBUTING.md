@@ -12,6 +12,7 @@ We are not relaxed. We are not permissive. We have standards, and we enforce the
 - [pre-commit](https://pre-commit.com/) for running pre-commit hooks
 - [taplo](https://taplo.tamasfe.dev/) for TOML formatting (`cargo install taplo-cli`)
 - [`just`](https://github.com/casey/just) for the build and test commands below (`cargo install just`)
+- [cargo-deny](https://github.com/EmbarkStudios/cargo-deny) for the advisory and license check (`cargo install cargo-deny`)
 
 Clone the repository:
 ```bash
@@ -34,10 +35,10 @@ Never bypass hooks on commits intended for pull request review. CI will catch wh
 
 ## Building and Running Locally
 
-The `justfile` is the front door. Running `just` with no arguments runs the whole local gate — format, lint, test, doc, build — the same checks the hooks and CI enforce:
+The `justfile` is the front door. Running `just` with no arguments runs the whole local gate — format, lint, test, doc, build, cargo-deny — the same checks the hooks and CI enforce:
 
 ```bash
-just              # fmt · clippy · test · doc · build
+just              # fmt · clippy · test · doc · build · deny
 ```
 
 Reach for a single recipe when you want one step:
@@ -48,6 +49,7 @@ just test         # cargo test --workspace
 just clippy       # cargo clippy --workspace --all-targets -- -D warnings
 just fmt          # cargo fmt --all
 just doc          # cargo doc --workspace --no-deps, warnings denied
+just deny         # cargo deny check (advisories, licenses, bans, sources)
 just coverage     # llvm-cov across covered crates → lcov.info
 ```
 
@@ -183,7 +185,7 @@ Security advisory GHSA-xxxx-xxxx-xxxx affects zip < 2.2.0.
 ### Review Requirements
 
 Every pull request requires at least one reviewer approval before merging. Reviewers verify:
-- All CI checks pass (tests, lint, format)
+- All CI checks pass (tests, lint, format, cargo-deny)
 - New and changed executable Rust lines in covered crates meet the 98% coverage floor
 - New code has tests covering the changes
 - Public APIs are documented
