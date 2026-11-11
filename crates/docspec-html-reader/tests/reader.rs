@@ -240,29 +240,75 @@ mod tests {
         );
     }
 
+    fn start_paragraph() -> Event {
+        Event::StartParagraph {
+            alignment: None,
+            id: None,
+        }
+    }
+
+    fn text(content: &str) -> Event {
+        Event::Text {
+            content: content.to_string(),
+        }
+    }
+
+    fn start_document() -> Event {
+        Event::StartDocument {
+            id: None,
+            language: None,
+            metadata: None,
+        }
+    }
+
     #[test]
-    fn nested_paragraph_inner_ignored() {
-        // Inner <p> is ignored (already in_paragraph); inner </p> closes the outer;
-        // " tail" after close is dropped (not in_paragraph); outer </p> is orphan
-        let events = collect_events("<p>outer <p>inner</p> tail</p>");
+    fn p_start_tag_closes_open_paragraph() {
+        // `</p>` is optional in HTML: a `<p>` start tag closes the open one.
         assert_eq!(
-            events,
+            collect_events("<p>one<p>two</p>"),
             vec![
-                Event::StartDocument {
-                    id: None,
-                    language: None,
-                    metadata: None,
-                },
-                Event::StartParagraph {
-                    alignment: None,
-                    id: None,
-                },
-                Event::Text {
-                    content: "outer ".to_string(),
-                },
-                Event::Text {
-                    content: "inner".to_string(),
-                },
+                start_document(),
+                start_paragraph(),
+                text("one"),
+                Event::EndParagraph,
+                start_paragraph(),
+                text("two"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn nested_paragraph_closes_outer() {
+        // Inner <p> closes the outer and opens its own; inner </p> closes it;
+        // " tail" is then outside any paragraph and dropped like all such text;
+        // the final </p> is an orphan.
+        assert_eq!(
+            collect_events("<p>outer <p>inner</p> tail</p>"),
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("outer "),
+                Event::EndParagraph,
+                start_paragraph(),
+                text("inner"),
+                Event::EndParagraph,
+                Event::EndDocument,
+            ]
+        );
+    }
+
+    #[test]
+    fn trailing_p_start_tag_opens_empty_paragraph_closed_at_eof() {
+        assert_eq!(
+            collect_events("<p>a<p>"),
+            vec![
+                start_document(),
+                start_paragraph(),
+                text("a"),
+                Event::EndParagraph,
+                start_paragraph(),
                 Event::EndParagraph,
                 Event::EndDocument,
             ]
