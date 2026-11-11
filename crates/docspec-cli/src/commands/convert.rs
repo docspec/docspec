@@ -2,6 +2,7 @@
 
 use std::fs::File;
 use std::io::{BufWriter, Cursor, ErrorKind, Read as _, Write};
+use std::path::Path;
 
 use docspec::{AnyReader, AnyWriter};
 
@@ -24,6 +25,27 @@ where
     output.write_all(b"\n").map_err(Into::into)
 }
 
+/// Whether `a` and `b` name the same existing file, however they are spelled:
+/// `./x` and `x`, absolute and relative, symlinks, and (on Unix) hard links.
+/// A path that does not exist cannot be the other one.
+fn same_file(a: &Path, b: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt as _;
+        match (std::fs::metadata(a), std::fs::metadata(b)) {
+            (Ok(a), Ok(b)) => a.dev() == b.dev() && a.ino() == b.ino(),
+            _ => false,
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+            (Ok(a), Ok(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
 /// Executes the `convert` subcommand.
 pub fn run(args: ConvertArgs) -> Result<()> {
     let ConvertArgs {
@@ -35,7 +57,7 @@ pub fn run(args: ConvertArgs) -> Result<()> {
     } = args;
 
     if let (Some(source_path), Some(destination_path)) = (&input_path, &output_path) {
-        if source_path == destination_path {
+        if source_path.as_os_str() != "-" && same_file(source_path, destination_path) {
             return Err(CliError::SameInputOutput);
         }
     }
