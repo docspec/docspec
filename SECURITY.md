@@ -75,6 +75,7 @@ None exist today. A request body size limit (#497, `413 Content Too Large`) and 
 - DOCX package part size, `document.xml` node size and table nesting depth are unbounded (#412, #496). A zip bomb or a deeply nested table can exhaust memory or the stack.
 - A single wide DOCX table is read into the reader's event queue before its first event is yielded, so memory is proportional to the largest table (#415).
 - DOCX read through `from_reader` (as the HTTP server does) buffers the whole decompressed `document.xml` before parsing; `from_path` streams it (#410).
+- ODT `content.xml` size and node size are unbounded (#582): `from_reader` (as the HTTP server uses) buffers the whole decompressed `content.xml`, and `from_path` holds the largest single XML node in memory. The total text that `<text:s text:c>` space runs expand to is also unbounded (#583).
 - The Markdown reader reads the whole source into memory before parsing (pulldown-cmark borrows it), so memory is proportional to the input size (#572).
 - The BlockNote writer buffers nested tables and block-level content found inside table cells until the outermost table closes, so memory is proportional to that content (#416).
 - The Pandoc native writer buffers each code block and inline code span in full before writing it, so memory is proportional to the largest one (#460).
