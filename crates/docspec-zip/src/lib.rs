@@ -121,4 +121,40 @@ mod tests {
         assert_eq!(message, "not a valid ZIP archive");
         assert_eq!(position, None);
     }
+
+    /// Seeks like a 64-byte file but fails every read.
+    struct FailingReader;
+
+    impl Read for FailingReader {
+        fn read(&mut self, _buf: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("disk gone"))
+        }
+    }
+
+    impl Seek for FailingReader {
+        fn seek(&mut self, _pos: std::io::SeekFrom) -> std::io::Result<u64> {
+            Ok(64)
+        }
+    }
+
+    #[test]
+    fn open_archive_keeps_io_errors() {
+        let Err(Error::Io { source }) = open_archive(FailingReader) else {
+            panic!("expected an I/O error");
+        };
+        assert_eq!(source.kind(), std::io::ErrorKind::Other);
+        assert_eq!(source.to_string(), "disk gone");
+    }
+
+    #[test]
+    fn other_zip_errors_name_the_cause() {
+        let Error::Parse { message, position } = map_zip_open_error(ZipError::FileNotFound) else {
+            panic!("expected a parse error");
+        };
+        assert_eq!(
+            message,
+            "not a valid ZIP archive: specified file not found in archive"
+        );
+        assert_eq!(position, None);
+    }
 }
